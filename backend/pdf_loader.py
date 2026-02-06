@@ -105,20 +105,32 @@ def _platform_file_filter(path: Path) -> bool:
     return "정강" in name or "정책" in name
 
 
-def _pledge_file_filter(path: Path) -> bool:
+def _pledge_file_filter(path: Path, pdf_dir: Path) -> bool:
     """공약 문서로 볼 파일인지. 
-    - 경로에 'president'가 포함되어 있거나
-    - 파일명 또는 경로에 '대선공약'이 포함되어 있는 경우만 공약으로 분류
+    - pdf_dir/president/ 폴더 안의 모든 파일은 공약
+    - 경로에 '대선공약'이 포함되어 있으면 공약
     """
-    path_str = str(path).lower()
-    name = path.name.lower()
+    # 상대 경로로 변환
+    try:
+        rel_path = path.relative_to(pdf_dir)
+        path_parts = rel_path.parts
+    except ValueError:
+        # 절대 경로인 경우
+        path_str = str(path).lower()
+        # president 폴더 확인
+        if "/president/" in path_str or "\\president\\" in path_str:
+            return True
+        if "대선공약" in str(path):
+            return True
+        return False
     
-    # president가 경로에 포함되어 있으면 공약
-    if "president" in path_str:
+    # president 폴더 안의 모든 파일은 공약
+    if "president" in path_parts:
         return True
     
-    # 대선공약이 파일명이나 경로에 포함되어 있으면 공약
-    if "대선공약" in str(path) or "대선공약" in name:
+    # 대선공약이 경로나 파일명에 포함되어 있으면 공약
+    path_str = str(rel_path).lower()
+    if "대선공약" in str(rel_path) or "대선공약" in path.name:
         return True
     
     return False
@@ -195,34 +207,39 @@ def load_pledges_context() -> str:
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return ""
     
-    logger.info(f"공약 PDF 검색 시작: {pdf_dir} (president 또는 대선공약 포함 파일만)")
+    logger.info(f"공약 PDF 검색 시작: {pdf_dir} (president 폴더 안의 모든 파일 또는 대선공약 포함 파일)")
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
     found_files = []
     skipped_files = []
     
+    # president 폴더 확인
+    president_dir = pdf_dir / "president"
+    if president_dir.exists():
+        logger.info(f"president 폴더 발견: {president_dir}")
+    else:
+        logger.warning(f"president 폴더가 없습니다: {president_dir}")
+    
     # 모든 PDF 파일 찾기 (한글 경로 처리)
     try:
         all_pdfs = list(pdf_dir.rglob("*.pdf"))
         logger.info(f"전체 PDF 파일 {len(all_pdfs)}개 발견")
-        for pdf_path in all_pdfs:
-            logger.debug(f"검사 중: {pdf_path}")
     except Exception as e:
         logger.error(f"PDF 파일 검색 실패: {e}")
         return ""
     
     for path in sorted(all_pdfs):
-        # 정강·정책 파일은 제외
+        # 정강·정책 파일은 제외 (파일명에 정강 또는 정책 포함)
         if _platform_file_filter(path):
             skipped_files.append(str(path))
             logger.debug(f"정강정책 파일로 분류되어 제외: {path.name}")
             continue
         
-        # president 또는 대선공약이 포함된 파일만 공약으로 분류
-        if not _pledge_file_filter(path):
+        # president 폴더 안의 모든 파일 또는 대선공약이 포함된 파일만 공약으로 분류
+        if not _pledge_file_filter(path, pdf_dir):
             skipped_files.append(str(path))
-            logger.debug(f"공약 필터 조건 불일치로 제외: {path}")
+            logger.debug(f"공약 필터 조건 불일치로 제외: {path} (president 폴더나 대선공약이 경로에 없음)")
             continue
         
         found_files.append(str(path))
@@ -259,12 +276,17 @@ def load_pledges_context() -> str:
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     
-    logger.info(f"공약 PDF 총 {len(found_files)}개 발견 (president/대선공약 필터 통과, 정강정책 제외: {len(skipped_files)}개), {len(combined)}개 로드됨")
+    logger.info(f"공약 PDF 총 {len(found_files)}개 발견 (president 폴더 또는 대선공약 포함, 정강정책 제외: {len(skipped_files)}개), {len(combined)}개 로드됨")
     logger.info(f"공약 컨텍스트 최종 길이: {total_len}자 (한도: {limit}자)")
     if found_files:
-        logger.info(f"발견된 공약 PDF 파일 목록: {found_files[:5]}...")  # 처음 5개만
+        logger.info(f"발견된 공약 PDF 파일 목록:")
+        for f in found_files[:10]:  # 처음 10개
+            logger.info(f"  - {f}")
     else:
-        logger.warning("공약 PDF 파일이 하나도 발견되지 않았습니다. 'president' 또는 '대선공약'이 경로/파일명에 포함되어 있는지 확인하세요.")
+        logger.error("공약 PDF 파일이 하나도 발견되지 않았습니다!")
+        logger.error(f"  - president 폴더 경로: {pdf_dir / 'president'}")
+        logger.error(f"  - president 폴더 존재 여부: {(pdf_dir / 'president').exists()}")
+        logger.error("  - 'president' 폴더 안의 모든 PDF 파일이 공약으로 분류됩니다.")
     if combined:
         # 실제 텍스트가 있는지 확인
         full_text = "\n\n".join(combined)

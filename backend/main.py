@@ -135,7 +135,7 @@ def debug_pdf():
         try:
             rel_path = str(pdf_path.relative_to(pdf_dir))
             is_platform = _platform_file_filter(pdf_path)
-            is_pledge = _pledge_file_filter(pdf_path)
+            is_pledge = _pledge_file_filter(pdf_path, pdf_dir)
             exists = pdf_path.exists()
             size = pdf_path.stat().st_size if exists else 0
             
