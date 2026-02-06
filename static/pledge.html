@@ -92,6 +92,15 @@
     .loading { color: #666; }
     a { color: #2d7ff9; text-decoration: none; }
     a:hover { text-decoration: underline; }
+    .disclaimer {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f9f9f9;
+      border-left: 3px solid #999;
+      font-size: 0.85rem;
+      color: #666;
+      line-height: 1.5;
+    }
     .footer { margin-top: 2rem; font-size: 0.85rem; color: #666; }
   </style>
 </head>
@@ -110,11 +119,14 @@
   <div class="card">
     <label>점검 결과</label>
     <div id="result" class="result empty">점검 버튼을 누르면 결과가 여기에 표시됩니다.</div>
+    <div class="disclaimer">
+      본 결과는 개혁신당의 정강정책, 공약 등을 AI로 분석한 자료로서 대략적인 결과만 보여주는 것이니 참고용으로만 활용해 주시기 바랍니다.
+    </div>
   </div>
 
   <p class="footer">
     개혁신당 정책국<br>
-    API 문서: <a href="/docs" target="_blank">/docs</a>
+    문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
   </p>
 
   <script>
