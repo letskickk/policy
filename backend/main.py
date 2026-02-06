@@ -8,9 +8,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend.config import ROOT_DIR
+from backend.config import ROOT_DIR, PDF_DIR
 from backend.check_service import check_pledge_alignment
-from backend.pdf_loader import load_platform_context, load_pledges_context
+from backend.pdf_loader import (
+    HAS_PDFPLUMBER,
+    load_platform_context,
+    load_pledges_context,
+)
 from backend.index_builder import build_all_indexes
 from backend.report import generate_report
 
@@ -35,18 +39,30 @@ async def startup_event():
     """서버 시작 시 인덱스 빌드."""
     global _indexes
     logger.info("서버 시작: 인덱스 빌드 중...")
+    logger.info(f"HAS_PDFPLUMBER={HAS_PDFPLUMBER}")
     try:
         _indexes = build_all_indexes(force_rebuild=False)
+        from backend.vector_index import VectorIndex
+
         # 빈 인덱스가 있으면 기본값으로 채우기
         if "platform" not in _indexes:
-            from backend.vector_index import VectorIndex
             _indexes["platform"] = VectorIndex(dimension=3072, use_cosine=True)
         if "pledge" not in _indexes:
-            from backend.vector_index import VectorIndex
             _indexes["pledge"] = VectorIndex(dimension=3072, use_cosine=True)
         if "regional" not in _indexes:
-            from backend.vector_index import VectorIndex
             _indexes["regional"] = VectorIndex(dimension=3072, use_cosine=True)
+
+        # 인덱스 크기 로깅
+        platform_vectors = _indexes["platform"].size()
+        pledge_vectors = _indexes["pledge"].size()
+        regional_vectors = _indexes["regional"].size()
+        logger.info(f"platform_index: {platform_vectors} vectors")
+        logger.info(f"pledge_index: {pledge_vectors} vectors")
+        logger.info(f"regional_index: {regional_vectors} vectors")
+
+        if pledge_vectors == 0:
+            raise RuntimeError("pledge_index empty")
+
         logger.info("인덱스 빌드 완료")
     except Exception as e:
         logger.error(f"인덱스 빌드 실패: {e}", exc_info=True)
@@ -54,7 +70,7 @@ async def startup_event():
         _indexes = {
             "platform": VectorIndex(dimension=3072, use_cosine=True),
             "pledge": VectorIndex(dimension=3072, use_cosine=True),
-            "regional": VectorIndex(dimension=3072, use_cosine=True)
+            "regional": VectorIndex(dimension=3072, use_cosine=True),
         }
 
 STATIC_DIR = ROOT_DIR / "static"
@@ -253,6 +269,46 @@ def debug_pdf():
         result["error"] = error_msg
     
     return result
+
+
+@app.get("/api/debug/index")
+def debug_index():
+    """인덱스 벡터 수를 반환하는 디버깅 엔드포인트."""
+    global _indexes
+    if _indexes is None:
+        raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
+
+    try:
+        platform_vectors = _indexes.get("platform").size() if _indexes.get("platform") else 0
+        pledge_vectors = _indexes.get("pledge").size() if _indexes.get("pledge") else 0
+        regional_vectors = _indexes.get("regional").size() if _indexes.get("regional") else 0
+    except Exception as e:
+        logger.error(f"인덱스 디버그 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="인덱스 정보를 가져오는 중 오류 발생")
+
+    return {
+        "platform_vectors": platform_vectors,
+        "pledge_vectors": pledge_vectors,
+        "regional_vectors": regional_vectors,
+    }
+
+
+@app.get("/api/debug/scan")
+def debug_scan():
+    """PDF 폴더 구조 및 파일 목록을 반환하는 디버깅 엔드포인트."""
+    base_dir = PDF_DIR
+
+    def list_files(subdir_name: str):
+        subdir = base_dir / subdir_name
+        if not subdir.exists():
+            return []
+        return [str(p.relative_to(base_dir)) for p in subdir.rglob("*.pdf")]
+
+    return {
+        "platform_files": list_files("정강정책"),
+        "pledge_files": list_files("공약"),
+        "regional_files": list_files("지역별 공약"),
+    }
 
 
 @app.post("/check", response_model=PledgeCheckResponse)

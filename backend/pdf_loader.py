@@ -13,11 +13,13 @@ from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
 
+# pdfplumber는 필수 의존성이다. 없으면 바로 에러를 발생시켜 디버깅을 쉽게 한다.
 try:
     import pdfplumber
-    HAS_PDFPLUMBER = True
-except ImportError:
-    HAS_PDFPLUMBER = False
+except ImportError as e:
+    raise RuntimeError("pdfplumber not installed") from e
+
+HAS_PDFPLUMBER = True
 
 from backend.config import (
     MAX_CONTEXT_CHARS,
@@ -45,16 +47,24 @@ def extract_text_from_pdf(path: Path) -> str:
             if t:
                 parts.append(t)
         text = "\n\n".join(parts)
+
+        # pypdf 추출 결과 로깅
+        stripped = text.strip()
+        logger.info(f"[PDF] {path.name} pypdf chars={len(stripped)}")
+        logger.info(f"[PDF] {path.name} pypdf snip={stripped[:200]}")
+
         # 텍스트가 너무 짧으면(빈 페이지일 수 있음) pdfplumber로 재시도
-        if len(text.strip()) < 50 and HAS_PDFPLUMBER:
-            logger.info(f"pypdf로 추출한 텍스트가 짧음 ({len(text)}자), pdfplumber로 재시도: {path.name}")
+        if len(stripped) < 50 and HAS_PDFPLUMBER:
+            logger.warning(f"[PDF] fallback -> pdfplumber: {path.name}")
             return _extract_with_pdfplumber(path)
+
         logger.debug(f"pypdf로 추출 성공: {path.name} ({len(text)}자)")
         return text
     except Exception as e:
         logger.warning(f"pypdf 실패 ({path.name}): {e}, pdfplumber로 재시도")
         # pypdf 실패 시 pdfplumber로 재시도
         if HAS_PDFPLUMBER:
+            logger.warning(f"[PDF] fallback -> pdfplumber: {path.name}")
             return _extract_with_pdfplumber(path)
         raise
 
@@ -71,6 +81,9 @@ def _extract_with_pdfplumber(path: Path) -> str:
                 if t:
                     parts.append(t)
         text = "\n\n".join(parts)
+        stripped = text.strip()
+        logger.info(f"[PDF] {path.name} pdfplumber chars={len(stripped)}")
+        logger.info(f"[PDF] {path.name} pdfplumber snip={stripped[:200]}")
         logger.debug(f"pdfplumber로 추출 성공: {path.name} ({len(text)}자)")
         return text
     except Exception as e:
@@ -89,11 +102,21 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
     
     # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
     try:
+        logger.info(f"[SCAN] dir={dir_path}")
         pdf_files = list(dir_path.rglob("*.pdf"))
-        logger.info(f"{dir_path.name} 폴더에서 {len(pdf_files)}개 PDF 파일 발견")
+        logger.info(f"[SCAN] found={len(pdf_files)}")
+        # 공약 폴더 특별 로깅
+        if dir_path.name == "공약":
+            logger.info(f"[SCAN] 공약 폴더 found={len(pdf_files)}")
+        # 샘플 몇 개 출력
+        for p in pdf_files[:10]:
+            logger.info(f"[SCAN] sample={p}")
     except Exception as e:
         logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
         return ""
+
+    if not pdf_files:
+        logger.warning(f"[SCAN] no pdf files found in {dir_path}. 폴더 경로/이름을 확인하세요.")
     
     for path in sorted(pdf_files):
         try:
@@ -120,7 +143,9 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
                     logger.warning(f"컨텍스트 한도 초과로 일부만 로드: {rel_path} (전체: {len(text)}자, 로드: {remain}자)")
                 else:
                     logger.warning(f"컨텍스트 한도 초과로 스킵: {rel_path} (필요: {len(text)}자, 남은 공간: {remain}자)")
-                break
+                # 남은 컨텍스트 한도를 넘었지만, 이후 파일 스캔은 계속한다.
+                # (다른 파일이 완전히 누락되지 않도록 break 대신 continue 사용)
+                continue
         except Exception as e:
             logger.error(f"PDF 읽기 실패: {path.name} - {e}", exc_info=True)
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")

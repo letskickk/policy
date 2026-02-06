@@ -29,3 +29,6 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1200"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 MAX_CHUNKS_PER_FILE = int(os.getenv("MAX_CHUNKS_PER_FILE", "120"))
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
+
+# 인덱스 강제 재빌드 플래그 (1이면 캐시 삭제 후 재빌드)
+REBUILD_INDEX = os.getenv("REBUILD_INDEX", "0") == "1"

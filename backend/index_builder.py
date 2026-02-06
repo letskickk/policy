@@ -13,6 +13,7 @@ from backend.config import (
     INDEX_CACHE_DIR,
     MAX_CHUNKS_PER_FILE,
     PDF_DIR,
+    REBUILD_INDEX,
 )
 from backend.embeddings import embed_texts
 try:
@@ -212,6 +213,23 @@ def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
         {인덱스명: VectorIndex} 딕셔너리
     """
     logger.info("모든 인덱스 빌드 시작...")
+
+    # 환경 변수 또는 인자로 강제 재빌드 여부 결정
+    effective_rebuild = force_rebuild or REBUILD_INDEX
+
+    cache_dir = INDEX_CACHE_DIR
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # REBUILD_INDEX=1 이면 기존 캐시 파일 삭제
+    if REBUILD_INDEX:
+        try:
+            logger.info("REBUILD_INDEX=1 감지, 기존 인덱스 캐시 삭제 중...")
+            for pattern in ("*.faiss", "*_meta.pkl", "*_hashes.pkl"):
+                for p in cache_dir.glob(pattern):
+                    logger.info(f"캐시 삭제: {p}")
+                    p.unlink(missing_ok=True)
+        except Exception as e:
+            logger.error(f"인덱스 캐시 삭제 실패: {e}")
     
     indexes = {}
     
@@ -221,7 +239,7 @@ def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
         folder_name="정강정책",
         source_type="platform",
         load_chunks_func=load_platform_chunks,
-        force_rebuild=force_rebuild
+        force_rebuild=effective_rebuild
     )
     
     # 공약 인덱스
@@ -230,7 +248,7 @@ def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
         folder_name="공약",
         source_type="pledge",
         load_chunks_func=load_pledge_chunks,
-        force_rebuild=force_rebuild
+        force_rebuild=effective_rebuild
     )
     
     # 지역별 공약 인덱스
@@ -239,7 +257,7 @@ def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
         folder_name="지역별 공약",
         source_type="regional",
         load_chunks_func=load_regional_chunks,
-        force_rebuild=force_rebuild
+        force_rebuild=effective_rebuild
     )
     
     total_chunks = sum(idx.size() for idx in indexes.values())
