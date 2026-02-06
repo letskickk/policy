@@ -101,6 +101,10 @@
       color: #666;
       line-height: 1.5;
     }
+    .disclaimer strong {
+      color: #c00;
+      font-weight: 700;
+    }
     .footer { margin-top: 2rem; font-size: 0.85rem; color: #666; }
   </style>
 </head>
@@ -112,15 +116,15 @@
 
   <div class="card">
     <label for="pledge">공약 입력</label>
-    <textarea id="pledge" placeholder="점검할 공약을 입력하세요. 여러 항목은 줄바꿈으로 구분할 수 있습니다."></textarea>
+    <textarea id="pledge" placeholder="점검할 공약을 입력하세요."></textarea>
     <button type="button" id="btn">점검하기</button>
   </div>
 
   <div class="card">
-    <label>점검 결과</label>
-    <div id="result" class="result empty">점검 버튼을 누르면 결과가 여기에 표시됩니다.</div>
+    <label>분석 결과</label>
+    <div id="result" class="result empty">점검하기 버튼을 누르면 분석 결과가 여기에 표시됩니다.</div>
     <div class="disclaimer">
-      본 결과는 개혁신당의 정강정책, 공약 등을 AI로 분석한 자료로서 대략적인 결과만 보여주는 것이니 참고용으로만 활용해 주시기 바랍니다.
+      본 결과는 개혁신당의 정강정책, 공약 등을 AI로 분석한 자료로서 대략적인 결과만 보여주는 것이니 <strong>참고용으로만 활용해 주시기 바랍니다.</strong>
     </div>
   </div>
 
@@ -143,7 +147,7 @@
     function setLoading() {
       resultEl.classList.remove('empty', 'error');
       resultEl.classList.add('loading');
-      resultEl.textContent = '점검 중입니다… (잠시만 기다려 주세요)';
+      resultEl.textContent = 'AI가 공약을 분석하고 있습니다. 잠시만 기다려 주세요.';
     }
 
     btnEl.addEventListener('click', async function () {
