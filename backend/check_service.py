@@ -1,11 +1,15 @@
 """
 당 부합 점검: PDF 기준 문서 + GPT API 호출.
 """
+import logging
+
 from openai import OpenAI
 
 from backend.config import OPENAI_API_KEY, OPENAI_MODEL
 from backend.pdf_loader import load_platform_context, load_pledges_context
 from backend.prompts import build_user_message, load_system_prompt
+
+logger = logging.getLogger(__name__)
 
 
 def check_pledge_alignment(pledge: str) -> str:
@@ -17,13 +21,26 @@ def check_pledge_alignment(pledge: str) -> str:
     if not OPENAI_API_KEY:
         return "오류: OPENAI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요."
 
+    logger.info("PDF 컨텍스트 로드 시작...")
     platform_context = load_platform_context()
     pledges_context = load_pledges_context()
+    
+    logger.info(f"정강정책 컨텍스트 길이: {len(platform_context)}자")
+    logger.info(f"공약 컨텍스트 길이: {len(pledges_context)}자")
+    
     if not platform_context.strip() and not pledges_context.strip():
         return "오류: 기준 문서가 없습니다. data/pdf/ 에 정강·정책 PDF와 공약 PDF를 넣어 주세요."
 
+    if not pledges_context.strip():
+        logger.warning("공약 컨텍스트가 비어있습니다. GPT가 공약 비교를 제대로 할 수 없습니다.")
+    
     system = load_system_prompt()
     user = build_user_message(platform_context, pledges_context, pledge)
+    
+    # 디버깅: 컨텍스트가 제대로 전달되는지 확인
+    logger.debug(f"시스템 프롬프트 길이: {len(system)}자")
+    logger.debug(f"사용자 메시지 길이: {len(user)}자")
+    logger.debug(f"공약 컨텍스트 미리보기: {pledges_context[:200]}...")
 
     client = OpenAI(api_key=OPENAI_API_KEY)
     response = client.chat.completions.create(
@@ -33,4 +50,6 @@ def check_pledge_alignment(pledge: str) -> str:
             {"role": "user", "content": user},
         ],
     )
-    return response.choices[0].message.content or ""
+    result = response.choices[0].message.content or ""
+    logger.info(f"GPT 응답 길이: {len(result)}자")
+    return result

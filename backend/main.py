@@ -1,6 +1,7 @@
 """
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 """
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,12 @@ from pydantic import BaseModel, Field
 from backend.config import ROOT_DIR
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import load_platform_context, load_pledges_context
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 app = FastAPI(
     title="개혁신당 정책 멘토링",
@@ -68,6 +75,7 @@ def test():
 def debug_pdf():
     """PDF 로드 상태 확인용 디버깅 엔드포인트."""
     from backend.config import PDF_DIR
+    from backend.prompts import build_user_message
     
     # PDF 디렉토리 확인 (한글 경로 처리)
     pdf_dir_str = str(PDF_DIR.resolve())
@@ -86,21 +94,64 @@ def debug_pdf():
     platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and ".pdf" in line] if platform else []
     pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and ".pdf" in line] if pledges else []
     
+    # 테스트용 메시지 생성 (실제 GPT에 전달되는 형식)
+    test_message = build_user_message(platform, pledges, "테스트 공약: 지역경제 활성화")
+    
+    # 각 PDF 파일의 상태 확인
+    pdf_status = []
+    for pdf_path in all_pdfs[:20]:  # 처음 20개만
+        try:
+            rel_path = str(pdf_path.relative_to(pdf_dir))
+            is_platform = "정강" in pdf_path.name or "정책" in pdf_path.name
+            exists = pdf_path.exists()
+            size = pdf_path.stat().st_size if exists else 0
+            
+            # 실제로 읽혔는지 확인
+            is_loaded = False
+            if is_platform:
+                is_loaded = any(pdf_path.name in f for f in platform_files)
+            else:
+                is_loaded = any(pdf_path.name in f for f in pledges_files)
+            
+            pdf_status.append({
+                "path": rel_path,
+                "name": pdf_path.name,
+                "exists": exists,
+                "size_bytes": size,
+                "is_platform": is_platform,
+                "is_loaded": is_loaded,
+            })
+        except Exception as e:
+            pdf_status.append({
+                "path": str(pdf_path.relative_to(pdf_dir)) if pdf_dir.exists() else str(pdf_path),
+                "error": str(e)[:100]
+            })
+    
     result = {
-        "pdf_dir_exists": pdf_dir.exists(),
-        "pdf_dir_path": str(pdf_dir),
-        "pdf_dir_absolute": str(pdf_dir.resolve()),
-        "total_pdf_files": len(all_pdfs),
-        "all_pdf_paths": [str(p.relative_to(pdf_dir)) for p in all_pdfs] if pdf_dir.exists() else [],
-        "all_pdf_absolute_paths": [str(p.resolve()) for p in all_pdfs[:10]],  # 처음 10개만
-        "platform_files_count": len(platform_files),
-        "platform_files": platform_files,
-        "platform_length": len(platform),
-        "pledges_files_count": len(pledges_files),
-        "pledges_files": pledges_files,
-        "pledges_length": len(pledges),
-        "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
-        "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
+        "summary": {
+            "pdf_dir_exists": pdf_dir.exists(),
+            "pdf_dir_path": str(pdf_dir),
+            "pdf_dir_absolute": str(pdf_dir.resolve()),
+            "total_pdf_files_found": len(all_pdfs),
+            "platform_files_loaded": len(platform_files),
+            "pledges_files_loaded": len(pledges_files),
+            "platform_text_length": len(platform),
+            "pledges_text_length": len(pledges),
+        },
+        "all_pdf_files": {
+            "count": len(all_pdfs),
+            "paths": [str(p.relative_to(pdf_dir)) for p in all_pdfs] if pdf_dir.exists() else [],
+        },
+        "loaded_files": {
+            "platform": platform_files,
+            "pledges": pledges_files,
+        },
+        "pdf_status": pdf_status,
+        "previews": {
+            "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
+            "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
+            "test_message_preview": test_message[:3000] + "..." if len(test_message) > 3000 else test_message,
+        },
     }
     
     if 'error_msg' in locals():
