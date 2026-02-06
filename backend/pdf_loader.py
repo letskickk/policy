@@ -110,19 +110,37 @@ def load_platform_context() -> str:
     정강·정책(이념·취지) 문서만 로드한다.
     - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 파일명에 '정강' 또는 '정책'이 들어간 PDF를 찾는다.
     """
-    if not PDF_DIR.exists():
-        logger.warning(f"PDF_DIR이 존재하지 않음: {PDF_DIR}")
+    pdf_dir_str = str(PDF_DIR.resolve())
+    pdf_dir = Path(pdf_dir_str)
+    
+    if not pdf_dir.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return ""
+    
+    logger.info(f"정강정책 PDF 검색 시작: {pdf_dir}")
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
     found_files = []
-    for path in sorted(PDF_DIR.rglob("*.pdf")):
+    
+    # 모든 PDF 파일 찾기 (한글 경로 처리)
+    try:
+        all_pdfs = list(pdf_dir.rglob("*.pdf"))
+        logger.info(f"전체 PDF 파일 {len(all_pdfs)}개 발견")
+    except Exception as e:
+        logger.error(f"PDF 파일 검색 실패: {e}")
+        return ""
+    
+    for path in sorted(all_pdfs):
         if not _platform_file_filter(path):
             continue
         found_files.append(str(path))
         try:
             text = extract_text_from_pdf(path)
+            if not text or len(text.strip()) < 10:
+                logger.warning(f"정강정책 PDF 텍스트가 비어있거나 너무 짧음: {path.name}")
+                combined.append(f"--- {path.name} --- (텍스트 없음)\n")
+                continue
             text = f"--- {path.name} ---\n{text}".strip()
             if total_len + len(text) <= limit:
                 combined.append(text)
@@ -132,12 +150,16 @@ def load_platform_context() -> str:
                 remain = limit - total_len
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
+                logger.warning(f"정강정책 PDF 컨텍스트 한도 초과로 일부만 로드: {path.name}")
                 break
         except Exception as e:
-            logger.error(f"정강정책 PDF 읽기 실패: {path.name} - {e}")
+            logger.error(f"정강정책 PDF 읽기 실패: {path.name} - {e}", exc_info=True)
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
+    
     logger.info(f"정강정책 PDF 총 {len(found_files)}개 발견, {len(combined)}개 로드됨")
+    if found_files:
+        logger.info(f"발견된 정강정책 PDF 파일 목록: {found_files[:5]}...")  # 처음 5개만
     return "\n\n".join(combined) if combined else ""
 
 
