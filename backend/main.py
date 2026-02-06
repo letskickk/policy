@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from backend.config import ROOT_DIR
 from backend.check_service import check_pledge_alignment
+from backend.pdf_loader import load_platform_context, load_pledges_context
 
 app = FastAPI(
     title="개혁신당 정책 멘토링",
@@ -55,6 +56,37 @@ def pledge_page():
 @app.get("/api")
 def api_info():
     return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
+
+
+@app.get("/debug/pdf")
+def debug_pdf():
+    """PDF 로드 상태 확인용 디버깅 엔드포인트."""
+    from backend.config import PDF_DIR
+    
+    # PDF 디렉토리 확인
+    all_pdfs = list(PDF_DIR.rglob("*.pdf")) if PDF_DIR.exists() else []
+    
+    platform = load_platform_context()
+    pledges = load_pledges_context()
+    
+    # 파일명 추출
+    platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and ".pdf" in line] if platform else []
+    pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and ".pdf" in line] if pledges else []
+    
+    return {
+        "pdf_dir_exists": PDF_DIR.exists(),
+        "pdf_dir_path": str(PDF_DIR),
+        "total_pdf_files": len(all_pdfs),
+        "all_pdf_paths": [str(p.relative_to(PDF_DIR)) for p in all_pdfs],
+        "platform_files_count": len(platform_files),
+        "platform_files": platform_files,
+        "platform_length": len(platform),
+        "pledges_files_count": len(pledges_files),
+        "pledges_files": pledges_files,
+        "pledges_length": len(pledges),
+        "platform_preview": platform[:1000] + "..." if len(platform) > 1000 else platform,
+        "pledges_preview": pledges[:1000] + "..." if len(pledges) > 1000 else pledges,
+    }
 
 
 @app.post("/check", response_model=PledgeCheckResponse)
