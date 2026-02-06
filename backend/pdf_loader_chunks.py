@@ -42,11 +42,19 @@ def load_pdf_chunks(folder_name: str, source_type: str) -> List[DocChunk]:
     
     # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
     try:
+        logger.info(f"[SCAN] dir={target_dir}")
         pdf_files = list(target_dir.rglob("*.pdf"))
-        logger.info(f"{folder_name} 폴더에서 {len(pdf_files)}개 PDF 파일 발견")
+        logger.info(f"[SCAN] found={len(pdf_files)}")
+        if folder_name == "공약":
+            logger.info(f"[SCAN] 공약 폴더 found={len(pdf_files)}")
+        for p in pdf_files[:10]:
+            logger.info(f"[SCAN] sample={p}")
     except Exception as e:
         logger.error(f"PDF 파일 검색 실패 ({target_dir}): {e}")
         return []
+
+    if not pdf_files:
+        logger.warning(f"[SCAN] no pdf files found in {target_dir}. 폴더 경로/이름을 확인하세요.")
     
     for pdf_path in sorted(pdf_files):
         try:
