@@ -1,5 +1,5 @@
 """
-당 부합 점검 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
+개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 """
 from pathlib import Path
 
@@ -11,8 +11,8 @@ from backend.config import ROOT_DIR
 from backend.check_service import check_pledge_alignment
 
 app = FastAPI(
-    title="AI 공약 멘토링",
-    description="출마자 공약의 당 방향 부합 점검 API",
+    title="개혁신당 정책 멘토링",
+    description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
     version="0.1.0",
 )
 
@@ -40,7 +40,7 @@ def index():
     res = _serve_html("index.html")
     if res is not None:
         return res
-    return {"service": "AI 공약 멘토링", "endpoint": "POST /check"}
+    return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
 
 
 @app.get("/pledge")
@@ -54,12 +54,12 @@ def pledge_page():
 
 @app.get("/api")
 def api_info():
-    return {"service": "AI 공약 멘토링", "endpoint": "POST /check"}
+    return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
 
 
 @app.post("/check", response_model=PledgeCheckResponse)
 def check_pledge(body: PledgeCheckRequest):
-    """공약을 입력하면 당 방향 부합 여부, 근거, 수정·보완 체크리스트를 반환한다."""
+    """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다."""
     pledge = (body.pledge or "").strip()
     if not pledge:
         raise HTTPException(status_code=400, detail="pledge 내용이 비어 있습니다.")
