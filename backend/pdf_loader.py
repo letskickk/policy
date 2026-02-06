@@ -5,6 +5,12 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
+
 from backend.config import (
     MAX_CONTEXT_CHARS,
     PDF_DIR,
@@ -14,14 +20,39 @@ from backend.config import (
 
 
 def extract_text_from_pdf(path: Path) -> str:
-    """PDF 한 파일에서 텍스트 추출."""
-    reader = PdfReader(path)
-    parts = []
-    for page in reader.pages:
-        t = page.extract_text()
-        if t:
-            parts.append(t)
-    return "\n\n".join(parts)
+    """PDF 한 파일에서 텍스트 추출. pypdf로 시도하고 실패하면 pdfplumber 사용."""
+    # 먼저 pypdf로 시도
+    try:
+        reader = PdfReader(path)
+        parts = []
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                parts.append(t)
+        text = "\n\n".join(parts)
+        # 텍스트가 너무 짧으면(빈 페이지일 수 있음) pdfplumber로 재시도
+        if len(text.strip()) < 50 and HAS_PDFPLUMBER:
+            return _extract_with_pdfplumber(path)
+        return text
+    except Exception:
+        # pypdf 실패 시 pdfplumber로 재시도
+        if HAS_PDFPLUMBER:
+            return _extract_with_pdfplumber(path)
+        raise
+
+
+def _extract_with_pdfplumber(path: Path) -> str:
+    """pdfplumber로 PDF 텍스트 추출 (fallback)."""
+    try:
+        parts = []
+        with pdfplumber.open(path) as pdf:
+            for page in pdf.pages:
+                t = page.extract_text()
+                if t:
+                    parts.append(t)
+        return "\n\n".join(parts)
+    except Exception as e:
+        raise Exception(f"PDF 추출 실패 ({path.name}): {e}")
 
 
 def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
@@ -42,8 +73,8 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
                 break
-        except Exception:
-            combined.append(f"--- {path.name} --- (읽기 실패)\n")
+        except Exception as e:
+            combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     return "\n\n".join(combined) if combined else ""
 
@@ -81,8 +112,8 @@ def load_platform_context() -> str:
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
                 break
-        except Exception:
-            combined.append(f"--- {path.name} --- (읽기 실패)\n")
+        except Exception as e:
+            combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     return "\n\n".join(combined) if combined else ""
 
@@ -114,8 +145,8 @@ def load_pledges_context() -> str:
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
                 break
-        except Exception:
-            combined.append(f"--- {path.name} --- (읽기 실패)\n")
+        except Exception as e:
+            combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     return "\n\n".join(combined) if combined else ""
 
