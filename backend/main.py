@@ -75,11 +75,13 @@ def test():
 def debug_context(pledge: str = "테스트 공약: 지역경제 활성화"):
     """실제 GPT에 전달되는 컨텍스트 확인용 엔드포인트."""
     from backend.prompts import build_user_message, load_system_prompt
+    from backend.pdf_loader import load_regional_pledges_context
     
     platform = load_platform_context()
     pledges = load_pledges_context()
+    regional = load_regional_pledges_context()
     system = load_system_prompt()
-    user = build_user_message(platform, pledges, pledge)
+    user = build_user_message(platform, pledges, regional, pledge)
     
     # 공약 컨텍스트에서 특정 키워드 검색
     search_keywords = []
@@ -93,8 +95,11 @@ def debug_context(pledge: str = "테스트 공약: 지역경제 활성화"):
         "user_message_length": len(user),
         "platform_context_length": len(platform),
         "pledges_context_length": len(pledges),
+        "regional_pledges_context_length": len(regional),
         "pledges_file_count": pledges.count("---") if pledges else 0,
+        "regional_file_count": regional.count("---") if regional else 0,
         "pledges_context_preview": pledges[:5000] + "..." if len(pledges) > 5000 else pledges,
+        "regional_context_preview": regional[:5000] + "..." if len(regional) > 5000 else regional,
         "user_message_preview": user[:5000] + "..." if len(user) > 5000 else user,
         "system_prompt": system,
         "test_pledge": pledge,
@@ -117,34 +122,46 @@ def debug_pdf():
         all_pdfs = []
         error_msg = str(e)
     
+    from backend.pdf_loader import load_regional_pledges_context
+    
     platform = load_platform_context()
     pledges = load_pledges_context()
+    regional = load_regional_pledges_context()
     
     # 파일명 추출
     platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and ".pdf" in line] if platform else []
     pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and ".pdf" in line] if pledges else []
+    regional_files = [line.split("---")[1].strip() for line in regional.split("\n") if "---" in line and ".pdf" in line] if regional else []
     
     # 테스트용 메시지 생성 (실제 GPT에 전달되는 형식)
-    test_message = build_user_message(platform, pledges, "테스트 공약: 지역경제 활성화")
+    test_message = build_user_message(platform, pledges, regional, "테스트 공약: 지역경제 활성화")
     
-    # 각 PDF 파일의 상태 확인
-    from backend.pdf_loader import _platform_file_filter, _pledge_file_filter
-    
+    # 각 PDF 파일의 상태 확인 (폴더 기반)
     pdf_status = []
-    for pdf_path in all_pdfs[:20]:  # 처음 20개만
+    for pdf_path in all_pdfs[:30]:  # 처음 30개만
         try:
             rel_path = str(pdf_path.relative_to(pdf_dir))
-            is_platform = _platform_file_filter(pdf_path)
-            is_pledge = _pledge_file_filter(pdf_path, pdf_dir)
+            path_parts = pdf_path.relative_to(pdf_dir).parts if pdf_dir.exists() else []
             exists = pdf_path.exists()
             size = pdf_path.stat().st_size if exists else 0
             
+            # 폴더 기반 분류
+            is_platform = "정강정책" in path_parts
+            is_pledge = "공약" in path_parts and "지역별 공약" not in str(rel_path)
+            is_regional = "지역별 공약" in str(rel_path)
+            
             # 실제로 읽혔는지 확인
             is_loaded = False
+            classification = "기타"
             if is_platform:
-                is_loaded = any(pdf_path.name in f for f in platform_files)
+                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in platform_files)
+                classification = "정강정책"
             elif is_pledge:
-                is_loaded = any(pdf_path.name in f for f in pledges_files)
+                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in pledges_files)
+                classification = "공약"
+            elif is_regional:
+                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in regional_files)
+                classification = "지역별 공약"
             
             pdf_status.append({
                 "path": rel_path,
@@ -153,8 +170,9 @@ def debug_pdf():
                 "size_bytes": size,
                 "is_platform": is_platform,
                 "is_pledge": is_pledge,
+                "is_regional": is_regional,
                 "is_loaded": is_loaded,
-                "classification": "정강정책" if is_platform else ("공약" if is_pledge else "기타"),
+                "classification": classification,
             })
         except Exception as e:
             pdf_status.append({
@@ -170,9 +188,15 @@ def debug_pdf():
             "total_pdf_files_found": len(all_pdfs),
             "platform_files_loaded": len(platform_files),
             "pledges_files_loaded": len(pledges_files),
+            "regional_files_loaded": len(regional_files),
             "platform_text_length": len(platform),
             "pledges_text_length": len(pledges),
-            "filter_info": "공약 파일은 'president' 또는 '대선공약'이 경로/파일명에 포함된 것만 로드됩니다",
+            "regional_text_length": len(regional),
+            "folder_structure": {
+                "정강정책": str(pdf_dir / "정강정책"),
+                "공약": str(pdf_dir / "공약"),
+                "지역별 공약": str(pdf_dir / "지역별 공약"),
+            },
         },
         "all_pdf_files": {
             "count": len(all_pdfs),
@@ -181,11 +205,13 @@ def debug_pdf():
         "loaded_files": {
             "platform": platform_files,
             "pledges": pledges_files,
+            "regional": regional_files,
         },
         "pdf_status": pdf_status,
         "previews": {
             "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
             "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
+            "regional_preview": regional[:2000] + "..." if len(regional) > 2000 else regional,
             "test_message_preview": test_message[:3000] + "..." if len(test_message) > 3000 else test_message,
         },
     }

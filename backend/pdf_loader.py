@@ -1,5 +1,10 @@
 """
 정강·정책(이념·취지) PDF와 우리당 공약 PDF를 구분해 로드한다.
+
+폴더 구조:
+- data/pdf/정강정책/ : 정강정책 문서 (모든 파일)
+- data/pdf/공약/ : 우리당 공약 문서 (모든 파일)
+- data/pdf/지역별 공약/ : 타지역 공약 문서 (모든 파일)
 """
 import logging
 from pathlib import Path
@@ -17,8 +22,6 @@ except ImportError:
 from backend.config import (
     MAX_CONTEXT_CHARS,
     PDF_DIR,
-    PDF_DIR_PLATFORM,
-    PDF_DIR_PLEDGES,
 )
 
 
@@ -78,223 +81,145 @@ def _extract_with_pdfplumber(path: Path) -> str:
 def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
     """지정 폴더 내 PDF들을 읽어 하나의 문자열로 합친다. 하위 폴더까지 재귀적으로 찾는다. limit_chars 초과 시 앞부분만 사용."""
     if not dir_path.exists():
-        return ""
-    combined: list[str] = []
-    total_len = 0
-    for path in sorted(dir_path.rglob("*.pdf")):
-        try:
-            text = extract_text_from_pdf(path)
-            text = f"--- {path.name} ---\n{text}".strip()
-            if total_len + len(text) <= limit_chars:
-                combined.append(text)
-                total_len += len(text)
-            else:
-                remain = limit_chars - total_len
-                if remain > 500:
-                    combined.append(text[:remain] + "\n[... 일부 생략 ...]")
-                break
-        except Exception as e:
-            combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
-            continue
-    return "\n\n".join(combined) if combined else ""
-
-
-def _platform_file_filter(path: Path) -> bool:
-    """정강·정책 문서로 볼 파일인지. 파일명에 '정강' 또는 '정책' 포함 (공약 설명이 아닌 정강정책 문서)."""
-    name = path.name
-    return "정강" in name or "정책" in name
-
-
-def _pledge_file_filter(path: Path, pdf_dir: Path) -> bool:
-    """공약 문서로 볼 파일인지. 
-    - pdf_dir/president/ 폴더 안의 모든 파일은 공약
-    - 경로에 '대선공약'이 포함되어 있으면 공약
-    """
-    # 상대 경로로 변환
-    try:
-        rel_path = path.relative_to(pdf_dir)
-        path_parts = rel_path.parts
-    except ValueError:
-        # 절대 경로인 경우
-        path_str = str(path).lower()
-        # president 폴더 확인
-        if "/president/" in path_str or "\\president\\" in path_str:
-            return True
-        if "대선공약" in str(path):
-            return True
-        return False
-    
-    # president 폴더 안의 모든 파일은 공약
-    if "president" in path_parts:
-        return True
-    
-    # 대선공약이 경로나 파일명에 포함되어 있으면 공약
-    path_str = str(rel_path).lower()
-    if "대선공약" in str(rel_path) or "대선공약" in path.name:
-        return True
-    
-    return False
-
-
-def load_platform_context() -> str:
-    """
-    정강·정책(이념·취지) 문서만 로드한다.
-    - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 파일명에 '정강' 또는 '정책'이 들어간 PDF를 찾는다.
-    """
-    pdf_dir_str = str(PDF_DIR.resolve())
-    pdf_dir = Path(pdf_dir_str)
-    
-    if not pdf_dir.exists():
-        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
+        logger.warning(f"폴더가 존재하지 않음: {dir_path}")
         return ""
     
-    logger.info(f"정강정책 PDF 검색 시작: {pdf_dir}")
     combined: list[str] = []
     total_len = 0
-    limit = MAX_CONTEXT_CHARS // 2
-    found_files = []
     
-    # 모든 PDF 파일 찾기 (한글 경로 처리)
+    # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
     try:
-        all_pdfs = list(pdf_dir.rglob("*.pdf"))
-        logger.info(f"전체 PDF 파일 {len(all_pdfs)}개 발견")
+        pdf_files = list(dir_path.rglob("*.pdf"))
+        logger.info(f"{dir_path.name} 폴더에서 {len(pdf_files)}개 PDF 파일 발견")
     except Exception as e:
-        logger.error(f"PDF 파일 검색 실패: {e}")
+        logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
         return ""
     
-    for path in sorted(all_pdfs):
-        if not _platform_file_filter(path):
-            continue
-        found_files.append(str(path))
-        try:
-            text = extract_text_from_pdf(path)
-            if not text or len(text.strip()) < 10:
-                logger.warning(f"정강정책 PDF 텍스트가 비어있거나 너무 짧음: {path.name}")
-                combined.append(f"--- {path.name} --- (텍스트 없음)\n")
-                continue
-            text = f"--- {path.name} ---\n{text}".strip()
-            if total_len + len(text) <= limit:
-                combined.append(text)
-                total_len += len(text)
-                logger.info(f"정강정책 PDF 로드 성공: {path.name} ({len(text)}자)")
-            else:
-                remain = limit - total_len
-                if remain > 500:
-                    combined.append(text[:remain] + "\n[... 일부 생략 ...]")
-                logger.warning(f"정강정책 PDF 컨텍스트 한도 초과로 일부만 로드: {path.name}")
-                break
-        except Exception as e:
-            logger.error(f"정강정책 PDF 읽기 실패: {path.name} - {e}", exc_info=True)
-            combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
-            continue
-    
-    logger.info(f"정강정책 PDF 총 {len(found_files)}개 발견, {len(combined)}개 로드됨")
-    if found_files:
-        logger.info(f"발견된 정강정책 PDF 파일 목록: {found_files[:5]}...")  # 처음 5개만
-    return "\n\n".join(combined) if combined else ""
-
-
-def load_pledges_context() -> str:
-    """
-    우리당 공약 문서만 로드한다.
-    - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 
-      'president' 또는 '대선공약'이 포함된 PDF만 찾는다.
-    """
-    pdf_dir_str = str(PDF_DIR.resolve())
-    pdf_dir = Path(pdf_dir_str)
-    
-    if not pdf_dir.exists():
-        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
-        return ""
-    
-    logger.info(f"공약 PDF 검색 시작: {pdf_dir} (president 폴더 안의 모든 파일 또는 대선공약 포함 파일)")
-    combined: list[str] = []
-    total_len = 0
-    limit = MAX_CONTEXT_CHARS // 2
-    found_files = []
-    skipped_files = []
-    
-    # president 폴더 확인
-    president_dir = pdf_dir / "president"
-    if president_dir.exists():
-        logger.info(f"president 폴더 발견: {president_dir}")
-    else:
-        logger.warning(f"president 폴더가 없습니다: {president_dir}")
-    
-    # 모든 PDF 파일 찾기 (한글 경로 처리)
-    try:
-        all_pdfs = list(pdf_dir.rglob("*.pdf"))
-        logger.info(f"전체 PDF 파일 {len(all_pdfs)}개 발견")
-    except Exception as e:
-        logger.error(f"PDF 파일 검색 실패: {e}")
-        return ""
-    
-    for path in sorted(all_pdfs):
-        # 정강·정책 파일은 제외 (파일명에 정강 또는 정책 포함)
-        if _platform_file_filter(path):
-            skipped_files.append(str(path))
-            logger.debug(f"정강정책 파일로 분류되어 제외: {path.name}")
-            continue
-        
-        # president 폴더 안의 모든 파일 또는 대선공약이 포함된 파일만 공약으로 분류
-        if not _pledge_file_filter(path, pdf_dir):
-            skipped_files.append(str(path))
-            logger.debug(f"공약 필터 조건 불일치로 제외: {path} (president 폴더나 대선공약이 경로에 없음)")
-            continue
-        
-        found_files.append(str(path))
-        logger.info(f"공약 파일로 분류됨: {path}")
+    for path in sorted(pdf_files):
         try:
             text = extract_text_from_pdf(path)
             text_len = len(text.strip()) if text else 0
             
             if not text or text_len < 10:
-                logger.warning(f"공약 PDF 텍스트가 비어있거나 너무 짧음: {path.name} (길이: {text_len}자)")
-                # 텍스트가 없어도 파일명은 기록
-                combined.append(f"--- {path.name} --- (텍스트 없음, 파일 크기: {path.stat().st_size if path.exists() else 0}바이트)\n")
+                logger.warning(f"PDF 텍스트가 비어있거나 너무 짧음: {path.name} (길이: {text_len}자)")
+                combined.append(f"--- {path.name} --- (텍스트 없음)\n")
                 continue
             
-            # 텍스트 샘플 로깅
-            text_sample = text[:200].replace("\n", " ").strip()
-            logger.info(f"공약 PDF 읽기 성공: {path.name} (길이: {text_len}자, 샘플: {text_sample}...)")
+            # 상대 경로로 파일명 표시
+            rel_path = path.relative_to(dir_path)
+            text = f"--- {rel_path} ---\n{text}".strip()
             
-            text = f"--- {path.name} ---\n{text}".strip()
-            if total_len + len(text) <= limit:
+            if total_len + len(text) <= limit_chars:
                 combined.append(text)
                 total_len += len(text)
-                logger.info(f"공약 PDF 로드 완료: {path.name} (누적 길이: {total_len}/{limit}자)")
+                logger.info(f"PDF 로드 성공: {rel_path} ({text_len}자, 누적: {total_len}/{limit_chars}자)")
             else:
-                remain = limit - total_len
+                remain = limit_chars - total_len
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
-                    logger.warning(f"공약 PDF 컨텍스트 한도 초과로 일부만 로드: {path.name} (전체: {len(text)}자, 로드: {remain}자)")
+                    logger.warning(f"컨텍스트 한도 초과로 일부만 로드: {rel_path} (전체: {len(text)}자, 로드: {remain}자)")
                 else:
-                    logger.warning(f"공약 PDF 컨텍스트 한도 초과로 스킵: {path.name} (필요: {len(text)}자, 남은 공간: {remain}자)")
+                    logger.warning(f"컨텍스트 한도 초과로 스킵: {rel_path} (필요: {len(text)}자, 남은 공간: {remain}자)")
                 break
         except Exception as e:
-            logger.error(f"공약 PDF 읽기 실패: {path.name} - {e}", exc_info=True)
+            logger.error(f"PDF 읽기 실패: {path.name} - {e}", exc_info=True)
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     
-    logger.info(f"공약 PDF 총 {len(found_files)}개 발견 (president 폴더 또는 대선공약 포함, 정강정책 제외: {len(skipped_files)}개), {len(combined)}개 로드됨")
-    logger.info(f"공약 컨텍스트 최종 길이: {total_len}자 (한도: {limit}자)")
-    if found_files:
-        logger.info(f"발견된 공약 PDF 파일 목록:")
-        for f in found_files[:10]:  # 처음 10개
-            logger.info(f"  - {f}")
+    result = "\n\n".join(combined) if combined else ""
+    logger.info(f"{dir_path.name} 폴더 로드 완료: {len(pdf_files)}개 파일 중 {len(combined)}개 로드, 총 {total_len}자")
+    return result
+
+
+def load_platform_context() -> str:
+    """
+    정강·정책(이념·취지) 문서만 로드한다.
+    - data/pdf/정강정책/ 폴더 안의 모든 PDF 파일을 로드한다.
+    """
+    pdf_dir_str = str(PDF_DIR.resolve())
+    pdf_dir = Path(pdf_dir_str)
+    
+    if not pdf_dir.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
+        return ""
+    
+    platform_dir = pdf_dir / "정강정책"
+    
+    if not platform_dir.exists():
+        logger.warning(f"정강정책 폴더가 존재하지 않음: {platform_dir}")
+        return ""
+    
+    logger.info(f"정강정책 PDF 로드 시작: {platform_dir}")
+    limit = MAX_CONTEXT_CHARS // 2
+    result = _load_pdfs_from_dir(platform_dir, limit)
+    
+    if result:
+        logger.info(f"정강정책 컨텍스트 로드 완료: {len(result)}자")
     else:
-        logger.error("공약 PDF 파일이 하나도 발견되지 않았습니다!")
-        logger.error(f"  - president 폴더 경로: {pdf_dir / 'president'}")
-        logger.error(f"  - president 폴더 존재 여부: {(pdf_dir / 'president').exists()}")
-        logger.error("  - 'president' 폴더 안의 모든 PDF 파일이 공약으로 분류됩니다.")
-    if combined:
-        # 실제 텍스트가 있는지 확인
-        full_text = "\n\n".join(combined)
-        text_without_headers = full_text.replace("---", "").replace("\n", " ").strip()
-        logger.info(f"공약 컨텍스트 실제 텍스트 길이 (헤더 제외): {len(text_without_headers)}자")
-        if len(text_without_headers) < 100:
-            logger.error("경고: 공약 컨텍스트의 실제 텍스트가 너무 짧습니다! PDF가 제대로 읽히지 않았을 수 있습니다.")
-    return "\n\n".join(combined) if combined else ""
+        logger.warning("정강정책 컨텍스트가 비어있습니다.")
+    
+    return result
+
+
+def load_pledges_context() -> str:
+    """
+    우리당 공약 문서만 로드한다.
+    - data/pdf/공약/ 폴더 안의 모든 PDF 파일을 로드한다.
+    """
+    pdf_dir_str = str(PDF_DIR.resolve())
+    pdf_dir = Path(pdf_dir_str)
+    
+    if not pdf_dir.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
+        return ""
+    
+    pledges_dir = pdf_dir / "공약"
+    
+    if not pledges_dir.exists():
+        logger.warning(f"공약 폴더가 존재하지 않음: {pledges_dir}")
+        return ""
+    
+    logger.info(f"공약 PDF 로드 시작: {pledges_dir}")
+    limit = MAX_CONTEXT_CHARS // 2
+    result = _load_pdfs_from_dir(pledges_dir, limit)
+    
+    if result:
+        logger.info(f"공약 컨텍스트 로드 완료: {len(result)}자")
+    else:
+        logger.warning("공약 컨텍스트가 비어있습니다.")
+    
+    return result
+
+
+def load_regional_pledges_context() -> str:
+    """
+    타지역 공약 문서를 로드한다.
+    - data/pdf/지역별 공약/ 폴더 안의 모든 PDF 파일을 로드한다.
+    - 이 컨텍스트는 타지역 공약과의 유사성 분석에 사용된다.
+    """
+    pdf_dir_str = str(PDF_DIR.resolve())
+    pdf_dir = Path(pdf_dir_str)
+    
+    if not pdf_dir.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
+        return ""
+    
+    regional_dir = pdf_dir / "지역별 공약"
+    
+    if not regional_dir.exists():
+        logger.warning(f"지역별 공약 폴더가 존재하지 않음: {regional_dir}")
+        return ""
+    
+    logger.info(f"지역별 공약 PDF 로드 시작: {regional_dir}")
+    limit = MAX_CONTEXT_CHARS // 3  # 지역별 공약은 별도로 관리하므로 더 작은 한도 사용
+    result = _load_pdfs_from_dir(regional_dir, limit)
+    
+    if result:
+        logger.info(f"지역별 공약 컨텍스트 로드 완료: {len(result)}자")
+    else:
+        logger.warning("지역별 공약 컨텍스트가 비어있습니다.")
+    
+    return result
 
 
 def load_all_pdf_context() -> str:
