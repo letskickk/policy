@@ -1,0 +1,35 @@
+"""
+당 부합 점검용 프롬프트 로드 및 치환.
+정강·정책(이념·취지) 컨텍스트와 우리당 공약 컨텍스트를 구분해 넣는다.
+"""
+from pathlib import Path
+
+from backend.config import PROMPTS_DIR
+
+
+def load_system_prompt() -> str:
+    path = PROMPTS_DIR / "당_부합_점검_시스템.txt"
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    return "당 정책 전문가로서 출마자 공약을 정강·정책(이념·취지)과 우리당 공약 기준으로만 평가하세요."
+
+
+def load_user_prompt_template() -> str:
+    path = PROMPTS_DIR / "당_부합_점검_유저.txt"
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    return (
+        "[정강·정책]\n{{PLATFORM_CONTEXT}}\n\n[우리당 공약]\n{{PLEDGES_CONTEXT}}\n\n"
+        "출마자 공약:\n{{PLEDGE}}\n\n위 형식으로 부합 여부, 근거, 체크리스트를 답변하세요."
+    )
+
+
+def build_user_message(platform_context: str, pledges_context: str, pledge: str) -> str:
+    template = load_user_prompt_template()
+    platform = platform_context.strip() or "(정강·정책 문서 없음. data/pdf/정강정책/ 또는 정강·정책 PDF를 넣어 주세요.)"
+    pledges = pledges_context.strip() or "(우리당 공약 문서 없음. data/pdf/공약/ 또는 공약 PDF를 넣어 주세요.)"
+    return (
+        template.replace("{{PLATFORM_CONTEXT}}", platform)
+        .replace("{{PLEDGES_CONTEXT}}", pledges)
+        .replace("{{PLEDGE}}", pledge)
+    )
