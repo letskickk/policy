@@ -1,6 +1,6 @@
 """
 당 부합 점검용 프롬프트 로드 및 치환.
-정강·정책(이념·취지) 컨텍스트와 우리당 공약 컨텍스트를 구분해 넣는다.
+정강·정책(이념·취지) 컨텍스트, 우리당 공약 컨텍스트, 타지역 공약 컨텍스트를 구분해 넣는다.
 """
 from pathlib import Path
 
@@ -20,16 +20,19 @@ def load_user_prompt_template() -> str:
         return path.read_text(encoding="utf-8").strip()
     return (
         "[정강·정책]\n{{PLATFORM_CONTEXT}}\n\n[우리당 공약]\n{{PLEDGES_CONTEXT}}\n\n"
+        "[타지역 공약]\n{{REGIONAL_PLEDGES_CONTEXT}}\n\n"
         "출마자 공약:\n{{PLEDGE}}\n\n위 형식으로 부합 여부, 근거, 체크리스트를 답변하세요."
     )
 
 
-def build_user_message(platform_context: str, pledges_context: str, pledge: str) -> str:
+def build_user_message(platform_context: str, pledges_context: str, regional_pledges_context: str, pledge: str) -> str:
     template = load_user_prompt_template()
-    platform = platform_context.strip() or "(정강·정책 문서 없음. data/pdf/정강정책/ 또는 정강·정책 PDF를 넣어 주세요.)"
-    pledges = pledges_context.strip() or "(우리당 공약 문서 없음. data/pdf/공약/ 또는 공약 PDF를 넣어 주세요.)"
+    platform = platform_context.strip() or "(정강·정책 문서 없음. data/pdf/정강정책/ 폴더에 PDF를 넣어 주세요.)"
+    pledges = pledges_context.strip() or "(우리당 공약 문서 없음. data/pdf/공약/ 폴더에 PDF를 넣어 주세요.)"
+    regional = regional_pledges_context.strip() or "(타지역 공약 문서 없음. data/pdf/지역별 공약/ 폴더에 PDF를 넣어 주세요.)"
     return (
         template.replace("{{PLATFORM_CONTEXT}}", platform)
         .replace("{{PLEDGES_CONTEXT}}", pledges)
+        .replace("{{REGIONAL_PLEDGES_CONTEXT}}", regional)
         .replace("{{PLEDGE}}", pledge)
     )
