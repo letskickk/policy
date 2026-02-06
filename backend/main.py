@@ -293,6 +293,60 @@ def debug_index():
     }
 
 
+@app.get("/api/debug/search")
+def debug_search(source: str, q: str, k: int = 5):
+    """
+    특정 인덱스에서 검색 결과를 확인하는 디버깅 엔드포인트.
+
+    source: "platform" | "pledge" | "regional"
+    q: 쿼리 텍스트
+    k: top_k
+    """
+    global _indexes
+    if _indexes is None or not _indexes:
+        raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
+
+    source_map = {
+        "platform": "platform",
+        "pledge": "pledge",
+        "regional": "regional",
+    }
+    if source not in source_map:
+        raise HTTPException(status_code=400, detail="source는 platform|pledge|regional 중 하나여야 합니다.")
+
+    index = _indexes.get(source_map[source])
+    if index is None:
+        raise HTTPException(status_code=500, detail=f"{source} 인덱스가 없습니다.")
+
+    from backend.embeddings import embed_texts
+
+    embeddings = embed_texts([q], batch_size=1)
+    if not embeddings:
+        raise HTTPException(status_code=500, detail="쿼리 임베딩 생성 실패")
+
+    query_embedding = embeddings[0]
+    results = index.search(query_embedding, k=k)
+
+    items = []
+    for chunk, score in results:
+        items.append(
+            {
+                "source": chunk.source,
+                "path": chunk.path,
+                "chunk_id": chunk.chunk_id,
+                "score": score,
+                "snippet": (chunk.text[:250] + "...") if len(chunk.text) > 250 else chunk.text,
+            }
+        )
+
+    return {
+        "source": source,
+        "query": q,
+        "k": k,
+        "results": items,
+    }
+
+
 @app.get("/api/debug/scan")
 def debug_scan():
     """PDF 폴더 구조 및 파일 목록을 반환하는 디버깅 엔드포인트."""

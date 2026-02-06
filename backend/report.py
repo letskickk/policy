@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple
 from openai import OpenAI
 
 from backend.chunking import DocChunk
-from backend.config import CHAT_MODEL, OPENAI_API_KEY
+from backend.config import CHAT_MODEL
 from backend.embeddings import embed_texts, get_openai_client
 from backend.vector_index import VectorIndex
 
@@ -45,7 +45,7 @@ def search_all_indexes(
     regional_index: VectorIndex,
     top_k_platform: int = 6,
     top_k_pledge: int = 6,
-    top_k_regional: int = 8
+    top_k_regional: int = 8,
 ) -> Dict[str, List[Tuple[DocChunk, float]]]:
     """
     모든 인덱스에서 검색한다.
@@ -80,90 +80,128 @@ def search_all_indexes(
     return {
         "platform": platform_hits,
         "pledge": pledge_hits,
-        "regional": regional_hits
+        "regional": regional_hits,
     }
 
 
-def build_report_prompt(
-    user_pledge: str,
+def build_evidence_map(
     platform_hits: List[Tuple[DocChunk, float]],
     pledge_hits: List[Tuple[DocChunk, float]],
-    regional_hits: List[Tuple[DocChunk, float]]
-) -> str:
+    regional_hits: List[Tuple[DocChunk, float]],
+) -> Dict[str, Dict]:
     """
-    LLM 리포트 생성을 위한 프롬프트를 만든다.
-    
-    Args:
-        user_pledge: 사용자 공약 텍스트
-        platform_hits: 정강정책 검색 결과
-        pledge_hits: 공약 검색 결과
-        regional_hits: 지역별 공약 검색 결과
-    
-    Returns:
-        프롬프트 문자열
+    검색 결과를 evidence_map 구조로 변환한다.
+
+    Evidence ID 규칙:
+    - P1, P2, ... : platform (정강정책)
+    - G1, G2, ... : pledge (우리당 공약)
+    - R1, R2, ... : regional (지역별 공약)
     """
-    # 정강정책 근거
-    platform_snippets = []
-    for chunk, score in platform_hits:
-        quote = truncate_quote(chunk.text)
-        platform_snippets.append(f"- [{chunk.path}, 청크 {chunk.chunk_id}, 유사도: {score:.3f}]\n  {quote}")
-    
-    # 공약 근거
-    pledge_snippets = []
-    for chunk, score in pledge_hits:
-        quote = truncate_quote(chunk.text)
-        pledge_snippets.append(f"- [{chunk.path}, 청크 {chunk.chunk_id}, 유사도: {score:.3f}]\n  {quote}")
-    
-    # 지역별 공약 유사성
-    regional_snippets = []
-    for chunk, score in regional_hits:
-        quote = truncate_quote(chunk.text)
-        regional_snippets.append(f"- [{chunk.path}, 청크 {chunk.chunk_id}, 유사도: {score:.3f}]\n  {quote}")
-    
-    prompt = f"""당 정책 전문가로서 출마자 공약을 분석하고 리포트를 생성하세요.
+    evidence_map: Dict[str, Dict] = {}
+
+    # 플랫폼 evidence
+    for i, (chunk, score) in enumerate(platform_hits, start=1):
+        evid_id = f"P{i}"
+        snippet = truncate_quote(chunk.text, max_length=250)
+        evidence_map[evid_id] = {
+            "source": "platform",
+            "path": chunk.path,
+            "chunk_id": chunk.chunk_id,
+            "snippet": snippet,
+            "score": score,
+        }
+
+    # 공약 evidence
+    for i, (chunk, score) in enumerate(pledge_hits, start=1):
+        evid_id = f"G{i}"
+        snippet = truncate_quote(chunk.text, max_length=250)
+        evidence_map[evid_id] = {
+            "source": "pledge",
+            "path": chunk.path,
+            "chunk_id": chunk.chunk_id,
+            "snippet": snippet,
+            "score": score,
+        }
+
+    # 지역별 evidence
+    for i, (chunk, score) in enumerate(regional_hits, start=1):
+        evid_id = f"R{i}"
+        snippet = truncate_quote(chunk.text, max_length=250)
+        evidence_map[evid_id] = {
+            "source": "regional",
+            "path": chunk.path,
+            "chunk_id": chunk.chunk_id,
+            "snippet": snippet,
+            "score": score,
+        }
+
+    return evidence_map
+
+
+def build_rubric_prompt(user_pledge: str, evidence_map: Dict[str, Dict]) -> str:
+    """
+    LLM이 rubric + score_0_5 + evidence ID 배열만 생성하도록 하는 프롬프트.
+    """
+    # evidence를 텍스트로 풀어쓰기
+    evid_lines = []
+    for evid_id, info in evidence_map.items():
+        evid_lines.append(
+            f"[{evid_id}] ({info['source']} | {info['path']} | chunk {info['chunk_id']})\n{info['snippet']}"
+        )
+
+    evidence_block = "\n\n".join(evid_lines) if evid_lines else "없음"
+
+    prompt = f"""너는 정책 정합성 채점관이다. 제공된 Evidence 범위 밖 사실/인용은 절대 금지다.
 
 [출마자 공약]
 {user_pledge}
 
-[정강정책 근거 스니펫]
-{chr(10).join(platform_snippets) if platform_snippets else "없음"}
+[Evidence 목록]
+각 Evidence는 ID와 스니펫으로 주어진다. ID만 사용해 인용해야 한다.
+{evidence_block}
 
-[우리당 공약 근거 스니펫]
-{chr(10).join(pledge_snippets) if pledge_snippets else "없음"}
+각 rubric 항목은 0~5점으로 채점한다.
+- 0: 상충 또는 근거 전무
+- 1~2: 대체로 부적합 / 일부만 맞음
+- 3: 부분부합 (긍정/부정 요소가 섞여 있음)
+- 4: 대체로 부합
+- 5: 강한 부합, 매우 잘 맞음
 
-[타지역 공약 유사성 스니펫]
-{chr(10).join(regional_snippets) if regional_snippets else "없음"}
+Evidence 규칙:
+- evidence 배열에는 반드시 1개 이상 ID를 넣는 것을 원칙으로 한다.
+- 정말 근거가 없으면 evidence=[] 로 두고, note에 "근거 부족"을 명시하고 score_0_5를 낮게 준다.
+- 스니펫에 없는 내용을 인용하거나 단정하지 않는다.
 
-위 근거 스니펫을 기반으로 다음 JSON 형식으로 리포트를 생성하세요. 반드시 스니펫을 인용하여 근거를 제시해야 합니다.
-
+출력 JSON 스키마 (이 구조만 반환):
 {{
-  "summary": {{
-    "fit_score": 0~100,
-    "fit_verdict": "부합/부분부합/보완필요/상충우려"
+  "confidence": 0-100,
+  "rubric": {{
+    "platform": [
+      {{"item":"가치 정합성","score_0_5":0-5,"evidence":["P1","P3"],"note":"..."}},
+      {{"item":"정책 방향 일치","score_0_5":0-5,"evidence":["P2"],"note":"..."}},
+      {{"item":"수단 적합성","score_0_5":0-5,"evidence":["P4"],"note":"..."}},
+      {{"item":"일관성","score_0_5":0-5,"evidence":["P1"],"note":"..."}}
+    ],
+    "pledges": [
+      {{"item":"중복/연계 가능","score_0_5":0-5,"evidence":["G2"],"note":"..."}},
+      {{"item":"차별성","score_0_5":0-5,"evidence":["G1"],"note":"..."}},
+      {{"item":"정책 언어 호환","score_0_5":0-5,"evidence":["G3"],"note":"..."}}
+    ],
+    "conflicts": [
+      {{"item":"명시적 상충","score_0_5":0-5,"evidence":["P5"],"note":"..."}},
+      {{"item":"잠재 리스크","score_0_5":0-5,"evidence":["P2","G4"],"note":"..."}}
+    ]
   }},
-  "platform": [
-    {{"quote": "인용문 (최대 250자)", "source_path": "파일경로", "chunk_id": 번호, "reason": "근거 설명"}}
-  ],
-  "pledges": [
-    {{"quote": "인용문 (최대 250자)", "source_path": "파일경로", "chunk_id": 번호, "reason": "근거 설명"}}
-  ],
-  "regional_similarity": [
-    {{"source_path": "파일경로", "chunk_id": 번호, "similarity_note": "유사성 설명"}}
-  ],
-  "conflicts": [
-    {{"issue": "상충 이슈", "why": "이유", "suggest": "제안"}}
-  ],
-  "improvements": [
-    {{"title": "개선 제목", "detail": "상세 내용"}}
+  "improvements":[
+    {{"title":"...","detail":"...","evidence":["P2"]}}
   ]
 }}
 
 중요:
-- quote는 반드시 위 스니펫에서 인용해야 합니다.
-- 모든 근거는 스니펫 기반으로 작성해야 합니다.
-- 추측이나 일반적인 지식은 사용하지 마세요.
-- JSON만 반환하고 다른 설명은 추가하지 마세요."""
-    
+- fit_score, breakdown은 너가 계산하지 않는다. 오직 rubric.score_0_5와 evidence, note, confidence, improvements만 작성한다.
+- evidence에는 반드시 위에서 정의된 ID만 사용한다.
+- JSON만 반환하고 다른 설명은 절대 붙이지 마라.
+"""
     return prompt
 
 
@@ -215,18 +253,20 @@ def generate_report(
         regional_index,
         top_k_platform,
         top_k_pledge,
-        top_k_regional
+        top_k_regional,
     )
-    
-    # 프롬프트 생성
-    prompt = build_report_prompt(
-        user_pledge,
-        hits["platform"],
-        hits["pledge"],
-        hits["regional"]
-    )
-    
-    # LLM 호출
+
+    platform_hits = hits["platform"]
+    pledge_hits = hits["pledge"]
+    regional_hits = hits["regional"]
+
+    # evidence_map 생성
+    evidence_map = build_evidence_map(platform_hits, pledge_hits, regional_hits)
+
+    # 프롬프트 생성 (rubric 전용)
+    prompt = build_rubric_prompt(user_pledge, evidence_map)
+
+    # LLM 호출 (채점/근거정리만 수행, temperature=0)
     client = get_openai_client()
     try:
         response = client.chat.completions.create(
@@ -234,35 +274,102 @@ def generate_report(
             messages=[
                 {
                     "role": "system",
-                    "content": "당 정책 전문가로서 근거 기반 리포트를 생성합니다. 반드시 제공된 스니펫을 인용하여 근거를 제시해야 합니다."
+                    "content": (
+                        "너는 정책 정합성 채점관이다. "
+                        "제공된 Evidence(ID로 식별되는 스니펫) 범위 밖 사실/인용은 절대 금지다. "
+                        "각 rubric 항목에 대해 0~5점 score_0_5와 evidence ID 배열, note만 작성하라."
+                    ),
                 },
                 {
                     "role": "user",
-                    "content": prompt
-                }
+                    "content": prompt,
+                },
             ],
-            temperature=0.3,
-            response_format={"type": "json_object"}
+            temperature=0.0,
+            response_format={"type": "json_object"},
         )
-        
+
         result_text = response.choices[0].message.content
-        report = json.loads(result_text)
-        
-        logger.info("리포트 생성 완료")
+        raw = json.loads(result_text)
+
+        logger.info("rubric 생성 완료")
+
+        # rubric 구조 추출
+        rubric = raw.get("rubric", {})
+        confidence = int(raw.get("confidence", 0)) if isinstance(raw.get("confidence", 0), (int, float)) else 0
+        improvements = raw.get("improvements", [])
+
+        # 점수 산식 적용
+        def avg_score(items: List[Dict]) -> float:
+            if not items:
+                return 0.0
+            vals = []
+            for it in items:
+                try:
+                    vals.append(float(it.get("score_0_5", 0)))
+                except Exception:
+                    vals.append(0.0)
+            if not vals:
+                return 0.0
+            return sum(vals) / len(vals)
+
+        platform_items = rubric.get("platform", [])
+        pledge_items = rubric.get("pledges", [])
+        conflict_items = rubric.get("conflicts", [])
+
+        platform_avg_0_5 = avg_score(platform_items)
+        pledge_avg_0_5 = avg_score(pledge_items)
+        conflict_avg_0_5 = avg_score(conflict_items)
+
+        platform_score = max(0.0, min(100.0, platform_avg_0_5 * 20.0))
+        pledge_score = max(0.0, min(100.0, pledge_avg_0_5 * 20.0))
+        conflict_penalty = max(0.0, min(100.0, conflict_avg_0_5 * 20.0))
+
+        fit_score = 0.50 * platform_score + 0.35 * pledge_score - 0.15 * conflict_penalty
+        fit_score = max(0.0, min(100.0, fit_score))
+
+        # fit_verdict 간단 규칙 (원하면 나중에 조정 가능)
+        if fit_score >= 80:
+            fit_verdict = "부합"
+        elif fit_score >= 60:
+            fit_verdict = "부분부합"
+        elif fit_score >= 40:
+            fit_verdict = "보완필요"
+        else:
+            fit_verdict = "상충우려"
+
+        report = {
+            "fit_score": round(fit_score, 1),
+            "confidence": max(0, min(100, confidence)),
+            "breakdown": {
+                "platform_score": round(platform_score, 1),
+                "pledge_score": round(pledge_score, 1),
+                "conflict_penalty": round(conflict_penalty, 1),
+            },
+            "rubric": rubric,
+            "evidence_map": evidence_map,
+            "improvements": improvements,
+        }
+
         return report
-    
+
     except Exception as e:
         logger.error(f"LLM 리포트 생성 실패: {e}", exc_info=True)
         # 기본 리포트 반환
         return {
-            "summary": {
-                "fit_score": 0,
-                "fit_verdict": "오류"
+            "fit_score": 0,
+            "confidence": 0,
+            "breakdown": {
+                "platform_score": 0,
+                "pledge_score": 0,
+                "conflict_penalty": 0,
             },
-            "platform": [],
-            "pledges": [],
-            "regional_similarity": [],
-            "conflicts": [],
+            "rubric": {
+                "platform": [],
+                "pledges": [],
+                "conflicts": [],
+            },
+            "evidence_map": {},
             "improvements": [],
-            "error": str(e)
+            "error": str(e),
         }
