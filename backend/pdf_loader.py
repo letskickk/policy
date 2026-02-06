@@ -88,11 +88,8 @@ def _platform_file_filter(path: Path) -> bool:
 def load_platform_context() -> str:
     """
     정강·정책(이념·취지) 문서만 로드한다.
-    - data/pdf/정강정책/ 폴더가 있으면 그 안의 PDF만 사용.
-    - 없으면 data/pdf/ 안에서 파일명에 '정강' 또는 '정책'이 들어간 PDF만 사용.
+    - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 파일명에 '정강' 또는 '정책'이 들어간 PDF를 찾는다.
     """
-    if PDF_DIR_PLATFORM.exists():
-        return _load_pdfs_from_dir(PDF_DIR_PLATFORM, MAX_CONTEXT_CHARS // 2)
     if not PDF_DIR.exists():
         return ""
     combined: list[str] = []
@@ -121,17 +118,15 @@ def load_platform_context() -> str:
 def load_pledges_context() -> str:
     """
     우리당 공약 문서만 로드한다.
-    - data/pdf/공약/ 폴더가 있으면 그 안의 PDF만 사용.
-    - 없으면 data/pdf/ 안에서 정강·정책으로 분류되지 않은 PDF를 사용.
+    - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 정강·정책으로 분류되지 않은 모든 PDF를 찾는다.
     """
-    if PDF_DIR_PLEDGES.exists():
-        return _load_pdfs_from_dir(PDF_DIR_PLEDGES, MAX_CONTEXT_CHARS // 2)
     if not PDF_DIR.exists():
         return ""
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
     for path in sorted(PDF_DIR.rglob("*.pdf")):
+        # 정강·정책 파일은 제외
         if _platform_file_filter(path):
             continue
         try:
