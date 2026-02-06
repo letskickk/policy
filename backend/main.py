@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 from backend.config import ROOT_DIR
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import load_platform_context, load_pledges_context
+from backend.index_builder import build_all_indexes
+from backend.report import generate_report
 
 # 로깅 설정
 logging.basicConfig(
@@ -23,6 +25,37 @@ app = FastAPI(
     description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
     version="0.1.0",
 )
+
+# 전역 인덱스 (서버 시작 시 초기화)
+_indexes = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """서버 시작 시 인덱스 빌드."""
+    global _indexes
+    logger.info("서버 시작: 인덱스 빌드 중...")
+    try:
+        _indexes = build_all_indexes(force_rebuild=False)
+        # 빈 인덱스가 있으면 기본값으로 채우기
+        if "platform" not in _indexes:
+            from backend.vector_index import VectorIndex
+            _indexes["platform"] = VectorIndex(dimension=3072, use_cosine=True)
+        if "pledge" not in _indexes:
+            from backend.vector_index import VectorIndex
+            _indexes["pledge"] = VectorIndex(dimension=3072, use_cosine=True)
+        if "regional" not in _indexes:
+            from backend.vector_index import VectorIndex
+            _indexes["regional"] = VectorIndex(dimension=3072, use_cosine=True)
+        logger.info("인덱스 빌드 완료")
+    except Exception as e:
+        logger.error(f"인덱스 빌드 실패: {e}", exc_info=True)
+        from backend.vector_index import VectorIndex
+        _indexes = {
+            "platform": VectorIndex(dimension=3072, use_cosine=True),
+            "pledge": VectorIndex(dimension=3072, use_cosine=True),
+            "regional": VectorIndex(dimension=3072, use_cosine=True)
+        }
 
 STATIC_DIR = ROOT_DIR / "static"
 
@@ -232,3 +265,48 @@ def check_pledge(body: PledgeCheckRequest):
     if result.startswith("오류:"):
         raise HTTPException(status_code=503, detail=result)
     return PledgeCheckResponse(result=result)
+
+
+class PledgeVerifyRequest(BaseModel):
+    text: str = Field(..., description="검증할 출마자 공약 텍스트")
+    top_k_platform: int = Field(default=6, description="정강정책 검색 개수")
+    top_k_pledge: int = Field(default=6, description="공약 검색 개수")
+    top_k_regional: int = Field(default=8, description="지역별 공약 검색 개수")
+
+
+@app.post("/api/pledge/verify")
+def verify_pledge(body: PledgeVerifyRequest):
+    """
+    벡터 검색 기반 공약 검증 리포트를 생성한다.
+    
+    - 정강정책 부합 근거
+    - 우리당 공약 연결 근거
+    - 타지역 중복/유사성
+    - 상충/보완 제안
+    """
+    global _indexes
+    
+    if _indexes is None or not _indexes:
+        raise HTTPException(
+            status_code=503,
+            detail="인덱스가 준비되지 않았습니다. 서버를 재시작하세요."
+        )
+    
+    pledge_text = (body.text or "").strip()
+    if not pledge_text:
+        raise HTTPException(status_code=400, detail="공약 텍스트가 비어 있습니다.")
+    
+    try:
+        report = generate_report(
+            pledge_text,
+            _indexes.get("platform"),
+            _indexes.get("pledge"),
+            _indexes.get("regional"),
+            body.top_k_platform,
+            body.top_k_pledge,
+            body.top_k_regional
+        )
+        return report
+    except Exception as e:
+        logger.error(f"공약 검증 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")

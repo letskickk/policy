@@ -12,6 +12,7 @@
 | 기능 | 설명 |
 |------|------|
 | **당 방향 부합 점검** | 정강·정책·과거 공약 기준으로 부합 여부 점검, 수정·보완 체크리스트 제공 |
+| **벡터 검색 기반 검증** | FAISS 인덱스를 활용한 정확한 근거 인용 및 리포트 생성 (POST /api/pledge/verify) |
 | **중복·유사 탐지** | 후보 공약 DB와 비교해 유사 공약 제시, 차별화 포인트 제안 |
 
 ## 추진 범위
@@ -41,8 +42,20 @@ Policy/
 │   ├── 요구사항_명세서.md
 │   └── 기술_명세_구현방향.md
 ├── data/
-│   └── pdf/              # 정강·정책·과거 공약 PDF 원본
+│   ├── pdf/              # 정강·정책·과거 공약 PDF 원본
+│   │   ├── 정강정책/     # 정강정책 PDF들
+│   │   ├── 공약/         # 우리당 공약 PDF들
+│   │   └── 지역별 공약/  # 타지역 공약 PDF들
+│   └── index_cache/      # FAISS 인덱스 캐시 (자동 생성)
 ├── backend/              # PDF 파싱, GPT API 호출, 당 부합 점검 API
+│   ├── pdf_loader.py     # PDF 텍스트 추출
+│   ├── pdf_loader_chunks.py  # PDF 청크 분할
+│   ├── chunking.py       # 텍스트 청킹 로직
+│   ├── embeddings.py     # OpenAI 임베딩 생성
+│   ├── vector_index.py   # FAISS 벡터 인덱스
+│   ├── index_builder.py  # 인덱스 빌드 및 캐시 관리
+│   ├── report.py         # 검색 결과 기반 리포트 생성
+│   └── main.py           # FastAPI 앱
 ├── frontend/             # 출마자 공약 입력·결과 표시 UI (추후)
 └── prompts/              # GPT 시스템/유저 프롬프트
 ```
@@ -60,7 +73,14 @@ Policy/
    `.env.example`을 복사해 `.env`를 만들고 `OPENAI_API_KEY`에 키를 넣는다.
 
 3. **PDF 배치**  
-   `data/pdf/`에 정강·정책·과거 공약 PDF를 넣는다. (없어도 API는 동작하며, 기준 문서 없음 안내가 나온다.)
+   다음 폴더 구조로 PDF를 배치한다:
+   ```
+   data/pdf/
+   ├── 정강정책/     # 정강정책 PDF들
+   ├── 공약/         # 우리당 공약 PDF들
+   └── 지역별 공약/  # 타지역 공약 PDF들
+   ```
+   (폴더가 없어도 API는 동작하며, 해당 섹션은 비어있음으로 표시된다.)
 
 4. **서버 실행** (프로젝트 루트에서)
    ```bash
@@ -68,11 +88,59 @@ Policy/
    ```
    브라우저: http://127.0.0.1:8000  
    API 문서: http://127.0.0.1:8000/docs
+   
+   **참고**: 서버 시작 시 PDF를 자동으로 청크 분할하고 임베딩하여 FAISS 인덱스를 구축합니다.
+   첫 실행 시 시간이 걸릴 수 있으며, 이후에는 캐시를 사용하여 빠르게 시작됩니다.
 
-5. **당 부합 점검 호출 예시**
+5. **API 호출 예시**
+
+   **기존 방식 (전체 컨텍스트 사용)**:
    ```bash
-   curl -X POST http://127.0.0.1:8000/check -H "Content-Type: application/json" -d "{\"pledge\": \"지역 청년 일자리 1000개 창출\"}"
+   curl -X POST http://127.0.0.1:8000/check \
+     -H "Content-Type: application/json" \
+     -d '{"pledge": "지역 청년 일자리 1000개 창출"}'
    ```
+   
+   **벡터 검색 기반 검증 (근거 인용)**:
+   ```bash
+   curl -X POST http://127.0.0.1:8000/api/pledge/verify \
+     -H "Content-Type: application/json" \
+     -d '{
+       "text": "지역 청년 일자리 1000개 창출",
+       "top_k_platform": 6,
+       "top_k_pledge": 6,
+       "top_k_regional": 8
+     }'
+   ```
+   
+   응답은 JSON 형식으로 다음을 포함합니다:
+   - `summary`: 적합도 점수 및 판정
+   - `platform`: 정강정책 근거 스니펫 (인용 포함)
+   - `pledges`: 우리당 공약 근거 스니펫 (인용 포함)
+   - `regional_similarity`: 타지역 공약 유사성 분석
+   - `conflicts`: 상충 이슈 및 제안
+   - `improvements`: 개선 제안
+
+## 환경 변수 설정
+
+`.env` 파일에 다음 변수를 설정할 수 있습니다:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+EMBEDDING_MODEL=text-embedding-3-large
+CHAT_MODEL=gpt-4o-mini
+CHUNK_SIZE=1200
+CHUNK_OVERLAP=200
+MAX_CHUNKS_PER_FILE=120
+EMBEDDING_BATCH_SIZE=64
+```
+
+## 인덱스 캐시 관리
+
+- 인덱스는 `data/index_cache/`에 자동으로 저장됩니다.
+- PDF 파일이 변경되면 (파일명, 수정시간, 크기 기준) 자동으로 재빌드됩니다.
+- 강제 재빌드가 필요한 경우 캐시 파일을 삭제하거나 서버를 재시작하세요.
 
 ## 다음 단계
 
