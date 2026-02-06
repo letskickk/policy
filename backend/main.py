@@ -71,6 +71,36 @@ def test():
     return {"status": "ok", "message": "서버 작동 중", "version": "0.1.0"}
 
 
+@app.get("/debug/context")
+def debug_context(pledge: str = "테스트 공약: 지역경제 활성화"):
+    """실제 GPT에 전달되는 컨텍스트 확인용 엔드포인트."""
+    from backend.prompts import build_user_message, load_system_prompt
+    
+    platform = load_platform_context()
+    pledges = load_pledges_context()
+    system = load_system_prompt()
+    user = build_user_message(platform, pledges, pledge)
+    
+    # 공약 컨텍스트에서 특정 키워드 검색
+    search_keywords = []
+    if pledges:
+        # 공약 컨텍스트의 일부를 샘플로 추출
+        sample_text = pledges[:5000] if len(pledges) > 5000 else pledges
+        search_keywords.append(f"컨텍스트 샘플 (처음 5000자): {sample_text}")
+    
+    return {
+        "system_prompt_length": len(system),
+        "user_message_length": len(user),
+        "platform_context_length": len(platform),
+        "pledges_context_length": len(pledges),
+        "pledges_file_count": pledges.count("---") if pledges else 0,
+        "pledges_context_preview": pledges[:5000] + "..." if len(pledges) > 5000 else pledges,
+        "user_message_preview": user[:5000] + "..." if len(user) > 5000 else user,
+        "system_prompt": system,
+        "test_pledge": pledge,
+    }
+
+
 @app.get("/debug/pdf")
 def debug_pdf():
     """PDF 로드 상태 확인용 디버깅 엔드포인트."""
@@ -98,11 +128,14 @@ def debug_pdf():
     test_message = build_user_message(platform, pledges, "테스트 공약: 지역경제 활성화")
     
     # 각 PDF 파일의 상태 확인
+    from backend.pdf_loader import _platform_file_filter, _pledge_file_filter
+    
     pdf_status = []
     for pdf_path in all_pdfs[:20]:  # 처음 20개만
         try:
             rel_path = str(pdf_path.relative_to(pdf_dir))
-            is_platform = "정강" in pdf_path.name or "정책" in pdf_path.name
+            is_platform = _platform_file_filter(pdf_path)
+            is_pledge = _pledge_file_filter(pdf_path)
             exists = pdf_path.exists()
             size = pdf_path.stat().st_size if exists else 0
             
@@ -110,7 +143,7 @@ def debug_pdf():
             is_loaded = False
             if is_platform:
                 is_loaded = any(pdf_path.name in f for f in platform_files)
-            else:
+            elif is_pledge:
                 is_loaded = any(pdf_path.name in f for f in pledges_files)
             
             pdf_status.append({
@@ -119,7 +152,9 @@ def debug_pdf():
                 "exists": exists,
                 "size_bytes": size,
                 "is_platform": is_platform,
+                "is_pledge": is_pledge,
                 "is_loaded": is_loaded,
+                "classification": "정강정책" if is_platform else ("공약" if is_pledge else "기타"),
             })
         except Exception as e:
             pdf_status.append({
@@ -137,6 +172,7 @@ def debug_pdf():
             "pledges_files_loaded": len(pledges_files),
             "platform_text_length": len(platform),
             "pledges_text_length": len(pledges),
+            "filter_info": "공약 파일은 'president' 또는 '대선공약'이 경로/파일명에 포함된 것만 로드됩니다",
         },
         "all_pdf_files": {
             "count": len(all_pdfs),
