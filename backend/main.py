@@ -58,13 +58,26 @@ def api_info():
     return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
 
 
+@app.get("/test")
+def test():
+    """간단한 테스트 엔드포인트."""
+    return {"status": "ok", "message": "서버 작동 중", "version": "0.1.0"}
+
+
 @app.get("/debug/pdf")
 def debug_pdf():
     """PDF 로드 상태 확인용 디버깅 엔드포인트."""
     from backend.config import PDF_DIR
     
-    # PDF 디렉토리 확인
-    all_pdfs = list(PDF_DIR.rglob("*.pdf")) if PDF_DIR.exists() else []
+    # PDF 디렉토리 확인 (한글 경로 처리)
+    pdf_dir_str = str(PDF_DIR.resolve())
+    pdf_dir = Path(pdf_dir_str)
+    
+    try:
+        all_pdfs = list(pdf_dir.rglob("*.pdf")) if pdf_dir.exists() else []
+    except Exception as e:
+        all_pdfs = []
+        error_msg = str(e)
     
     platform = load_platform_context()
     pledges = load_pledges_context()
@@ -73,20 +86,27 @@ def debug_pdf():
     platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and ".pdf" in line] if platform else []
     pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and ".pdf" in line] if pledges else []
     
-    return {
-        "pdf_dir_exists": PDF_DIR.exists(),
-        "pdf_dir_path": str(PDF_DIR),
+    result = {
+        "pdf_dir_exists": pdf_dir.exists(),
+        "pdf_dir_path": str(pdf_dir),
+        "pdf_dir_absolute": str(pdf_dir.resolve()),
         "total_pdf_files": len(all_pdfs),
-        "all_pdf_paths": [str(p.relative_to(PDF_DIR)) for p in all_pdfs],
+        "all_pdf_paths": [str(p.relative_to(pdf_dir)) for p in all_pdfs] if pdf_dir.exists() else [],
+        "all_pdf_absolute_paths": [str(p.resolve()) for p in all_pdfs[:10]],  # 처음 10개만
         "platform_files_count": len(platform_files),
         "platform_files": platform_files,
         "platform_length": len(platform),
         "pledges_files_count": len(pledges_files),
         "pledges_files": pledges_files,
         "pledges_length": len(pledges),
-        "platform_preview": platform[:1000] + "..." if len(platform) > 1000 else platform,
-        "pledges_preview": pledges[:1000] + "..." if len(pledges) > 1000 else pledges,
+        "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
+        "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
     }
+    
+    if 'error_msg' in locals():
+        result["error"] = error_msg
+    
+    return result
 
 
 @app.post("/check", response_model=PledgeCheckResponse)
