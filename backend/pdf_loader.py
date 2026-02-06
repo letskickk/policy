@@ -1,9 +1,12 @@
 """
 정강·정책(이념·취지) PDF와 우리당 공약 PDF를 구분해 로드한다.
 """
+import logging
 from pathlib import Path
 
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 try:
     import pdfplumber
@@ -91,27 +94,33 @@ def load_platform_context() -> str:
     - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 파일명에 '정강' 또는 '정책'이 들어간 PDF를 찾는다.
     """
     if not PDF_DIR.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {PDF_DIR}")
         return ""
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
+    found_files = []
     for path in sorted(PDF_DIR.rglob("*.pdf")):
         if not _platform_file_filter(path):
             continue
+        found_files.append(str(path))
         try:
             text = extract_text_from_pdf(path)
             text = f"--- {path.name} ---\n{text}".strip()
             if total_len + len(text) <= limit:
                 combined.append(text)
                 total_len += len(text)
+                logger.info(f"정강정책 PDF 로드 성공: {path.name} ({len(text)}자)")
             else:
                 remain = limit - total_len
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
                 break
         except Exception as e:
+            logger.error(f"정강정책 PDF 읽기 실패: {path.name} - {e}")
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
+    logger.info(f"정강정책 PDF 총 {len(found_files)}개 발견, {len(combined)}개 로드됨")
     return "\n\n".join(combined) if combined else ""
 
 
@@ -121,28 +130,34 @@ def load_pledges_context() -> str:
     - data/pdf/ 밑의 모든 하위 폴더를 재귀적으로 탐색하여 정강·정책으로 분류되지 않은 모든 PDF를 찾는다.
     """
     if not PDF_DIR.exists():
+        logger.warning(f"PDF_DIR이 존재하지 않음: {PDF_DIR}")
         return ""
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
+    found_files = []
     for path in sorted(PDF_DIR.rglob("*.pdf")):
         # 정강·정책 파일은 제외
         if _platform_file_filter(path):
             continue
+        found_files.append(str(path))
         try:
             text = extract_text_from_pdf(path)
             text = f"--- {path.name} ---\n{text}".strip()
             if total_len + len(text) <= limit:
                 combined.append(text)
                 total_len += len(text)
+                logger.info(f"공약 PDF 로드 성공: {path.name} ({len(text)}자)")
             else:
                 remain = limit - total_len
                 if remain > 500:
                     combined.append(text[:remain] + "\n[... 일부 생략 ...]")
                 break
         except Exception as e:
+            logger.error(f"공약 PDF 읽기 실패: {path.name} - {e}")
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
+    logger.info(f"공약 PDF 총 {len(found_files)}개 발견, {len(combined)}개 로드됨")
     return "\n\n".join(combined) if combined else ""
 
 
