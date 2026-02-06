@@ -25,12 +25,12 @@ def extract_text_from_pdf(path: Path) -> str:
 
 
 def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
-    """지정 폴더 내 PDF들을 읽어 하나의 문자열로 합친다. limit_chars 초과 시 앞부분만 사용."""
+    """지정 폴더 내 PDF들을 읽어 하나의 문자열로 합친다. 하위 폴더까지 재귀적으로 찾는다. limit_chars 초과 시 앞부분만 사용."""
     if not dir_path.exists():
         return ""
     combined: list[str] = []
     total_len = 0
-    for path in sorted(dir_path.glob("*.pdf")):
+    for path in sorted(dir_path.rglob("*.pdf")):
         try:
             text = extract_text_from_pdf(path)
             text = f"--- {path.name} ---\n{text}".strip()
@@ -67,7 +67,7 @@ def load_platform_context() -> str:
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
-    for path in sorted(PDF_DIR.glob("*.pdf")):
+    for path in sorted(PDF_DIR.rglob("*.pdf")):
         if not _platform_file_filter(path):
             continue
         try:
@@ -100,7 +100,7 @@ def load_pledges_context() -> str:
     combined: list[str] = []
     total_len = 0
     limit = MAX_CONTEXT_CHARS // 2
-    for path in sorted(PDF_DIR.glob("*.pdf")):
+    for path in sorted(PDF_DIR.rglob("*.pdf")):
         if _platform_file_filter(path):
             continue
         try:

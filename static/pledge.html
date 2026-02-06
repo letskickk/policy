@@ -89,7 +89,23 @@
       border-radius: 8px;
       margin-top: 0.5rem;
     }
-    .loading { color: #666; }
+    .loading { 
+      color: #666; 
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #2d7ff9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     a { color: #2d7ff9; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .disclaimer {
@@ -147,7 +163,7 @@
     function setLoading() {
       resultEl.classList.remove('empty', 'error');
       resultEl.classList.add('loading');
-      resultEl.textContent = 'AI가 공약을 분석하고 있습니다. 잠시만 기다려 주세요.';
+      resultEl.innerHTML = '<span class="spinner"></span><span>AI가 공약을 분석하고 있습니다. 잠시만 기다려 주세요.</span>';
     }
 
     btnEl.addEventListener('click', async function () {
