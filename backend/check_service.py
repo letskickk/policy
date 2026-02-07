@@ -70,6 +70,17 @@ def check_pledge_alignment(pledge: str) -> str:
     result = response.choices[0].message.content or ""
     logger.info(f"GPT 응답 길이: {len(result)}자")
 
+    # 섹션 2 제목·결과 형식 보정 (GPT가 구 형식을 내는 경우 대비)
+    result = result.replace("2. 개혁신당 공약과의 비교", "2. 개혁신당 중앙당 공약과의 유사성")
+    # 섹션 2 "결과: 적합/부분적 적합/부적합 (XX점)" → "결과: 유사도(XX점)" (2번째 결과=섹션2)
+    _section2_result = re.compile(
+        r"결과:\s*(?:적합|부분적 적합|부적합)\s*\((\d{1,3})점\)"
+    )
+    matches = list(_section2_result.finditer(result))
+    if len(matches) >= 2:
+        m = matches[1]
+        result = result[: m.start()] + f"결과: 유사도({m.group(1)}점)" + result[m.end() :]
+
     # 지역별 공약 폴더에 파일이 없으면 타지역 유사성은 무조건 '없음'으로 서버 보정
     if not regional_pledges_context.strip():
         result = result.replace("유사 공약: 있음", "유사 공약: 없음")
