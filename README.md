@@ -131,6 +131,20 @@ Policy/
    - `conflicts`: 상충 이슈 및 제안
    - `improvements`: 개선 제안
 
+## OpenAI Vector Store 모드 (AWS 단순화)
+
+FAISS 대신 OpenAI File Search를 쓰면 인덱스 경로·EBS/EFS 등 AWS 설정이 필요 없습니다.
+
+```env
+USE_OPENAI_VECTOR_STORE=1
+```
+
+- 1GB까지 무료, 초과 시 $0.10/GB/day
+- 서버 시작 시 PDF를 OpenAI에 업로드 → Vector Store 생성
+- 재시작 시 재생성 방지: 로그에 나온 `OPENAI_VECTOR_STORE_ID`를 `.env`에 저장
+
+---
+
 ## 환경 변수 설정
 
 `.env` 파일에 다음 변수를 설정할 수 있습니다:

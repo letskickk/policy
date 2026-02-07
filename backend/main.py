@@ -20,6 +20,7 @@ from backend.config import (
     CHAT_MODEL,
     DEBUG_ENDPOINTS_ENABLED,
     PDF_S3_URI,
+    USE_OPENAI_VECTOR_STORE,
     _nfc,
 )
 from backend.check_service import check_pledge_alignment
@@ -45,8 +46,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# 전역 인덱스 (서버 시작 시 초기화)
+# 전역 인덱스 (서버 시작 시 초기화). USE_OPENAI_VECTOR_STORE=1이면 _vector_store_id 사용.
 _indexes = None
+_vector_store_id = None
 
 
 def _startup_self_check() -> int:
@@ -154,37 +156,49 @@ def _startup_self_check() -> int:
 
 @app.on_event("startup")
 async def startup_event():
-    """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 빌드. 조건 불만족 시 RuntimeError로 중단."""
-    global _indexes
-    logger.info("서버 시작: Self-Check 및 인덱스 빌드 중...")
+    """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 또는 Vector Store 준비."""
+    global _indexes, _vector_store_id
+    logger.info("서버 시작: Self-Check 및 인덱스/Vector Store 준비 중...")
     logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
+    logger.info(f"USE_OPENAI_VECTOR_STORE= {USE_OPENAI_VECTOR_STORE}")
 
     _startup_self_check()
 
-    _indexes = build_all_indexes(force_rebuild=False)
-    from backend.vector_index import VectorIndex
-
-    from backend.config import EMBEDDING_DIMENSION
-    if "platform" not in _indexes:
-        _indexes["platform"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-    if "pledge" not in _indexes:
-        _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-    if "regional" not in _indexes:
-        _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-
-    platform_vectors = _indexes["platform"].size()
-    pledge_vectors = _indexes["pledge"].size()
-    regional_vectors = _indexes["regional"].size()
-    logger.info(f"platform_index: {platform_vectors} vectors")
-    logger.info(f"pledge_index: {pledge_vectors} vectors")
-    logger.info(f"regional_index: {regional_vectors} vectors")
-
-    if pledge_vectors == 0:
-        raise RuntimeError(
-            "pledge_index 벡터가 0입니다. PDF 추출 또는 인덱스 빌드가 실패한 상태로 서비스를 시작할 수 없습니다. "
-            "로그에서 [EXTRACT] final_chars, [SELF-CHECK] 공약 pdf count를 확인하세요."
-        )
-    logger.info("인덱스 빌드 완료")
+    if USE_OPENAI_VECTOR_STORE:
+        from backend.openai_vector_store import ensure_vector_store, sync_vector_store_incremental
+        from backend.config import OPENAI_VECTOR_STORE_ID
+        if OPENAI_VECTOR_STORE_ID:
+            _vector_store_id = OPENAI_VECTOR_STORE_ID
+            logger.info(f"[VECTOR_STORE] 기존 Vector Store 사용: {_vector_store_id}")
+            try:
+                sync_vector_store_incremental(_vector_store_id)
+            except Exception as e:
+                logger.warning(f"[VECTOR_STORE] 증분 동기화 실패 (무시하고 진행): {e}")
+        else:
+            _vector_store_id = ensure_vector_store()
+            logger.info(f"[VECTOR_STORE] Vector Store 준비 완료: {_vector_store_id}")
+    else:
+        _indexes = build_all_indexes(force_rebuild=False)
+        from backend.vector_index import VectorIndex
+        from backend.config import EMBEDDING_DIMENSION
+        if "platform" not in _indexes:
+            _indexes["platform"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+        if "pledge" not in _indexes:
+            _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+        if "regional" not in _indexes:
+            _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+        platform_vectors = _indexes["platform"].size()
+        pledge_vectors = _indexes["pledge"].size()
+        regional_vectors = _indexes["regional"].size()
+        logger.info(f"platform_index: {platform_vectors} vectors")
+        logger.info(f"pledge_index: {pledge_vectors} vectors")
+        logger.info(f"regional_index: {regional_vectors} vectors")
+        if pledge_vectors == 0:
+            raise RuntimeError(
+                "pledge_index 벡터가 0입니다. PDF 추출 또는 인덱스 빌드가 실패한 상태로 서비스를 시작할 수 없습니다. "
+                "로그에서 [EXTRACT] final_chars, [SELF-CHECK] 공약 pdf count를 확인하세요."
+            )
+    logger.info("준비 완료")
 
 STATIC_DIR = ROOT_DIR / "static"
 
@@ -431,7 +445,18 @@ def debug_vectorstore():
     AWS 배포 시 벡터스토어 상태 확인용.
     """
     _debug_endpoint()
-    global _indexes
+    global _indexes, _vector_store_id
+    if USE_OPENAI_VECTOR_STORE:
+        return {
+            "mode": "openai_vector_store",
+            "vector_store_id": _vector_store_id,
+            "persist_path": "N/A (OpenAI 호스팅)",
+            "collection_names": ["policy-rag-store"],
+            "total_count": "N/A",
+            "embedding_model_name": "OpenAI file_search",
+            "embedding_dim": "N/A",
+            "sample_doc": None,
+        }
     if _indexes is None:
         raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
     from backend.config import EMBEDDING_MODEL, EMBEDDING_DIMENSION
@@ -496,7 +521,15 @@ def debug_context_summary():
 def debug_index():
     """인덱스 벡터 수를 반환하는 디버깅 엔드포인트."""
     _debug_endpoint()
-    global _indexes
+    global _indexes, _vector_store_id
+    if USE_OPENAI_VECTOR_STORE:
+        return {
+            "mode": "openai_vector_store",
+            "vector_store_id": _vector_store_id,
+            "platform_vectors": 0,
+            "pledge_vectors": 0,
+            "regional_vectors": 0,
+        }
     if _indexes is None:
         raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
 
@@ -625,17 +658,30 @@ def verify_pledge(body: PledgeVerifyRequest):
     - 타지역 중복/유사성
     - 상충/보완 제안
     """
-    global _indexes
+    global _indexes, _vector_store_id
+
+    pledge_text = (body.text or "").strip()
+    if not pledge_text:
+        raise HTTPException(status_code=400, detail="공약 텍스트가 비어 있습니다.")
+
+    if USE_OPENAI_VECTOR_STORE:
+        if not _vector_store_id:
+            raise HTTPException(
+                status_code=503,
+                detail="Vector Store가 준비되지 않았습니다. 서버를 재시작하세요."
+            )
+        try:
+            from backend.openai_vector_store import run_verify
+            return run_verify(_vector_store_id, pledge_text)
+        except Exception as e:
+            logger.error(f"공약 검증 실패 (Vector Store): {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")
     
     if _indexes is None or not _indexes:
         raise HTTPException(
             status_code=503,
             detail="인덱스가 준비되지 않았습니다. 서버를 재시작하세요."
         )
-    
-    pledge_text = (body.text or "").strip()
-    if not pledge_text:
-        raise HTTPException(status_code=400, detail="공약 텍스트가 비어 있습니다.")
     
     try:
         report = generate_report(
