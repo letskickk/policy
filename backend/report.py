@@ -350,7 +350,9 @@ def build_rubric_prompt(
 [채점 원칙]
 - 문자열·단어 일치가 아니다. 핵심 이념·가치·정책 방향의 부합으로 판단한다.
 - 표현이 다르더라도 이념·가치·방향이 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수를 준다.
-- 출마자 공약이 우리당 공약(pledges)과 유사할 때는 정강정책(platform) 부합 점수도 그에 맞춰 소폭 높게 줄 수 있다.
+- **제목·표제만 적은 경우 = 2점 이하 고정**: "지역경제 활성화", "청년 일자리 창출" 같이 제목만 띡 적고 구체적 수단·수치·이행 계획이 없으면, 워딩이 아무리 비슷해도 2점 이하. 일치율이 높게 나오면 안 됨.
+- **구체성 없으면 높은 점수 금지**: 내용이 짧거나(한 문장·한 줄 수준) 구체적 방안이 없으면 3점 이하. 4~5점은 구체적 수단·수치·이행 계획이 있을 때만.
+- 출마자 공약이 우리당 공약(pledges)과 유사할 때는 정강정책(platform) 부합 점수도 그에 맞춰 소폭 높게 줄 수 있다. 단, 제목만·구체성 부족 시 위 규칙 우선.
 - **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
 
 [정강정책 전체]
@@ -409,6 +411,7 @@ Evidence 규칙:
 - fit_score, breakdown은 계산하지 않는다. rubric.score_0_5, evidence, note, confidence, improvements만 작성.
 - platform·pledges의 evidence는 [] 가능. conflicts 등에서만 R1,R2 등 타지역 ID 사용.
 - improvements: 구체적 방안·수치·이행 계획이 없으면 "구체성 보완 필요" 항목을 반드시 포함.
+- 제목만·한 줄만 적은 경우: platform/pledges 모든 항목 2점 이하. fit_score 40 이하 수준으로.
 - JSON만 반환하고 다른 설명은 붙이지 마라.
 """
     return prompt
@@ -577,6 +580,10 @@ def generate_report(
 
         fit_score = 0.50 * platform_score + 0.35 * pledge_score - 0.15 * conflict_penalty
         fit_score = max(0.0, min(100.0, fit_score))
+
+        # 제목·한 줄만 적은 경우: 서버 측 상한 적용 (80자 미만이면 fit_score 최대 40)
+        if len(user_pledge.strip()) < 80 and fit_score > 40:
+            fit_score = min(fit_score, 40.0)
 
         # fit_verdict 간단 규칙 (원하면 나중에 조정 가능)
         if fit_score >= 80:
