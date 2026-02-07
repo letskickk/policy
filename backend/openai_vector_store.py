@@ -302,6 +302,8 @@ file_search 도구가 2개 있음 (반드시 구분 사용):
 
 [채점 원칙]
 - **단어·문자열 일치가 아니다.** 핵심 가치·이념·정책 방향의 부합으로 판단한다. 표현이 다르더라도 가치가 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수.
+- **제목·표제만 적은 경우 = 2점 이하 고정**: "지역경제 활성화", "청년 일자리 창출" 같이 제목만 띡 적고 구체적 수단·수치·이행 계획이 없으면, 정강정책·공약과 워딩이 아무리 비슷해도 2점 이하. 일치율이 높게 나오면 안 됨.
+- **구체성 없으면 높은 점수 금지**: 내용이 짧거나(한 문장·한 줄 수준) 구체적 방안이 없으면 3점 이하. 4~5점은 구체적 수단·수치·이행 계획이 있을 때만.
 - **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
 
 출마자 공약이 주어지면, file_search로 관련 문서를 검색한 뒤,
@@ -318,6 +320,7 @@ file_search 도구가 2개 있음 (반드시 구분 사용):
 }
 
 score_0_5: 0=상충/근거전무, 1~2=부적합, 3=부분부합, 4=대체로 부합, 5=강한 부합.
+- 제목만·한 줄만 적은 경우: platform/pledges 모든 항목 2점 이하. fit_score 40 이하 수준으로.
 evidence는 검색된 문서 인용 시 사용. platform/pledges는 [] 가능.
 improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 보완 필요\" 항목을 반드시 포함.
 """
@@ -400,6 +403,10 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
     fit_score = round((platform_avg * 0.4 + pledges_avg * 0.4 + (5 - conflicts_avg) * 0.2) * 20, 1)
     if fit_score > 100:
         fit_score = 100.0
+
+    # 제목·한 줄만 적은 경우: 서버 측 상한 적용 (80자 미만이면 fit_score 최대 40)
+    if len(user_pledge.strip()) < 80 and fit_score > 40:
+        fit_score = min(fit_score, 40.0)
 
     fit_verdict = "강한 부합" if fit_score >= 80 else "부합" if fit_score >= 60 else "부분부합" if fit_score >= 40 else "미부합"
 
