@@ -29,10 +29,15 @@ def build_user_message(platform_context: str, pledges_context: str, regional_ple
     template = load_user_prompt_template()
     platform = platform_context.strip() or "(정강·정책 문서 없음. data/pdf/정강정책/ 폴더에 PDF를 넣어 주세요.)"
     pledges = pledges_context.strip() or "(우리당 공약 문서 없음. data/pdf/공약/ 폴더에 PDF를 넣어 주세요.)"
-    regional = regional_pledges_context.strip() or "(타지역 공약 문서 없음. data/pdf/지역별 공약/ 폴더에 PDF를 넣어 주세요.)"
-    return (
+    regional_raw = regional_pledges_context.strip()
+    regional = regional_raw or "(타지역 공약 문서 없음. data/pdf/지역별 공약/ 폴더에 PDF를 넣어 주세요.)"
+    out = (
         template.replace("{{PLATFORM_CONTEXT}}", platform)
         .replace("{{PLEDGES_CONTEXT}}", pledges)
         .replace("{{REGIONAL_PLEDGES_CONTEXT}}", regional)
         .replace("{{PLEDGE}}", pledge)
     )
+    # 지역별 공약 문서가 없으면 타지역 유사성은 반드시 '없음'으로만 표기하도록 명시
+    if not regional_raw:
+        out += "\n\n【필수】 타지역 공약 문서가 없으므로 '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'으로만 표기하라."
+    return out

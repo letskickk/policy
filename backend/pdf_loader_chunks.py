@@ -1,94 +1,112 @@
 """
 PDF를 청크 리스트로 로드하는 모듈 (벡터 검색용).
+전체 컨텍스트(Global Context) 로드용 함수도 제공한다.
 """
 import logging
 from pathlib import Path
 from typing import List
 
 from backend.chunking import DocChunk, build_chunks
-from backend.config import MAX_CHUNKS_PER_FILE, PDF_DIR
-from backend.pdf_loader import extract_text_from_pdf
+from backend.config import PDF_DIR
+from backend.pdf_loader import iter_pdf_texts
 
 logger = logging.getLogger(__name__)
 
 
+# ---------- 전체 컨텍스트 로드 (LLM이 전체 문서를 한 번에 읽고 판단할 때 사용) ----------
+
+def load_folder_full_text(folder_name: str) -> str:
+    """
+    지정 폴더의 모든 PDF를 청크로 나누지 않고, 전체 텍스트를 하나의 문자열로 합쳐 반환한다.
+    정강정책·공약처럼 LLM이 전체 맥락(Global Context)을 보고 의미적 적합도를 판단할 때 사용한다.
+    파일 간 구분은 "=== [파일명] ===" 헤더로 둔다.
+    """
+    target_dir = PDF_DIR / folder_name
+    if not target_dir.exists():
+        logger.warning(f"{folder_name} 폴더가 존재하지 않음: {target_dir}")
+        return ""
+
+    parts: List[str] = []
+    total_chars = 0
+    for rel_path_str, text in iter_pdf_texts(target_dir):
+        block = f"=== [{rel_path_str}] ===\n{text}"
+        parts.append(block)
+        total_chars += len(block)
+
+    result = "\n\n".join(parts) if parts else ""
+    logger.info(f"[FULL-TEXT] {folder_name}: {len(parts)}개 파일, 총 {total_chars}자")
+    return result
+
+
+def get_platform_full_text() -> str:
+    """정강정책 폴더의 모든 PDF 텍스트를 하나의 문자열로 반환한다 (전체 컨텍스트용)."""
+    return load_folder_full_text("정강정책")
+
+
+def get_pledge_full_text() -> str:
+    """공약 폴더의 모든 PDF 텍스트를 하나의 문자열로 반환한다 (전체 컨텍스트용)."""
+    return load_folder_full_text("공약")
+
+
+# ---------- 벡터 인덱싱용 청크 로드 (RAG 검색용, 기존 유지) ----------
+
+
 def load_pdf_chunks(folder_name: str, source_type: str) -> List[DocChunk]:
     """
-    지정된 폴더의 모든 PDF를 청크로 분할하여 반환한다.
-    
-    Args:
-        folder_name: 폴더명 ("정강정책", "공약", "지역별 공약")
-        source_type: 소스 타입 ("platform", "pledge", "regional")
-    
-    Returns:
-        DocChunk 리스트
+    지정된 폴더의 모든 PDF를 limit 없이 iter_pdf_texts로 읽어 청크로 분할한다.
+    인덱싱 전용: 누적 한도/파일당 청크 상한 없이 전부 반환한다.
     """
     pdf_dir_str = str(PDF_DIR.resolve())
     pdf_dir = Path(pdf_dir_str)
-    
+
     if not pdf_dir.exists():
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return []
-    
+
     target_dir = pdf_dir / folder_name
-    
     if not target_dir.exists():
         logger.warning(f"{folder_name} 폴더가 존재하지 않음: {target_dir}")
         return []
-    
-    logger.info(f"{folder_name} 폴더에서 PDF 청크 로드 시작: {target_dir}")
-    
-    all_chunks = []
-    
-    # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
-    try:
-        logger.info(f"[SCAN] dir={target_dir}")
-        pdf_files = list(target_dir.rglob("*.pdf"))
-        logger.info(f"[SCAN] found={len(pdf_files)}")
-        if folder_name == "공약":
-            logger.info(f"[SCAN] 공약 폴더 found={len(pdf_files)}")
-        for p in pdf_files[:10]:
-            logger.info(f"[SCAN] sample={p}")
-    except Exception as e:
-        logger.error(f"PDF 파일 검색 실패 ({target_dir}): {e}")
-        return []
 
-    if not pdf_files:
-        logger.warning(f"[SCAN] no pdf files found in {target_dir}. 폴더 경로/이름을 확인하세요.")
-    
-    for pdf_path in sorted(pdf_files):
-        try:
-            # 상대 경로 계산
-            rel_path = str(pdf_path.relative_to(target_dir))
-            doc_id = f"{source_type}:{folder_name}/{rel_path}"
-            
-            # PDF 텍스트 추출
-            text = extract_text_from_pdf(pdf_path)
-            text_len = len(text.strip()) if text else 0
-            
-            if not text or text_len < 10:
-                logger.warning(f"PDF 텍스트가 비어있거나 너무 짧음: {rel_path} (길이: {text_len}자)")
-                continue
-            
-            # 청크로 분할
-            chunks = build_chunks(
-                text=text,
-                doc_id=doc_id,
-                source=source_type,
-                path=rel_path,
-                max_chunks=MAX_CHUNKS_PER_FILE
-            )
-            
-            if chunks:
-                all_chunks.extend(chunks)
-                logger.info(f"PDF 청크 생성 완료: {rel_path} ({len(chunks)}개 청크)")
-            else:
-                logger.warning(f"PDF에서 청크 생성 실패: {rel_path}")
-        
-        except Exception as e:
-            logger.error(f"PDF 읽기 실패: {pdf_path} - {e}", exc_info=True)
-            continue
-    
+    expected_pdf_files = sorted(target_dir.rglob("*.pdf"))
+    expected_count = len(expected_pdf_files)
+    logger.info(f"{folder_name} 폴더에서 PDF 청크 로드 시작 (iter_pdf_texts): {target_dir}, expected_pdf_files={expected_count}")
+
+    yielded_count = 0
+    all_chunks: List[DocChunk] = []
+
+    for rel_path_str, text in iter_pdf_texts(target_dir):
+        yielded_count += 1
+        doc_id = f"{source_type}:{folder_name}/{rel_path_str}"
+        # 인덱싱용: max_chunks=None 으로 전체 청크 반환
+        chunks = build_chunks(
+            text=text,
+            doc_id=doc_id,
+            source=source_type,
+            path=rel_path_str,
+            max_chunks=None,
+        )
+        chars = len(text)
+        if chunks:
+            all_chunks.extend(chunks)
+            logger.info(f"PDF 청크 생성 완료: {rel_path_str} ({len(chunks)}개 청크)")
+        else:
+            logger.warning(f"PDF에서 청크 생성 실패: {rel_path_str}")
+        # pledge(공약) 폴더: PDF별 인덱싱 로그 (rel_path, chars, chunks) — "신구연금 분리" 등 파일 확인용
+        if folder_name == "공약":
+            logger.info(f"[INDEX-PDF] pledge: rel_path={rel_path_str!r}, chars={chars}, chunks={len(chunks)}")
+
+    if expected_count != yielded_count:
+        logger.warning(
+            f"[INDEX-COMPARE] {folder_name}: expected_pdf_files={expected_count}, iter_pdf_texts yielded={yielded_count}, skipped={expected_count - yielded_count}"
+        )
+    else:
+        logger.info(f"[INDEX-COMPARE] {folder_name}: expected_pdf_files={expected_count}, yielded={yielded_count} (일치)")
+
+    if folder_name == "공약":
+        logger.info(f"[INDEX-SCAN] pledge files={yielded_count}")
+        logger.info(f"[INDEX-BUILD] pledge chunks={len(all_chunks)}")
+
     logger.info(f"{folder_name} 폴더 청크 로드 완료: {len(all_chunks)}개 청크")
     return all_chunks
 

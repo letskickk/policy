@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from backend.chunking import DocChunk
 from backend.config import (
+    BUILD_CARDS,
     EMBEDDING_BATCH_SIZE,
     INDEX_CACHE_DIR,
     MAX_CHUNKS_PER_FILE,
@@ -196,9 +197,11 @@ def build_index(
             save_cache_hashes(cache_dir, cache_name, hashes)
         
         logger.info(f"{cache_name} 인덱스 빌드 및 저장 완료: {len(chunks)}개 청크")
+        if cache_name == "pledge":
+            logger.info(f"pledge_index: {len(chunks)} vectors")
     except Exception as e:
         logger.error(f"인덱스 저장 실패: {e}")
-    
+
     return index
 
 
@@ -262,5 +265,13 @@ def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
     
     total_chunks = sum(idx.size() for idx in indexes.values())
     logger.info(f"모든 인덱스 빌드 완료: 총 {total_chunks}개 청크")
-    
+
+    if BUILD_CARDS and indexes.get("platform") and indexes.get("pledge"):
+        try:
+            from backend.cards import build_and_save_platform_cards, build_and_save_pledge_cards
+            build_and_save_platform_cards(indexes["platform"].chunks)
+            build_and_save_pledge_cards(indexes["pledge"].chunks)
+        except Exception as e:
+            logger.warning(f"카드 생성 스킵: {e}")
+
     return indexes

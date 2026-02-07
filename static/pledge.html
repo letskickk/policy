@@ -44,6 +44,13 @@
       margin-bottom: 0.5rem;
       color: #333;
     }
+    .hint {
+      font-size: 0.9rem;
+      color: #555;
+      margin: -0.25rem 0 0.5rem 0;
+      line-height: 1.45;
+    }
+    .hint strong { color: #333; }
     textarea {
       width: 100%;
       min-height: 140px;
@@ -132,7 +139,8 @@
 
   <div class="card">
     <label for="pledge">공약 입력</label>
-    <textarea id="pledge" placeholder="공약을 입력하세요."></textarea>
+    <p class="hint">배경, 목표, 구체적 방안 등을 포함해 <strong>최대한 자세하게</strong> 작성해 주시면 분석이 더 정확합니다.</p>
+    <textarea id="pledge" placeholder="공약을 최대한 자세하게 입력해 주세요. (예: 어떤 문제인지, 무엇을 어떻게 하겠다는지, 근거나 수단을 함께 적어 주시면 좋습니다.)"></textarea>
     <button type="button" id="btn">분석하기</button>
   </div>
 
