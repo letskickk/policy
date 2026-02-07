@@ -148,9 +148,11 @@ EMBEDDING_BATCH_SIZE=64
 
 ## 인덱스 캐시 관리
 
-- 인덱스는 `data/index_cache/`에 자동으로 저장됩니다.
+- 인덱스는 `INDEX_CACHE_DIR`에 저장됩니다 (Windows: `data/index_cache`, Linux: `/tmp/index_cache`).
+- **AWS 배포 시**: Linux 기본값 `/tmp`는 재시작 시 삭제되므로 `.env`에 `INDEX_CACHE_DIR=/app/data/index_cache` 등 **영구 경로**를 지정하세요.
 - PDF 파일이 변경되면 (파일명, 수정시간, 크기 기준) 자동으로 재빌드됩니다.
-- 강제 재빌드가 필요한 경우 캐시 파일을 삭제하거나 서버를 재시작하세요.
+- 강제 재빌드가 필요한 경우 캐시 파일을 삭제하거나 `REBUILD_INDEX=1`로 서버를 재시작하세요.
+- RAG 검색 시 **멀티워커**는 인덱스 미공유 이슈가 있으므로 `uvicorn --workers 1` 권장.
 
 ## 다음 단계
 

@@ -18,8 +18,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # data/pdf 포함 (COPY 시 .dockerignore에서 제외하지 말 것)
-# 실행 시 ENV PYTHONPATH=/app
+# 인덱스 캐시: /tmp는 재시작 시 휘발 → 영구 볼륨 마운트 시 이 경로 사용
 ENV PYTHONPATH=/app
+ENV INDEX_CACHE_DIR=/app/data/index_cache
 
 EXPOSE 8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# workers=1: 멀티워커 시 인덱스 미공유 이슈 회피. RAG 검색 시 단일 워커 권장.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

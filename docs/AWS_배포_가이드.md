@@ -303,6 +303,47 @@ sudo systemctl restart nginx
 
 ---
 
+## 6-1. AWS 실행환경별 RAG 체크리스트 (검색 결과 0 방지)
+
+### EB/EC2 (systemd, pm2, supervisor)
+
+| 항목 | 확인 |
+|------|------|
+| `INDEX_CACHE_DIR`를 **영구 경로**로 설정 (예: `/app/data/index_cache`, EBS 마운트) | |
+| Linux 기본값 `/tmp/index_cache`는 **재시작 시 삭제됨** — 반드시 ENV 또는 볼륨 지정 | |
+| `WEB_CONCURRENCY=1` 또는 `uvicorn --workers 1` (멀티워커 시 인덱스 미공유 이슈) | |
+| 작업 디렉터리(WorkingDirectory)가 프로젝트 루트 | |
+| `data/pdf/`, `data/index_cache/` 쓰기 권한 | |
+| 로그: `journalctl -u policy-app -f` 또는 pm2 logs | |
+
+### ECS (Docker)
+
+| 항목 | 확인 |
+|------|------|
+| task definition에 `INDEX_CACHE_DIR=/app/data/index_cache` 환경변수 | |
+| **volume mount**: `index-cache` → `/app/data/index_cache` (EFS 또는 호스트 볼륨) | |
+| `desiredCount > 1` 시: **모든 task가 EFS 등 공유 스토리지**에 인덱스 저장/로드 | |
+| healthcheck: `GET /api/debug/index` 응답 `pledge_vectors > 0` | |
+| CMD에 `--workers 1` 포함 | |
+
+### ALB 뒤 multiple instances
+
+| 항목 | 확인 |
+|------|------|
+| 인스턴스별 로컬 디스크(`/tmp`)는 **공유되지 않음** | |
+| **공유 전략**: EFS 마운트로 `INDEX_CACHE_DIR`를 모든 인스턴스에서 동일 경로로 사용 | |
+| 또는 인스턴스 1개만 RAG 검색 담당, 나머지는 리다이렉트 | |
+
+### 디버그 API 확인
+
+- `GET /api/debug/fs` — `pdf_dir_exists: true`, `folders.공약.pdf_count > 0`
+- `GET /api/debug/index` — `pledge_vectors > 0`, `platform_vectors`, `regional_vectors`
+- `GET /api/debug/vectorstore` — `persist_path`, `total_count`, `embedding_model_name`, `sample_doc`
+
+`DEBUG_ENDPOINTS_ENABLED=0`이면 프로덕션에서 비활성화됨.
+
+---
+
 ## 7. 문제 해결
 
 - **접속 안 됨**: 보안 그룹에서 해당 포트(8000 또는 80) 인바운드 허용 여부 확인.

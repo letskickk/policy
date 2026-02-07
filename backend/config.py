@@ -37,10 +37,16 @@ if PDF_EXTRACTOR not in ("pdfplumber", "pypdf", "auto"):
 
 # 벡터 검색 설정
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
+# 임베딩 차원 (text-embedding-3-large=3072, text-embedding-3-small=1536). 모델 변경 시 이것도 변경 필요.
+_embed_dim = os.getenv("EMBEDDING_DIMENSION", "").strip()
+if _embed_dim:
+    EMBEDDING_DIMENSION = int(_embed_dim)
+else:
+    EMBEDDING_DIMENSION = 3072 if "large" in EMBEDDING_MODEL.lower() else 1536
 # /api/pledge/verify·카드 생성에서 사용. 미설정 시 OPENAI_MODEL(gpt-5.2)과 동일
 CHAT_MODEL = os.getenv("CHAT_MODEL", "").strip() or OPENAI_MODEL
 
-# 인덱스 캐시: AWS/컨테이너에서 read-only /app/data 이면 쓰기 실패 → env 또는 /tmp 권장
+# 인덱스 캐시: AWS/컨테이너에서 /tmp는 재시작 시 휘발 → INDEX_CACHE_DIR로 영구 경로 지정 권장
 _def_cache_env = os.getenv("INDEX_CACHE_DIR", "").strip()
 if _def_cache_env:
     INDEX_CACHE_DIR = Path(_def_cache_env).resolve()
@@ -61,3 +67,5 @@ REBUILD_INDEX = os.getenv("REBUILD_INDEX", "0") == "1"
 BUILD_CARDS = os.getenv("BUILD_CARDS", "0") == "1"
 # AWS: PDF 폴더가 비었을 때 S3에서 동기화할 URI (예: s3://bucket/pdf/)
 PDF_S3_URI = os.getenv("PDF_S3_URI", "").strip()
+# /api/debug/* 엔드포인트 활성화 (프로덕션: 0으로 비활성화)
+DEBUG_ENDPOINTS_ENABLED = os.getenv("DEBUG_ENDPOINTS_ENABLED", "1") == "1"
