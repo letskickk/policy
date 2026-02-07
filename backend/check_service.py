@@ -74,4 +74,22 @@ def check_pledge_alignment(pledge: str) -> str:
     if not regional_pledges_context.strip():
         result = result.replace("유사 공약: 있음", "유사 공약: 없음")
         result = re.sub(r"유사성 분석:\s*[^\n]+", "유사성 분석: 없음", result, count=1)
+
+    # 명칭·제목만 제시된 경우(80자 미만): 점수·유사·중복 설명 보정
+    if len(pledge.strip()) < 80:
+        # "2. 개혁신당 공약과의 비교" 섹션의 "적합 (95점 이상)" → "부분적 적합 (50점)"으로
+        result = re.sub(
+            r"(2\. 개혁신당 공약과의 비교\s*\n결과:\s*)적합\s*\((\d{2,3})점\)",
+            r"\1부분적 적합 (50점)",
+            result,
+            count=1,
+        )
+        # "90% 이상", "거의 동일", "사실상 동일" 등 잘못된 표현 → 구체적 지적으로 치환
+        _fix = "제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 우리당 공약의 구체적 방안을 참고해 보완 필요."
+        result = re.sub(r"일치율은\s*90% 이상[^.]*판단한다?", f"{_fix}", result)
+        result = re.sub(r"90% 이상\s*\(거의 동일\)", _fix, result)
+        result = result.replace("거의 동일", "구체적 방안 부족")
+        result = result.replace("사실상 동일한", "명칭만 동일한")
+        result = result.replace("동일하여", "명칭은 같으나")
+        result = result.replace("동일로 판단", "구체성 부족으로 판단")
     return result

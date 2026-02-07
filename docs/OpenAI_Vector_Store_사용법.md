@@ -88,6 +88,35 @@ curl -X POST http://localhost:8000/api/pledge/verify \
   -d '{"text": "지역 청년 일자리 1000개 창출"}'
 ```
 
+### strict judge 모드 (`judge: true`)
+
+evidence·specificity cap·QUERY/VERIFY 모드 적용:
+
+```bash
+curl -X POST http://localhost:8000/api/pledge/verify \
+  -H "Content-Type: application/json" \
+  -d '{"text": "지역 청년 일자리 1000개 창출", "judge": true}'
+```
+
+응답 예시:
+```json
+{
+  "status": "OK",
+  "mode": "VERIFY",
+  "duplication_score": 85,
+  "ideology_fit_score": 80,
+  "specificity_score": 65,
+  "final_score": 75,
+  "confidence": "MED",
+  "missing_fields": [],
+  "evidence": {"input_quotes": [...], "reference_quotes": [...]}
+}
+```
+
+- 입력 ≤10자 또는 ≤3 토큰 → `mode: "QUERY"`, `final_score`/`ideology_fit_score` null
+- `specificity_score < 30` → `final_score` 최대 70
+- `specificity_score < 15` → `final_score` 최대 55
+
 브라우저: http://127.0.0.1:8000/pledge
 
 ---
