@@ -302,7 +302,7 @@ file_search 도구가 2개 있음 (반드시 구분 사용):
 
 [채점 원칙]
 - **단어·문자열 일치가 아니다.** 핵심 가치·이념·정책 방향의 부합으로 판단한다. 표현이 다르더라도 가치가 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수.
-- **제목·표제만 적은 경우 = 2점 이하 고정**: "지역경제 활성화", "청년 일자리 창출" 같이 제목만 띡 적고 구체적 수단·수치·이행 계획이 없으면, 정강정책·공약과 워딩이 아무리 비슷해도 2점 이하. 일치율이 높게 나오면 안 됨.
+- **제목·표제만 적은 경우 = 2점 이하 고정**: "다자녀 핑크번호판", "지역경제 활성화" 같이 명칭만 적고 구체적 방안이 없으면 2점 이하. 이때 note에는 "90% 일치", "거의 동일" 대신 → "우리당 공약은 [검색된 내용 요약: 누구에게 무엇을 어떻게 주겠다]. 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요." 형식으로 작성.
 - **구체성 없으면 높은 점수 금지**: 내용이 짧거나(한 문장·한 줄 수준) 구체적 방안이 없으면 3점 이하. 4~5점은 구체적 수단·수치·이행 계획이 있을 때만.
 - **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
 
@@ -320,7 +320,7 @@ file_search 도구가 2개 있음 (반드시 구분 사용):
 }
 
 score_0_5: 0=상충/근거전무, 1~2=부적합, 3=부분부합, 4=대체로 부합, 5=강한 부합.
-- 제목만·한 줄만 적은 경우: platform/pledges 모든 항목 2점 이하. fit_score 40 이하 수준으로.
+- 제목만·한 줄만 적은 경우: platform/pledges 2점 이하. note는 "우리당 공약은 [검색된 내용]. 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요." 형식으로. "90% 일치", "거의 동일" 사용 금지.
 evidence는 검색된 문서 인용 시 사용. platform/pledges는 [] 가능.
 improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 보완 필요\" 항목을 반드시 포함.
 """
@@ -396,6 +396,18 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
     platform_items = rubric.get("platform", [])
     pledges_items = rubric.get("pledges", [])
     conflicts_items = rubric.get("conflicts", [])
+
+    # 제목·한 줄만 적은 경우: rubric 점수 강제 상한 (80자 미만). note는 모델이 우리당 공약 내용을 참조해 작성하도록 프롬프트에 위임.
+    _short_input = len(user_pledge.strip()) < 80
+    if _short_input:
+        for item in platform_items + pledges_items:
+            if isinstance(item, dict):
+                item["score_0_5"] = min(item.get("score_0_5", 0), 2)
+                # note에 "90% 일치" 등 잘못된 표현만 제거, 구체적 지적은 유지
+                n = (item.get("note") or "").strip()
+                if any(x in n for x in ("90%", "거의 동일", "사실상 동일", "동일하여", "동일로")):
+                    item["note"] = "우리당 공약에 구체적 방안이 있으나, 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요."
+
     platform_avg = avg_score(platform_items)
     pledges_avg = avg_score(pledges_items)
     conflicts_avg = avg_score(conflicts_items)
@@ -404,11 +416,16 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
     if fit_score > 100:
         fit_score = 100.0
 
-    # 제목·한 줄만 적은 경우: 서버 측 상한 적용 (80자 미만이면 fit_score 최대 40)
-    if len(user_pledge.strip()) < 80 and fit_score > 40:
+    if _short_input and fit_score > 40:
         fit_score = min(fit_score, 40.0)
 
     fit_verdict = "강한 부합" if fit_score >= 80 else "부합" if fit_score >= 60 else "부분부합" if fit_score >= 40 else "미부합"
+
+    improvements = raw.get("improvements", [])
+    if _short_input:
+        has_concreteness = any("구체" in str(t.get("title", "") or t.get("detail", "")) for t in improvements)
+        if not has_concreteness:
+            improvements = [{"title": "구체성 보완 필요", "detail": "제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 우리당 공약의 구체적 방안을 참고해 보완하세요.", "evidence": []}] + improvements
 
     return {
         "summary": {
@@ -420,5 +437,5 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
         "pledges": pledges_items,
         "regional_similarity": [],
         "conflicts": conflicts_items,
-        "improvements": raw.get("improvements", []),
+        "improvements": improvements,
     }

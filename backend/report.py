@@ -350,7 +350,7 @@ def build_rubric_prompt(
 [채점 원칙]
 - 문자열·단어 일치가 아니다. 핵심 이념·가치·정책 방향의 부합으로 판단한다.
 - 표현이 다르더라도 이념·가치·방향이 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수를 준다.
-- **제목·표제만 적은 경우 = 2점 이하 고정**: "지역경제 활성화", "청년 일자리 창출" 같이 제목만 띡 적고 구체적 수단·수치·이행 계획이 없으면, 워딩이 아무리 비슷해도 2점 이하. 일치율이 높게 나오면 안 됨.
+- **제목·표제만 적은 경우 = 2점 이하 고정**: "다자녀 핑크번호판", "지역경제 활성화" 같이 명칭만 적고 구체적 방안이 없으면 2점 이하. note에는 "90% 일치", "거의 동일" 대신 → "우리당 공약은 [검색된 내용 요약: 누구에게 무엇을 어떻게 주겠다]. 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요." 형식으로 작성.
 - **구체성 없으면 높은 점수 금지**: 내용이 짧거나(한 문장·한 줄 수준) 구체적 방안이 없으면 3점 이하. 4~5점은 구체적 수단·수치·이행 계획이 있을 때만.
 - 출마자 공약이 우리당 공약(pledges)과 유사할 때는 정강정책(platform) 부합 점수도 그에 맞춰 소폭 높게 줄 수 있다. 단, 제목만·구체성 부족 시 위 규칙 우선.
 - **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
@@ -411,7 +411,7 @@ Evidence 규칙:
 - fit_score, breakdown은 계산하지 않는다. rubric.score_0_5, evidence, note, confidence, improvements만 작성.
 - platform·pledges의 evidence는 [] 가능. conflicts 등에서만 R1,R2 등 타지역 ID 사용.
 - improvements: 구체적 방안·수치·이행 계획이 없으면 "구체성 보완 필요" 항목을 반드시 포함.
-- 제목만·한 줄만 적은 경우: platform/pledges 모든 항목 2점 이하. fit_score 40 이하 수준으로.
+- 제목만·한 줄만 적은 경우: platform/pledges 2점 이하. note는 "우리당 공약은 [검색된 내용]. 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요." 형식으로. "90% 일치", "거의 동일" 사용 금지.
 - JSON만 반환하고 다른 설명은 붙이지 마라.
 """
     return prompt
@@ -565,6 +565,19 @@ def generate_report(
         platform_items = rubric.get("platform", [])
         pledge_items = rubric.get("pledges", [])
         conflict_items = rubric.get("conflicts", [])
+
+        # 제목·한 줄만 적은 경우: rubric 점수 강제 상한 (80자 미만)
+        _short_input = len(user_pledge.strip()) < 80
+        if _short_input:
+            for item in platform_items + pledge_items:
+                if isinstance(item, dict):
+                    item["score_0_5"] = min(item.get("score_0_5", 0), 2)
+                    n = (item.get("note") or "").strip()
+                    if any(x in n for x in ("90%", "거의 동일", "사실상 동일", "동일하여", "동일로")):
+                        item["note"] = "우리당 공약에 구체적 방안이 있으나, 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요."
+            has_concreteness = any("구체" in str(t.get("title", "") or t.get("detail", "")) for t in improvements)
+            if not has_concreteness:
+                improvements = [{"title": "구체성 보완 필요", "detail": "제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 우리당 공약의 구체적 방안을 참고해 보완하세요.", "evidence": []}] + improvements
 
         platform_avg_0_5 = avg_score(platform_items)
         pledge_avg_0_5 = avg_score(pledge_items)
