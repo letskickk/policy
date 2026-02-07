@@ -114,6 +114,37 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+**Ubuntu에서 한글 PDF가 잘 안 읽힐 때** (로컬과 다르게 추출되거나 빈 텍스트가 많을 때):
+
+```bash
+# 한글 폰트 설치 후 서버 재시작 (PDF 텍스트 추출 품질 개선)
+sudo apt update
+sudo apt install -y fonts-noto-cjk fonts-nanum
+```
+
+설치 후 앱을 한 번 재시작하면, 같은 PDF도 더 안정적으로 읽힐 수 있습니다.
+
+### 로컬과 AWS 출력을 최대한 맞추는 방법
+
+1. **같은 PDF 추출기 사용**  
+   `.env`에 다음을 넣으면 로컬·AWS 모두 **pdfplumber**만 사용합니다. (기본값이 이미 pdfplumber입니다.)
+   ```
+   PDF_EXTRACTOR=pdfplumber
+   ```
+
+2. **수치로 비교**  
+   로컬과 AWS에서 각각 다음 주소를 열어 보세요.  
+   - `http://로컬주소:8000/api/debug/context-summary`  
+   - `http://AWS주소:8000/api/debug/context-summary`  
+   `platform`, `pledges`, `regional`의 `files_loaded`, `total_chars`가 비슷해야 합니다.  
+   AWS에서 `total_chars`가 현저히 작으면 PDF 추출이 다르게 되고 있는 것이므로, 출력 차이의 원인일 수 있습니다.
+
+3. **인덱스를 로컬에서 만들어서 AWS에 올리기 (선택)**  
+   로컬에서 PDF가 잘 읽히므로, **로컬에서 서버를 한 번 실행**해 인덱스를 만든 뒤,  
+   `data/index_cache/` 폴더 전체를 AWS로 복사합니다.  
+   AWS에서는 같은 `data/pdf/`와 `data/index_cache/`를 쓰면, 검색(verify)에 쓰이는 청크·임베딩이 로컬과 동일해집니다.  
+   (앱 시작 시 캐시가 있으면 재빌드하지 않습니다. PDF를 바꾸지 않았다면 캐시만 배포해도 됩니다.)
+
 ### .env 파일 만들기
 
 서버에도 API 키가 있어야 합니다.
