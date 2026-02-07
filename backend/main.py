@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend.config import ROOT_DIR, PDF_DIR
+from backend.config import ROOT_DIR, PDF_DIR, OPENAI_MODEL, CHAT_MODEL
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import (
     HAS_PDFPLUMBER,
@@ -42,6 +42,7 @@ async def startup_event():
     """서버 시작 시 인덱스 빌드."""
     global _indexes
     logger.info("서버 시작: 인덱스 빌드 중...")
+    logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
     logger.info(f"HAS_PDFPLUMBER={HAS_PDFPLUMBER}")
     try:
         _indexes = build_all_indexes(force_rebuild=False)
@@ -272,6 +273,16 @@ def debug_pdf():
         result["error"] = error_msg
     
     return result
+
+
+@app.get("/api/debug/models")
+def debug_models():
+    """현재 서버에서 사용 중인 OpenAI 모델명을 반환 (AWS 등 배포 환경 확인용)."""
+    return {
+        "openai_model": OPENAI_MODEL,
+        "chat_model": CHAT_MODEL,
+        "hint": "/check 는 OPENAI_MODEL, /api/pledge/verify·카드는 CHAT_MODEL 사용. 동일하게 쓰려면 .env에 둘 다 설정.",
+    }
 
 
 @app.get("/api/debug/index")
