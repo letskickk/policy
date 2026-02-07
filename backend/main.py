@@ -2,15 +2,22 @@
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 """
 import logging
+import os
 from pathlib import Path
-
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend.config import ROOT_DIR, PDF_DIR, OPENAI_MODEL, CHAT_MODEL
+from backend.config import (
+    ROOT_DIR,
+    PDF_DIR,
+    INDEX_CACHE_DIR,
+    OPENAI_MODEL,
+    CHAT_MODEL,
+    PDF_S3_URI,
+)
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import (
     HAS_PDFPLUMBER,
@@ -38,45 +45,124 @@ app = FastAPI(
 _indexes = None
 
 
+def _startup_self_check() -> int:
+    """
+    서버 시작 시 강제 진단. 조건 불만족 시 RuntimeError.
+    Returns: 공약 폴더 PDF 개수 (0이면 그대로 raise)
+    """
+    # 경로
+    cwd = os.getcwd()
+    try:
+        backend_file = Path(__file__).resolve()
+        base_dir = backend_file.parent.parent
+    except Exception:
+        base_dir = Path(cwd)
+    logger.info(f"[SELF-CHECK] cwd={cwd!r}, __file__ base={base_dir!s}")
+
+    pdf_dir = Path(PDF_DIR).resolve()
+    pdf_dir_exists = pdf_dir.exists()
+    logger.info(f"[SELF-CHECK] PDF_DIR={pdf_dir!s}, exists={pdf_dir_exists}")
+
+    folders = [
+        ("정강정책", pdf_dir / "정강정책"),
+        ("공약", pdf_dir / "공약"),
+        ("지역별 공약", pdf_dir / "지역별 공약"),
+    ]
+    pledge_pdf_count = 0
+    for name, dir_path in folders:
+        exists = dir_path.exists()
+        try:
+            pdf_list = list(dir_path.rglob("*.pdf")) if exists else []
+        except Exception as e:
+            logger.warning(f"[SELF-CHECK] {name} rglob failed: {e}")
+            pdf_list = []
+        count = len(pdf_list)
+        samples = [p.name for p in sorted(pdf_list)[:5]]
+        if name == "공약":
+            pledge_pdf_count = count
+        has_sin_gu = any("신구연금" in p.name for p in pdf_list)
+        logger.info(f"[SELF-CHECK] {name} exists={exists} pdf_count={count} sample={samples!r} 신구연금포함={has_sin_gu}")
+
+    if not HAS_PDFPLUMBER:
+        raise RuntimeError("HAS_PDFPLUMBER is False. pdfplumber is required. Install: pip install pdfplumber pdfminer.six")
+    logger.info("[SELF-CHECK] HAS_PDFPLUMBER=True")
+
+    cache_dir = Path(INDEX_CACHE_DIR).resolve()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_exists = cache_dir.exists()
+    writable = False
+    try:
+        touch = cache_dir / ".write_test"
+        touch.write_text("ok")
+        touch.unlink(missing_ok=True)
+        writable = True
+    except Exception as e:
+        logger.error(f"[SELF-CHECK] INDEX_CACHE_DIR not writable: {cache_dir} - {e}")
+    logger.info(f"[SELF-CHECK] INDEX_CACHE_DIR={cache_dir!s} exists={cache_exists} writable={writable}")
+    if not writable:
+        raise RuntimeError(f"INDEX_CACHE_DIR is not writable: {cache_dir}")
+
+    if pledge_pdf_count == 0 and not PDF_S3_URI:
+        raise RuntimeError(
+            "공약 폴더 PDF 개수가 0입니다. AWS에 PDF를 배포했는지 확인하세요. "
+            "또는 PDF_S3_URI를 설정해 S3에서 내려받도록 하세요."
+        )
+    logger.info(f"[SELF-CHECK] 공약 pdf count={pledge_pdf_count} (>0 or PDF_S3_URI set)")
+
+    if pledge_pdf_count == 0 and PDF_S3_URI:
+        try:
+            import subprocess
+            pdf_dir.mkdir(parents=True, exist_ok=True)
+            pdf_pledge = pdf_dir / "공약"
+            pdf_pledge.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["aws", "s3", "sync", PDF_S3_URI.rstrip("/") + "/", str(pdf_pledge)],
+                check=True,
+                timeout=300,
+                capture_output=True,
+            )
+            pledge_pdf_count = len(list(pdf_pledge.rglob("*.pdf")))
+            logger.info(f"[SELF-CHECK] S3 sync done, 공약 pdf count={pledge_pdf_count}")
+        except Exception as e:
+            raise RuntimeError(f"PDF_S3_URI sync failed: {e}") from e
+        if pledge_pdf_count == 0:
+            raise RuntimeError("S3 sync 후에도 공약 폴더 PDF가 0건입니다.")
+
+    return pledge_pdf_count
+
+
 @app.on_event("startup")
 async def startup_event():
-    """서버 시작 시 인덱스 빌드."""
+    """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 빌드. 조건 불만족 시 RuntimeError로 중단."""
     global _indexes
-    logger.info("서버 시작: 인덱스 빌드 중...")
+    logger.info("서버 시작: Self-Check 및 인덱스 빌드 중...")
     logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
-    logger.info(f"HAS_PDFPLUMBER={HAS_PDFPLUMBER}")
-    try:
-        _indexes = build_all_indexes(force_rebuild=False)
-        from backend.vector_index import VectorIndex
 
-        # 빈 인덱스가 있으면 기본값으로 채우기
-        if "platform" not in _indexes:
-            _indexes["platform"] = VectorIndex(dimension=3072, use_cosine=True)
-        if "pledge" not in _indexes:
-            _indexes["pledge"] = VectorIndex(dimension=3072, use_cosine=True)
-        if "regional" not in _indexes:
-            _indexes["regional"] = VectorIndex(dimension=3072, use_cosine=True)
+    _startup_self_check()
 
-        # 인덱스 크기 로깅
-        platform_vectors = _indexes["platform"].size()
-        pledge_vectors = _indexes["pledge"].size()
-        regional_vectors = _indexes["regional"].size()
-        logger.info(f"platform_index: {platform_vectors} vectors")
-        logger.info(f"pledge_index: {pledge_vectors} vectors")
-        logger.info(f"regional_index: {regional_vectors} vectors")
+    _indexes = build_all_indexes(force_rebuild=False)
+    from backend.vector_index import VectorIndex
 
-        if pledge_vectors == 0:
-            raise RuntimeError("pledge_index empty")
+    if "platform" not in _indexes:
+        _indexes["platform"] = VectorIndex(dimension=3072, use_cosine=True)
+    if "pledge" not in _indexes:
+        _indexes["pledge"] = VectorIndex(dimension=3072, use_cosine=True)
+    if "regional" not in _indexes:
+        _indexes["regional"] = VectorIndex(dimension=3072, use_cosine=True)
 
-        logger.info("인덱스 빌드 완료")
-    except Exception as e:
-        logger.error(f"인덱스 빌드 실패: {e}", exc_info=True)
-        from backend.vector_index import VectorIndex
-        _indexes = {
-            "platform": VectorIndex(dimension=3072, use_cosine=True),
-            "pledge": VectorIndex(dimension=3072, use_cosine=True),
-            "regional": VectorIndex(dimension=3072, use_cosine=True),
-        }
+    platform_vectors = _indexes["platform"].size()
+    pledge_vectors = _indexes["pledge"].size()
+    regional_vectors = _indexes["regional"].size()
+    logger.info(f"platform_index: {platform_vectors} vectors")
+    logger.info(f"pledge_index: {pledge_vectors} vectors")
+    logger.info(f"regional_index: {regional_vectors} vectors")
+
+    if pledge_vectors == 0:
+        raise RuntimeError(
+            "pledge_index 벡터가 0입니다. PDF 추출 또는 인덱스 빌드가 실패한 상태로 서비스를 시작할 수 없습니다. "
+            "로그에서 [EXTRACT] final_chars, [SELF-CHECK] 공약 pdf count를 확인하세요."
+        )
+    logger.info("인덱스 빌드 완료")
 
 STATIC_DIR = ROOT_DIR / "static"
 
@@ -274,6 +360,39 @@ def debug_pdf():
         result["error"] = error_msg
     
     return result
+
+
+def _get_fs_debug() -> dict:
+    """PDF 디렉터리·폴더별 파일 수·샘플 파일명 (GET /api/debug/fs용)."""
+    pdf_dir = Path(PDF_DIR).resolve()
+    folders = [
+        ("정강정책", pdf_dir / "정강정책"),
+        ("공약", pdf_dir / "공약"),
+        ("지역별 공약", pdf_dir / "지역별 공약"),
+    ]
+    by_folder = {}
+    for name, dir_path in folders:
+        exists = dir_path.exists()
+        try:
+            pdf_list = list(dir_path.rglob("*.pdf")) if exists else []
+        except Exception:
+            pdf_list = []
+        by_folder[name] = {
+            "exists": exists,
+            "pdf_count": len(pdf_list),
+            "sample_names": [p.name for p in sorted(pdf_list)[:10]],
+        }
+    return {
+        "pdf_dir": str(pdf_dir),
+        "pdf_dir_exists": pdf_dir.exists(),
+        "folders": by_folder,
+    }
+
+
+@app.get("/api/debug/fs")
+def debug_fs():
+    """PDF 디렉터리 존재·폴더별 PDF 개수·샘플 파일명. AWS 배포 확인용."""
+    return _get_fs_debug()
 
 
 @app.get("/api/debug/models")

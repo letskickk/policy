@@ -25,13 +25,12 @@ def _use_pdfplumber_first() -> bool:
         return False
     return sys.platform != "win32"  # auto: Linux만 pdfplumber 우선
 
-# pdfplumber는 필수 의존성이다. 없으면 바로 에러를 발생시켜 디버깅을 쉽게 한다.
+# pdfplumber 필수: 없으면 추출 fallback 불가 → RuntimeError로 fail-fast
 try:
     import pdfplumber
-except ImportError as e:
-    raise RuntimeError("pdfplumber not installed") from e
-
-HAS_PDFPLUMBER = True
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
 
 from backend.config import (
     MAX_CONTEXT_CHARS,
@@ -122,31 +121,35 @@ def load_full_text_from_dir(dir_path: Path) -> str:
 
 
 def extract_text_from_pdf(path: Path) -> str:
-    """PDF 한 파일에서 텍스트 추출. PDF_EXTRACTOR에 따라 pdfplumber만 / pypdf만 / 자동(OS별) 사용."""
+    """PDF 한 파일에서 텍스트 추출. pdfplumber 없으면 fallback 불가 시 RuntimeError."""
     path_str = str(path.resolve())
     path = Path(path_str)
-
     if not path.exists():
         raise FileNotFoundError(f"PDF 파일이 존재하지 않음: {path}")
 
+    pypdf_chars = 0
+    plumber_chars = 0
+    final_text: str = ""
+
+    def _log_extract():
+        logger.info(
+            f"[EXTRACT] file={path.name!r} pypdf_chars={pypdf_chars} plumber_chars={plumber_chars} final_chars={len(final_text)}"
+        )
+
     use_plumber_first = _use_pdfplumber_first()
 
-    # 1) pdfplumber 우선 경로 (로컬/AWS 동일 출력을 위해 기본)
     if use_plumber_first and HAS_PDFPLUMBER:
         try:
-            text = _extract_with_pdfplumber(path)
-            if text is not None:
-                logger.info(f"[PDF] {path.name} pdfplumber chars={len((text or '').strip())}")
-                if PDF_EXTRACTOR == "pdfplumber" or len((text or "").strip()) >= 10:
-                    return text or ""
-                # auto 모드에서 너무 짧으면 pypdf 시도
+            final_text = _extract_with_pdfplumber(path) or ""
+            plumber_chars = len(final_text.strip())
+            if PDF_EXTRACTOR == "pdfplumber" or plumber_chars >= 10:
+                _log_extract()
+                return final_text
         except Exception as e:
             logger.warning(f"[PDF] pdfplumber 실패 ({path.name}): {e}")
             if PDF_EXTRACTOR == "pdfplumber":
-                raise
-            # fall through to pypdf
+                raise RuntimeError(f"pdfplumber is required for PDF extraction; failed: {e}") from e
 
-    # 2) pypdf 시도
     try:
         reader = PdfReader(str(path))
         parts = []
@@ -154,41 +157,40 @@ def extract_text_from_pdf(path: Path) -> str:
             t = page.extract_text()
             if t:
                 parts.append(t)
-        text = "\n\n".join(parts)
-        stripped = text.strip()
-        logger.info(f"[PDF] {path.name} pypdf chars={len(stripped)}")
-        if len(stripped) < 50 and HAS_PDFPLUMBER and PDF_EXTRACTOR != "pypdf":
+        final_text = "\n\n".join(parts)
+        pypdf_chars = len(final_text.strip())
+        if len(final_text.strip()) < 50 and HAS_PDFPLUMBER and PDF_EXTRACTOR != "pypdf":
             try:
-                text = _extract_with_pdfplumber(path)
-                if text and len(text.strip()) > len(stripped):
-                    return text
+                t2 = _extract_with_pdfplumber(path) or ""
+                plumber_chars = len(t2.strip())
+                if plumber_chars > pypdf_chars:
+                    final_text = t2
             except Exception:
                 pass
-        return text
+        _log_extract()
+        return final_text
     except Exception as e:
         logger.warning(f"pypdf 실패 ({path.name}): {e}")
-        if HAS_PDFPLUMBER:
-            return _extract_with_pdfplumber(path)
-        raise
+        if not HAS_PDFPLUMBER:
+            raise RuntimeError(
+                "pdfplumber is required for PDF extraction (fallback unavailable). Install: pip install pdfplumber pdfminer.six"
+            ) from e
+        final_text = _extract_with_pdfplumber(path) or ""
+        plumber_chars = len(final_text.strip())
+        _log_extract()
+        return final_text
 
 
 def _extract_with_pdfplumber(path: Path) -> str:
-    """pdfplumber로 PDF 텍스트 추출 (Linux 우선 사용 또는 fallback)."""
-    try:
-        path_str = str(path.resolve())
-        parts = []
-        with pdfplumber.open(path_str) as pdf:
-            for page in pdf.pages:
-                t = page.extract_text()
-                if t:
-                    parts.append(t)
-        text = "\n\n".join(parts)
-        stripped = text.strip()
-        logger.info(f"[PDF] {path.name} pdfplumber chars={len(stripped)}")
-        return text
-    except Exception as e:
-        logger.error(f"pdfplumber 실패 ({path.name}): {e}")
-        raise Exception(f"PDF 추출 실패 ({path.name}): {e}")
+    """pdfplumber로 PDF 텍스트 추출. [EXTRACT] 로깅은 extract_text_from_pdf에서 수행."""
+    path_str = str(path.resolve())
+    parts = []
+    with pdfplumber.open(path_str) as pdf:
+        for page in pdf.pages:
+            t = page.extract_text()
+            if t:
+                parts.append(t)
+    return "\n\n".join(parts)
 
 
 def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:

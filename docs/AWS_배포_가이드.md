@@ -83,6 +83,14 @@ cd Policy
 
 (저장소가 비공개면 SSH 키나 토큰 설정 필요.)
 
+**중요: AWS에서 PDF가 반드시 있어야 합니다.** `data/pdf/공약/` 등에 PDF가 없으면 서버가 시작 시 `RuntimeError`로 중단됩니다. 아래 중 하나를 반드시 적용하세요.
+
+| 옵션 | 설명 |
+|------|------|
+| **A. 이미지/배포에 포함** | Dockerfile에서 `COPY data/pdf /app/data/pdf` 또는 SCP/rsync로 `data/pdf` 전체를 서버에 올림. `.dockerignore`에 `data/pdf`가 있으면 제거. |
+| **B. S3에서 내려받기** | `.env`에 `PDF_S3_URI=s3://버킷명/경로/` 설정. 시작 시 공약 폴더가 비어 있으면 `aws s3 sync`로 다운로드 후 진행. (AWS CLI 설치 및 권한 필요) |
+| **C. EFS 마운트** | `data/pdf`를 EFS로 마운트. 시작 self-check에서 PDF 개수 검증. |
+
 ### 방법 B: 로컬에서 파일 복사 (SCP)
 
 **Windows (PowerShell 또는 CMD)**에서 프로젝트 폴더로 간 뒤:
@@ -173,6 +181,29 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 브라우저에서 `http://<서버_공인IP>:8000` 으로 접속해 보세요.  
 **보안 그룹에서 8000 포트 인바운드 허용**이 되어 있어야 합니다.
+
+### 워커 1개로 실행 (레이스 확인용)
+
+멀티워커에서 인덱스가 비는 현상이 있으면, 우선 **워커 1개**로 실행해 보세요.
+
+```bash
+# uvicorn 단일 프로세스 (기본)
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# gunicorn 사용 시 워커 1개
+WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app --bind 0.0.0.0:8000
+```
+
+워커 1개로 정상화되면 멀티워커 레이스가 원인이므로, 앱은 `build.lock`으로 보정되어 있습니다. 필요 시 워커 수를 다시 늘려도 됩니다.
+
+### 배포 성공 확인
+
+다음 두 API가 **정상 값**을 보여야 배포 성공입니다.
+
+- **GET /api/debug/fs** — `pdf_dir_exists: true`, `folders.공약.pdf_count > 0`, `sample_names`에 파일명 나옴
+- **GET /api/debug/index** — `pledge_vectors > 0`, `platform_vectors`, `regional_vectors` 확인
+
+둘 중 하나라도 0이거나 비정상이면 서버는 시작 단계에서 이미 `RuntimeError`로 떨어져 있거나, 다른 인스턴스/경로를 보고 있을 수 있습니다.
 
 ### 계속 켜 두기: systemd 서비스 (권장)
 
