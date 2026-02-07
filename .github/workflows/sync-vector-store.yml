@@ -1,0 +1,59 @@
+# push to main 시 OpenAI Vector Store 증분 동기화 (변경된 PDF만 업로드)
+name: Sync Vector Store
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/pdf/**"
+      - "scripts/**"
+      - "backend/**"
+      - "data/vector_store_manifest*.json"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # manifest 커밋 시 push 필요
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Sync Vector Store
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_VECTOR_STORE_ID: ${{ secrets.OPENAI_VECTOR_STORE_ID }}
+          OPENAI_REGIONAL_VECTOR_STORE_ID: ${{ secrets.OPENAI_REGIONAL_VECTOR_STORE_ID }}
+        run: |
+          python scripts/sync_vector_store.py
+
+      - name: Commit and push manifest if changed
+        run: |
+          to_add=""
+          for f in data/vector_store_manifest.json data/vector_store_regional_manifest.json; do
+            [ -f "$f" ] && to_add="$to_add $f"
+          done
+          if [ -z "$to_add" ]; then
+            echo "No manifest files to commit."
+            exit 0
+          fi
+          if git diff --quiet $to_add 2>/dev/null; then
+            echo "Manifest unchanged, nothing to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add $to_add
+            git commit -m "chore: sync vector store manifest [skip ci]"
+            git push
+          fi

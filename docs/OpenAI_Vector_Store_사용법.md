@@ -51,7 +51,18 @@ USE_OPENAI_VECTOR_STORE=1
 OPENAI_VECTOR_STORE_ID=vs_xxxxxxxxxxxxxxxxxxxx
 ```
 
-> **주의**: PDF를 추가/수정했다면 `OPENAI_VECTOR_STORE_ID`를 지우고 서버를 재시작해 새로 만들어야 합니다.
+> **주의**: PDF를 추가/수정했다면 `OPENAI_VECTOR_STORE_ID`·`OPENAI_REGIONAL_VECTOR_STORE_ID`를 지우고 서버를 재시작해 새로 만들어야 합니다.
+
+---
+
+## 3-0. 공약·지역별 공약 분리 (타지역 유사성 검토 수정)
+
+**공약** 폴더와 **지역별 공약** 폴더는 서로 다른 Vector Store에 저장됩니다.
+
+- **정강+공약**: platform·pledges 채점 시 검색
+- **지역별 공약**: 타지역 유사성·중복 검토(conflicts) 시 **이 store만** 검색
+
+이전에 지역별 유사성 검토 시 공약 폴더를 잘못 읽던 문제가 해결됩니다.
 
 ---
 

@@ -1,8 +1,9 @@
 .env
 .venv/
 venv/
-# Vector Store 증분 동기화용 (환경별 file_id 포함)
-data/vector_store_manifest.json
+# Vector Store manifest: CI 동기화를 위해 커밋 가능 (로컬 .env ID와 분리 운영 시 제거)
+# data/vector_store_manifest.json
+# data/vector_store_regional_manifest.json
 __pycache__/
 *.pyc
 *.pyo

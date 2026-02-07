@@ -348,9 +348,10 @@ def build_rubric_prompt(
 {cards_instruction}
 
 [채점 원칙]
-- 문자열 유사도가 아니라, 핵심 이념·가치·정책 방향의 부합으로 판단한다.
+- 문자열·단어 일치가 아니다. 핵심 이념·가치·정책 방향의 부합으로 판단한다.
 - 표현이 다르더라도 이념·가치·방향이 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수를 준다.
 - 출마자 공약이 우리당 공약(pledges)과 유사할 때는 정강정책(platform) 부합 점수도 그에 맞춰 소폭 높게 줄 수 있다.
+- **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
 
 [정강정책 전체]
 {platform_block}
@@ -407,6 +408,7 @@ Evidence 규칙:
 중요:
 - fit_score, breakdown은 계산하지 않는다. rubric.score_0_5, evidence, note, confidence, improvements만 작성.
 - platform·pledges의 evidence는 [] 가능. conflicts 등에서만 R1,R2 등 타지역 ID 사용.
+- improvements: 구체적 방안·수치·이행 계획이 없으면 "구체성 보완 필요" 항목을 반드시 포함.
 - JSON만 반환하고 다른 설명은 붙이지 마라.
 """
     return prompt

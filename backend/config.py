@@ -72,5 +72,13 @@ PDF_S3_URI = os.getenv("PDF_S3_URI", "").strip()
 DEBUG_ENDPOINTS_ENABLED = os.getenv("DEBUG_ENDPOINTS_ENABLED", "1") == "1"
 # OpenAI Vector Store 사용 (1=사용, FAISS 대신). AWS 인프라 복잡도 제거.
 USE_OPENAI_VECTOR_STORE = os.getenv("USE_OPENAI_VECTOR_STORE", "0") == "1"
-# Vector Store 재사용 (설정 시 매번 새로 만들지 않음)
+# 서버 시작 시 PDF 스캔 생략. 1이면 scripts/index_pdfs_to_vector_store.py로 별도 인덱싱 후 .env의 ID만 사용.
+SKIP_PDF_SCAN_ON_STARTUP = os.getenv("SKIP_PDF_SCAN_ON_STARTUP", "0") == "1"
+# Vector Store ID (scripts/index_pdfs_to_vector_store.py 실행 후 .env에 저장)
 OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID", "").strip()
+# 지역별 공약 전용 (타지역 유사성 검토 시 이 store만 검색)
+OPENAI_REGIONAL_VECTOR_STORE_ID = os.getenv("OPENAI_REGIONAL_VECTOR_STORE_ID", "").strip()
+# file_search 결과 개수 제한 (full phase 기본 6)
+FILE_SEARCH_MAX_RESULTS = int(os.getenv("FILE_SEARCH_MAX_RESULTS", "6"))
+# quick phase용 (속도 우선, 기본 3)
+FILE_SEARCH_MAX_RESULTS_QUICK = int(os.getenv("FILE_SEARCH_MAX_RESULTS_QUICK", "3"))

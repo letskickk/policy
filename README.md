@@ -89,8 +89,9 @@ Policy/
    브라우저: http://127.0.0.1:8000  
    API 문서: http://127.0.0.1:8000/docs
    
-   **참고**: 서버 시작 시 PDF를 자동으로 청크 분할하고 임베딩하여 FAISS 인덱스를 구축합니다.
-   첫 실행 시 시간이 걸릴 수 있으며, 이후에는 캐시를 사용하여 빠르게 시작됩니다.
+   **참고**:  
+   - FAISS 모드: 서버 시작 시 PDF 스캔 → 청크 분할 → 임베딩 → 인덱스 구축. 첫 실행 시 시간이 걸릴 수 있음.  
+   - Vector Store 모드 + `SKIP_PDF_SCAN_ON_STARTUP=1`: 시작 시 스캔 없음. `scripts/index_pdfs_to_vector_store.py`로 별도 인덱싱 후 `.env`의 ID만 사용.
 
 5. **API 호출 예시**
 
@@ -135,13 +136,41 @@ Policy/
 
 FAISS 대신 OpenAI File Search를 쓰면 인덱스 경로·EBS/EFS 등 AWS 설정이 필요 없습니다.
 
+### 설정
+
 ```env
 USE_OPENAI_VECTOR_STORE=1
+SKIP_PDF_SCAN_ON_STARTUP=1   # 서버 시작 시 PDF 스캔 생략
+OPENAI_VECTOR_STORE_ID=vs_xxx
+OPENAI_REGIONAL_VECTOR_STORE_ID=vs_yyy
+FILE_SEARCH_MAX_RESULTS=6
 ```
 
-- 1GB까지 무료, 초과 시 $0.10/GB/day
-- 서버 시작 시 PDF를 OpenAI에 업로드 → Vector Store 생성
-- 재시작 시 재생성 방지: 로그에 나온 `OPENAI_VECTOR_STORE_ID`를 `.env`에 저장
+### PDF 업로드 스크립트 (1회 실행)
+
+서버 시작 시 PDF 스캔 없이 `.env`의 Vector Store ID만 사용하려면, **별도 스크립트**로 PDF를 한 번 업로드·인덱싱한다:
+
+```bash
+# 프로젝트 루트에서 실행
+python scripts/index_pdfs_to_vector_store.py --output-env
+```
+
+- `data/pdf/정강정책/`, `data/pdf/공약/` → 정강·공약 Vector Store 생성
+- `data/pdf/지역별 공약/` → 지역별 공약 Vector Store 생성
+- `--output-env`: 완료 후 `.env`에 `OPENAI_VECTOR_STORE_ID`, `OPENAI_REGIONAL_VECTOR_STORE_ID` 자동 기록
+- `--single-store`: 두 폴더를 하나의 Vector Store로 합칠 때 사용
+
+자세한 사용법: [docs/Vector_Store_업로드_스크립트.md](docs/Vector_Store_업로드_스크립트.md)
+
+### 검증 API (2단계)
+
+- `phase=quick`: file_search 결과 3~5개, 짧은 판정(JSON)만 반환
+- `phase=full`: 결과 6~8개, 근거 인용·상충 분석 포함
+
+### git push 시 자동 동기화
+
+`push to main` 시 GitHub Actions가 `scripts/sync_vector_store.py`를 실행해 **변경된 PDF만** Vector Store에 반영합니다.  
+초기 설정: [docs/Vector_Store_업로드_스크립트.md §8](docs/Vector_Store_업로드_스크립트.md) 참고.
 
 ---
 
