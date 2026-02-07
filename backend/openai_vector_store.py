@@ -326,34 +326,49 @@ improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 �
 """
 
 
-_JUDGE_INSTRUCTIONS = """You are a policy-verification judge.
+_JUDGE_INSTRUCTIONS = """You are a judge that separates '공약 유사도 탐색(QUERY)' from '정책 내용 검증(VERIFY)'.
 
-Hard rules:
-1) Never infer missing policy details. If input lacks details, respond with status INSUFFICIENT_INFO.
-2) Provide evidence snippets: at least 2 from the user's input and 2 from the retrieved party reference. If not possible, INSUFFICIENT_INFO.
-3) Output JSON only with fields:
-   - status: "OK" | "INSUFFICIENT_INFO"
-   - mode: "QUERY" | "VERIFY"
-   - duplication_score (0-100)
-   - ideology_fit_score (0-100 or null if insufficient)
-   - specificity_score (0-100)
-   - final_score (0-100, must be capped by specificity; null in QUERY mode)
-   - confidence ("LOW"|"MED"|"HIGH")
-   - missing_fields: list of required slots not present (e.g. ["구체적 수단", "대상", "수치"])
-   - evidence: {input_quotes:[], reference_quotes:[]}
-4) Mode:
-   - If user input is <= 10 Korean characters or <= 3 space-separated tokens, treat as QUERY (mode=QUERY, no final_score, ideology_fit_score=null).
-5) Scoring cap:
-   - If specificity_score < 30, final_score <= 70
-   - If specificity_score < 15, final_score <= 55
-6) specificity_score: 0=title-only, 100=full concrete plan with targets, means, numbers.
+[모드 규칙]
+- 입력이 키워드/제목 수준(예: 20자 미만 또는 1문장 또는 정책 슬롯 2개 미만)이면 mode="QUERY"로 처리한다.
+- QUERY 모드에서는 final_score(적합/검증 점수)를 산출하지 말고, 유사 문서 후보와 "추가로 필요한 정보"만 제시한다.
+
+[검증 규칙]
+- mode="VERIFY"는 입력에 정책 슬롯이 3개 이상 있을 때만 허용한다.
+- VERIFY에서 점수는 '정책 내용 동일성' 기준이며, 제목/키워드 일치만으로 80점 이상을 주지 않는다.
+- evidence: 입력에서 2개, 레퍼런스에서 2개 근거를 반드시 인용한다. 못하면 INSUFFICIENT_INFO로 종료한다.
+
+[상한]
+- 슬롯 0~1개면 final_score 금지 또는 55 이하, confidence=LOW.
+- 슬롯 2개면 final_score <= 70.
+- 슬롯 3개 이상이어야 80+ 가능.
+
+[정책 슬롯 예시] 대상, 목표, 구체적 수단, 수치·목표치, 이행 계획 등.
+
+Output JSON only:
+{
+  "status": "OK" | "INSUFFICIENT_INFO",
+  "mode": "QUERY" | "VERIFY",
+  "policy_slot_count": 0-5,
+  "duplication_score": 0-100,
+  "ideology_fit_score": 0-100 or null,
+  "specificity_score": 0-100,
+  "final_score": 0-100 or null,
+  "confidence": "LOW"|"MED"|"HIGH",
+  "missing_fields": ["추가로 필요한 정보 목록"],
+  "evidence": {"input_quotes":[], "reference_quotes":[]},
+  "similar_candidates": []  // QUERY 모드 시 유사 문서 후보 요약
+}
 """
 
 
 def _is_query_mode(text: str) -> bool:
-    """<= 10 chars or <= 3 tokens → QUERY mode."""
+    """20자 미만 또는 1문장 → QUERY mode."""
     t = (text or "").strip()
-    return len(t) <= 10 or len(t.split()) <= 3
+    if len(t) < 20:
+        return True
+    # 1문장: 마침표/느낌표/물음표가 0~1개
+    punct_count = sum(1 for c in t if c in ".!?。！？")
+    return punct_count <= 1
 
 
 def run_verify_judge(
@@ -408,24 +423,31 @@ def run_verify_judge(
         text = "\n".join(lines)
     raw = json.loads(text)
 
-    # QUERY mode: server-side override when input is very short
+    # QUERY mode: server-side override (20자 미만 또는 1문장)
     if _is_query_mode(user_pledge):
         raw["mode"] = "QUERY"
         raw["final_score"] = None
         raw["ideology_fit_score"] = None
-        raw["specificity_score"] = raw.get("specificity_score", 0)
+        raw["policy_slot_count"] = raw.get("policy_slot_count", 0)
         raw["status"] = raw.get("status", "INSUFFICIENT_INFO")
         raw.setdefault("evidence", {"input_quotes": [], "reference_quotes": []})
         raw.setdefault("missing_fields", ["구체적 수단", "대상", "수치·이행 계획"])
+        raw.setdefault("similar_candidates", [])
 
-    # Scoring cap: specificity < 30 → final_score <= 70; < 15 → <= 55
-    spec = raw.get("specificity_score")
+    # Scoring cap by policy_slot_count (슬롯 0~1 → 55 이하, 2개 → 70 이하, 3+ → 80+ 가능)
+    slot_count = raw.get("policy_slot_count")
     final = raw.get("final_score")
-    if spec is not None and final is not None:
-        if spec < 15:
-            raw["final_score"] = min(final, 55)
-        elif spec < 30:
-            raw["final_score"] = min(final, 70)
+    spec = raw.get("specificity_score")
+    if final is not None and raw.get("mode") == "VERIFY":
+        if slot_count is not None:
+            if slot_count <= 1:
+                raw["final_score"] = min(final, 55)
+                raw["confidence"] = "LOW"
+            elif slot_count == 2:
+                raw["final_score"] = min(final, 70)
+        # 제목/키워드 일치만으로 80점 이상 금지 (specificity < 50이면 80 상한)
+        if spec is not None and spec < 50 and final and final > 80:
+            raw["final_score"] = min(raw["final_score"], 80)
 
     return raw
 
