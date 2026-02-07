@@ -8,7 +8,7 @@ from typing import List
 
 from backend.chunking import DocChunk, build_chunks
 from backend.config import PDF_DIR, _nfc
-from backend.pdf_loader import iter_pdf_texts
+from backend.pdf_loader import _iter_doc_files, iter_pdf_texts
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +68,9 @@ def load_pdf_chunks(folder_name: str, source_type: str) -> List[DocChunk]:
         logger.warning(f"{folder_name} 폴더가 존재하지 않음: {target_dir}")
         return []
 
-    expected_pdf_files = sorted(target_dir.rglob("*.pdf"))
-    expected_count = len(expected_pdf_files)
-    logger.info(f"{folder_name} 폴더에서 PDF 청크 로드 시작 (iter_pdf_texts): {target_dir}, expected_pdf_files={expected_count}")
+    expected_doc_files = list(_iter_doc_files(target_dir))
+    expected_count = len(expected_doc_files)
+    logger.info(f"{folder_name} 폴더에서 문서 청크 로드 시작 (iter_pdf_texts): {target_dir}, expected={expected_count}")
 
     yielded_count = 0
     all_chunks: List[DocChunk] = []
@@ -98,10 +98,10 @@ def load_pdf_chunks(folder_name: str, source_type: str) -> List[DocChunk]:
 
     if expected_count != yielded_count:
         logger.warning(
-            f"[INDEX-COMPARE] {folder_name}: expected_pdf_files={expected_count}, iter_pdf_texts yielded={yielded_count}, skipped={expected_count - yielded_count}"
+            f"[INDEX-COMPARE] {folder_name}: expected={expected_count}, yielded={yielded_count}, skipped={expected_count - yielded_count}"
         )
     else:
-        logger.info(f"[INDEX-COMPARE] {folder_name}: expected_pdf_files={expected_count}, yielded={yielded_count} (일치)")
+        logger.info(f"[INDEX-COMPARE] {folder_name}: expected={expected_count}, yielded={yielded_count} (일치)")
 
     if folder_name == "공약":
         logger.info(f"[INDEX-SCAN] pledge files={yielded_count}")

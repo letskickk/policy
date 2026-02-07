@@ -63,7 +63,7 @@ def compute_file_hash(file_path: Path) -> str:
 
 def compute_folder_hash(folder_path: Path) -> Dict[str, str]:
     """
-    폴더 내 모든 PDF 파일의 해시를 계산한다.
+    폴더 내 모든 .pdf, .txt 파일의 해시를 계산한다.
     
     Args:
         folder_path: 폴더 경로
@@ -73,9 +73,10 @@ def compute_folder_hash(folder_path: Path) -> Dict[str, str]:
     """
     hashes = {}
     try:
-        for pdf_path in folder_path.rglob("*.pdf"):
-            rel_path = str(pdf_path.relative_to(folder_path))
-            hashes[rel_path] = compute_file_hash(pdf_path)
+        from backend.pdf_loader import _iter_doc_files
+        for doc_path in _iter_doc_files(folder_path):
+            rel_path = str(doc_path.relative_to(folder_path))
+            hashes[rel_path] = compute_file_hash(doc_path)
     except Exception as e:
         logger.error(f"폴더 해시 계산 실패 ({folder_path}): {e}")
     return hashes

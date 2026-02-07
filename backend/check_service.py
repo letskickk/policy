@@ -70,7 +70,7 @@ def check_pledge_alignment(pledge: str) -> str:
     result = response.choices[0].message.content or ""
     logger.info(f"GPT 응답 길이: {len(result)}자")
 
-    # 지역별 공약 폴더에 파일이 없으면 타지역 유사성은 무조건 '없음'으로 서버 보정 (GPT가 있음으로 나와도 치환)
+    # 지역별 공약 폴더에 파일이 없으면 타지역 유사성은 무조건 '없음'으로 서버 보정
     if not regional_pledges_context.strip():
         result = result.replace("유사 공약: 있음", "유사 공약: 없음")
         result = re.sub(r"유사성 분석:\s*[^\n]+", "유사성 분석: 없음", result, count=1)

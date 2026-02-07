@@ -381,6 +381,8 @@ Evidence 규칙:
 - **conflicts·타지역 관련**: evidence에는 R1, R2 등 타지역 ID만 사용. 해당 없으면 evidence=[] + note에 "근거 부족".
 - **인용 규칙**: evidence snippet 밖 문장 생성 금지. 모든 quote와 note 내 따옴표 인용은 반드시 해당 evidence 스니펫의 substring이어야 하며, 서버에서 검증한다.
 - "유사·중복 공약: 없음"은 타지역 검색 결과가 0건일 때만 쓸 수 있다. 1건 이상이면 "관련도 낮음/근거 약함"으로 표현.
+- 유사 공약을 나열할 때는 대표 2~3건만. 모든 공약을 나열하지 말 것.
+- regional Evidence가 없으면 conflicts에서 우리당 공약(P, G)을 인용하지 말 것. R1,R2 등 타지역 ID만 사용.
 
 출력 JSON 스키마 (이 구조만 반환). platform·pledges는 위 전체 문서 기반 판단(evidence=[] 가능), conflicts·improvements는 R1,R2 등만 사용.
 {{

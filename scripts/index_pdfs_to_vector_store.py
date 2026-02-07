@@ -62,31 +62,32 @@ def _safe_filename(name: str) -> str:
 
 
 def _collect_pdf_paths():
+    from backend.pdf_loader import _iter_doc_files
     result = []
     for cat, folder_name in FOLDERS:
         dir_path = PDF_DIR / _nfc(folder_name)
         if not dir_path.exists():
             continue
-        for p in sorted(dir_path.rglob("*.pdf")):
+        for p in _iter_doc_files(dir_path):
             result.append((cat, p, folder_name))
     return result
 
 
-def _create_txt_content(pdf_path: Path, category: str) -> str | None:
+def _create_txt_content(doc_path: Path, category: str) -> str | None:
     try:
-        from backend.pdf_loader import extract_text_from_pdf
-        text = extract_text_from_pdf(pdf_path)
+        from backend.pdf_loader import extract_text_from_file
+        text = extract_text_from_file(doc_path)
         if not (text or "").strip() or len(text.strip()) < 10:
             return None
         header = CATEGORY_HEADER.get(category, "")
         try:
-            rel = pdf_path.relative_to(PDF_DIR)
+            rel = doc_path.relative_to(PDF_DIR)
             source_path = str(rel).replace("\\", "/")
         except ValueError:
-            source_path = pdf_path.name
-        return f"{header}\n출처: {source_path}\n원본파일: {pdf_path.name}\n\n{text.strip()}"
+            source_path = doc_path.name
+        return f"{header}\n출처: {source_path}\n원본파일: {doc_path.name}\n\n{text.strip()}"
     except Exception as e:
-        print(f"  [경고] PDF 추출 실패 {pdf_path.name}: {e}")
+        print(f"  [경고] 문서 추출 실패 {doc_path.name}: {e}")
         return None
 
 
