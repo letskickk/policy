@@ -4,7 +4,9 @@
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -23,6 +25,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="개혁신당 정책 멘토링",
@@ -293,58 +296,65 @@ def debug_index():
     }
 
 
-@app.get("/api/debug/search")
-def debug_search(source: str, q: str, k: int = 5):
-    """
-    특정 인덱스에서 검색 결과를 확인하는 디버깅 엔드포인트.
-
-    source: "platform" | "pledge" | "regional"
-    q: 쿼리 텍스트
-    k: top_k
-    """
+def _run_debug_search(source: Literal["platform", "pledge", "regional"], q: str, top_k: int):
+    """source/q/top_k로 인덱스 검색 후 [{ path, chunk_id, score, snippet }] 반환."""
     global _indexes
     if _indexes is None or not _indexes:
         raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
 
-    source_map = {
-        "platform": "platform",
-        "pledge": "pledge",
-        "regional": "regional",
-    }
-    if source not in source_map:
-        raise HTTPException(status_code=400, detail="source는 platform|pledge|regional 중 하나여야 합니다.")
-
-    index = _indexes.get(source_map[source])
+    index = _indexes.get(source)
     if index is None:
         raise HTTPException(status_code=500, detail=f"{source} 인덱스가 없습니다.")
 
     from backend.embeddings import embed_texts
+    from backend.report import exact_match_search, _merge_exact_and_embedding
 
     embeddings = embed_texts([q], batch_size=1)
     if not embeddings:
         raise HTTPException(status_code=500, detail="쿼리 임베딩 생성 실패")
 
     query_embedding = embeddings[0]
-    results = index.search(query_embedding, k=k)
+    exact_hits = exact_match_search(q, index, top_k_exact=min(5, top_k))
+    emb_hits = index.search(query_embedding, k=top_k)
+    merged = _merge_exact_and_embedding(exact_hits, emb_hits, top_k)
 
-    items = []
-    for chunk, score in results:
-        items.append(
-            {
-                "source": chunk.source,
-                "path": chunk.path,
-                "chunk_id": chunk.chunk_id,
-                "score": score,
-                "snippet": (chunk.text[:250] + "...") if len(chunk.text) > 250 else chunk.text,
-            }
-        )
+    return [
+        {
+            "path": chunk.path,
+            "chunk_id": chunk.chunk_id,
+            "score": round(score, 6),
+            "snippet": (chunk.text[:200] + "...") if len(chunk.text) > 200 else chunk.text,
+        }
+        for chunk, score in merged
+    ]
 
-    return {
-        "source": source,
-        "query": q,
-        "k": k,
-        "results": items,
-    }
+
+@app.get("/api/debug/search")
+def debug_search_get(
+    source: Literal["platform", "pledge", "regional"] = Query(..., description="platform | pledge | regional"),
+    q: str = Query(..., min_length=1, description="검색 쿼리"),
+    top_k: int = Query(10, ge=1, le=50, description="상위 결과 개수"),
+):
+    """
+    특정 인덱스에서 검색 결과를 확인하는 디버깅 엔드포인트 (GET).
+    응답: [{ "path": "...", "chunk_id": 0, "score": 0.123, "snippet": "..." }]
+    """
+    return _run_debug_search(source, q, top_k)
+
+
+class DebugSearchBody(BaseModel):
+    source: Literal["platform", "pledge", "regional"] = Field(..., description="platform | pledge | regional")
+    q: str = Field(..., min_length=1, description="검색 쿼리")
+    top_k: int = Field(10, ge=1, le=50, description="상위 결과 개수")
+
+
+@app.post("/api/debug/search")
+def debug_search_post(body: DebugSearchBody):
+    """
+    특정 인덱스에서 검색 (POST, JSON 바디).
+    응답: [{ "path": "...", "chunk_id": 0, "score": 0.123, "snippet": "..." }]
+    """
+    return _run_debug_search(body.source, body.q, body.top_k)
 
 
 @app.get("/api/debug/scan")

@@ -2,6 +2,8 @@
 FAISS 기반 벡터 인덱스 모듈.
 """
 import logging
+import sys
+from pathlib import Path
 from typing import List, Tuple
 
 import faiss
@@ -11,6 +13,24 @@ from backend.chunking import DocChunk
 from backend.embeddings import normalize_embedding
 
 logger = logging.getLogger(__name__)
+
+
+def _faiss_path(path: str) -> str:
+    """FAISS용 경로. Windows에서 한글 경로 시 8.3 단축 경로로 변환."""
+    p = Path(path).resolve()
+    if sys.platform != "win32":
+        return str(p)
+    try:
+        import ctypes
+        from ctypes import wintypes
+        buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        n = ctypes.windll.kernel32.GetShortPathNameW(str(p.parent), buf, wintypes.MAX_PATH)
+        if n > 0:
+            short_dir = buf.value
+            return str(Path(short_dir) / p.name)
+    except Exception:
+        pass
+    return str(p)
 
 
 class VectorIndex:
@@ -116,14 +136,18 @@ class VectorIndex:
             meta_path: 청크 메타데이터 파일 경로 (pickle)
         """
         import pickle
-        
-        # FAISS 인덱스 저장
-        faiss.write_index(self.index, index_path)
-        
-        # 메타데이터 저장
+
+        # 디렉터리 확보 (한글 경로 대비)
+        Path(index_path).parent.mkdir(parents=True, exist_ok=True)
+        faiss_path = _faiss_path(index_path)
+
+        # FAISS 인덱스 저장 (Windows 한글 경로 시 단축 경로 사용)
+        faiss.write_index(self.index, faiss_path)
+
+        # 메타데이터 저장 (pickle은 한글 경로 OK)
         with open(meta_path, 'wb') as f:
             pickle.dump(self.chunks, f)
-        
+
         logger.info(f"인덱스 저장 완료: {index_path}, {meta_path}")
     
     @classmethod
@@ -141,9 +165,10 @@ class VectorIndex:
             VectorIndex 인스턴스
         """
         import pickle
-        
-        # FAISS 인덱스 로드
-        index = faiss.read_index(index_path)
+
+        faiss_path = _faiss_path(index_path)
+        # FAISS 인덱스 로드 (Windows 한글 경로 시 단축 경로 사용)
+        index = faiss.read_index(faiss_path)
         
         # 메타데이터 로드
         with open(meta_path, 'rb') as f:

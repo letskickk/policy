@@ -7,3 +7,4 @@ pdfminer.six>=20221105
 python-dotenv>=1.0.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
+rapidfuzz>=3.0.0

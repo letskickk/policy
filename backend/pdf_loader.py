@@ -8,6 +8,7 @@
 """
 import logging
 from pathlib import Path
+from typing import Iterable
 
 from pypdf import PdfReader
 
@@ -25,6 +26,56 @@ from backend.config import (
     MAX_CONTEXT_CHARS,
     PDF_DIR,
 )
+
+
+def iter_pdf_texts(dir_path: Path) -> Iterable[tuple[str, str]]:
+    """
+    폴더의 실제 pdf_files 리스트(rglob)를 기반으로 순회하며, 각 PDF 전체 텍스트를 yield한다.
+    실패/빈 텍스트는 로그만 남기고 yield하지 않아 상위에서 자동 스킵된다.
+    """
+    if not dir_path.exists():
+        logger.warning(f"폴더가 존재하지 않음: {dir_path}")
+        return
+
+    try:
+        pdf_files = sorted(dir_path.rglob("*.pdf"))
+    except Exception as e:
+        logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
+        return
+
+    for path in pdf_files:
+        rel_path_str = str(path.relative_to(dir_path))
+        try:
+            text = extract_text_from_pdf(path)
+            text_stripped = (text or "").strip()
+            if len(text_stripped) < 10:
+                logger.warning(
+                    f"[ITER-SKIP] 빈/짧은 텍스트: {rel_path_str} (길이: {len(text_stripped)}자)"
+                )
+                continue
+            yield (rel_path_str, text_stripped)
+        except Exception as e:
+            logger.warning(f"[ITER-SKIP] 읽기 실패: {rel_path_str} - {e}")
+            continue
+
+
+def load_full_text_from_dir(dir_path: Path) -> str:
+    """
+    폴더 안 모든 PDF를 한도 없이 전부 읽어 하나의 문자열로 합친다.
+    정강정책·공약 전체 학습용(리포트 생성 시 GPT에 넣을 때 사용).
+    """
+    if not dir_path.exists():
+        logger.warning(f"폴더가 존재하지 않음: {dir_path}")
+        return ""
+    parts = []
+    total_chars = 0
+    for rel_path_str, text in iter_pdf_texts(dir_path):
+        block = f"--- {rel_path_str} ---\n{text}"
+        parts.append(block)
+        total_chars += len(block)
+    result = "\n\n".join(parts) if parts else ""
+    logger.info(f"[FULL-LOAD] {dir_path.name}: {len(parts)}개 파일, 총 {total_chars}자")
+    return result
 
 
 def extract_text_from_pdf(path: Path) -> str:

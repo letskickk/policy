@@ -112,6 +112,16 @@ Policy/
        "top_k_regional": 8
      }'
    ```
+
+   **디버그 검색 (GET, query params)** — `source`, `q` 필수, `top_k` 선택(기본 10, 1~50):
+   ```bash
+   curl -G "http://localhost:8000/api/debug/search" --data-urlencode "source=pledge" --data-urlencode "q=신구연금 분리" --data-urlencode "top_k=10"
+   ```
+   **디버그 검색 (POST, JSON 바디)**:
+   ```bash
+   curl -X POST "http://localhost:8000/api/debug/search" -H "Content-Type: application/json" -d "{\"source\":\"pledge\",\"q\":\"신구연금 분리\",\"top_k\":10}"
+   ```
+   (Windows PowerShell에서는 `-d '{"source":"pledge","q":"신구연금 분리","top_k":10}'` 형태로 사용 가능.)
    
    응답은 JSON 형식으로 다음을 포함합니다:
    - `summary`: 적합도 점수 및 판정
