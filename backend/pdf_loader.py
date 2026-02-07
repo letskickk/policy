@@ -1,10 +1,11 @@
 """
 정강·정책(이념·취지) PDF와 우리당 공약 PDF를 구분해 로드한다.
+PDF 외에 .txt 파일도 지원한다.
 
 폴더 구조:
-- data/pdf/정강정책/ : 정강정책 문서 (모든 파일)
-- data/pdf/공약/ : 우리당 공약 문서 (모든 파일)
-- data/pdf/지역별 공약/ : 타지역 공약 문서 (모든 파일)
+- data/pdf/정강정책/ : 정강정책 문서 (모든 .pdf, .txt)
+- data/pdf/공약/ : 우리당 공약 문서 (모든 .pdf, .txt)
+- data/pdf/지역별 공약/ : 타지역 공약 문서 (모든 .pdf, .txt)
 
 Linux(AWS 등)에서는 pdfplumber를 우선 사용해 한글/폰트 차이로 인한 추출 품질 저하를 줄인다.
 """
@@ -40,9 +41,32 @@ from backend.config import (
 )
 
 
+def _iter_doc_files(dir_path: Path):
+    """폴더 내 .pdf, .txt 파일을 정렬하여 yield. 같은 stem(확장자 제외)이면 .pdf 우선."""
+    pdfs = sorted(dir_path.rglob("*.pdf"))
+    txts = sorted(dir_path.rglob("*.txt"))
+    seen_stems = set()
+    for p in pdfs:
+        stem = str(p.relative_to(dir_path)).replace("\\", "/")
+        seen_stems.add(Path(stem).stem)
+        yield p
+    for p in txts:
+        stem = Path(str(p.relative_to(dir_path)).replace("\\", "/")).stem
+        if stem not in seen_stems:
+            yield p
+
+
+def extract_text_from_file(path: Path) -> str:
+    """PDF 또는 TXT 파일에서 텍스트 추출. .txt는 UTF-8로 읽음."""
+    suf = (path.suffix or "").lower()
+    if suf == ".txt":
+        return path.read_text(encoding="utf-8", errors="replace")
+    return extract_text_from_pdf(path)
+
+
 def iter_pdf_texts(dir_path: Path) -> Iterable[tuple[str, str]]:
     """
-    폴더의 실제 pdf_files 리스트(rglob)를 기반으로 순회하며, 각 PDF 전체 텍스트를 yield한다.
+    폴더의 .pdf, .txt 파일을 순회하며 각 파일 전체 텍스트를 yield한다.
     실패/빈 텍스트는 로그만 남기고 yield하지 않아 상위에서 자동 스킵된다.
     """
     if not dir_path.exists():
@@ -50,18 +74,16 @@ def iter_pdf_texts(dir_path: Path) -> Iterable[tuple[str, str]]:
         return
 
     try:
-        raw_sample = list(dir_path.iterdir())[:5]
-        logger.info(f"[SCAN RAW] {dir_path.name} iterdir sample={[str(p) for p in raw_sample]}")
-        pdf_files = sorted(dir_path.rglob("*.pdf"))
-        logger.info(f"[SCAN PDF] {dir_path.name} rglob count={len(pdf_files)}")
+        doc_files = list(_iter_doc_files(dir_path))
+        logger.info(f"[SCAN DOC] {dir_path.name} pdf+txt count={len(doc_files)}")
     except Exception as e:
-        logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
+        logger.error(f"문서 파일 검색 실패 ({dir_path}): {e}")
         return
 
-    for path in pdf_files:
+    for path in doc_files:
         rel_path_str = str(path.relative_to(dir_path))
         try:
-            text = extract_text_from_pdf(path)
+            text = extract_text_from_file(path)
             text_stripped = (text or "").strip()
             if len(text_stripped) < 10:
                 logger.warning(
@@ -89,16 +111,16 @@ def get_context_summary() -> dict:
             summary[folder_name] = {"files_found": 0, "files_loaded": 0, "total_chars": 0}
             continue
         try:
-            pdf_files = list(dir_path.rglob("*.pdf"))
+            doc_files = list(_iter_doc_files(dir_path))
         except Exception:
-            pdf_files = []
+            doc_files = []
         files_loaded = 0
         total_chars = 0
         for _rel, text in iter_pdf_texts(dir_path):
             files_loaded += 1
             total_chars += len(text or "")
         summary[folder_name] = {
-            "files_found": len(pdf_files),
+            "files_found": len(doc_files),
             "files_loaded": files_loaded,
             "total_chars": total_chars,
         }
@@ -206,33 +228,29 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
     combined: list[str] = []
     total_len = 0
     
-    # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
+    # 폴더 안의 모든 .pdf, .txt 파일 찾기 (재귀적)
     try:
         logger.info(f"[SCAN] dir={dir_path}")
-        raw_sample = list(dir_path.iterdir())[:5]
-        logger.info(f"[SCAN RAW] iterdir sample={[str(p) for p in raw_sample]}")
-        pdf_files = list(dir_path.rglob("*.pdf"))
-        logger.info(f"[SCAN PDF] rglob count={len(pdf_files)}")
-        # 공약 폴더 특별 로깅
+        doc_files = list(_iter_doc_files(dir_path))
+        logger.info(f"[SCAN DOC] rglob count={len(doc_files)}")
         if dir_path.name == "공약":
-            logger.info(f"[SCAN] 공약 폴더 found={len(pdf_files)}")
-        # 샘플 몇 개 출력
-        for p in pdf_files[:10]:
+            logger.info(f"[SCAN] 공약 폴더 found={len(doc_files)}")
+        for p in doc_files[:10]:
             logger.info(f"[SCAN] sample={p}")
     except Exception as e:
-        logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
+        logger.error(f"문서 파일 검색 실패 ({dir_path}): {e}")
         return ""
 
-    if not pdf_files:
-        logger.warning(f"[SCAN] no pdf files found in {dir_path}. 폴더 경로/이름을 확인하세요.")
+    if not doc_files:
+        logger.warning(f"[SCAN] no pdf/txt files found in {dir_path}. 폴더 경로/이름을 확인하세요.")
     
-    for path in sorted(pdf_files):
+    for path in doc_files:
         try:
-            text = extract_text_from_pdf(path)
+            text = extract_text_from_file(path)
             text_len = len(text.strip()) if text else 0
             
             if not text or text_len < 10:
-                logger.warning(f"PDF 텍스트가 비어있거나 너무 짧음: {path.name} (길이: {text_len}자)")
+                logger.warning(f"텍스트가 비어있거나 너무 짧음: {path.name} (길이: {text_len}자)")
                 combined.append(f"--- {path.name} --- (텍스트 없음)\n")
                 continue
             
@@ -243,7 +261,7 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
             if total_len + len(text) <= limit_chars:
                 combined.append(text)
                 total_len += len(text)
-                logger.info(f"PDF 로드 성공: {rel_path} ({text_len}자, 누적: {total_len}/{limit_chars}자)")
+                logger.info(f"문서 로드 성공: {rel_path} ({text_len}자, 누적: {total_len}/{limit_chars}자)")
             else:
                 remain = limit_chars - total_len
                 if remain > 500:
@@ -255,12 +273,12 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
                 # (다른 파일이 완전히 누락되지 않도록 break 대신 continue 사용)
                 continue
         except Exception as e:
-            logger.error(f"PDF 읽기 실패: {path.name} - {e}", exc_info=True)
+            logger.error(f"문서 읽기 실패: {path.name} - {e}", exc_info=True)
             combined.append(f"--- {path.name} --- (읽기 실패: {str(e)[:100]})\n")
             continue
     
     result = "\n\n".join(combined) if combined else ""
-    logger.info(f"{dir_path.name} 폴더 로드 완료: {len(pdf_files)}개 파일 중 {len(combined)}개 로드, 총 {total_len}자")
+    logger.info(f"{dir_path.name} 폴더 로드 완료: {len(doc_files)}개 파일 중 {len(combined)}개 로드, 총 {total_len}자")
     return result
 
 

@@ -37,7 +37,7 @@ def build_user_message(platform_context: str, pledges_context: str, regional_ple
         .replace("{{REGIONAL_PLEDGES_CONTEXT}}", regional)
         .replace("{{PLEDGE}}", pledge)
     )
-    # 지역별 공약 문서가 없으면 타지역 유사성은 반드시 '없음'으로만 표기하도록 명시
+    # 지역별 공약 문서가 없으면 타지역 유사성은 반드시 '없음'. 우리당 공약을 타지역으로 착각하지 말 것.
     if not regional_raw:
-        out += "\n\n【필수】 타지역 공약 문서가 없으므로 '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'으로만 표기하라."
+        out += "\n\n【필수】 [타지역 공약] 문서가 없음. '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'만 표기. [우리당 공약] 내용을 타지역으로 착각해 넣지 말 것."
     return out

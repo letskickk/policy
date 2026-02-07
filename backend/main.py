@@ -28,6 +28,7 @@ from backend.config import (
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import (
     HAS_PDFPLUMBER,
+    _iter_doc_files,
     load_platform_context,
     load_pledges_context,
     get_context_summary,
@@ -102,8 +103,8 @@ def _startup_self_check() -> int:
         try:
             raw_entries = list(dir_path.iterdir())[:5] if exists else []
             logger.info(f"[SCAN RAW] {name} iterdir sample={[str(p) for p in raw_entries]}")
-            pdf_list = list(dir_path.rglob("*.pdf")) if exists else []
-            logger.info(f"[SCAN PDF] {name} rglob count={len(pdf_list)}")
+            pdf_list = list(_iter_doc_files(dir_path)) if exists else []
+            logger.info(f"[SCAN DOC] {name} pdf+txt count={len(pdf_list)}")
         except Exception as e:
             logger.warning(f"[SELF-CHECK] {name} rglob failed: {e}")
             pdf_list = []
@@ -152,7 +153,7 @@ def _startup_self_check() -> int:
                 timeout=300,
                 capture_output=True,
             )
-            pledge_pdf_count = len(list(pdf_pledge.rglob("*.pdf")))
+            pledge_pdf_count = len(list(_iter_doc_files(pdf_pledge)))
             logger.info(f"[SELF-CHECK] S3 sync done, 공약 pdf count={pledge_pdf_count}")
         except Exception as e:
             raise RuntimeError(f"PDF_S3_URI sync failed: {e}") from e
@@ -312,7 +313,7 @@ def debug_pdf():
     pdf_dir = Path(pdf_dir_str)
     
     try:
-        all_pdfs = list(pdf_dir.rglob("*.pdf")) if pdf_dir.exists() else []
+        all_pdfs = list(_iter_doc_files(pdf_dir)) if pdf_dir.exists() else []
     except Exception as e:
         all_pdfs = []
         error_msg = str(e)
@@ -324,9 +325,9 @@ def debug_pdf():
     regional = load_regional_pledges_context()
     
     # 파일명 추출
-    platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and ".pdf" in line] if platform else []
-    pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and ".pdf" in line] if pledges else []
-    regional_files = [line.split("---")[1].strip() for line in regional.split("\n") if "---" in line and ".pdf" in line] if regional else []
+    platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if platform else []
+    pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if pledges else []
+    regional_files = [line.split("---")[1].strip() for line in regional.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if regional else []
     
     # 테스트용 메시지 생성 (실제 GPT에 전달되는 형식)
     test_message = build_user_message(platform, pledges, regional, "테스트 공약: 지역경제 활성화")
@@ -429,13 +430,13 @@ def _get_fs_debug() -> dict:
     for name, dir_path in folders:
         exists = dir_path.exists()
         try:
-            pdf_list = list(dir_path.rglob("*.pdf")) if exists else []
+            pdf_list = list(_iter_doc_files(dir_path)) if exists else []
         except Exception:
             pdf_list = []
         by_folder[name] = {
             "exists": exists,
-            "pdf_count": len(pdf_list),
-            "sample_names": [p.name for p in sorted(pdf_list)[:10]],
+            "doc_count": len(pdf_list),
+            "sample_names": [p.name for p in sorted(pdf_list, key=lambda x: x.name)[:10]],
         }
     return {
         "pdf_dir": str(pdf_dir),
@@ -641,7 +642,7 @@ def debug_scan():
         subdir = base_dir / subdir_name
         if not subdir.exists():
             return []
-        return [str(p.relative_to(base_dir)) for p in subdir.rglob("*.pdf")]
+        return [str(p.relative_to(base_dir)) for p in _iter_doc_files(subdir)]
 
     return {
         "platform_files": list_files("정강정책"),

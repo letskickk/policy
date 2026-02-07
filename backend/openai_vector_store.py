@@ -53,18 +53,19 @@ def _collect_pdf_paths() -> list[tuple[str, Path]]:
         if not dir_path.exists():
             continue
         try:
-            for p in sorted(dir_path.rglob("*.pdf")):
+            from backend.pdf_loader import _iter_doc_files
+            for p in _iter_doc_files(dir_path):
                 result.append((cat, p))
         except Exception as e:
             logger.warning(f"PDF 스캔 실패 ({dir_path}): {e}")
     return result
 
 
-def _create_txt_content(pdf_path: Path, category: str) -> str | None:
-    """PDF를 읽어 카테고리 헤더가 붙은 텍스트 반환. 실패 시 None."""
+def _create_txt_content(doc_path: Path, category: str) -> str | None:
+    """PDF/TXT를 읽어 카테고리 헤더가 붙은 텍스트 반환. 실패 시 None."""
     try:
-        from backend.pdf_loader import extract_text_from_pdf
-        text = extract_text_from_pdf(pdf_path)
+        from backend.pdf_loader import extract_text_from_file
+        text = extract_text_from_file(doc_path)
         if not (text or "").strip() or len(text.strip()) < 10:
             return None
         header = _CATEGORY_HEADER.get(category, "")
@@ -73,10 +74,10 @@ def _create_txt_content(pdf_path: Path, category: str) -> str | None:
             rel = pdf_path.relative_to(PDF_DIR)
             source_path = str(rel).replace("\\", "/")
         except ValueError:
-            source_path = pdf_path.name
+            source_path = doc_path.name
         return f"{header}\n출처: {source_path}\n\n{text.strip()}"
     except Exception as e:
-        logger.warning(f"PDF 추출 실패 {pdf_path}: {e}")
+        logger.warning(f"문서 추출 실패 {doc_path}: {e}")
         return None
 
 
@@ -322,6 +323,8 @@ file_search 도구가 2개 있음 (반드시 구분 사용):
 score_0_5: 0=상충/근거전무, 1~2=부적합, 3=부분부합, 4=대체로 부합, 5=강한 부합.
 - 제목만·한 줄만 적은 경우: platform/pledges 2점 이하. note는 "우리당 공약은 [검색된 내용]. 제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 보완 필요." 형식으로. "90% 일치", "거의 동일" 사용 금지.
 evidence는 검색된 문서 인용 시 사용. platform/pledges는 [] 가능.
+note에 유사 공약을 나열할 때는 대표 2~3건만. 모든 공약을 나열하지 말 것.
+지역별 공약 store가 비어 있으면 conflicts·regional_similarity에서 우리당 공약 내용을 인용하지 말 것.
 improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 보완 필요\" 항목을 반드시 포함.
 """
 
