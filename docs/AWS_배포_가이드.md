@@ -246,6 +246,21 @@ sudo systemctl status policy-app
 - 재시작: `sudo systemctl restart policy-app`
 - 로그: `journalctl -u policy-app -f`
 
+### systemd 없을 때: 한 번에 재시작 (sudo 불필요)
+
+```bash
+cd /home/ec2-user/Policy
+./restart_server.sh
+```
+
+또는 **코드 업데이트 + 재시작** 한 번에:
+
+```bash
+./update.sh
+```
+
+(최초 1회: `chmod +x restart_server.sh update.sh`)
+
 ---
 
 ## 5. 80번 포트로 접속하려면 (Nginx, 선택)

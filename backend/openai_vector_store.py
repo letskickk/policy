@@ -17,17 +17,27 @@ from typing import Dict
 
 from openai import OpenAI
 
-from backend.config import CHAT_MODEL, OPENAI_API_KEY, PDF_DIR, ROOT_DIR, _nfc
+from backend.config import (
+    CHAT_MODEL,
+    OPENAI_API_KEY,
+    PDF_DIR,
+    ROOT_DIR,
+    FILE_SEARCH_MAX_RESULTS,
+    FILE_SEARCH_MAX_RESULTS_QUICK,
+    _nfc,
+)
 
 MANIFEST_PATH = ROOT_DIR / "data" / "vector_store_manifest.json"
+# 지역별 공약 전용 manifest (타지역 유사성 검토 시 이 store만 검색)
+MANIFEST_REGIONAL_PATH = ROOT_DIR / "data" / "vector_store_regional_manifest.json"
 
 logger = logging.getLogger(__name__)
 
-# 업로드된 파일의 폴더 구분을 위한 prefix (파일명에 포함)
-_CATEGORY_PREFIX = {
-    "platform": "[정강정책]",
-    "pledge": "[공약]",
-    "regional": "[지역별공약]",
+# 업로드된 파일의 폴더 구분. 출처 혼동 방지를 위해 명확한 라벨 사용
+_CATEGORY_HEADER = {
+    "platform": "[정강정책] 우리당 강령·정책 원칙",
+    "pledge": "[공약] 우리당 중앙 공약 (일반공약)",
+    "regional": "[지역별공약] 타지역 출마자 공약 (비교·중복 검토용)",
 }
 
 
@@ -51,151 +61,146 @@ def _collect_pdf_paths() -> list[tuple[str, Path]]:
 
 
 def _create_txt_content(pdf_path: Path, category: str) -> str | None:
-    """PDF를 읽어 카테고리 prefix가 붙은 텍스트 반환. 실패 시 None."""
+    """PDF를 읽어 카테고리 헤더가 붙은 텍스트 반환. 실패 시 None."""
     try:
         from backend.pdf_loader import extract_text_from_pdf
         text = extract_text_from_pdf(pdf_path)
         if not (text or "").strip() or len(text.strip()) < 10:
             return None
-        prefix = _CATEGORY_PREFIX.get(category, "")
-        return f"{prefix} {pdf_path.name}\n\n{text.strip()}"
+        header = _CATEGORY_HEADER.get(category, "")
+        # 폴더 경로 포함해 일반공약 vs 지역별공약 출처 명확히 구분
+        try:
+            rel = pdf_path.relative_to(PDF_DIR)
+            source_path = str(rel).replace("\\", "/")
+        except ValueError:
+            source_path = pdf_path.name
+        return f"{header}\n출처: {source_path}\n\n{text.strip()}"
     except Exception as e:
         logger.warning(f"PDF 추출 실패 {pdf_path}: {e}")
         return None
 
 
-def ensure_vector_store() -> str:
+def ensure_vector_store() -> tuple[str, str]:
     """
-    Vector Store 생성 및 PDF 업로드.
-    Returns: vector_store_id (Responses API file_search에서 사용)
+    Vector Store 2개 생성: (정강+공약) / (지역별 공약) 분리.
+    타지역 유사성 검토 시 지역별 store만 검색해 공약 폴더 혼선 방지.
+    Returns: (policy_vector_store_id, regional_vector_store_id)
     """
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # 1. PDF 수집 및 텍스트 추출
     pairs = _collect_pdf_paths()
-    if not pairs:
-        raise RuntimeError("업로드할 PDF가 없습니다. data/pdf/ 정강정책·공약·지역별 공약 폴더를 확인하세요.")
+    policy_pairs = [(c, p) for c, p in pairs if c in ("platform", "pledge")]
+    regional_pairs = [(c, p) for c, p in pairs if c == "regional"]
 
-    logger.info(f"[VECTOR_STORE] PDF {len(pairs)}개 수집 중...")
+    if not policy_pairs:
+        raise RuntimeError("정강정책 또는 공약 폴더에 PDF가 없습니다.")
 
-    # 2. 텍스트 파일로 변환 (OpenAI는 PDF 직접 지원하지만, 카테고리 prefix를 위해 txt 사용)
-    files_to_upload: list[tuple[str, str]] = []  # (filename, content)
-    for cat, p in pairs:
-        content = _create_txt_content(p, cat)
-        if content:
-            safe_name = p.stem[:80] + ".txt"
-            files_to_upload.append((f"{cat}_{safe_name}", content))
+    def _upload_and_create(pairs_subset: list, store_name: str, manifest_path: Path) -> str:
+        files_to_upload: list[tuple[str, str]] = []
+        for cat, p in pairs_subset:
+            content = _create_txt_content(p, cat)
+            if content:
+                safe_name = p.stem[:80] + ".txt"
+                files_to_upload.append((f"{cat}_{safe_name}", content))
+        if not files_to_upload:
+            return ""
+        import tempfile
+        file_ids = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for filename, content in files_to_upload:
+                path = Path(tmpdir) / filename
+                path.write_text(content, encoding="utf-8")
+                with open(path, "rb") as f:
+                    fobj = client.files.create(file=f, purpose="assistants")
+                    file_ids.append(fobj.id)
+        vs = client.vector_stores.create(name=store_name, file_ids=file_ids)
+        vs_id = vs.id
+        for _ in range(60):
+            vs = client.vector_stores.retrieve(vs_id)
+            if vs.status == "completed":
+                break
+            time.sleep(2)
+        else:
+            raise RuntimeError(f"Vector Store {store_name} 처리 타임아웃")
+        manifest = {"vector_store_id": vs_id, "files": {}}
+        idx = 0
+        for cat, p in pairs_subset:
+            content = _create_txt_content(p, cat)
+            if content:
+                try:
+                    rel = str(p.relative_to(PDF_DIR))
+                    ch = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+                    manifest["files"][rel] = {"file_id": file_ids[idx], "content_hash": ch}
+                    idx += 1
+                except ValueError:
+                    pass
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        return vs_id
 
-    if not files_to_upload:
-        raise RuntimeError("PDF에서 추출된 텍스트가 없습니다.")
+    logger.info(f"[VECTOR_STORE] 정강+공약 {len(policy_pairs)}개, 지역별 {len(regional_pairs)}개")
+    vs_policy = _upload_and_create(policy_pairs, "policy-rag-store", MANIFEST_PATH)
+    vs_regional = _upload_and_create(regional_pairs, "regional-pledge-store", MANIFEST_REGIONAL_PATH) if regional_pairs else ""
+    logger.info(f"[VECTOR_STORE] policy: {vs_policy}, regional: {vs_regional or '(없음)'}")
 
-    logger.info(f"[VECTOR_STORE] 텍스트 파일 {len(files_to_upload)}개 준비 완료")
-
-    # 3. 파일 업로드: Files API로 먼저 업로드
-    import tempfile
-    file_ids = []
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for filename, content in files_to_upload:
-            path = Path(tmpdir) / filename
-            path.write_text(content, encoding="utf-8")
-            with open(path, "rb") as f:
-                fobj = client.files.create(file=f, purpose="assistants")
-                file_ids.append(fobj.id)
-    logger.info(f"[VECTOR_STORE] Files API 업로드 완료: {len(file_ids)}개")
-
-    # 4. Vector Store 생성 (file_ids와 함께)
-    vs = client.vector_stores.create(name="policy-rag-store", file_ids=file_ids)
-    vector_store_id = vs.id
-    logger.info(f"[VECTOR_STORE] 생성: {vector_store_id}")
-
-    # 5. Vector Store 준비 대기
-    import time
-    for _ in range(60):
-        vs = client.vector_stores.retrieve(vector_store_id)
-        if vs.status == "completed":
-            break
-        logger.info(f"[VECTOR_STORE] 대기 중... status={vs.status}")
-        time.sleep(2)
-    else:
-        raise RuntimeError("Vector Store 처리 타임아웃. 잠시 후 재시도하세요.")
-
-    logger.info(f"[VECTOR_STORE] 준비 완료: file_count={getattr(vs, 'file_counts', {})}")
-
-    # manifest 저장 (나중에 증분 업데이트용, content_hash로 변경 감지)
-    manifest = {"vector_store_id": vector_store_id, "files": {}}
-    idx = 0
-    for cat, p in pairs:
-        content = _create_txt_content(p, cat)
-        if content:
-            try:
-                rel = str(p.relative_to(PDF_DIR))
-                ch = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
-                manifest["files"][rel] = {"file_id": file_ids[idx], "content_hash": ch}
-                idx += 1
-            except ValueError:
-                pass
-    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST_PATH.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    logger.info(f"[VECTOR_STORE] manifest 저장: {MANIFEST_PATH}")
-
-    # .env에 OPENAI_VECTOR_STORE_ID 자동 추가
-    _append_vector_store_id_to_env(vector_store_id)
-
-    return vector_store_id
+    _append_vector_store_ids_to_env(vs_policy, vs_regional)
+    return (vs_policy, vs_regional)
 
 
-def _append_vector_store_id_to_env(vector_store_id: str) -> None:
+def _append_vector_store_ids_to_env(vs_policy: str, vs_regional: str) -> None:
     """생성된 vector_store_id를 .env에 자동 기록."""
     env_path = ROOT_DIR / ".env"
+    lines_add = [f"OPENAI_VECTOR_STORE_ID={vs_policy}"]
+    if vs_regional:
+        lines_add.append(f"OPENAI_REGIONAL_VECTOR_STORE_ID={vs_regional}")
     if not env_path.exists():
-        env_path.write_text(f"OPENAI_VECTOR_STORE_ID={vector_store_id}\n", encoding="utf-8")
-        logger.info(f"[VECTOR_STORE] .env에 OPENAI_VECTOR_STORE_ID 자동 추가: {vector_store_id}")
+        env_path.write_text("\n".join(lines_add) + "\n", encoding="utf-8")
+        logger.info(f"[VECTOR_STORE] .env에 자동 추가: {lines_add}")
         return
     text = env_path.read_text(encoding="utf-8")
-    if "OPENAI_VECTOR_STORE_ID=" in text:
-        # 기존 값이 있으면 갱신 (빈 값일 때만)
-        new_lines = []
-        for line in text.splitlines():
-            if line.strip().startswith("OPENAI_VECTOR_STORE_ID="):
-                val = line.split("=", 1)[1].strip()
-                if not val:
-                    new_lines.append(f"OPENAI_VECTOR_STORE_ID={vector_store_id}")
-                else:
-                    new_lines.append(line)
-            else:
-                new_lines.append(line)
-        env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-    else:
-        env_path.write_text(text.rstrip() + f"\n\nOPENAI_VECTOR_STORE_ID={vector_store_id}\n", encoding="utf-8")
-    logger.info(f"[VECTOR_STORE] .env에 OPENAI_VECTOR_STORE_ID 자동 추가: {vector_store_id}")
+    new_lines = []
+    seen = {"OPENAI_VECTOR_STORE_ID": False, "OPENAI_REGIONAL_VECTOR_STORE_ID": False}
+    for line in text.splitlines():
+        if line.strip().startswith("OPENAI_VECTOR_STORE_ID="):
+            seen["OPENAI_VECTOR_STORE_ID"] = True
+            new_lines.append(f"OPENAI_VECTOR_STORE_ID={vs_policy}")
+        elif line.strip().startswith("OPENAI_REGIONAL_VECTOR_STORE_ID="):
+            seen["OPENAI_REGIONAL_VECTOR_STORE_ID"] = True
+            new_lines.append(f"OPENAI_REGIONAL_VECTOR_STORE_ID={vs_regional}")
+        else:
+            new_lines.append(line)
+    if not seen["OPENAI_VECTOR_STORE_ID"]:
+        new_lines.extend(lines_add)
+    elif vs_regional and not seen["OPENAI_REGIONAL_VECTOR_STORE_ID"]:
+        new_lines.append(f"OPENAI_REGIONAL_VECTOR_STORE_ID={vs_regional}")
+    env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    logger.info(f"[VECTOR_STORE] .env에 자동 추가: {lines_add}")
 
 
-def sync_vector_store_incremental(vector_store_id: str) -> None:
+def sync_vector_store_incremental(vector_store_id: str, manifest_path: Path = MANIFEST_PATH, categories: tuple[str, ...] = ("platform", "pledge")) -> None:
     """
     기존 Vector Store에 새/수정 PDF만 추가, 삭제된 PDF는 제거.
-    manifest(로컬 경로↔file_id 매핑)를 사용해 변경분만 동기화.
+    categories: 이 manifest에 해당하는 폴더만 동기화 (platform,pledge) 또는 (regional,)
     """
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # manifest 로드 (없으면 증분 불가 → 전체 재생성 필요)
     manifest: dict = {"vector_store_id": vector_store_id, "files": {}}
-    if MANIFEST_PATH.exists():
+    if manifest_path.exists():
         try:
-            manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except Exception:
             pass
     if not manifest.get("files"):
-        # manifest 없음 또는 비어있음 = 첫 배포 시. 증분 생략.
-        logger.info("[VECTOR_STORE] manifest 없음 → 증분 동기화 생략. (전체 재생성: OPENAI_VECTOR_STORE_ID 지우고 재시작)")
+        logger.info(f"[VECTOR_STORE] manifest 없음 ({manifest_path.name}) → 증분 동기화 생략")
         return
 
-    pairs = _collect_pdf_paths()
+    pairs = [(c, p) for c, p in _collect_pdf_paths() if c in categories]
     local_keys: dict[str, tuple[Path, str, str]] = {}  # rel -> (path, content_hash, cat)
     for cat, p in pairs:
         try:
@@ -282,15 +287,22 @@ def sync_vector_store_incremental(vector_store_id: str) -> None:
         manifest["files"].update(new_entries)
         logger.info(f"[VECTOR_STORE] 추가 완료: {list(new_entries.keys())}")
 
-    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST_PATH.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 _INSTRUCTIONS = """너는 정책 정합성 채점관이다.
 당 출마자 공약을 정강정책·우리당 공약·타지역 공약 문서와 비교해 적합도를 판단한다.
 
-문서 내 [정강정책], [공약], [지역별공약] prefix로 출처를 구분한다.
-채점 시 이념·가치·정책 방향의 부합으로 판단하고, 문자열 유사도가 아니다.
+file_search 도구가 2개 있음 (반드시 구분 사용):
+1) 정강정책·공약 검색: platform, pledges 채점 시 반드시 이 도구만 사용. 우리당 강령·중앙 공약.
+2) 지역별 공약 검색: 타지역 유사성·중복 검토(conflicts, regional_similarity) 시 반드시 이 도구만 사용. 공약 폴더가 아님.
+
+타지역 출마자 공약과의 유사성·중복을 검토할 때는 반드시 '지역별 공약' 전용 검색 도구를 사용. 공약 폴더(일반공약)를 검색하면 안 됨.
+
+[채점 원칙]
+- **단어·문자열 일치가 아니다.** 핵심 가치·이념·정책 방향의 부합으로 판단한다. 표현이 다르더라도 가치가 맞으면 높은 점수, 표현이 비슷해도 가치가 어긋나면 낮은 점수.
+- **모호한 방향/구체성 부족**: 방향만 제시하고 구체적 수단·수치·이행 계획이 없으면 improvements에 반드시 짚어라. 예: "지역경제 활성화"만 쓰고 어떻게 할지 없음 → "구체적 방안·수치·이행 계획 보완 필요".
 
 출마자 공약이 주어지면, file_search로 관련 문서를 검색한 뒤,
 다음 JSON 형식만 반환한다 (다른 설명 없이). JSON만 출력하고 코드블록 마크다운은 사용하지 마라.
@@ -298,7 +310,7 @@ _INSTRUCTIONS = """너는 정책 정합성 채점관이다.
 {
   "confidence": 0-100,
   "rubric": {
-    "platform": [{"item":"가치 정합성","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"정책 방향 일치","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"수단 적합성","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"일관성","score_0_5":0-5,"evidence":[],"note":"..."}],
+    "platform": [{"item":"가치 정합성","score_0_5":0-5,"evidence":[],"note":"핵심 이념·가치 부합(문자열 아님)"}, {"item":"정책 방향 일치","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"수단 적합성","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"일관성","score_0_5":0-5,"evidence":[],"note":"..."}],
     "pledges": [{"item":"중복/연계 가능","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"차별성","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"정책 언어 호환","score_0_5":0-5,"evidence":[],"note":"..."}],
     "conflicts": [{"item":"명시적 상충","score_0_5":0-5,"evidence":[],"note":"..."}, {"item":"잠재 리스크","score_0_5":0-5,"evidence":[],"note":"..."}]
   },
@@ -307,22 +319,43 @@ _INSTRUCTIONS = """너는 정책 정합성 채점관이다.
 
 score_0_5: 0=상충/근거전무, 1~2=부적합, 3=부분부합, 4=대체로 부합, 5=강한 부합.
 evidence는 검색된 문서 인용 시 사용. platform/pledges는 [] 가능.
+improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 보완 필요\" 항목을 반드시 포함.
 """
 
 
-def run_verify(vector_store_id: str, user_pledge: str) -> Dict:
+def _check_vector_store_ready(client: OpenAI, vs_id: str) -> None:
+    """인덱싱 완료 여부 확인. in_progress면 RuntimeError."""
+    vs = client.vector_stores.retrieve(vs_id)
+    if getattr(vs, "status", None) == "in_progress":
+        raise RuntimeError("Vector Store 인덱싱 중입니다. 잠시 후 다시 시도하세요.")
+
+
+def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id: str = "", max_results: int | None = None) -> Dict:
     """
-    Responses API (file_search)로 검증 리포트 JSON 반환. gpt-5.2 등 최신 모델 사용 가능.
+    Responses API (file_search)로 검증 리포트 JSON 반환.
+    max_results: file_search로 가져올 결과 개수 제한 (기본 FILE_SEARCH_MAX_RESULTS).
     """
     client = OpenAI(api_key=OPENAI_API_KEY)
+    _check_vector_store_ready(client, vector_store_id)
+    if regional_vector_store_id:
+        _check_vector_store_ready(client, regional_vector_store_id)
+    limit = max_results if max_results is not None else FILE_SEARCH_MAX_RESULTS
 
     input_text = f"다음 출마자 공약을 검증하고, 지정된 JSON 형식만 반환해라:\n\n{user_pledge}"
+
+    def _tool(vs_id: str):
+        t = {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": limit}
+        return t
+
+    tools = [_tool(vector_store_id)]
+    if regional_vector_store_id:
+        tools.append(_tool(regional_vector_store_id))
 
     response = client.responses.create(
         model=CHAT_MODEL,
         input=input_text,
         instructions=_INSTRUCTIONS,
-        tools=[{"type": "file_search", "vector_store_ids": [vector_store_id]}],
+        tools=tools,
     )
 
     if getattr(response, "status", None) != "completed":

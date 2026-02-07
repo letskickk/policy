@@ -21,6 +21,8 @@ from backend.config import (
     DEBUG_ENDPOINTS_ENABLED,
     PDF_S3_URI,
     USE_OPENAI_VECTOR_STORE,
+    SKIP_PDF_SCAN_ON_STARTUP,
+    OPENAI_VECTOR_STORE_ID,
     _nfc,
 )
 from backend.check_service import check_pledge_alignment
@@ -49,13 +51,19 @@ app = FastAPI(
 # 전역 인덱스 (서버 시작 시 초기화). USE_OPENAI_VECTOR_STORE=1이면 _vector_store_id 사용.
 _indexes = None
 _vector_store_id = None
+_regional_vector_store_id = None
 
 
 def _startup_self_check() -> int:
     """
     서버 시작 시 강제 진단. 조건 불만족 시 RuntimeError.
-    Returns: 공약 폴더 PDF 개수 (0이면 그대로 raise)
+    SKIP_PDF_SCAN_ON_STARTUP=1 + USE_OPENAI_VECTOR_STORE + OPENAI_VECTOR_STORE_ID 설정 시 PDF 스캔 생략.
+    Returns: 공약 폴더 PDF 개수 (0이면 그대로 raise, skip 시 0 반환)
     """
+    if USE_OPENAI_VECTOR_STORE and SKIP_PDF_SCAN_ON_STARTUP and OPENAI_VECTOR_STORE_ID:
+        logger.info("[SELF-CHECK] SKIP_PDF_SCAN_ON_STARTUP=1 → PDF 스캔 생략")
+        return 0
+
     # locale 확인: UTF-8 아님 → fail-fast
     enc = locale.getpreferredencoding()
     try:
@@ -157,7 +165,7 @@ def _startup_self_check() -> int:
 @app.on_event("startup")
 async def startup_event():
     """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 또는 Vector Store 준비."""
-    global _indexes, _vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id
     logger.info("서버 시작: Self-Check 및 인덱스/Vector Store 준비 중...")
     logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
     logger.info(f"USE_OPENAI_VECTOR_STORE= {USE_OPENAI_VECTOR_STORE}")
@@ -165,18 +173,29 @@ async def startup_event():
     _startup_self_check()
 
     if USE_OPENAI_VECTOR_STORE:
-        from backend.openai_vector_store import ensure_vector_store, sync_vector_store_incremental
-        from backend.config import OPENAI_VECTOR_STORE_ID
+        from backend.config import OPENAI_REGIONAL_VECTOR_STORE_ID
         if OPENAI_VECTOR_STORE_ID:
             _vector_store_id = OPENAI_VECTOR_STORE_ID
-            logger.info(f"[VECTOR_STORE] 기존 Vector Store 사용: {_vector_store_id}")
-            try:
-                sync_vector_store_incremental(_vector_store_id)
-            except Exception as e:
-                logger.warning(f"[VECTOR_STORE] 증분 동기화 실패 (무시하고 진행): {e}")
+            _regional_vector_store_id = OPENAI_REGIONAL_VECTOR_STORE_ID
+            logger.info(f"[VECTOR_STORE] .env ID 사용: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
+            if not SKIP_PDF_SCAN_ON_STARTUP:
+                try:
+                    from backend.openai_vector_store import sync_vector_store_incremental
+                    from backend.openai_vector_store import MANIFEST_PATH, MANIFEST_REGIONAL_PATH
+                    sync_vector_store_incremental(_vector_store_id, MANIFEST_PATH, ("platform", "pledge"))
+                    if _regional_vector_store_id and MANIFEST_REGIONAL_PATH.exists():
+                        sync_vector_store_incremental(_regional_vector_store_id, MANIFEST_REGIONAL_PATH, ("regional",))
+                except Exception as e:
+                    logger.warning(f"[VECTOR_STORE] 증분 동기화 실패 (무시하고 진행): {e}")
+        elif not SKIP_PDF_SCAN_ON_STARTUP:
+            from backend.openai_vector_store import ensure_vector_store
+            _vector_store_id, _regional_vector_store_id = ensure_vector_store()
+            logger.info(f"[VECTOR_STORE] 준비 완료: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
         else:
-            _vector_store_id = ensure_vector_store()
-            logger.info(f"[VECTOR_STORE] Vector Store 준비 완료: {_vector_store_id}")
+            raise RuntimeError(
+                "SKIP_PDF_SCAN_ON_STARTUP=1인데 OPENAI_VECTOR_STORE_ID가 없습니다. "
+                "scripts/index_pdfs_to_vector_store.py를 실행한 뒤 .env에 ID를 저장하세요."
+            )
     else:
         _indexes = build_all_indexes(force_rebuild=False)
         from backend.vector_index import VectorIndex
@@ -445,11 +464,12 @@ def debug_vectorstore():
     AWS 배포 시 벡터스토어 상태 확인용.
     """
     _debug_endpoint()
-    global _indexes, _vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id
     if USE_OPENAI_VECTOR_STORE:
         return {
             "mode": "openai_vector_store",
             "vector_store_id": _vector_store_id,
+            "regional_vector_store_id": _regional_vector_store_id,
             "persist_path": "N/A (OpenAI 호스팅)",
             "collection_names": ["policy-rag-store"],
             "total_count": "N/A",
@@ -521,11 +541,12 @@ def debug_context_summary():
 def debug_index():
     """인덱스 벡터 수를 반환하는 디버깅 엔드포인트."""
     _debug_endpoint()
-    global _indexes, _vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id
     if USE_OPENAI_VECTOR_STORE:
         return {
             "mode": "openai_vector_store",
             "vector_store_id": _vector_store_id,
+            "regional_vector_store_id": _regional_vector_store_id,
             "platform_vectors": 0,
             "pledge_vectors": 0,
             "regional_vectors": 0,
@@ -646,6 +667,7 @@ class PledgeVerifyRequest(BaseModel):
     top_k_platform: int = Field(default=6, description="정강정책 검색 개수")
     top_k_pledge: int = Field(default=6, description="공약 검색 개수")
     top_k_regional: int = Field(default=8, description="지역별 공약 검색 개수")
+    phase: str = Field(default="full", description="quick=1차 빠른 판정(결과 3개, 속도 우선), full=2차 상세 근거·상충 분석(6개)")
 
 
 @app.post("/api/pledge/verify")
@@ -658,7 +680,7 @@ def verify_pledge(body: PledgeVerifyRequest):
     - 타지역 중복/유사성
     - 상충/보완 제안
     """
-    global _indexes, _vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id
 
     pledge_text = (body.text or "").strip()
     if not pledge_text:
@@ -671,8 +693,10 @@ def verify_pledge(body: PledgeVerifyRequest):
                 detail="Vector Store가 준비되지 않았습니다. 서버를 재시작하세요."
             )
         try:
+            from backend.config import FILE_SEARCH_MAX_RESULTS_QUICK
             from backend.openai_vector_store import run_verify
-            return run_verify(_vector_store_id, pledge_text)
+            max_results = FILE_SEARCH_MAX_RESULTS_QUICK if (body.phase or "").strip().lower() == "quick" else None
+            return run_verify(_vector_store_id, pledge_text, _regional_vector_store_id or "", max_results)
         except Exception as e:
             logger.error(f"공약 검증 실패 (Vector Store): {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")
