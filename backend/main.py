@@ -16,6 +16,7 @@ from backend.pdf_loader import (
     HAS_PDFPLUMBER,
     load_platform_context,
     load_pledges_context,
+    get_context_summary,
 )
 from backend.index_builder import build_all_indexes
 from backend.report import generate_report
@@ -283,6 +284,25 @@ def debug_models():
         "chat_model": CHAT_MODEL,
         "hint": "/check 는 OPENAI_MODEL, /api/pledge/verify·카드는 CHAT_MODEL 사용. 동일하게 쓰려면 .env에 둘 다 설정.",
     }
+
+
+@app.get("/api/debug/context-summary")
+def debug_context_summary():
+    """
+    폴더별 PDF 파일 수·추출 성공 수·총 문자 수. 로컬 vs AWS 비교용.
+    수치가 AWS에서 현저히 작으면 PDF 추출이 다르게 되고 있는 것이므로 출력 차이 원인일 수 있음.
+    """
+    from backend.config import PDF_EXTRACTOR
+    try:
+        summary = get_context_summary()
+        return {
+            "pdf_extractor": PDF_EXTRACTOR,
+            "context": summary,
+            "hint": "로컬과 AWS에서 이 수치를 비교하세요. total_chars 차이가 크면 추출이 다릅니다.",
+        }
+    except Exception as e:
+        logger.exception("context-summary 실패")
+        return {"error": str(e), "context": {}}
 
 
 @app.get("/api/debug/index")

@@ -6,4 +6,9 @@ if [ ! -d .venv ]; then
     echo ".venv 없음. 먼저 실행: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
     exit 1
 fi
+# faiss 등 의존성 미설치 시 자동 설치
+if ! .venv/bin/python -c "import faiss" 2>/dev/null; then
+    echo "faiss 미설치. requirements.txt 설치 중..."
+    .venv/bin/pip install -r requirements.txt
+fi
 .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000

@@ -23,6 +23,11 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
 # 각 컨텍스트(정강정책, 공약)는 절반씩 사용하므로 각각 25000자까지 가능
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "50000"))
 
+# PDF 텍스트 추출: "pdfplumber" | "pypdf" | "auto". 로컬/AWS 출력 일치를 위해 pdfplumber 권장.
+PDF_EXTRACTOR = (os.getenv("PDF_EXTRACTOR", "pdfplumber") or "pdfplumber").strip().lower()
+if PDF_EXTRACTOR not in ("pdfplumber", "pypdf", "auto"):
+    PDF_EXTRACTOR = "pdfplumber"
+
 # 벡터 검색 설정
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
 # /api/pledge/verify·카드 생성에서 사용. 미설정 시 OPENAI_MODEL(gpt-5.2)과 동일
