@@ -19,6 +19,7 @@ from backend.config import (
     MAX_CHUNKS_PER_FILE,
     PDF_DIR,
     REBUILD_INDEX,
+    _nfc,
 )
 from backend.embeddings import embed_texts
 try:
@@ -130,7 +131,7 @@ def _build_index_inner(
     meta_tmp = cache_dir / f"{cache_name}_meta.pkl.tmp"
 
     if not force_rebuild and index_path.exists() and meta_path.exists():
-        folder_path = PDF_DIR / folder_name
+        folder_path = PDF_DIR / _nfc(folder_name)
         if folder_path.exists():
             current_hashes = compute_folder_hash(folder_path)
             cached_hashes = load_cache_hashes(cache_dir, cache_name)
@@ -163,7 +164,7 @@ def _build_index_inner(
         index.save(str(index_tmp), str(meta_tmp))
         os.replace(index_tmp, index_path)
         os.replace(meta_tmp, meta_path)
-        folder_path = PDF_DIR / folder_name
+        folder_path = PDF_DIR / _nfc(folder_name)
         if folder_path.exists():
             save_cache_hashes(cache_dir, cache_name, compute_folder_hash(folder_path))
         logger.info(f"{cache_name} 인덱스 빌드 및 저장 완료: {len(chunks)}개 청크")

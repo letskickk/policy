@@ -1,5 +1,6 @@
 import os
 import sys
+import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,10 +10,16 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 # .env는 항상 프로젝트 루트에서 로드 (실행 위치와 무관)
 load_dotenv(ROOT_DIR / ".env")
 
+
+def _nfc(s: str) -> str:
+    """mac/linux 호환: 경로 문자열을 NFC로 정규화."""
+    return unicodedata.normalize("NFC", s) if s else s
+
+
 PDF_DIR = ROOT_DIR / "data" / "pdf"
-# 정강·정책(이념·취지) 문서 / 우리당 공약 문서 구분용 하위 폴더
-PDF_DIR_PLATFORM = PDF_DIR / "정강정책"
-PDF_DIR_PLEDGES = PDF_DIR / "공약"
+# 정강·정책(이념·취지) 문서 / 우리당 공약 문서 구분용 하위 폴더 (NFC 정규화)
+PDF_DIR_PLATFORM = PDF_DIR / _nfc("정강정책")
+PDF_DIR_PLEDGES = PDF_DIR / _nfc("공약")
 PROMPTS_DIR = ROOT_DIR / "prompts"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()

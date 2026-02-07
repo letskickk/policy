@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List
 
 from backend.chunking import DocChunk, build_chunks
-from backend.config import PDF_DIR
+from backend.config import PDF_DIR, _nfc
 from backend.pdf_loader import iter_pdf_texts
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def load_folder_full_text(folder_name: str) -> str:
     정강정책·공약처럼 LLM이 전체 맥락(Global Context)을 보고 의미적 적합도를 판단할 때 사용한다.
     파일 간 구분은 "=== [파일명] ===" 헤더로 둔다.
     """
-    target_dir = PDF_DIR / folder_name
+    target_dir = PDF_DIR / _nfc(folder_name)
     if not target_dir.exists():
         logger.warning(f"{folder_name} 폴더가 존재하지 않음: {target_dir}")
         return ""
@@ -63,7 +63,7 @@ def load_pdf_chunks(folder_name: str, source_type: str) -> List[DocChunk]:
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return []
 
-    target_dir = pdf_dir / folder_name
+    target_dir = pdf_dir / _nfc(folder_name)
     if not target_dir.exists():
         logger.warning(f"{folder_name} 폴더가 존재하지 않음: {target_dir}")
         return []

@@ -1,8 +1,10 @@
 """
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 """
+import locale
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -17,6 +19,7 @@ from backend.config import (
     OPENAI_MODEL,
     CHAT_MODEL,
     PDF_S3_URI,
+    _nfc,
 )
 from backend.check_service import check_pledge_alignment
 from backend.pdf_loader import (
@@ -50,6 +53,20 @@ def _startup_self_check() -> int:
     서버 시작 시 강제 진단. 조건 불만족 시 RuntimeError.
     Returns: 공약 폴더 PDF 개수 (0이면 그대로 raise)
     """
+    # locale 확인: UTF-8 아님 → fail-fast
+    enc = locale.getpreferredencoding()
+    try:
+        lc = locale.setlocale(locale.LC_ALL, None)
+    except Exception:
+        lc = "unknown"
+    logger.info(f"[LOCALE] encoding={enc} LC_ALL={lc}")
+    # Linux/컨테이너에서만 UTF-8 강제 (한글 rglob용). Windows(cp949)는 통과.
+    if sys.platform != "win32" and enc.upper() not in ("UTF-8", "UTF8"):
+        raise RuntimeError(
+            f"UTF-8 locale이 필요합니다. 현재 encoding={enc}. "
+            "Dockerfile에 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 또는 export LC_ALL=C.UTF-8 을 설정하세요."
+        )
+
     # 경로
     cwd = os.getcwd()
     try:
@@ -64,15 +81,18 @@ def _startup_self_check() -> int:
     logger.info(f"[SELF-CHECK] PDF_DIR={pdf_dir!s}, exists={pdf_dir_exists}")
 
     folders = [
-        ("정강정책", pdf_dir / "정강정책"),
-        ("공약", pdf_dir / "공약"),
-        ("지역별 공약", pdf_dir / "지역별 공약"),
+        ("정강정책", pdf_dir / _nfc("정강정책")),
+        ("공약", pdf_dir / _nfc("공약")),
+        ("지역별 공약", pdf_dir / _nfc("지역별 공약")),
     ]
     pledge_pdf_count = 0
     for name, dir_path in folders:
         exists = dir_path.exists()
         try:
+            raw_entries = list(dir_path.iterdir())[:5] if exists else []
+            logger.info(f"[SCAN RAW] {name} iterdir sample={[str(p) for p in raw_entries]}")
             pdf_list = list(dir_path.rglob("*.pdf")) if exists else []
+            logger.info(f"[SCAN PDF] {name} rglob count={len(pdf_list)}")
         except Exception as e:
             logger.warning(f"[SELF-CHECK] {name} rglob failed: {e}")
             pdf_list = []
@@ -113,7 +133,7 @@ def _startup_self_check() -> int:
         try:
             import subprocess
             pdf_dir.mkdir(parents=True, exist_ok=True)
-            pdf_pledge = pdf_dir / "공약"
+            pdf_pledge = pdf_dir / _nfc("공약")
             pdf_pledge.mkdir(parents=True, exist_ok=True)
             subprocess.run(
                 ["aws", "s3", "sync", PDF_S3_URI.rstrip("/") + "/", str(pdf_pledge)],
@@ -366,9 +386,9 @@ def _get_fs_debug() -> dict:
     """PDF 디렉터리·폴더별 파일 수·샘플 파일명 (GET /api/debug/fs용)."""
     pdf_dir = Path(PDF_DIR).resolve()
     folders = [
-        ("정강정책", pdf_dir / "정강정책"),
-        ("공약", pdf_dir / "공약"),
-        ("지역별 공약", pdf_dir / "지역별 공약"),
+        ("정강정책", pdf_dir / _nfc("정강정책")),
+        ("공약", pdf_dir / _nfc("공약")),
+        ("지역별 공약", pdf_dir / _nfc("지역별 공약")),
     ]
     by_folder = {}
     for name, dir_path in folders:
