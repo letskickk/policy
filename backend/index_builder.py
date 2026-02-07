@@ -15,6 +15,7 @@ from backend.chunking import DocChunk
 from backend.config import (
     BUILD_CARDS,
     EMBEDDING_BATCH_SIZE,
+    EMBEDDING_DIMENSION,
     INDEX_CACHE_DIR,
     MAX_CHUNKS_PER_FILE,
     PDF_DIR,
@@ -148,16 +149,16 @@ def _build_index_inner(
     chunks = load_chunks_func()
     if not chunks:
         logger.warning(f"{cache_name} 폴더에 청크가 없습니다.")
-        return VectorIndex(dimension=3072, use_cosine=True)
+        return VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
 
     logger.info(f"{cache_name} 청크 로드 완료: {len(chunks)}개")
     texts = [chunk.text for chunk in chunks]
     embeddings = embed_texts(texts, batch_size=EMBEDDING_BATCH_SIZE)
     if len(embeddings) != len(chunks):
         logger.error(f"임베딩 수({len(embeddings)})와 청크 수({len(chunks)})가 일치하지 않습니다.")
-        return VectorIndex(dimension=3072, use_cosine=True)
+        return VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
 
-    dimension = len(embeddings[0]) if embeddings else 3072
+    dimension = len(embeddings[0]) if embeddings else EMBEDDING_DIMENSION
     index = VectorIndex(dimension=dimension, use_cosine=True)
     index.add(embeddings, chunks)
     try:

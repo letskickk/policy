@@ -10,6 +10,7 @@ import faiss
 import numpy as np
 
 from backend.chunking import DocChunk
+from backend.config import EMBEDDING_DIMENSION
 from backend.embeddings import normalize_embedding
 
 logger = logging.getLogger(__name__)
@@ -36,26 +37,27 @@ def _faiss_path(path: str) -> str:
 class VectorIndex:
     """FAISS 기반 벡터 인덱스."""
     
-    def __init__(self, dimension: int = 3072, use_cosine: bool = True):
+    def __init__(self, dimension: int = None, use_cosine: bool = True):
         """
         벡터 인덱스를 초기화한다.
         
         Args:
-            dimension: 임베딩 차원 수 (text-embedding-3-large는 3072)
+            dimension: 임베딩 차원 수 (None이면 config.EMBEDDING_DIMENSION)
             use_cosine: True면 코사인 유사도(IndexFlatIP), False면 L2 거리(IndexFlatL2)
         """
-        self.dimension = dimension
+        self.dimension = dimension if dimension is not None else EMBEDDING_DIMENSION
         self.use_cosine = use_cosine
         
+        dim = self.dimension
         if use_cosine:
             # 내적 기반 (코사인 유사도용, 임베딩은 정규화되어야 함)
-            self.index = faiss.IndexFlatIP(dimension)
+            self.index = faiss.IndexFlatIP(dim)
         else:
             # L2 거리 기반
-            self.index = faiss.IndexFlatL2(dimension)
+            self.index = faiss.IndexFlatL2(dim)
         
         self.chunks: List[DocChunk] = []
-        logger.info(f"벡터 인덱스 초기화 완료 (차원: {dimension}, 코사인: {use_cosine})")
+        logger.info(f"벡터 인덱스 초기화 완료 (차원: {self.dimension}, 코사인: {use_cosine})")
     
     def add(self, embeddings: List[List[float]], chunks: List[DocChunk]):
         """
@@ -151,7 +153,7 @@ class VectorIndex:
         logger.info(f"인덱스 저장 완료: {index_path}, {meta_path}")
     
     @classmethod
-    def load(cls, index_path: str, meta_path: str, dimension: int = 3072, use_cosine: bool = True):
+    def load(cls, index_path: str, meta_path: str, dimension: int = None, use_cosine: bool = True):
         """
         파일에서 인덱스와 메타데이터를 로드한다.
         
@@ -174,8 +176,16 @@ class VectorIndex:
         with open(meta_path, 'rb') as f:
             chunks = pickle.load(f)
         
+        dim = dimension if dimension is not None else EMBEDDING_DIMENSION
+        # 로드한 인덱스 차원과 불일치 시 에러
+        if index.d != dim:
+            raise ValueError(
+                f"임베딩 차원 불일치: 저장된 인덱스는 {index.d}차원, 설정은 {dim}차원. "
+                f"EMBEDDING_MODEL 또는 EMBEDDING_DIMENSION을 확인하세요."
+            )
+        
         # 인스턴스 생성
-        instance = cls(dimension=dimension, use_cosine=use_cosine)
+        instance = cls(dimension=dim, use_cosine=use_cosine)
         instance.index = index
         instance.chunks = chunks
         

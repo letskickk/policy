@@ -18,6 +18,7 @@ from backend.config import (
     INDEX_CACHE_DIR,
     OPENAI_MODEL,
     CHAT_MODEL,
+    DEBUG_ENDPOINTS_ENABLED,
     PDF_S3_URI,
     _nfc,
 )
@@ -163,12 +164,13 @@ async def startup_event():
     _indexes = build_all_indexes(force_rebuild=False)
     from backend.vector_index import VectorIndex
 
+    from backend.config import EMBEDDING_DIMENSION
     if "platform" not in _indexes:
-        _indexes["platform"] = VectorIndex(dimension=3072, use_cosine=True)
+        _indexes["platform"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
     if "pledge" not in _indexes:
-        _indexes["pledge"] = VectorIndex(dimension=3072, use_cosine=True)
+        _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
     if "regional" not in _indexes:
-        _indexes["regional"] = VectorIndex(dimension=3072, use_cosine=True)
+        _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
 
     platform_vectors = _indexes["platform"].size()
     pledge_vectors = _indexes["pledge"].size()
@@ -409,15 +411,60 @@ def _get_fs_debug() -> dict:
     }
 
 
+def _debug_endpoint(allowed: bool = True):
+    """DEBUG_ENDPOINTS_ENABLED=0 시 404 반환."""
+    if not allowed or not DEBUG_ENDPOINTS_ENABLED:
+        raise HTTPException(status_code=404, detail="Debug endpoint disabled (DEBUG_ENDPOINTS_ENABLED=0)")
+
+
 @app.get("/api/debug/fs")
 def debug_fs():
     """PDF 디렉터리 존재·폴더별 PDF 개수·샘플 파일명. AWS 배포 확인용."""
+    _debug_endpoint()
     return _get_fs_debug()
+
+
+@app.get("/api/debug/vectorstore")
+def debug_vectorstore():
+    """
+    persist_path, collection_name, total_count, embedding_model, embedding_dim, sample_doc 반환.
+    AWS 배포 시 벡터스토어 상태 확인용.
+    """
+    _debug_endpoint()
+    global _indexes
+    if _indexes is None:
+        raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
+    from backend.config import EMBEDDING_MODEL, EMBEDDING_DIMENSION
+    cache_dir = Path(INDEX_CACHE_DIR).resolve()
+    collections = ["platform", "pledge", "regional"]
+    total_count = sum((_indexes.get(k).size() if _indexes.get(k) else 0) for k in collections)
+    sample = None
+    for name in collections:
+        idx = _indexes.get(name)
+        if idx and idx.chunks:
+            c = idx.chunks[0]
+            sample = {
+                "collection": name,
+                "doc_id": c.doc_id,
+                "path": c.path,
+                "text_length": len(c.text),
+                "snippet": (c.text[:150] + "...") if len(c.text) > 150 else c.text,
+            }
+            break
+    return {
+        "persist_path": str(cache_dir),
+        "collection_names": collections,
+        "total_count": total_count,
+        "embedding_model_name": EMBEDDING_MODEL,
+        "embedding_dim": EMBEDDING_DIMENSION,
+        "sample_doc": sample,
+    }
 
 
 @app.get("/api/debug/models")
 def debug_models():
     """현재 서버에서 사용 중인 OpenAI 모델명을 반환 (AWS 등 배포 환경 확인용)."""
+    _debug_endpoint()
     return {
         "openai_model": OPENAI_MODEL,
         "chat_model": CHAT_MODEL,
@@ -431,6 +478,7 @@ def debug_context_summary():
     폴더별 PDF 파일 수·추출 성공 수·총 문자 수. 로컬 vs AWS 비교용.
     수치가 AWS에서 현저히 작으면 PDF 추출이 다르게 되고 있는 것이므로 출력 차이 원인일 수 있음.
     """
+    _debug_endpoint()
     from backend.config import PDF_EXTRACTOR
     try:
         summary = get_context_summary()
@@ -447,6 +495,7 @@ def debug_context_summary():
 @app.get("/api/debug/index")
 def debug_index():
     """인덱스 벡터 수를 반환하는 디버깅 엔드포인트."""
+    _debug_endpoint()
     global _indexes
     if _indexes is None:
         raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
@@ -468,6 +517,7 @@ def debug_index():
 
 def _run_debug_search(source: Literal["platform", "pledge", "regional"], q: str, top_k: int):
     """source/q/top_k로 인덱스 검색 후 [{ path, chunk_id, score, snippet }] 반환."""
+    _debug_endpoint()
     global _indexes
     if _indexes is None or not _indexes:
         raise HTTPException(status_code=503, detail="인덱스가 아직 초기화되지 않았습니다.")
@@ -530,6 +580,7 @@ def debug_search_post(body: DebugSearchBody):
 @app.get("/api/debug/scan")
 def debug_scan():
     """PDF 폴더 구조 및 파일 목록을 반환하는 디버깅 엔드포인트."""
+    _debug_endpoint()
     base_dir = PDF_DIR
 
     def list_files(subdir_name: str):

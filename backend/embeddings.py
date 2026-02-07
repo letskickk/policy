@@ -6,7 +6,7 @@ from typing import List
 
 from openai import OpenAI
 
-from backend.config import EMBEDDING_BATCH_SIZE, EMBEDDING_MODEL, OPENAI_API_KEY
+from backend.config import EMBEDDING_BATCH_SIZE, EMBEDDING_DIMENSION, EMBEDDING_MODEL, OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def embed_texts(texts: List[str], batch_size: int = EMBEDDING_BATCH_SIZE) -> Lis
         except Exception as e:
             logger.error(f"임베딩 생성 실패 (배치 {i//batch_size + 1}): {e}")
             # 실패한 배치는 빈 벡터로 채움 (나중에 필터링)
-            embeddings.extend([[0.0] * 3072 for _ in batch])  # text-embedding-3-large는 3072차원
+            embeddings.extend([[0.0] * EMBEDDING_DIMENSION for _ in batch])
     
     return embeddings
 
