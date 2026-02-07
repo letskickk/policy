@@ -668,6 +668,7 @@ class PledgeVerifyRequest(BaseModel):
     top_k_pledge: int = Field(default=6, description="공약 검색 개수")
     top_k_regional: int = Field(default=8, description="지역별 공약 검색 개수")
     phase: str = Field(default="full", description="quick=1차 빠른 판정(결과 3개, 속도 우선), full=2차 상세 근거·상충 분석(6개)")
+    judge: bool = Field(default=False, description="true=strict judge 모드 (evidence, specificity cap, QUERY/VERIFY)")
 
 
 @app.post("/api/pledge/verify")
@@ -694,13 +695,21 @@ def verify_pledge(body: PledgeVerifyRequest):
             )
         try:
             from backend.config import FILE_SEARCH_MAX_RESULTS_QUICK
-            from backend.openai_vector_store import run_verify
+            from backend.openai_vector_store import run_verify, run_verify_judge
             max_results = FILE_SEARCH_MAX_RESULTS_QUICK if (body.phase or "").strip().lower() == "quick" else None
+            if body.judge:
+                return run_verify_judge(_vector_store_id, pledge_text, _regional_vector_store_id or "", max_results)
             return run_verify(_vector_store_id, pledge_text, _regional_vector_store_id or "", max_results)
         except Exception as e:
             logger.error(f"공약 검증 실패 (Vector Store): {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")
     
+    if body.judge:
+        raise HTTPException(
+            status_code=400,
+            detail="judge 모드는 USE_OPENAI_VECTOR_STORE=1일 때만 사용 가능합니다."
+        )
+
     if _indexes is None or not _indexes:
         raise HTTPException(
             status_code=503,

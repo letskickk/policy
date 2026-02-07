@@ -326,6 +326,110 @@ improvements: 구체적 방안·수치·이행 계획이 없으면 \"구체성 �
 """
 
 
+_JUDGE_INSTRUCTIONS = """You are a policy-verification judge.
+
+Hard rules:
+1) Never infer missing policy details. If input lacks details, respond with status INSUFFICIENT_INFO.
+2) Provide evidence snippets: at least 2 from the user's input and 2 from the retrieved party reference. If not possible, INSUFFICIENT_INFO.
+3) Output JSON only with fields:
+   - status: "OK" | "INSUFFICIENT_INFO"
+   - mode: "QUERY" | "VERIFY"
+   - duplication_score (0-100)
+   - ideology_fit_score (0-100 or null if insufficient)
+   - specificity_score (0-100)
+   - final_score (0-100, must be capped by specificity; null in QUERY mode)
+   - confidence ("LOW"|"MED"|"HIGH")
+   - missing_fields: list of required slots not present (e.g. ["구체적 수단", "대상", "수치"])
+   - evidence: {input_quotes:[], reference_quotes:[]}
+4) Mode:
+   - If user input is <= 10 Korean characters or <= 3 space-separated tokens, treat as QUERY (mode=QUERY, no final_score, ideology_fit_score=null).
+5) Scoring cap:
+   - If specificity_score < 30, final_score <= 70
+   - If specificity_score < 15, final_score <= 55
+6) specificity_score: 0=title-only, 100=full concrete plan with targets, means, numbers.
+"""
+
+
+def _is_query_mode(text: str) -> bool:
+    """<= 10 chars or <= 3 tokens → QUERY mode."""
+    t = (text or "").strip()
+    return len(t) <= 10 or len(t.split()) <= 3
+
+
+def run_verify_judge(
+    vector_store_id: str,
+    user_pledge: str,
+    regional_vector_store_id: str = "",
+    max_results: int | None = None,
+) -> Dict:
+    """
+    Strict policy judge: JSON output with evidence, specificity cap, QUERY/VERIFY mode.
+    """
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    _check_vector_store_ready(client, vector_store_id)
+    if regional_vector_store_id:
+        _check_vector_store_ready(client, regional_vector_store_id)
+    limit = max_results if max_results is not None else FILE_SEARCH_MAX_RESULTS
+
+    input_text = f"Evaluate the following pledge. Return only valid JSON.\n\n{user_pledge}"
+
+    def _tool(vs_id: str):
+        return {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": limit}
+
+    tools = [_tool(vector_store_id)]
+    if regional_vector_store_id:
+        tools.append(_tool(regional_vector_store_id))
+
+    response = client.responses.create(
+        model=CHAT_MODEL,
+        input=input_text,
+        instructions=_JUDGE_INSTRUCTIONS,
+        tools=tools,
+    )
+
+    if getattr(response, "status", None) != "completed":
+        raise RuntimeError(f"Responses API 실패: status={getattr(response, 'status', 'unknown')}")
+
+    text = ""
+    for item in response.output:
+        if getattr(item, "type", None) == "message":
+            for c in getattr(item, "content", []):
+                if getattr(c, "type", None) == "output_text":
+                    text = getattr(c, "text", "")
+                    break
+            break
+
+    if not text:
+        raise RuntimeError("모델이 텍스트를 반환하지 않음")
+
+    text = text.strip()
+    if text.startswith("```"):
+        lines = [l for l in text.split("\n") if not l.strip().startswith("```")]
+        text = "\n".join(lines)
+    raw = json.loads(text)
+
+    # QUERY mode: server-side override when input is very short
+    if _is_query_mode(user_pledge):
+        raw["mode"] = "QUERY"
+        raw["final_score"] = None
+        raw["ideology_fit_score"] = None
+        raw["specificity_score"] = raw.get("specificity_score", 0)
+        raw["status"] = raw.get("status", "INSUFFICIENT_INFO")
+        raw.setdefault("evidence", {"input_quotes": [], "reference_quotes": []})
+        raw.setdefault("missing_fields", ["구체적 수단", "대상", "수치·이행 계획"])
+
+    # Scoring cap: specificity < 30 → final_score <= 70; < 15 → <= 55
+    spec = raw.get("specificity_score")
+    final = raw.get("final_score")
+    if spec is not None and final is not None:
+        if spec < 15:
+            raw["final_score"] = min(final, 55)
+        elif spec < 30:
+            raw["final_score"] = min(final, 70)
+
+    return raw
+
+
 def _check_vector_store_ready(client: OpenAI, vs_id: str) -> None:
     """인덱싱 완료 여부 확인. in_progress면 RuntimeError."""
     vs = client.vector_stores.retrieve(vs_id)
