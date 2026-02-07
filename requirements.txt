@@ -5,6 +5,7 @@ pypdf>=4.0.0
 pdfplumber>=0.11.0
 pdfminer.six>=20221105
 python-dotenv>=1.0.0
+filelock>=3.12.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
 rapidfuzz>=3.0.0

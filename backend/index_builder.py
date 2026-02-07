@@ -1,11 +1,15 @@
 """
 인덱스 빌드 및 캐시 관리 모듈.
+멀티워커 환경에서 build.lock으로 동시 빌드/저장 레이스를 막고, 원자적 저장으로 깨진 캐시 방지.
 """
 import hashlib
 import logging
+import os
 import pickle
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from filelock import FileLock
 
 from backend.chunking import DocChunk
 from backend.config import (
@@ -97,58 +101,39 @@ def load_cache_hashes(cache_dir: Path, cache_name: str) -> Optional[Dict[str, st
 
 
 def save_cache_hashes(cache_dir: Path, cache_name: str, hashes: Dict[str, str]):
-    """
-    파일 해시를 캐시에 저장한다.
-    
-    Args:
-        cache_dir: 캐시 디렉토리
-        cache_name: 캐시 이름
-        hashes: {파일경로: 해시} 딕셔너리
-    """
+    """파일 해시를 캐시에 원자적으로 저장한다."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     hash_file = cache_dir / f"{cache_name}_hashes.pkl"
+    tmp_file = cache_dir / f"{cache_name}_hashes.pkl.tmp"
     try:
-        with open(hash_file, 'wb') as f:
+        with open(tmp_file, 'wb') as f:
             pickle.dump(hashes, f)
+        os.replace(tmp_file, hash_file)
     except Exception as e:
         logger.error(f"해시 캐시 저장 실패 ({hash_file}): {e}")
+        if tmp_file.exists():
+            tmp_file.unlink(missing_ok=True)
 
 
-def build_index(
+def _build_index_inner(
+    cache_dir: Path,
     cache_name: str,
     folder_name: str,
     source_type: str,
     load_chunks_func,
-    force_rebuild: bool = False
+    force_rebuild: bool = False,
 ) -> VectorIndex:
-    """
-    인덱스를 빌드하거나 캐시에서 로드한다.
-    
-    Args:
-        cache_name: 캐시 이름 ("platform", "pledge", "regional")
-        folder_name: 폴더명 ("정강정책", "공약", "지역별 공약")
-        source_type: 소스 타입 ("platform", "pledge", "regional")
-        load_chunks_func: 청크를 로드하는 함수
-        force_rebuild: True면 강제로 재빌드
-    
-    Returns:
-        VectorIndex 인스턴스
-    """
-    cache_dir = INDEX_CACHE_DIR
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    
+    """락 밖에서 호출하지 말 것. 빌드/로드 로직만 수행."""
     index_path = cache_dir / f"{cache_name}.faiss"
     meta_path = cache_dir / f"{cache_name}_meta.pkl"
-    
-    # 캐시 확인
+    index_tmp = cache_dir / f"{cache_name}.faiss.tmp"
+    meta_tmp = cache_dir / f"{cache_name}_meta.pkl.tmp"
+
     if not force_rebuild and index_path.exists() and meta_path.exists():
-        # 현재 폴더 해시 계산
         folder_path = PDF_DIR / folder_name
         if folder_path.exists():
             current_hashes = compute_folder_hash(folder_path)
             cached_hashes = load_cache_hashes(cache_dir, cache_name)
-            
-            # 해시 비교
             if cached_hashes == current_hashes:
                 logger.info(f"{cache_name} 인덱스 캐시 히트, 로드 중...")
                 try:
@@ -157,111 +142,85 @@ def build_index(
                     logger.warning(f"캐시 로드 실패, 재빌드: {e}")
             else:
                 logger.info(f"{cache_name} 폴더 변경 감지, 재빌드 필요")
-    
-    # 인덱스 빌드
+
     logger.info(f"{cache_name} 인덱스 빌드 시작...")
-    
-    # 청크 로드
     chunks = load_chunks_func()
-    
     if not chunks:
         logger.warning(f"{cache_name} 폴더에 청크가 없습니다.")
-        # 빈 인덱스 반환 (차원은 임베딩 모델에 맞춰 설정)
         return VectorIndex(dimension=3072, use_cosine=True)
-    
+
     logger.info(f"{cache_name} 청크 로드 완료: {len(chunks)}개")
-    
-    # 임베딩 생성
     texts = [chunk.text for chunk in chunks]
-    logger.info(f"{cache_name} 임베딩 생성 시작 ({len(texts)}개 텍스트)...")
-    
     embeddings = embed_texts(texts, batch_size=EMBEDDING_BATCH_SIZE)
-    
     if len(embeddings) != len(chunks):
         logger.error(f"임베딩 수({len(embeddings)})와 청크 수({len(chunks)})가 일치하지 않습니다.")
-        return VectorIndex()
-    
-    # 인덱스 생성 및 추가
+        return VectorIndex(dimension=3072, use_cosine=True)
+
     dimension = len(embeddings[0]) if embeddings else 3072
     index = VectorIndex(dimension=dimension, use_cosine=True)
     index.add(embeddings, chunks)
-    
-    # 인덱스 저장
     try:
-        index.save(str(index_path), str(meta_path))
-        
-        # 해시 저장
+        index.save(str(index_tmp), str(meta_tmp))
+        os.replace(index_tmp, index_path)
+        os.replace(meta_tmp, meta_path)
         folder_path = PDF_DIR / folder_name
         if folder_path.exists():
-            hashes = compute_folder_hash(folder_path)
-            save_cache_hashes(cache_dir, cache_name, hashes)
-        
+            save_cache_hashes(cache_dir, cache_name, compute_folder_hash(folder_path))
         logger.info(f"{cache_name} 인덱스 빌드 및 저장 완료: {len(chunks)}개 청크")
         if cache_name == "pledge":
             logger.info(f"pledge_index: {len(chunks)} vectors")
     except Exception as e:
         logger.error(f"인덱스 저장 실패: {e}")
-
+        for p in (index_tmp, meta_tmp):
+            if p.exists():
+                p.unlink(missing_ok=True)
     return index
 
 
-def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
-    """
-    모든 인덱스를 빌드한다.
-    
-    Args:
-        force_rebuild: True면 강제로 재빌드
-    
-    Returns:
-        {인덱스명: VectorIndex} 딕셔너리
-    """
-    logger.info("모든 인덱스 빌드 시작...")
-
-    # 환경 변수 또는 인자로 강제 재빌드 여부 결정
-    effective_rebuild = force_rebuild or REBUILD_INDEX
-
-    cache_dir = INDEX_CACHE_DIR
+def build_index(
+    cache_name: str,
+    folder_name: str,
+    source_type: str,
+    load_chunks_func,
+    force_rebuild: bool = False,
+) -> VectorIndex:
+    """인덱스 빌드/로드. build.lock으로 멀티워커 레이스 방지."""
+    cache_dir = Path(INDEX_CACHE_DIR)
     cache_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = cache_dir / "build.lock"
+    with FileLock(str(lock_path), timeout=600):
+        return _build_index_inner(cache_dir, cache_name, folder_name, source_type, load_chunks_func, force_rebuild)
 
-    # REBUILD_INDEX=1 이면 기존 캐시 파일 삭제
-    if REBUILD_INDEX:
-        try:
-            logger.info("REBUILD_INDEX=1 감지, 기존 인덱스 캐시 삭제 중...")
-            for pattern in ("*.faiss", "*_meta.pkl", "*_hashes.pkl"):
-                for p in cache_dir.glob(pattern):
-                    logger.info(f"캐시 삭제: {p}")
-                    p.unlink(missing_ok=True)
-        except Exception as e:
-            logger.error(f"인덱스 캐시 삭제 실패: {e}")
-    
-    indexes = {}
-    
-    # 정강정책 인덱스
-    indexes["platform"] = build_index(
-        cache_name="platform",
-        folder_name="정강정책",
-        source_type="platform",
-        load_chunks_func=load_platform_chunks,
-        force_rebuild=effective_rebuild
-    )
-    
-    # 공약 인덱스
-    indexes["pledge"] = build_index(
-        cache_name="pledge",
-        folder_name="공약",
-        source_type="pledge",
-        load_chunks_func=load_pledge_chunks,
-        force_rebuild=effective_rebuild
-    )
-    
-    # 지역별 공약 인덱스
-    indexes["regional"] = build_index(
-        cache_name="regional",
-        folder_name="지역별 공약",
-        source_type="regional",
-        load_chunks_func=load_regional_chunks,
-        force_rebuild=effective_rebuild
-    )
+
+def build_all_indexes(force_rebuild: bool = False) -> Dict[str, VectorIndex]:
+    """모든 인덱스 빌드. 전체를 build.lock으로 감싸 레이스 방지."""
+    logger.info("모든 인덱스 빌드 시작...")
+    effective_rebuild = force_rebuild or REBUILD_INDEX
+    cache_dir = Path(INDEX_CACHE_DIR)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = cache_dir / "build.lock"
+
+    with FileLock(str(lock_path), timeout=600):
+        if REBUILD_INDEX:
+            try:
+                logger.info("REBUILD_INDEX=1 감지, 기존 인덱스 캐시 삭제 중...")
+                for pattern in ("*.faiss", "*_meta.pkl", "*_hashes.pkl", "*.tmp"):
+                    for p in cache_dir.glob(pattern):
+                        logger.info(f"캐시 삭제: {p}")
+                        p.unlink(missing_ok=True)
+            except Exception as e:
+                logger.error(f"인덱스 캐시 삭제 실패: {e}")
+
+        indexes = {}
+        indexes["platform"] = _build_index_inner(
+            cache_dir, "platform", "정강정책", "platform", load_platform_chunks, effective_rebuild
+        )
+        indexes["pledge"] = _build_index_inner(
+            cache_dir, "pledge", "공약", "pledge", load_pledge_chunks, effective_rebuild
+        )
+        indexes["regional"] = _build_index_inner(
+            cache_dir, "regional", "지역별 공약", "regional", load_regional_chunks, effective_rebuild
+        )
     
     total_chunks = sum(idx.size() for idx in indexes.values())
     logger.info(f"모든 인덱스 빌드 완료: 총 {total_chunks}개 청크")
