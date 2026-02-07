@@ -1,6 +1,8 @@
 .env
 .venv/
 venv/
+# Vector Store 증분 동기화용 (환경별 file_id 포함)
+data/vector_store_manifest.json
 __pycache__/
 *.pyc
 *.pyo

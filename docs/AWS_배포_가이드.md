@@ -155,17 +155,15 @@ sudo apt install -y fonts-noto-cjk fonts-nanum
 
 ### .env 파일 만들기
 
-서버에도 API 키가 있어야 합니다.
+서버에도 환경변수가 필요합니다. **로컬 .env를 그대로 복사**해도 되고, 아래처럼 예시 파일을 써도 됩니다.
 
 ```bash
-nano .env
+# 예시 파일을 .env로 복사 (OPENAI_API_KEY만 수정하면 됨)
+cp .env.aws.example .env
+nano .env   # OPENAI_API_KEY=sk-proj-여기에본인키 부분만 본인 키로 수정
 ```
 
-아래 한 줄 입력 후 저장 (Ctrl+O, Enter, Ctrl+X):
-
-```
-OPENAI_API_KEY=sk-proj-여기에본인키
-```
+`.env.aws.example`에는 로컬과 동일한 설정(USE_OPENAI_VECTOR_STORE=1, CHAT_MODEL=gpt-5.2 등)이 이미 들어 있습니다. **수동으로 따로 바꿀 필요 없습니다.**
 
 ---
 

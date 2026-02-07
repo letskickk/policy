@@ -44,6 +44,7 @@ if _embed_dim:
 else:
     EMBEDDING_DIMENSION = 3072 if "large" in EMBEDDING_MODEL.lower() else 1536
 # /api/pledge/verify·카드 생성에서 사용. 미설정 시 OPENAI_MODEL(gpt-5.2)과 동일
+# Responses API 사용 시 gpt-5.2 등 최신 모델 지원
 CHAT_MODEL = os.getenv("CHAT_MODEL", "").strip() or OPENAI_MODEL
 
 # 인덱스 캐시: AWS/컨테이너에서 /tmp는 재시작 시 휘발 → INDEX_CACHE_DIR로 영구 경로 지정 권장
@@ -69,3 +70,7 @@ BUILD_CARDS = os.getenv("BUILD_CARDS", "0") == "1"
 PDF_S3_URI = os.getenv("PDF_S3_URI", "").strip()
 # /api/debug/* 엔드포인트 활성화 (프로덕션: 0으로 비활성화)
 DEBUG_ENDPOINTS_ENABLED = os.getenv("DEBUG_ENDPOINTS_ENABLED", "1") == "1"
+# OpenAI Vector Store 사용 (1=사용, FAISS 대신). AWS 인프라 복잡도 제거.
+USE_OPENAI_VECTOR_STORE = os.getenv("USE_OPENAI_VECTOR_STORE", "0") == "1"
+# Vector Store 재사용 (설정 시 매번 새로 만들지 않음)
+OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID", "").strip()
