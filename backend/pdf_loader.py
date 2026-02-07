@@ -36,6 +36,7 @@ from backend.config import (
     MAX_CONTEXT_CHARS,
     PDF_DIR,
     PDF_EXTRACTOR,
+    _nfc,
 )
 
 
@@ -49,7 +50,10 @@ def iter_pdf_texts(dir_path: Path) -> Iterable[tuple[str, str]]:
         return
 
     try:
+        raw_sample = list(dir_path.iterdir())[:5]
+        logger.info(f"[SCAN RAW] {dir_path.name} iterdir sample={[str(p) for p in raw_sample]}")
         pdf_files = sorted(dir_path.rglob("*.pdf"))
+        logger.info(f"[SCAN PDF] {dir_path.name} rglob count={len(pdf_files)}")
     except Exception as e:
         logger.error(f"PDF 파일 검색 실패 ({dir_path}): {e}")
         return
@@ -77,9 +81,9 @@ def get_context_summary() -> dict:
     """
     summary = {}
     for folder_name, dir_path in [
-        ("platform", PDF_DIR / "정강정책"),
-        ("pledges", PDF_DIR / "공약"),
-        ("regional", PDF_DIR / "지역별 공약"),
+        ("platform", PDF_DIR / _nfc("정강정책")),
+        ("pledges", PDF_DIR / _nfc("공약")),
+        ("regional", PDF_DIR / _nfc("지역별 공약")),
     ]:
         if not dir_path.exists():
             summary[folder_name] = {"files_found": 0, "files_loaded": 0, "total_chars": 0}
@@ -205,8 +209,10 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
     # 폴더 안의 모든 PDF 파일 찾기 (재귀적)
     try:
         logger.info(f"[SCAN] dir={dir_path}")
+        raw_sample = list(dir_path.iterdir())[:5]
+        logger.info(f"[SCAN RAW] iterdir sample={[str(p) for p in raw_sample]}")
         pdf_files = list(dir_path.rglob("*.pdf"))
-        logger.info(f"[SCAN] found={len(pdf_files)}")
+        logger.info(f"[SCAN PDF] rglob count={len(pdf_files)}")
         # 공약 폴더 특별 로깅
         if dir_path.name == "공약":
             logger.info(f"[SCAN] 공약 폴더 found={len(pdf_files)}")
@@ -270,7 +276,7 @@ def load_platform_context() -> str:
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return ""
     
-    platform_dir = pdf_dir / "정강정책"
+    platform_dir = pdf_dir / _nfc("정강정책")
     
     if not platform_dir.exists():
         logger.warning(f"정강정책 폴더가 존재하지 않음: {platform_dir}")
@@ -300,7 +306,7 @@ def load_pledges_context() -> str:
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return ""
     
-    pledges_dir = pdf_dir / "공약"
+    pledges_dir = pdf_dir / _nfc("공약")
     
     if not pledges_dir.exists():
         logger.warning(f"공약 폴더가 존재하지 않음: {pledges_dir}")
@@ -331,7 +337,7 @@ def load_regional_pledges_context() -> str:
         logger.warning(f"PDF_DIR이 존재하지 않음: {pdf_dir}")
         return ""
     
-    regional_dir = pdf_dir / "지역별 공약"
+    regional_dir = pdf_dir / _nfc("지역별 공약")
     
     if not regional_dir.exists():
         logger.warning(f"지역별 공약 폴더가 존재하지 않음: {regional_dir}")

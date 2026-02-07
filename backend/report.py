@@ -471,10 +471,10 @@ def generate_report(
     evidence_map = build_evidence_map(platform_hits, pledge_hits, regional_hits)
 
     # 정강정책·공약 전체 문서 로드 (한도 없이 폴더 안 모든 PDF 전부 → GPT가 모두 학습·파악)
-    from backend.config import PDF_DIR
+    from backend.config import PDF_DIR, _nfc
     from backend.pdf_loader import load_full_text_from_dir
-    platform_full_text = load_full_text_from_dir(PDF_DIR / "정강정책")
-    pledges_full_text = load_full_text_from_dir(PDF_DIR / "공약")
+    platform_full_text = load_full_text_from_dir(PDF_DIR / _nfc("정강정책"))
+    pledges_full_text = load_full_text_from_dir(PDF_DIR / _nfc("공약"))
 
     # 구조화 카드(원칙 카드/공약 카드) 로드 — 있으면 검증 시 카드+원문 기반 점수화에 활용
     platform_cards: List[Dict] = []
