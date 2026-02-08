@@ -11,6 +11,7 @@ Linux(AWS 등)에서는 pdfplumber를 우선 사용해 한글/폰트 차이로 �
 """
 import logging
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
@@ -282,6 +283,7 @@ def _load_pdfs_from_dir(dir_path: Path, limit_chars: int) -> str:
     return result
 
 
+@lru_cache(maxsize=1)
 def load_platform_context() -> str:
     """
     정강·정책(이념·취지) 문서만 로드한다.
@@ -312,6 +314,7 @@ def load_platform_context() -> str:
     return result
 
 
+@lru_cache(maxsize=1)
 def load_pledges_context() -> str:
     """
     우리당 공약 문서만 로드한다.
@@ -342,6 +345,7 @@ def load_pledges_context() -> str:
     return result
 
 
+@lru_cache(maxsize=1)
 def load_regional_pledges_context() -> str:
     """
     타지역 공약 문서를 로드한다.
@@ -373,6 +377,7 @@ def load_regional_pledges_context() -> str:
     return result
 
 
+@lru_cache(maxsize=1)
 def load_all_pdf_context() -> str:
     """
     (하위 호환) 전체 PDF를 한 덩어리로 로드. 정강정책 + 공약 순으로 합친다.

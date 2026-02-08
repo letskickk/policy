@@ -1,143 +1,328 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>개혁신당 정책 멘토링</title>
   <style>
     * { box-sizing: border-box; }
-    body {
-      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    :root{
+      --bg1:#04162b;
+      --bg2:#073053;
+      --bg3:#0a3b69;
+
+      --text:#e2e8f0;
+      --text-strong:#f8fafc;
+      --muted:#cbd5e1;
+
+      --brand:#ff7210;
+
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
+
+      --cta:#eaf2ff;
+      --cta-text:#0b2a4d;
+      --cta-hover:#dbeafe;
+      --cta-ring: rgba(56, 189, 248, 0.35);
+
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --shadow2: 0 12px 26px rgba(0,0,0,0.32);
+    }
+
+    body{
+      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
       margin: 0;
       min-height: 100vh;
-      background: linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #334155 100%);
-      color: #e2e8f0;
+      background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+                  linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      color: var(--text);
       padding: 2rem 1rem;
     }
-    .wrap {
-      max-width: 640px;
-      margin: 0 auto;
-    }
-    .logo {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: #94a3b8;
-      margin-bottom: 3rem;
-    }
-    h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1.3;
-      margin-bottom: 1rem;
-      color: #f8fafc;
-      letter-spacing: -0.03em;
-    }
-    .hero-desc {
-      font-size: 1.05rem;
-      line-height: 1.65;
-      color: #cbd5e1;
-      margin-bottom: 2.5rem;
-    }
-    .cta {
-      display: inline-block;
-      padding: 1rem 2rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #fff;
-      background: #2563eb;
-      border: none;
-      border-radius: 10px;
-      text-decoration: none;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-    }
-    .cta:hover {
-      background: #1d4ed8;
-      transform: translateY(-1px);
-    }
-    .cta:active { transform: translateY(0); }
 
-    .features {
-      margin-top: 3.5rem;
-      padding-top: 2rem;
-      border-top: 1px solid rgba(148, 163, 184, 0.2);
+    .wrap{ max-width: 720px; margin: 0 auto; }
+
+    .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 1rem;
+      margin-bottom: 1.75rem;
     }
-    .features h2 {
+
+    .logo{
+      display:flex;
+      align-items:center;
+      gap: 0.75rem;
+      margin: 0;
+      line-height: 1;
+    }
+    .logo img{
+      height: 30px;
+      width: auto;
+      display: inline-block;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
+    }
+    .logo .title{
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--text-strong);
+    }
+    .logo .tag{
+      display:block;
+      margin-top: 0.35rem;
+      font-size: 0.84rem;
+      color: #ffb37a;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+      opacity: 0.95;
+    }
+
+    .pill{
+      padding: 0.55rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-weight: 800;
+    }
+
+    .hero{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.75rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    h1{
+      font-size: 2.05rem;
+      font-weight: 950;
+      line-height: 1.25;
+      margin: 0 0 0.85rem 0;
+      color: var(--text-strong);
+      letter-spacing: -0.04em;
+    }
+
+    .hero-desc{
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text);
+      margin: 0 0 1.25rem 0;
+      opacity: 0.95;
+    }
+
+    .flow{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.85rem;
+      margin: 1.25rem 0 1.4rem 0;
+    }
+    .step{
+      background: var(--card2);
+      border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 14px;
+      padding: 0.9rem 0.9rem;
+      min-height: 86px;
+    }
+    .step .k{
+      display:flex;
+      align-items:center;
+      gap: 0.55rem;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: var(--text-strong);
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .badge{
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      color: #e2e8f0;
+      font-weight: 950;
+      font-size: 0.9rem;
+    }
+    .step p{
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .cta{
+      display:block;
+      width: 100%;
+      text-align:center;
+      padding: 1.05rem 1.25rem;
+      font-size: 1.08rem;
+      font-weight: 950;
+      color: var(--cta-text);
+      background: var(--cta);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 14px;
+      text-decoration: none;
+      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    }
+    .cta:hover{
+      background: var(--cta-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow2);
+    }
+    .cta:active{ transform: translateY(0); }
+    .cta:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring), var(--shadow2);
+    }
+
+    .features{
+      margin-top: 2.2rem;
+      padding-top: 1.6rem;
+      border-top: 1px solid rgba(148,163,184,0.18);
+    }
+    .features h2{
       font-size: 0.85rem;
-      font-weight: 600;
+      font-weight: 900;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #94a3b8;
-      margin-bottom: 1.25rem;
+      letter-spacing: 0.08em;
+      color: #ffb37a;
+      margin: 0 0 1rem 0;
     }
-    .feature-list {
+    .feature-grid{
       list-style: none;
       padding: 0;
       margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.9rem;
     }
-    .feature-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-      font-size: 0.95rem;
-      line-height: 1.5;
-      color: #cbd5e1;
+    .feature-grid li{
+      background: var(--card2);
+      border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 14px;
+      padding: 1.05rem;
+      display:flex;
+      gap: 0.9rem;
+      align-items:flex-start;
     }
-    .feature-list li:last-child { border-bottom: none; }
-    .feature-list .icon {
+    .icon{
       flex-shrink: 0;
-      width: 28px;
-      height: 28px;
-      background: rgba(37, 99, 235, 0.25);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 1rem;
     }
-    .footer {
-      margin-top: 3rem;
-      font-size: 0.85rem;
-      color: #64748b;
+    .feature-grid strong{
+      color: var(--text-strong);
+      font-weight: 900;
     }
-    .footer a {
-      color: #93c5fd;
+    .feature-grid .txt{
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: var(--text);
+      opacity: 0.95;
+    }
+
+    .footer{
+      margin-top: 2.3rem;
+      font-size: 0.88rem;
+      color: rgba(203,213,225,0.92);
+      line-height: 1.6;
+      opacity: 0.95;
+    }
+    .footer a{
+      color: #ffb37a;
       text-decoration: none;
+      font-weight: 900;
     }
-    .footer a:hover { text-decoration: underline; }
+    .footer a:hover{ text-decoration: underline; }
+
+    @media (max-width: 640px){
+      h1{ font-size: 1.75rem; }
+      .hero{ padding: 1.25rem; border-radius: 16px; }
+      .flow{ grid-template-columns: 1fr; }
+      .top{ flex-direction: column; align-items: flex-start; }
+      .pill{ align-self: flex-start; }
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <p class="logo">개혁신당 정책 멘토링</p>
+    <div class="top">
+      <p class="logo">
+        <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고" />
+        <span>
+          <span class="title">개혁신당 정책 멘토링</span>
+          <span class="tag">지방선거 공약을 정강·정책 기준으로 빠르게 점검합니다</span>
+        </span>
+      </p>
+      <span class="pill">정강·정책·공약 기반 • 즉시 분석</span>
+    </div>
 
-    <h1>중앙당의 정강·정책에 맞는 공약을<br>스스로 확인하세요</h1>
-    <p class="hero-desc">
-      공약을 입력하면 중앙당의 정강정책, 공약 등과의 적합도를 판단합니다.
-      AI가 즉시 부합 여부, 근거, 수정·보완 체크리스트를 제공합니다.
-      정책국과 출마자 모두 전략과 메시지에 집중할 수 있도록 기초 검토를 자동화했습니다.
-    </p>
+    <div class="hero">
+      <h1>중앙당의 정강·정책에 맞는 공약을<br />스스로 확인하세요</h1>
 
-    <a href="/pledge" class="cta">공약 분석하기</a>
+      <p class="hero-desc">
+        공약을 입력하면 중앙당의 정강정책, 공약 등과의 적합도를 판단합니다.
+        AI가 즉시 부합 여부, 근거, 수정·보완 체크리스트를 제공합니다.
+        지방선거 출마자가 중앙당 공약과의 적합도를 판단하고 공약을 발전시키는 데 도움을 줍니다.
+      </p>
+
+      <div class="flow" aria-label="이용 흐름">
+        <div class="step">
+          <div class="k"><span class="badge">1</span> 공약 입력</div>
+          <p>검토할 공약을 그대로 붙여넣습니다.</p>
+        </div>
+        <div class="step">
+          <div class="k"><span class="badge">2</span> 기준 대조</div>
+          <p>정강·정책·공약 기준으로 적합도를 판단합니다.</p>
+        </div>
+        <div class="step">
+          <div class="k"><span class="badge">3</span> 보완 제안</div>
+          <p>근거와 체크리스트 형태로 보완안을 제공합니다.</p>
+        </div>
+      </div>
+
+      <a href="/pledge" class="cta">공약 분석하기</a>
+    </div>
 
     <section class="features">
       <h2>주요 기능</h2>
-      <ul class="feature-list">
+      <ul class="feature-grid">
         <li>
           <span class="icon">✓</span>
-          <span><strong>개혁신당 정책 멘토링</strong> — 중앙당의 정강·정책·공약 기준으로 적합도 판단, 수정·보완 체크리스트 제공</span>
+          <div class="txt">
+            <strong>개혁신당 정책 멘토링</strong> — 중앙당의 정강·정책·공약 기준으로 적합도 판단, 수정·보완 체크리스트 제공
+          </div>
         </li>
         <li>
           <span class="icon">↔</span>
-          <span><strong>중복·유사 탐지</strong> — 후보 공약 DB와 비교해 유사 공약 제시, 차별화 포인트 제안 (확장 예정)</span>
+          <div class="txt">
+            <strong>중복·유사 탐지</strong> — 후보 공약 DB와 비교해 유사 공약 제시, 차별화 포인트 제안 (확장 예정)
+          </div>
         </li>
         <li>
           <span class="icon">📄</span>
-          <span><strong>PDF 기반</strong> — 정강·정책·과거 공약 PDF를 기준으로 GPT가 분석</span>
+          <div class="txt">
+            <strong>정강·정책·공약 기반</strong> — 중앙당의 정강·정책·공약을 기준으로 GPT가 분석
+          </div>
         </li>
       </ul>
     </section>
