@@ -5,295 +5,378 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>개혁신당 정책 멘토링</title>
   <style>
-    /* --- [디자인 변수 및 초기화] --- */
+    /* --- [초기화] --- */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      /* 배경색 팔레트 */
-      --bg-main: #0a1929; /* 더 깊은 남색 배경 */
-      --bg-gradient-1: #0c2b4d;
-      --bg-gradient-2: #103c6b;
 
-      /* 텍스트 색상 (가시성 향상을 위해 더 밝게 조정) */
-      --text-primary: #ffffff; /* 가장 중요한 텍스트 (완전 흰색) */
-      --text-secondary: #e2e8f0; /* 본문 텍스트 (밝은 회색) */
-      --text-muted: #cbd5e1; /* 부가 설명 텍스트 (차분한 회색) */
-      --text-placeholder: rgba(203, 213, 225, 0.6); /* 입력창 안내 문구 */
+    /* --- [메인과 동일한 톤/팔레트] --- */
+    :root{
+      --bg1:#04162b;
+      --bg2:#073053;
+      --bg3:#0a3b69;
 
-      /* 포인트 컬러 */
-      --brand-orange: #ff7e36; /* 개혁신당 오렌지 (채도 약간 조정) */
-      --brand-blue: #3db2ff; /* 강조용 블루 */
-      --error-red: #ff6b6b;
+      --text:#f1f5f9;
+      --text-strong:#ffffff;
+      --muted:#cbd5e1;
 
-      /* UI 요소 색상 (글래스모피즘 강화) */
-      --card-bg: rgba(255, 255, 255, 0.07); /* 카드 배경 (반투명 밝음) */
-      --input-bg: rgba(0, 0, 0, 0.25); /* 입력창 배경 (반투명 어두움 - 카드와 대비) */
-      --border-color: rgba(255, 255, 255, 0.15); /* 테두리 색상 (더 선명하게) */
-      --focus-ring: rgba(61, 178, 255, 0.5); /* 포커스 시 빛나는 효과 */
+      --brand:#ff7210;
 
-      /* 버튼 */
-      --btn-bg: #edf2f7;
-      --btn-text: #0f2942;
-      --btn-hover-bg: #ffffff;
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
 
-      /* 그림자 */
-      --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
-      --shadow-btn: 0 8px 20px rgba(0, 0, 0, 0.25);
+      --cta:#ffffff;
+      --cta-text:#0f172a;
+      --cta-hover:#f1f5f9;
+      --cta-ring: rgba(56, 189, 248, 0.35);
+
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --shadow2: 0 12px 26px rgba(0,0,0,0.32);
+
+      /* 입력/에러/보조 */
+      --input-bg: rgba(0,0,0,0.22);
+      --input-bg-focus: rgba(0,0,0,0.30);
+
+      /* ✅ 입력창 테두리(상시) */
+      --input-border: rgba(148,163,184,0.28);
+      --error-bg: rgba(255, 107, 107, 0.14);
+      --error-border: rgba(255, 107, 107, 0.40);
+      --error-text: #ffd1d1;
     }
 
-    body {
-      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; /* 가독성 좋은 폰트 우선 적용 */
-      max-width: 880px; /* 가독성을 위해 최대 폭 약간 축소 */
+    body{
+      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      max-width: 880px;
       margin: 0 auto;
       padding: 2rem 1.25rem 3rem;
       min-height: 100vh;
-      color: var(--text-secondary);
+      color: var(--text);
       line-height: 1.6;
-      /* 배경 그래픽 강화 */
-      background-color: var(--bg-main);
-      background-image:
-        radial-gradient(circle at 15% 15%, rgba(255, 126, 54, 0.12) 0%, transparent 50%), /* 오렌지 빛 */
-        radial-gradient(circle at 85% 30%, rgba(61, 178, 255, 0.12) 0%, transparent 50%), /* 블루 빛 */
-        linear-gradient(170deg, var(--bg-main) 0%, var(--bg-gradient-1) 50%, var(--bg-gradient-2) 100%);
-      background-attachment: fixed; /* 스크롤 시 배경 고정 */
+      font-size: 16px;
+
+      /* ✅ 메인과 동일한 배경 컨셉 */
+      background:
+        radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+        radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+        linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      background-attachment: fixed;
     }
 
-    /* --- [상단 네비게이션 및 브랜드] --- */
-    .nav { margin-bottom: 1.5rem; }
-    .nav-link {
-      display: inline-flex;
-      align-items: center;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.9rem;
-      font-weight: 600;
+    /* --- [네비게이션] --- */
+    .nav{
+      margin-bottom: 1.5rem;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-link{
+      display:inline-flex;
+      align-items:center;
+      color: var(--text);
+      text-decoration:none;
+      font-size: 0.92rem;
+      font-weight: 800;
       padding: 0.6rem 1rem;
-      border-radius: 99px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
       transition: all 0.2s ease;
     }
-    .nav-link:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: var(--text-primary);
-      border-color: rgba(255, 255, 255, 0.3);
+    .nav-link:hover{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+      border-color: rgba(148,163,184,0.28);
+    }
+    .nav-link:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring);
     }
 
+    /* --- [글자 크기 조절 컨트롤] --- */
+    .font-ctrl{
+      display:inline-flex;
+      align-items:center;
+      gap: 0.45rem;
+      padding: 0.55rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      backdrop-filter: blur(10px);
+    }
+    .font-btn{
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.18);
+      color: var(--text-strong);
+      font-weight: 950;
+      font-size: 1.15rem;
+      cursor: pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.22);
+      user-select:none;
+    }
+    .font-btn:hover{
+      background: rgba(255,255,255,0.10);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.26);
+    }
+    .font-btn:active{ transform: translateY(0); }
+    .font-btn:disabled{
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .font-btn:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring), 0 10px 18px rgba(0,0,0,0.26);
+    }
+    .font-indicator{
+      min-width: 76px;
+      text-align:center;
+      color: var(--text-strong);
+      font-weight: 900;
+      font-size: 0.86rem;
+      letter-spacing: -0.02em;
+      padding: 0 0.35rem;
+      user-select:none;
+    }
+
+    /* --- [브랜드] --- */
     .brand-container { margin-bottom: 1.5rem; }
-    .brand-logo {
-      display: inline-flex;
-      align-items: center;
+    .brand-logo{
+      display:inline-flex;
+      align-items:center;
       gap: 0.75rem;
-      font-weight: 800;
+      font-weight: 900;
       font-size: 1.1rem;
-      color: var(--text-primary);
+      color: var(--text-strong);
       letter-spacing: -0.01em;
     }
-    .brand-logo img {
+    .brand-logo img{
       height: 26px;
       width: auto;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); /* 로고 가시성 확보 */
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
     }
 
-    /* --- [타이틀 영역] --- */
-    header { margin-bottom: 2.5rem; }
-    h1 {
+    /* --- [헤더] --- */
+    header { margin-bottom: 2.2rem; }
+    h1{
       font-size: 2rem;
-      font-weight: 800;
-      color: var(--text-primary);
+      font-weight: 950;
+      color: var(--text-strong);
       margin-bottom: 0.75rem;
-      letter-spacing: -0.02em;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3); /* 제목 강조 */
+      letter-spacing: -0.03em;
     }
-    .subtitle {
+    .subtitle{
       font-size: 1.05rem;
-      color: var(--text-muted);
-      font-weight: 500;
+      color: var(--text);
+      font-weight: 600;
+      line-height: 1.7;
     }
 
-    /* --- [카드 컴포넌트 (공통)] --- */
-    .card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px); /* 블러 효과 강화 */
-      -webkit-backdrop-filter: blur(16px);
-      border-radius: 24px; /* 더 둥글게 */
-      padding: 2rem; /* 내부 여백 확대 */
+    /* --- [카드] --- */
+    .card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.75rem;
       margin-bottom: 1.75rem;
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
     }
 
-    /* --- [폼 요소 스타일링 (가시성 핵심)] --- */
-    .form-label {
-      display: block;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--text-primary);
+    /* --- [폼] --- */
+    .form-label{
+      display:block;
+      font-size: 1.08rem;
+      font-weight: 900;
+      color: var(--text-strong);
       margin-bottom: 0.6rem;
+      letter-spacing: -0.02em;
     }
-    .form-hint {
+    .form-hint{
       font-size: 0.95rem;
-      color: var(--text-muted);
-      margin-bottom: 1.25rem;
-      line-height: 1.5;
+      color: var(--text);
+      margin-bottom: 1.1rem;
+      line-height: 1.6;
     }
-    .form-hint strong { color: var(--brand-orange); font-weight: 600; }
+    .form-hint strong{
+      color: #ffb37a; /* 메인과 동일한 부드러운 강조 */
+      font-weight: 900;
+    }
 
-    /* 텍스트 입력창: 배경과 확실히 분리 */
-    textarea {
+    textarea{
       width: 100%;
       min-height: 220px;
       padding: 1.25rem;
-      border-radius: 18px;
-      border: 1px solid var(--border-color);
-      background: var(--input-bg); /* 더 어두운 배경 적용 */
-      color: var(--text-primary); /* 글자색 밝게 */
+      border-radius: 16px;
+
+      /* ✅ 요청: 마우스 올리지 않아도 테두리 상시 표시 */
+      border: 2px solid var(--input-border);
+
+      background: var(--input-bg);
+      color: var(--text-strong);
       font-size: 1.05rem;
       line-height: 1.65;
       resize: vertical;
       outline: none;
-      transition: all 0.2s ease;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); /* 내부 그림자로 깊이감 */
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.22);
     }
-    textarea::placeholder { color: var(--text-placeholder); }
-    textarea:focus {
-      border-color: var(--brand-blue);
-      background: rgba(0, 0, 0, 0.35); /* 포커스 시 약간 더 어둡게 */
-      box-shadow: 0 0 0 4px var(--focus-ring), inset 0 2px 4px rgba(0,0,0,0.2);
+    textarea::placeholder { color: rgba(203,213,225,0.85); }
+
+    textarea:focus{
+      border-color: rgba(255,255,255,0.45);
+      background: var(--input-bg-focus);
+      box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
     }
 
-    /* 버튼 스타일 */
-    .btn-primary {
-      display: block;
+    /* --- [버튼: 메인 CTA 톤(화이트)로 통일] --- */
+    .btn-primary{
+      display:block;
       width: 100%;
-      margin-top: 1.5rem;
-      padding: 1.1rem;
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--btn-text);
-      background: var(--btn-bg);
-      border: none;
-      border-radius: 18px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: var(--shadow-btn);
+      margin-top: 1.25rem;
+      padding: 1.05rem 1.25rem;
+      font-size: 1.08rem;
+      font-weight: 950;
+      color: var(--cta-text);
+      background: var(--cta);
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 14px;
+      cursor:pointer;
+      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.30);
     }
-    .btn-primary:hover {
-      background: var(--btn-hover-bg);
-      transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    .btn-primary:hover{
+      background: var(--cta-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow2);
     }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-primary:disabled {
-      opacity: 0.6;
+    .btn-primary:active{ transform: translateY(0); }
+    .btn-primary:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring), var(--shadow2);
+    }
+    .btn-primary:disabled{
+      opacity: 0.55;
       cursor: not-allowed;
       transform: none;
+      box-shadow: none;
     }
 
-    /* --- [결과 영역 스타일링] --- */
-    .result-container {
+    /* --- [결과 영역] --- */
+    .result-container{
       min-height: 100px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
-    .result-content {
+    .result-content{
       width: 100%;
       white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.75;
       font-size: 1.05rem;
-      color: var(--text-secondary);
+      color: var(--text-strong);
     }
-    /* 결과 없음 상태 (가운데 정렬, 흐린 색상) */
-    .result-content.empty {
-      text-align: center;
-      color: var(--text-placeholder);
-      font-weight: 500;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .result-content.empty{
+      text-align:center;
+      color: var(--text);
+      font-weight: 700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
       height: 100%;
       padding: 2rem 0;
     }
-    
-    /* 로딩 상태 */
-    .loading-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+
+    .loading-state{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
       gap: 1rem;
-      color: var(--text-secondary);
-      font-weight: 600;
+      color: var(--text-strong);
+      font-weight: 800;
     }
-    .spinner {
+    .spinner{
       width: 32px; height: 32px;
-      border: 3px solid rgba(255,255,255,0.1);
-      border-top-color: var(--brand-blue);
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: #ffb37a; /* 메인 보조 강조색 */
       border-radius: 50%;
-      animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+      animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* 에러 메시지 */
-    .error-message {
+    .error-message{
       padding: 1rem 1.25rem;
-      background: rgba(255, 107, 107, 0.15);
-      border: 1px solid rgba(255, 107, 107, 0.4);
-      color: #ffcece;
-      border-radius: 16px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error-text);
+      border-radius: 14px;
+      font-weight: 700;
+      display:flex;
+      align-items:center;
       gap: 0.75rem;
     }
-    .error-message::before { content: "⚠️"; }
+    .error-message::before{ content:"⚠️"; }
 
-    /* 면책 조항 박스 */
-    .disclaimer-box {
-      margin-top: 1.5rem;
-      padding: 1.25rem;
-      background: rgba(0, 0, 0, 0.2); /* 더 어둡게 눌러줌 */
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      line-height: 1.6;
+    .disclaimer-box{
+      margin-top: 1.35rem;
+      padding: 1.1rem 1.25rem;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      font-size: 0.92rem;
+      color: var(--text);
+      line-height: 1.7;
     }
-    .disclaimer-box strong {
-      color: var(--brand-orange);
-      font-weight: 700;
+    .disclaimer-box strong{
+      color: #ffb37a;
+      font-weight: 900;
     }
 
-    /* --- [하단 푸터] --- */
-    .footer {
-      margin-top: 3rem;
-      text-align: center;
+    .footer{
+      margin-top: 2.6rem;
+      text-align:center;
       font-size: 0.9rem;
-      color: var(--text-muted);
+      color: var(--text);
       line-height: 1.8;
-      opacity: 0.8;
     }
-    .footer a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      border-bottom: 1px dotted var(--text-muted);
-      transition: color 0.2s;
+    .footer a{
+      color: #ffb37a;
+      text-decoration:none;
+      font-weight: 900;
     }
-    .footer a:hover { color: var(--brand-orange); border-bottom-style: solid; }
+    .footer a:hover{ text-decoration: underline; }
 
-    /* --- [모바일 반응형] --- */
     @media (max-width: 640px){
       body { padding: 1.5rem 1rem 2.5rem; }
       h1 { font-size: 1.75rem; }
-      .card { padding: 1.5rem; }
+      .card { padding: 1.25rem; border-radius: 16px; }
       textarea { min-height: 180px; }
     }
   </style>
 </head>
+
 <body>
   <nav class="nav">
     <a href="/" class="nav-link">← 메인으로 돌아가기</a>
+
+    <div class="font-ctrl" aria-label="글자 크기 조절">
+      <button type="button" class="font-btn" id="fontDown" aria-label="글자 크기 줄이기">−</button>
+      <div class="font-indicator" id="fontLabel">글자 100%</div>
+      <button type="button" class="font-btn" id="fontUp" aria-label="글자 크기 키우기">+</button>
+    </div>
   </nav>
 
   <div class="brand-container">
@@ -323,12 +406,13 @@
       <div class="result-container">
         <div id="result" class="result-content empty">
           <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
-          공약 내용을 입력하고<br>'분석 시작하기' 버튼을 눌러주세요.
+          공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
         </div>
       </div>
-      
+
       <div class="disclaimer-box">
-        본 분석 결과는 생성형 AI를 활용하여 도출된 참고 자료입니다. 개혁신당의 공식적인 입장과는 다를 수 있으니 <strong>최종 정책 수립을 위한 보조 자료로만 활용</strong>해 주시기 바랍니다.
+        본 분석 결과는 <strong><bold>AI를 활용해 작성된 참고 자료</strong></bold>입니다.<br>
+        최종 정책 수립 과정에서 검토를 <strong><bold>보조하는 용도로 활용</strong></bold>해 주시기 바랍니다.
       </div>
     </section>
   </main>
@@ -336,25 +420,23 @@
   <footer class="footer">
     <p>
       <strong>개혁신당 정책국</strong><br>
-      시스템 문의 및 피드백: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+      문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
     </p>
   </footer>
 
   <script>
-    // --- [스크립트는 기존과 동일하게 작동합니다] ---
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
 
-    // 초기 안내 메시지 저장
     const emptyMessage = `
       <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
-      공약 내용을 입력하고<br>'분석 시작하기' 버튼을 눌러주세요.
+      공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
     `;
 
     function showResult(text) {
       resultEl.innerHTML = text;
-      resultEl.className = 'result-content'; // empty 클래스 제거
+      resultEl.className = 'result-content';
     }
 
     function showError(text) {
@@ -379,12 +461,11 @@
       btnEl.textContent = 'AI 분석 시작하기';
     }
 
-    // [추가] Ctrl+Enter로 제출 기능
     pledgeEl.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            e.preventDefault();
-            btnEl.click();
-        }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        btnEl.click();
+      }
     });
 
     btnEl.addEventListener('click', async function () {
@@ -398,7 +479,6 @@
       showLoading();
 
       try {
-        // 실제 구현된 서버 주소로 요청을 보냅니다.
         const res = await fetch('/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -412,9 +492,9 @@
         }
 
         if (data.result) {
-            showResult(data.result);
+          showResult(data.result);
         } else {
-            showResult('분석 결과가 없습니다. 다시 시도해 주세요.');
+          showResult('분석 결과가 없습니다. 다시 시도해 주세요.');
         }
 
       } catch (e) {
@@ -424,6 +504,39 @@
         resetBtn();
       }
     });
+
+    /* 글자 크기 조절(메인과 동일 키로 공유) */
+    (function () {
+      const key = 'rpm_font_scale';
+      const min = 0.92;
+      const max = 1.35;
+      const step = 0.06;
+
+      const down = document.getElementById('fontDown');
+      const up = document.getElementById('fontUp');
+      const label = document.getElementById('fontLabel');
+
+      function clamp(v){ return Math.min(max, Math.max(min, v)); }
+
+      function getScale(){
+        const v = parseFloat(localStorage.getItem(key));
+        return isFinite(v) ? clamp(v) : 1;
+      }
+
+      function setScale(v){
+        const nv = clamp(v);
+        localStorage.setItem(key, String(nv));
+        document.body.style.fontSize = (16 * nv) + 'px';
+        document.body.style.lineHeight = (1.6 * nv).toFixed(2);
+        label.textContent = '글자 ' + Math.round(nv * 100) + '%';
+        down.disabled = nv <= min + 0.0001;
+        up.disabled = nv >= max - 0.0001;
+      }
+
+      setScale(getScale());
+      down.addEventListener('click', function(){ setScale(getScale() - step); });
+      up.addEventListener('click', function(){ setScale(getScale() + step); });
+    })();
   </script>
 </body>
 </html>

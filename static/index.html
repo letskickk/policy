@@ -21,9 +21,9 @@
       --card2: rgba(255,255,255,0.04);
       --border: rgba(148,163,184,0.18);
 
-      --cta:#eaf2ff;
-      --cta-text:#0b2a4d;
-      --cta-hover:#dbeafe;
+      --cta:#ffffff;
+      --cta-text:#0f172a;
+      --cta-hover:#f1f5f9;
       --cta-ring: rgba(56, 189, 248, 0.35);
 
       --shadow: 0 10px 30px rgba(0,0,0,0.28);
@@ -39,13 +39,17 @@
                   linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
       color: var(--text);
       padding: 2rem 1rem;
+
+      /* [추가] 기본 폰트 스케일 (JS에서 설정) */
+      font-size: 16px;
+      line-height: 1.6;
     }
 
     .wrap{ max-width: 720px; margin: 0 auto; }
 
     .top{
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       justify-content:space-between;
       gap: 1rem;
       margin-bottom: 1.75rem;
@@ -80,15 +84,62 @@
       opacity: 0.95;
     }
 
-    .pill{
-      padding: 0.55rem 0.85rem;
+    /* [추가] 상단 우측 컨트롤 영역 */
+    .top-right{
+      display:flex;
+      align-items:center;
+      gap: 0.55rem;
+      margin-top: 0.1rem;
+    }
+
+    /* [추가] 글자 크기 조절 컨트롤 */
+    .font-ctrl{
+      display:inline-flex;
+      align-items:center;
+      gap: 0.45rem;
+      padding: 0.55rem 0.6rem;
       border-radius: 999px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      font-size: 0.82rem;
-      color: var(--muted);
-      white-space: nowrap;
-      font-weight: 800;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      backdrop-filter: blur(10px);
+    }
+    .font-btn{
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.24);
+      background: rgba(0,0,0,0.18);
+      color: var(--text-strong);
+      font-weight: 950;
+      font-size: 1.15rem;
+      cursor: pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.22);
+      user-select:none;
+    }
+    .font-btn:hover{
+      background: rgba(255,255,255,0.10);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.26);
+    }
+    .font-btn:active{ transform: translateY(0); }
+    .font-btn:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring), 0 10px 18px rgba(0,0,0,0.26);
+    }
+    .font-indicator{
+      min-width: 76px;
+      text-align:center;
+      color: rgba(226,232,240,0.92);
+      font-weight: 900;
+      font-size: 0.86rem;
+      letter-spacing: -0.02em;
+      padding: 0 0.35rem;
+      user-select:none;
     }
 
     .hero{
@@ -147,11 +198,12 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(148,163,184,0.18);
-      color: #e2e8f0;
+      background: #ffffff;
+      border: 1px solid rgba(255,255,255,0.5);
+      color: #0f172a;
       font-weight: 950;
       font-size: 0.9rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     .step p{
       margin: 0;
@@ -169,11 +221,11 @@
       font-weight: 950;
       color: var(--cta-text);
       background: var(--cta);
-      border: 1px solid rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.5);
       border-radius: 14px;
       text-decoration: none;
       transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
-      box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
     .cta:hover{
       background: var(--cta-hover);
@@ -258,7 +310,7 @@
       .hero{ padding: 1.25rem; border-radius: 16px; }
       .flow{ grid-template-columns: 1fr; }
       .top{ flex-direction: column; align-items: flex-start; }
-      .pill{ align-self: flex-start; }
+      .top-right{ align-items:flex-start; }
     }
   </style>
 </head>
@@ -273,7 +325,15 @@
           <span class="tag">지방선거 공약을 정강·정책 기준으로 빠르게 점검합니다</span>
         </span>
       </p>
-      <span class="pill">정강·정책·공약 기반 • 즉시 분석</span>
+
+      <!-- [변경] pill 삭제 + 글자크기 조절(-/+)만 유지 -->
+      <div class="top-right" aria-label="글자 크기 조절">
+        <div class="font-ctrl">
+          <button type="button" class="font-btn" id="fontDown" aria-label="글자 크기 줄이기">−</button>
+          <div class="font-indicator" id="fontLabel">글자 100%</div>
+          <button type="button" class="font-btn" id="fontUp" aria-label="글자 크기 키우기">+</button>
+        </div>
+      </div>
     </div>
 
     <div class="hero">
@@ -332,5 +392,43 @@
       문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
     </p>
   </div>
+
+  <!-- [추가] 글자 크기 조절 스크립트 (두 페이지 공통 키 사용) -->
+  <script>
+    (function () {
+      const key = 'rpm_font_scale';
+      const min = 0.92;
+      const max = 1.35;
+      const step = 0.06;
+
+      const down = document.getElementById('fontDown');
+      const up = document.getElementById('fontUp');
+      const label = document.getElementById('fontLabel');
+
+      function clamp(v){ return Math.min(max, Math.max(min, v)); }
+
+      function getScale(){
+        const v = parseFloat(localStorage.getItem(key));
+        return isFinite(v) ? clamp(v) : 1;
+      }
+
+      function setScale(v){
+        const nv = clamp(v);
+        localStorage.setItem(key, String(nv));
+        document.documentElement.style.setProperty('--font-scale', nv);
+        document.body.style.fontSize = (16 * nv) + 'px';
+        document.body.style.lineHeight = (1.6 * nv).toFixed(2);
+        label.textContent = '글자 ' + Math.round(nv * 100) + '%';
+        down.disabled = nv <= min + 0.0001;
+        up.disabled = nv >= max - 0.0001;
+      }
+
+      // 초기 적용
+      setScale(getScale());
+
+      down.addEventListener('click', function(){ setScale(getScale() - step); });
+      up.addEventListener('click', function(){ setScale(getScale() + step); });
+    })();
+  </script>
 </body>
 </html>
