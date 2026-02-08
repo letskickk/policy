@@ -80,7 +80,8 @@ OPENAI_VECTOR_STORE_ID=vs_xxxxxxxxxxxxxxxxxxxx
 
 ## 4. API 사용
 
-기존과 동일합니다.
+- **POST /check** : Vector Store 모드에서는 로컬 PDF 대신 file_search로 점검. `data/pdf/지역별 공약/` 폴더 의존 제거.
+- **POST /api/pledge/verify** : 기존과 동일.
 
 ```bash
 curl -X POST http://localhost:8000/api/pledge/verify \
@@ -113,11 +114,9 @@ curl -X POST http://localhost:8000/api/pledge/verify \
 }
 ```
 
-- 입력 20자 미만 또는 1문장 또는 정책 슬롯 2개 미만 → `mode: "QUERY"`, `final_score` 산출 안 함. 유사 문서 후보 + `missing_fields`(추가로 필요한 정보)만 제시
-- VERIFY는 정책 슬롯 3개 이상일 때만. 제목/키워드 일치만으로 80점 이상 금지
-- 슬롯 0~1개 → `final_score` ≤ 55, `confidence=LOW`
-- 슬롯 2개 → `final_score` ≤ 70
-- 슬롯 3개 이상 → 80+ 가능
+- 입력 ≤10자 또는 ≤3 토큰 → `mode: "QUERY"`, `final_score`/`ideology_fit_score` null
+- `specificity_score < 30` → `final_score` 최대 70
+- `specificity_score < 15` → `final_score` 최대 55
 
 브라우저: http://127.0.0.1:8000/pledge
 

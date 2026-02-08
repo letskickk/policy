@@ -365,6 +365,24 @@ def load_regional_pledges_context() -> str:
         logger.warning(f"지역별 공약 폴더가 존재하지 않음: {regional_dir}")
         return ""
     
+    # 안전장치: 지역별 공약 폴더가 공약 폴더와 사실상 동일할 때는 무시
+    try:
+        pledges_dir = pdf_dir / _nfc("공약")
+        if pledges_dir.exists():
+            regional_files = {p.name for p in _iter_doc_files(regional_dir)}
+            pledge_files = {p.name for p in _iter_doc_files(pledges_dir)}
+            if regional_files and pledge_files:
+                overlap = len(regional_files & pledge_files)
+                overlap_ratio = overlap / max(len(pledge_files), 1)
+                if overlap >= 3 and overlap_ratio >= 0.7:
+                    logger.warning(
+                        "지역별 공약 폴더가 공약 폴더와 거의 동일합니다. "
+                        "타지역 공약으로 보기 어려워 로드를 건너뜁니다."
+                    )
+                    return ""
+    except Exception as e:
+        logger.warning(f"지역별 공약 중복 검사 실패 (무시하고 진행): {e}")
+
     logger.info(f"지역별 공약 PDF 로드 시작: {regional_dir}")
     limit = MAX_CONTEXT_CHARS // 3  # 지역별 공약은 별도로 관리하므로 더 작은 한도 사용
     result = _load_pdfs_from_dir(regional_dir, limit)
