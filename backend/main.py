@@ -657,7 +657,9 @@ def check_pledge(body: PledgeCheckRequest):
     pledge = (body.pledge or "").strip()
     if not pledge:
         raise HTTPException(status_code=400, detail="pledge 내용이 비어 있습니다.")
-    result = check_pledge_alignment(pledge)
+    vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    result = check_pledge_alignment(pledge, vector_store_id=vs_id, regional_vector_store_id=regional_vs_id)
     if result.startswith("오류:"):
         raise HTTPException(status_code=503, detail=result)
     return PledgeCheckResponse(result=result)

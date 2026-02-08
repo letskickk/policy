@@ -24,6 +24,7 @@ from backend.config import (
     ROOT_DIR,
     FILE_SEARCH_MAX_RESULTS,
     FILE_SEARCH_MAX_RESULTS_QUICK,
+    PROMPTS_DIR,
     _nfc,
 )
 
@@ -49,12 +50,25 @@ def _collect_pdf_paths() -> list[tuple[str, Path]]:
         ("pledge", PDF_DIR / _nfc("공약")),
         ("regional", PDF_DIR / _nfc("지역별 공약")),
     ]
+    pledge_names = set()
     for cat, dir_path in folders:
         if not dir_path.exists():
             continue
         try:
             from backend.pdf_loader import _iter_doc_files
-            for p in _iter_doc_files(dir_path):
+            files = list(_iter_doc_files(dir_path))
+            if cat == "pledge":
+                pledge_names = {p.name for p in files}
+            if cat == "regional" and pledge_names and files:
+                regional_names = {p.name for p in files}
+                overlap = len(regional_names & pledge_names) / max(len(pledge_names), 1)
+                if overlap >= 0.7 and len(regional_names & pledge_names) >= 3:
+                    logger.warning(
+                        "지역별 공약 폴더가 공약 폴더와 거의 동일하여 Vector Store 업로드 건너뜀. "
+                        "타지역 공약 전용 파일만 넣어 주세요."
+                    )
+                    continue
+            for p in files:
                 result.append((cat, p))
         except Exception as e:
             logger.warning(f"PDF 스캔 실패 ({dir_path}): {e}")
@@ -71,7 +85,7 @@ def _create_txt_content(doc_path: Path, category: str) -> str | None:
         header = _CATEGORY_HEADER.get(category, "")
         # 폴더 경로 포함해 일반공약 vs 지역별공약 출처 명확히 구분
         try:
-            rel = pdf_path.relative_to(PDF_DIR)
+            rel = doc_path.relative_to(PDF_DIR)
             source_path = str(rel).replace("\\", "/")
         except ValueError:
             source_path = doc_path.name
@@ -362,6 +376,81 @@ Output JSON only:
   "similar_candidates": []  // QUERY 모드 시 유사 문서 후보 요약
 }
 """
+
+
+def _load_check_instructions(has_regional: bool) -> str:
+    """당 부합 점검용 instructions (file_search 버전)."""
+    sys_path = PROMPTS_DIR / "당_부합_점검_시스템.txt"
+    user_path = PROMPTS_DIR / "당_부합_점검_유저.txt"
+    system = sys_path.read_text(encoding="utf-8").strip() if sys_path.exists() else ""
+    user_tpl = user_path.read_text(encoding="utf-8").strip() if user_path.exists() else ""
+
+    tool_desc = """
+file_search 도구 사용:
+1) 정강정책·공약 검색: 첫 번째 도구로 [정강·정책 문서], [우리당 공약] 관련 내용을 검색. 우리당 강령·중앙 공약.
+2) 지역별 공약 검색: 두 번째 도구(있는 경우)로 [타지역 공약] 관련 내용을 검색. 우리당 공약과 혼동하지 말 것.
+"""
+    if not has_regional:
+        tool_desc += "\n지역별 공약 store가 없음. '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'만 표기."
+
+    # user 템플릿: 문서 블록은 file_search로 대체, PLEDGE는 입력에서 전달됨
+    user_adapted = (
+        user_tpl.replace("{{PLATFORM_CONTEXT}}", "[file_search로 정강·정책 문서 검색하여 사용]")
+        .replace("{{PLEDGES_CONTEXT}}", "[file_search로 우리당 공약 검색하여 사용]")
+        .replace("{{REGIONAL_PLEDGES_CONTEXT}}", "[file_search로 타지역 공약 검색 (지역별 store 있으면)]" if has_regional else "(타지역 공약 문서 없음)")
+        .replace("{{PLEDGE}}", "[입력으로 전달되는 출마자 공약]")
+    )
+    return f"{system}\n\n{tool_desc}\n\n{user_adapted}"
+
+
+def run_check(
+    vector_store_id: str,
+    user_pledge: str,
+    regional_vector_store_id: str = "",
+    max_results: int = 12,
+) -> str:
+    """
+    Vector Store file_search로 당 부합 점검 (마크다운 형식 반환).
+    로컬 PDF 의존 제거.
+    """
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    _check_vector_store_ready(client, vector_store_id)
+    has_regional = bool(regional_vector_store_id)
+    if has_regional:
+        _check_vector_store_ready(client, regional_vector_store_id)
+
+    instructions = _load_check_instructions(has_regional)
+    input_text = f"다음 [출마자 공약]을 점검하라. file_search로 기준 문서를 검색한 뒤, 지정된 형식으로만 답변하라.\n\n[출마자 공약]\n{user_pledge}"
+
+    def _tool(vs_id: str):
+        return {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": max_results}
+
+    tools = [_tool(vector_store_id)]
+    if has_regional:
+        tools.append(_tool(regional_vector_store_id))
+
+    response = client.responses.create(
+        model=CHAT_MODEL,
+        input=input_text,
+        instructions=instructions,
+        tools=tools,
+    )
+
+    if getattr(response, "status", None) != "completed":
+        raise RuntimeError(f"Responses API 실패: status={getattr(response, 'status', 'unknown')}")
+
+    text = ""
+    for item in response.output:
+        if getattr(item, "type", None) == "message":
+            for c in getattr(item, "content", []):
+                if getattr(c, "type", None) == "output_text":
+                    text = getattr(c, "text", "")
+                    break
+            break
+
+    if not text:
+        raise RuntimeError("모델이 텍스트를 반환하지 않음")
+    return text.strip()
 
 
 def _is_query_mode(text: str) -> bool:
