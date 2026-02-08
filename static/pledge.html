@@ -5,203 +5,423 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>개혁신당 정책 멘토링</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-      background: #f5f5f5;
-      color: #222;
+    /* --- [디자인 변수 및 초기화] --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      /* 배경색 팔레트 */
+      --bg-main: #0a1929; /* 더 깊은 남색 배경 */
+      --bg-gradient-1: #0c2b4d;
+      --bg-gradient-2: #103c6b;
+
+      /* 텍스트 색상 (가시성 향상을 위해 더 밝게 조정) */
+      --text-primary: #ffffff; /* 가장 중요한 텍스트 (완전 흰색) */
+      --text-secondary: #e2e8f0; /* 본문 텍스트 (밝은 회색) */
+      --text-muted: #cbd5e1; /* 부가 설명 텍스트 (차분한 회색) */
+      --text-placeholder: rgba(203, 213, 225, 0.6); /* 입력창 안내 문구 */
+
+      /* 포인트 컬러 */
+      --brand-orange: #ff7e36; /* 개혁신당 오렌지 (채도 약간 조정) */
+      --brand-blue: #3db2ff; /* 강조용 블루 */
+      --error-red: #ff6b6b;
+
+      /* UI 요소 색상 (글래스모피즘 강화) */
+      --card-bg: rgba(255, 255, 255, 0.07); /* 카드 배경 (반투명 밝음) */
+      --input-bg: rgba(0, 0, 0, 0.25); /* 입력창 배경 (반투명 어두움 - 카드와 대비) */
+      --border-color: rgba(255, 255, 255, 0.15); /* 테두리 색상 (더 선명하게) */
+      --focus-ring: rgba(61, 178, 255, 0.5); /* 포커스 시 빛나는 효과 */
+
+      /* 버튼 */
+      --btn-bg: #edf2f7;
+      --btn-text: #0f2942;
+      --btn-hover-bg: #ffffff;
+
+      /* 그림자 */
+      --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --shadow-btn: 0 8px 20px rgba(0, 0, 0, 0.25);
     }
+
+    body {
+      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; /* 가독성 좋은 폰트 우선 적용 */
+      max-width: 880px; /* 가독성을 위해 최대 폭 약간 축소 */
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+      min-height: 100vh;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      /* 배경 그래픽 강화 */
+      background-color: var(--bg-main);
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(255, 126, 54, 0.12) 0%, transparent 50%), /* 오렌지 빛 */
+        radial-gradient(circle at 85% 30%, rgba(61, 178, 255, 0.12) 0%, transparent 50%), /* 블루 빛 */
+        linear-gradient(170deg, var(--bg-main) 0%, var(--bg-gradient-1) 50%, var(--bg-gradient-2) 100%);
+      background-attachment: fixed; /* 스크롤 시 배경 고정 */
+    }
+
+    /* --- [상단 네비게이션 및 브랜드] --- */
     .nav { margin-bottom: 1.5rem; }
-    .nav a {
-      color: #2d7ff9;
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      color: var(--text-muted);
       text-decoration: none;
       font-size: 0.9rem;
-    }
-    .nav a:hover { text-decoration: underline; }
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-      color: #1a1a1a;
-    }
-    .sub {
-      font-size: 0.9rem;
-      color: #555;
-      margin-bottom: 1.5rem;
-    }
-    .card {
-      background: #fff;
-      border-radius: 10px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    label {
-      display: block;
       font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: #333;
+      padding: 0.6rem 1rem;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      transition: all 0.2s ease;
     }
-    .hint {
-      font-size: 0.9rem;
-      color: #555;
-      margin: -0.25rem 0 0.5rem 0;
-      line-height: 1.45;
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.3);
     }
-    .hint strong { color: #333; }
+
+    .brand-container { margin-bottom: 1.5rem; }
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .brand-logo img {
+      height: 26px;
+      width: auto;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); /* 로고 가시성 확보 */
+    }
+
+    /* --- [타이틀 영역] --- */
+    header { margin-bottom: 2.5rem; }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3); /* 제목 강조 */
+    }
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* --- [카드 컴포넌트 (공통)] --- */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px); /* 블러 효과 강화 */
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 24px; /* 더 둥글게 */
+      padding: 2rem; /* 내부 여백 확대 */
+      margin-bottom: 1.75rem;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-card);
+    }
+
+    /* --- [폼 요소 스타일링 (가시성 핵심)] --- */
+    .form-label {
+      display: block;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.6rem;
+    }
+    .form-hint {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+    .form-hint strong { color: var(--brand-orange); font-weight: 600; }
+
+    /* 텍스트 입력창: 배경과 확실히 분리 */
     textarea {
       width: 100%;
-      min-height: 140px;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-size: 1rem;
-      line-height: 1.5;
+      min-height: 220px;
+      padding: 1.25rem;
+      border-radius: 18px;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg); /* 더 어두운 배경 적용 */
+      color: var(--text-primary); /* 글자색 밝게 */
+      font-size: 1.05rem;
+      line-height: 1.65;
       resize: vertical;
-    }
-    textarea:focus {
       outline: none;
-      border-color: #2d7ff9;
-      box-shadow: 0 0 0 2px rgba(45, 127, 249, 0.2);
+      transition: all 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); /* 내부 그림자로 깊이감 */
     }
-    button {
-      margin-top: 0.75rem;
-      padding: 0.65rem 1.4rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #fff;
-      background: #2d7ff9;
+    textarea::placeholder { color: var(--text-placeholder); }
+    textarea:focus {
+      border-color: var(--brand-blue);
+      background: rgba(0, 0, 0, 0.35); /* 포커스 시 약간 더 어둡게 */
+      box-shadow: 0 0 0 4px var(--focus-ring), inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* 버튼 스타일 */
+    .btn-primary {
+      display: block;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 1.1rem;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--btn-text);
+      background: var(--btn-bg);
       border: none;
-      border-radius: 8px;
+      border-radius: 18px;
       cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-btn);
     }
-    button:hover { background: #1a6ae6; }
-    button:disabled {
-      background: #aaa;
+    .btn-primary:hover {
+      background: var(--btn-hover-bg);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
     }
-    .result {
+
+    /* --- [결과 영역 스타일링] --- */
+    .result-container {
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-content {
+      width: 100%;
       white-space: pre-wrap;
       word-break: break-word;
-      line-height: 1.6;
-      font-size: 0.95rem;
+      line-height: 1.75;
+      font-size: 1.05rem;
+      color: var(--text-secondary);
     }
-    .result.empty { color: #888; }
-    .error {
-      color: #c00;
-      background: #fff0f0;
-      padding: 0.75rem;
-      border-radius: 8px;
-      margin-top: 0.5rem;
+    /* 결과 없음 상태 (가운데 정렬, 흐린 색상) */
+    .result-content.empty {
+      text-align: center;
+      color: var(--text-placeholder);
+      font-weight: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 2rem 0;
     }
-    .loading { 
-      color: #666; 
+    
+    /* 로딩 상태 */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--brand-blue);
+      border-radius: 50%;
+      animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 에러 메시지 */
+    .error-message {
+      padding: 1rem 1.25rem;
+      background: rgba(255, 107, 107, 0.15);
+      border: 1px solid rgba(255, 107, 107, 0.4);
+      color: #ffcece;
+      border-radius: 16px;
+      font-weight: 500;
       display: flex;
       align-items: center;
       gap: 0.75rem;
     }
-    .spinner {
-      width: 20px;
-      height: 20px;
-      border: 3px solid #e0e0e0;
-      border-top-color: #2d7ff9;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .error-message::before { content: "⚠️"; }
+
+    /* 면책 조항 박스 */
+    .disclaimer-box {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      background: rgba(0, 0, 0, 0.2); /* 더 어둡게 눌러줌 */
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    a { color: #2d7ff9; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .disclaimer {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      background: #f9f9f9;
-      border-left: 3px solid #999;
-      font-size: 0.85rem;
-      color: #666;
-      line-height: 1.5;
-    }
-    .disclaimer strong {
-      color: #c00;
+    .disclaimer-box strong {
+      color: var(--brand-orange);
       font-weight: 700;
     }
-    .footer { margin-top: 2rem; font-size: 0.85rem; color: #666; }
+
+    /* --- [하단 푸터] --- */
+    .footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+      opacity: 0.8;
+    }
+    .footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--text-muted);
+      transition: color 0.2s;
+    }
+    .footer a:hover { color: var(--brand-orange); border-bottom-style: solid; }
+
+    /* --- [모바일 반응형] --- */
+    @media (max-width: 640px){
+      body { padding: 1.5rem 1rem 2.5rem; }
+      h1 { font-size: 1.75rem; }
+      .card { padding: 1.5rem; }
+      textarea { min-height: 180px; }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav"><a href="/">← 메인으로</a></nav>
+  <nav class="nav">
+    <a href="/" class="nav-link">← 메인으로 돌아가기</a>
+  </nav>
 
-  <h1>개혁신당 정책 멘토링</h1>
-  <p class="sub">공약을 입력하면 중앙당의 정강정책, 공약 등과의 적합도를 판단합니다.</p>
-
-  <div class="card">
-    <label for="pledge">공약 입력</label>
-    <p class="hint">배경, 목표, 구체적 방안 등을 포함해 <strong>최대한 자세하게</strong> 작성해 주시면 분석이 더 정확합니다.</p>
-    <textarea id="pledge" placeholder="공약을 최대한 자세하게 입력해 주세요. (예: 어떤 문제인지, 무엇을 어떻게 하겠다는지, 근거나 수단을 함께 적어 주시면 좋습니다.)"></textarea>
-    <button type="button" id="btn">분석하기</button>
-  </div>
-
-  <div class="card">
-    <label>분석 결과</label>
-    <div id="result" class="result empty">분석하기 버튼을 누르면 분석 결과가 여기에 표시됩니다.</div>
-    <div class="disclaimer">
-      본 결과는 개혁신당의 정강정책, 공약 등을 AI로 분석한 자료로서 대략적인 결과만 보여주는 것이니 <strong>참고용으로만 활용해 주시기 바랍니다.</strong>
+  <div class="brand-container">
+    <div class="brand-logo">
+      <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+      공약 멘토링
     </div>
   </div>
 
-  <p class="footer">
-    개혁신당 정책국<br>
-    문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
-  </p>
+  <header>
+    <h1>개혁신당 정책 멘토링</h1>
+    <p class="subtitle">작성하신 공약을 입력하면 당의 정강정책 및 기존 공약과의 정합성을 AI가 분석해 드립니다.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <label for="pledge" class="form-label">공약 내용 입력</label>
+      <p class="form-hint">
+        정책의 배경, 목표, 구체적인 실행 방안 등을 포함하여 <strong>최대한 상세하게 작성</strong>해 주시면 분석의 정확도가 높아집니다.
+      </p>
+      <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요.&#13;&#10;(예시: 저출산 해결을 위해 00 제도를 도입하고자 합니다. 현재 문제점은 무엇이며, 이를 통해 어떤 효과를 기대하는지...)"></textarea>
+      <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
+    </section>
+
+    <section class="card">
+      <h2 class="form-label">분석 결과</h2>
+      <div class="result-container">
+        <div id="result" class="result-content empty">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
+          공약 내용을 입력하고<br>'분석 시작하기' 버튼을 눌러주세요.
+        </div>
+      </div>
+      
+      <div class="disclaimer-box">
+        본 분석 결과는 생성형 AI를 활용하여 도출된 참고 자료입니다. 개혁신당의 공식적인 입장과는 다를 수 있으니 <strong>최종 정책 수립을 위한 보조 자료로만 활용</strong>해 주시기 바랍니다.
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      <strong>개혁신당 정책국</strong><br>
+      시스템 문의 및 피드백: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+    </p>
+  </footer>
 
   <script>
+    // --- [스크립트는 기존과 동일하게 작동합니다] ---
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
 
-    function setResult(text, isError) {
-      resultEl.classList.remove('empty', 'loading');
-      resultEl.className = 'result' + (isError ? ' error' : '');
-      resultEl.textContent = text;
+    // 초기 안내 메시지 저장
+    const emptyMessage = `
+      <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
+      공약 내용을 입력하고<br>'분석 시작하기' 버튼을 눌러주세요.
+    `;
+
+    function showResult(text) {
+      resultEl.innerHTML = text;
+      resultEl.className = 'result-content'; // empty 클래스 제거
     }
 
-    function setLoading() {
-      resultEl.classList.remove('empty', 'error');
-      resultEl.classList.add('loading');
-      resultEl.innerHTML = '<span class="spinner"></span><span>AI가 공약을 분석하고 있습니다. 잠시만 기다려 주세요.</span>';
+    function showError(text) {
+      resultEl.innerHTML = `<div class="error-message">${text}</div>`;
+      resultEl.className = 'result-content';
     }
+
+    function showLoading() {
+      resultEl.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>AI가 정책 데이터를 분석하고 있습니다...</span>
+        </div>
+      `;
+      resultEl.className = 'result-content';
+      btnEl.disabled = true;
+      btnEl.textContent = '분석 진행 중...';
+    }
+
+    function resetBtn() {
+      btnEl.disabled = false;
+      btnEl.textContent = 'AI 분석 시작하기';
+    }
+
+    // [추가] Ctrl+Enter로 제출 기능
+    pledgeEl.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            btnEl.click();
+        }
+    });
 
     btnEl.addEventListener('click', async function () {
       const text = (pledgeEl.value || '').trim();
       if (!text) {
-        setResult('공약 내용을 입력해 주세요.', true);
+        showError('공약 내용이 입력되지 않았습니다. 내용을 작성해 주세요.');
+        pledgeEl.focus();
         return;
       }
 
-      setLoading();
-      btnEl.disabled = true;
+      showLoading();
 
       try {
+        // 실제 구현된 서버 주소로 요청을 보냅니다.
         const res = await fetch('/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pledge: text })
         });
+
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          setResult(data.detail || res.statusText || '요청 실패', true);
-          return;
+          throw new Error(data.detail || res.statusText || '서버 요청 실패');
         }
 
-        setResult(data.result || '(결과 없음)', false);
+        if (data.result) {
+            showResult(data.result);
+        } else {
+            showResult('분석 결과가 없습니다. 다시 시도해 주세요.');
+        }
+
       } catch (e) {
-        setResult('연결 오류: ' + (e.message || '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.'), true);
+        console.error(e);
+        showError(`분석 중 오류가 발생했습니다.<br>(${e.message || '서버 연결 실패'})`);
       } finally {
-        btnEl.disabled = false;
+        resetBtn();
       }
     });
   </script>

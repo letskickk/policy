@@ -3,6 +3,7 @@
 """
 import logging
 import re
+from collections import OrderedDict
 
 from openai import OpenAI
 
@@ -11,6 +12,23 @@ from backend.pdf_loader import load_platform_context, load_pledges_context, load
 from backend.prompts import build_user_message, load_system_prompt
 
 logger = logging.getLogger(__name__)
+
+_RESULT_CACHE: "OrderedDict[str, str]" = OrderedDict()
+_RESULT_CACHE_MAX = 128
+
+
+def _get_cached_result(key: str) -> str | None:
+    if key in _RESULT_CACHE:
+        _RESULT_CACHE.move_to_end(key)
+        return _RESULT_CACHE[key]
+    return None
+
+
+def _set_cached_result(key: str, value: str) -> None:
+    _RESULT_CACHE[key] = value
+    _RESULT_CACHE.move_to_end(key)
+    if len(_RESULT_CACHE) > _RESULT_CACHE_MAX:
+        _RESULT_CACHE.popitem(last=False)
 
 
 def check_pledge_alignment(pledge: str) -> str:
@@ -21,6 +39,12 @@ def check_pledge_alignment(pledge: str) -> str:
     """
     if not OPENAI_API_KEY:
         return "오류: OPENAI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요."
+
+    pledge_key = (pledge or "").strip()
+    cached = _get_cached_result(pledge_key)
+    if cached is not None:
+        logger.info("캐시된 결과 반환")
+        return cached
 
     logger.info("PDF 컨텍스트 로드 시작...")
     platform_context = load_platform_context()
@@ -105,4 +129,5 @@ def check_pledge_alignment(pledge: str) -> str:
         result = result.replace("사실상 동일한", "명칭만 동일한")
         result = result.replace("동일하여", "명칭은 같으나")
         result = result.replace("동일로 판단", "구체성 부족으로 판단")
+    _set_cached_result(pledge_key, result)
     return result
