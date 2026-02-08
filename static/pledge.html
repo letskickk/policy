@@ -298,6 +298,7 @@
       justify-content:center;
       height: 100%;
       padding: 2rem 0;
+      line-height: 1.6;
     }
 
     .loading-state{
@@ -406,12 +407,12 @@
       <div class="result-container">
         <div id="result" class="result-content empty">
           <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
-          공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
+          공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
         </div>
       </div>
 
       <div class="disclaimer-box">
-        본 분석 결과는 <strong><bold>AI를 활용해 작성된 참고 자료</strong></bold>입니다.<br>
+        본 분석 결과는 <strong><bold>AI를 활용하여 작성된 참고 자료</strong></bold>입니다.<br>
         최종 정책 수립 과정에서 검토를 <strong><bold>보조하는 용도로 활용</strong></bold>해 주시기 바랍니다.
       </div>
     </section>
@@ -431,7 +432,7 @@
 
     const emptyMessage = `
       <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
-      공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
+      공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
     `;
 
     function showResult(text) {
@@ -505,12 +506,12 @@
       }
     });
 
-    /* 글자 크기 조절(메인과 동일 키로 공유) */
+    /* 글자 크기 조절(메인과 동일 키로 공유) - html 기준으로 rem 스케일 */
     (function () {
       const key = 'rpm_font_scale';
-      const min = 0.92;
-      const max = 1.35;
-      const step = 0.06;
+      const min = 0.9;
+      const max = 1.7;
+      const step = 0.1;
 
       const down = document.getElementById('fontDown');
       const up = document.getElementById('fontUp');
@@ -526,11 +527,10 @@
       function setScale(v){
         const nv = clamp(v);
         localStorage.setItem(key, String(nv));
-        document.body.style.fontSize = (16 * nv) + 'px';
-        document.body.style.lineHeight = (1.6 * nv).toFixed(2);
+        document.documentElement.style.fontSize = (16 * nv) + 'px';
         label.textContent = '글자 ' + Math.round(nv * 100) + '%';
-        down.disabled = nv <= min + 0.0001;
-        up.disabled = nv >= max - 0.0001;
+        down.disabled = nv <= min + 0.001;
+        up.disabled = nv >= max - 0.001;
       }
 
       setScale(getScale());
