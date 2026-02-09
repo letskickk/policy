@@ -515,7 +515,17 @@
 
       } catch (e) {
         console.error(e);
-        showError(`분석 중 오류가 발생했습니다.<br>(${e.message || '서버 연결 실패'})`);
+        const msg = (e && typeof e.message === 'string') ? e.message : '';
+        if (msg.includes('로그인이 필요합니다')) {
+          const next = encodeURIComponent(location.pathname + location.search);
+          showError(
+            '로그인이 필요합니다.<br>' +
+            `<a href="/login?next=${next}" style="color:#ffb37a;font-weight:700;">로그인</a> · ` +
+            '<a href="/signup" style="color:#ffb37a;font-weight:700;">회원가입</a>'
+          );
+        } else {
+          showError(`분석 중 오류가 발생했습니다.<br>(${msg || '서버 연결 실패'})`);
+        }
       } finally {
         resetBtn();
       }
