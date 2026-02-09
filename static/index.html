@@ -362,7 +362,8 @@
 
       <a href="/pledge" class="cta">공약 분석하기</a>
       <p id="authLinks" style="margin-top: 1rem; font-size: 0.9rem; color: var(--muted);">
-        회원가입 후 관리자 승인이 필요합니다. <a href="/signup" style="color: #ffb37a; font-weight: 700;">회원가입</a> | <a href="/login" style="color: #ffb37a; font-weight: 700;">로그인</a>
+        회원가입 후 관리자 승인이 필요합니다.<br>
+        <a href="/signup" style="color: #ffb37a; font-weight: 700;">회원가입</a> | <a href="/login" style="color: #ffb37a; font-weight: 700;">로그인</a>
       </p>
     </div>
 
@@ -415,7 +416,7 @@
           const safe = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
           el.innerHTML = (email ? '<span style="color:var(--muted);">' + safe(email) + ' 로그인 중</span> · ' : '') + '<a href="/dashboard" style="color:#ffb37a;font-weight:700;padding:0.4rem 0.8rem;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(148,163,184,0.25);text-decoration:none;display:inline-block;">내 사용량</a> · <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" style="background:none;border:none;color:#ffb37a;font-weight:700;cursor:pointer;padding:0;font-size:inherit;">로그아웃</button></form>';
         } else {
-          el.innerHTML = '회원가입 후 관리자 승인이 필요합니다. <a href="/signup" style="color: #ffb37a; font-weight: 700;">회원가입</a> | <a href="/login" style="color: #ffb37a; font-weight: 700;">로그인</a>';
+          el.innerHTML = '회원가입 후 관리자 승인이 필요합니다.<br><a href="/signup" style="color: #ffb37a; font-weight: 700;">회원가입</a> | <a href="/login" style="color: #ffb37a; font-weight: 700;">로그인</a>';
         }
       } catch (e) {}
     })();
