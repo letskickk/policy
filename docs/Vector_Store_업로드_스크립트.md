@@ -1,6 +1,7 @@
-# Vector Store 업로드 스크립트
+# Vector Store ingest 스크립트
 
-서버 시작 시 PDF 스캔 없이, **별도 스크립트로 1회 인덱싱** 후 `.env`에 저장된 Vector Store ID만 사용하는 방식입니다.
+서버 시작 시 ingest를 실행하지 않기 위해, **별도 스크립트로만 인덱싱**합니다.  
+Vector Store ID는 `.rag/registry.json` 및 `.rag/vector_store_id*.txt`에 저장되어 재시작 시 재사용됩니다.
 
 ---
 
@@ -20,13 +21,10 @@
 
 ```bash
 # 기본: 정강+공약 / 지역별 공약 각각 Vector Store 생성
-python scripts/index_pdfs_to_vector_store.py
+python scripts/ingest_vector_store.py
 
-# .env에 ID 자동 저장
-python scripts/index_pdfs_to_vector_store.py --output-env
-
-# 단일 Vector Store (정강+공약+지역별 통합)
-python scripts/index_pdfs_to_vector_store.py --single-store --output-env
+# 업로드 없이 변경 사항만 보기
+python scripts/ingest_vector_store.py --dry-run
 ```
 
 ---
@@ -43,10 +41,9 @@ python scripts/index_pdfs_to_vector_store.py --single-store --output-env
   완료 (대기 8초)
 
 === 완료 ===
-OPENAI_VECTOR_STORE_ID=vs_xxx
-OPENAI_REGIONAL_VECTOR_STORE_ID=vs_yyy
-
-.env에 저장됨: G:\...\Policy\.env
+.rag/registry.json 저장
+.rag/vector_store_id.txt 저장
+.rag/vector_store_regional_id.txt 저장 (지역별 공약이 있는 경우)
 ```
 
 ---
@@ -58,20 +55,18 @@ OPENAI_REGIONAL_VECTOR_STORE_ID=vs_yyy
 ```env
 OPENAI_API_KEY=sk-proj-...
 USE_OPENAI_VECTOR_STORE=1
-SKIP_PDF_SCAN_ON_STARTUP=1
 OPENAI_VECTOR_STORE_ID=vs_xxx
 OPENAI_REGIONAL_VECTOR_STORE_ID=vs_yyy
 ```
 
-`--output-env` 없이 실행한 경우, 출력된 ID를 수동으로 `.env`에 추가합니다.
+`.env` 값은 **fallback**이며, 실제 런타임은 `.rag`의 ID를 우선 사용합니다.
 
 ---
 
 ## 5. 서버 시작
 
 ```bash
-# SKIP_PDF_SCAN_ON_STARTUP=1 이면 서버 시작 시 PDF 스캔 없음
-# .env의 Vector Store ID만 사용
+# 런타임은 ingest를 실행하지 않고 Vector Store ID만 사용
 ./restart_server.sh
 # 또는
 uvicorn backend.main:app --host 0.0.0.0 --port 8000
@@ -82,10 +77,8 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ## 6. AWS 배포 시
 
 1. **로컬**에서 스크립트 실행 → Vector Store 생성
-2. 출력된 `OPENAI_VECTOR_STORE_ID`, `OPENAI_REGIONAL_VECTOR_STORE_ID`를 `.env`에 저장
-3. `.env`를 AWS 서버에 복사 (`scp` 등)
-4. `.env`에 `SKIP_PDF_SCAN_ON_STARTUP=1` 추가
-5. 서버 시작 → PDF 없이 즉시 검증 API 사용 가능
+2. `.rag/`에 저장된 ID를 서버 환경에 전달 (또는 `.env`에 ID 설정)
+3. 서버 시작 → PDF 없이 즉시 검증 API 사용 가능
 
 ---
 
@@ -103,15 +96,13 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 ### 사전 설정 (1회)
 
-1. **로컬**에서 `python scripts/index_pdfs_to_vector_store.py --output-env` 실행
-2. 생성된 `data/vector_store_manifest.json`, `data/vector_store_regional_manifest.json` **커밋**
-3. GitHub 저장소 → Settings → Secrets and variables → Actions 에 추가:
+1. **로컬**에서 `python scripts/ingest_vector_store.py` 실행
+2. GitHub 저장소 → Settings → Secrets and variables → Actions 에 추가:
    - `OPENAI_API_KEY`: OpenAI API 키
    - `OPENAI_VECTOR_STORE_ID`: 정강+공약 Vector Store ID
    - `OPENAI_REGIONAL_VECTOR_STORE_ID`: 지역별 공약 Vector Store ID (선택)
 
 ### 동작
 
-- `data/pdf/`, `scripts/`, `backend/`, manifest 변경 시 workflow 실행
-- `python scripts/sync_vector_store.py` 실행 → 변경된 PDF만 업로드
-- manifest 갱신 시 자동 커밋·푸시 (`[skip ci]`로 재실행 방지)
+- `data/pdf/`, `scripts/`, `backend/` 변경 시 workflow 실행
+- `python scripts/ingest_vector_store.py` 실행 → 변경된 PDF만 업로드

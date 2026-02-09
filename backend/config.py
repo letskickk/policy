@@ -26,9 +26,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 # /check(당 부합 점검)에서 사용
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
 
-# GPT 컨텍스트 한도(대략). 초과 시 잘라냄 (예: 4o-mini 128k, 보수적으로 50000자로 증가)
-# 각 컨텍스트(정강정책, 공약)는 절반씩 사용하므로 각각 25000자까지 가능
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "50000"))
+# GPT 컨텍스트 한도(자). 초과 시 잘라냄. 0이면 앱 한도 없음(전부 로드, GPT API 토큰 한도는 별도)
+# 각 컨텍스트(정강정책, 공약)는 절반씩 사용. 기본 50000 → 폴더당 25000자
+_raw = int(os.getenv("MAX_CONTEXT_CHARS", "50000"))
+MAX_CONTEXT_CHARS = (2**28) if _raw <= 0 else _raw  # 0 이하 = 무제한(실질적으로 전부 로드)
 
 # PDF 텍스트 추출: "pdfplumber" | "pypdf" | "auto". 로컬/AWS 출력 일치를 위해 pdfplumber 권장.
 PDF_EXTRACTOR = (os.getenv("PDF_EXTRACTOR", "pdfplumber") or "pdfplumber").strip().lower()

@@ -175,28 +175,25 @@ async def startup_event():
 
     if USE_OPENAI_VECTOR_STORE:
         from backend.config import OPENAI_REGIONAL_VECTOR_STORE_ID
-        if OPENAI_VECTOR_STORE_ID:
-            _vector_store_id = OPENAI_VECTOR_STORE_ID
-            _regional_vector_store_id = OPENAI_REGIONAL_VECTOR_STORE_ID
-            logger.info(f"[VECTOR_STORE] .env ID 사용: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
-            if not SKIP_PDF_SCAN_ON_STARTUP:
-                try:
-                    from backend.openai_vector_store import sync_vector_store_incremental
-                    from backend.openai_vector_store import MANIFEST_PATH, MANIFEST_REGIONAL_PATH
-                    sync_vector_store_incremental(_vector_store_id, MANIFEST_PATH, ("platform", "pledge"))
-                    if _regional_vector_store_id and MANIFEST_REGIONAL_PATH.exists():
-                        sync_vector_store_incremental(_regional_vector_store_id, MANIFEST_REGIONAL_PATH, ("regional",))
-                except Exception as e:
-                    logger.warning(f"[VECTOR_STORE] 증분 동기화 실패 (무시하고 진행): {e}")
-        elif not SKIP_PDF_SCAN_ON_STARTUP:
-            from backend.openai_vector_store import ensure_vector_store
-            _vector_store_id, _regional_vector_store_id = ensure_vector_store()
-            logger.info(f"[VECTOR_STORE] 준비 완료: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
-        else:
+        from backend.rag_registry import get_vector_store_ids
+
+        logger.info("[VECTOR_STORE] INGEST SKIPPED (runtime)")
+
+        policy_id, regional_id = get_vector_store_ids()
+        if not policy_id and OPENAI_VECTOR_STORE_ID:
+            policy_id = OPENAI_VECTOR_STORE_ID
+            regional_id = OPENAI_REGIONAL_VECTOR_STORE_ID
+            logger.warning("[VECTOR_STORE] .rag ID 없음 → .env ID 사용 (ingest는 실행하지 않음)")
+
+        if not policy_id:
             raise RuntimeError(
-                "SKIP_PDF_SCAN_ON_STARTUP=1인데 OPENAI_VECTOR_STORE_ID가 없습니다. "
-                "scripts/index_pdfs_to_vector_store.py를 실행한 뒤 .env에 ID를 저장하세요."
+                "Vector Store ID가 없습니다. 먼저 ingest 스크립트를 실행하세요: "
+                "python scripts/ingest_vector_store.py"
             )
+
+        _vector_store_id = policy_id
+        _regional_vector_store_id = regional_id
+        logger.info(f"[VECTOR_STORE] ID 사용: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
     else:
         _indexes = build_all_indexes(force_rebuild=False)
         from backend.vector_index import VectorIndex
@@ -659,7 +656,12 @@ def check_pledge(body: PledgeCheckRequest):
         raise HTTPException(status_code=400, detail="pledge 내용이 비어 있습니다.")
     vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
     regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    result = check_pledge_alignment(pledge, vector_store_id=vs_id, regional_vector_store_id=regional_vs_id)
+    result = check_pledge_alignment(
+        pledge,
+        vector_store_id=vs_id,
+        regional_vector_store_id=regional_vs_id,
+        indexes=_indexes if not USE_OPENAI_VECTOR_STORE else None,
+    )
     if result.startswith("오류:"):
         raise HTTPException(status_code=503, detail=result)
     return PledgeCheckResponse(result=result)

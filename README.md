@@ -92,7 +92,7 @@ Policy/
    
    **참고**:  
    - FAISS 모드: 서버 시작 시 PDF 스캔 → 청크 분할 → 임베딩 → 인덱스 구축. 첫 실행 시 시간이 걸릴 수 있음.  
-   - Vector Store 모드 + `SKIP_PDF_SCAN_ON_STARTUP=1`: 시작 시 스캔 없음. `scripts/index_pdfs_to_vector_store.py`로 별도 인덱싱 후 `.env`의 ID만 사용.
+   - Vector Store 모드: **서버 시작 시 ingest 없음**. 반드시 `scripts/ingest_vector_store.py`로 사전 인덱싱 후 서버를 실행.
 
 5. **API 호출 예시**
 
@@ -141,25 +141,24 @@ FAISS 대신 OpenAI File Search를 쓰면 인덱스 경로·EBS/EFS 등 AWS 설�
 
 ```env
 USE_OPENAI_VECTOR_STORE=1
-SKIP_PDF_SCAN_ON_STARTUP=1   # 서버 시작 시 PDF 스캔 생략
 OPENAI_VECTOR_STORE_ID=vs_xxx
 OPENAI_REGIONAL_VECTOR_STORE_ID=vs_yyy
 FILE_SEARCH_MAX_RESULTS=6
 ```
 
-### PDF 업로드 스크립트 (1회 실행)
+### PDF ingest 스크립트 (1회 실행)
 
-서버 시작 시 PDF 스캔 없이 `.env`의 Vector Store ID만 사용하려면, **별도 스크립트**로 PDF를 한 번 업로드·인덱싱한다:
+서버 시작 시 **ingest가 실행되지 않도록** 분리되어 있습니다. 아래 스크립트로 PDF를 업로드·인덱싱합니다:
 
 ```bash
 # 프로젝트 루트에서 실행
-python scripts/index_pdfs_to_vector_store.py --output-env
+python scripts/ingest_vector_store.py
 ```
 
 - `data/pdf/정강정책/`, `data/pdf/공약/` → 정강·공약 Vector Store 생성
 - `data/pdf/지역별 공약/` → 지역별 공약 Vector Store 생성
-- `--output-env`: 완료 후 `.env`에 `OPENAI_VECTOR_STORE_ID`, `OPENAI_REGIONAL_VECTOR_STORE_ID` 자동 기록
-- `--single-store`: 두 폴더를 하나의 Vector Store로 합칠 때 사용
+- 중복 판정: **sha256(file bytes)** 기반으로 동일 파일은 재업로드하지 않음
+- Vector Store ID는 `.rag/registry.json` 및 `.rag/vector_store_id*.txt`에 저장
 
 자세한 사용법: [docs/Vector_Store_업로드_스크립트.md](docs/Vector_Store_업로드_스크립트.md)
 

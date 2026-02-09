@@ -1,4 +1,5 @@
 @echo off
+REM 프로젝트 경로: 이 배치 파일이 있는 폴더(로컬, 예: c:\policy)
 REM 창이 바로 닫히지 않도록 새 cmd 창에서 실행 (끝나도 창 유지)
 if not "%~1"=="_run_" (
     cmd /k "%~f0" _run_
