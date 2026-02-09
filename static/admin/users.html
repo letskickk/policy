@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>사용자 관리 - 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%);
+      min-height: 100vh; color: #e2e8f0; padding: 2rem;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      border-radius: 18px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+    .status { padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
+    .PENDING { background: rgba(251,191,36,0.3); }
+    .APPROVED { background: rgba(34,197,94,0.3); }
+    .REJECTED { background: rgba(239,68,68,0.3); }
+    .SUSPENDED { background: rgba(148,163,184,0.3); }
+
+    button {
+      padding: 0.35rem 0.6rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-right: 0.3rem;
+      margin-bottom: 0.2rem;
+    }
+    .btn-approve { background: #22c55e; color: #fff; }
+    .btn-reject { background: #ef4444; color: #fff; }
+    .btn-suspend { background: #94a3b8; color: #fff; }
+    .btn-delete  { background: #111827; color: #fff; border: 1px solid rgba(148,163,184,0.35); }
+
+    .links { margin-bottom: 1rem; }
+    .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .muted { color: rgba(226,232,240,0.75); font-size: 0.9rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="links"><a href="/admin">← 관리자</a></div>
+    <h1>사용자 관리</h1>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>이름</th>
+            <th>전화번호</th>
+            <th>이메일</th>
+            <th>상태</th>
+            <th>역할</th>
+            <th>가입일</th>
+            <th>승인/거절/중지/삭제</th>
+          </tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
+      <div class="muted">
+        삭제는 하드삭제(되돌릴 수 없음)로 처리됩니다. 삭제 전 반드시 확인하십시오.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function ymd(s) {
+      const t = String(s ?? '');
+      return t.length >= 10 ? t.slice(0, 10) : t;
+    }
+
+    (async () => {
+      const r = await fetch('/api/admin/users', { credentials: 'include' });
+      if (!r.ok) {
+        if (r.status === 401) window.location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        else alert('목록을 불러오지 못했습니다.');
+        return;
+      }
+
+      const d = await r.json();
+      const tbody = document.getElementById('list');
+      tbody.innerHTML = '';
+
+      for (const u of (d.users || [])) {
+        const tr = document.createElement('tr');
+
+        const statusCls = (u.status || 'PENDING');
+        const name = escapeHtml(u.name || '-');
+        const phone = escapeHtml(u.phone || '-');
+        const email = escapeHtml(u.email || '');
+        const role = escapeHtml(u.role || 'USER');
+        const created = escapeHtml(ymd(u.created_at || ''));
+
+        const actions = buildActionsHtml(u);
+
+        tr.innerHTML =
+          `<td>${name}</td>` +
+          `<td>${phone}</td>` +
+          `<td>${email}</td>` +
+          `<td><span class="status ${escapeHtml(statusCls)}">${escapeHtml(statusCls)}</span></td>` +
+          `<td>${role}</td>` +
+          `<td>${created}</td>` +
+          `<td>${actions}</td>`;
+
+        tbody.appendChild(tr);
+      }
+    })();
+
+    function buildActionsHtml(u) {
+      const id = Number(u.id);
+      const status = String(u.status || 'PENDING');
+      const role = String(u.role || 'USER');
+
+      // 삭제 버튼은 전 상태에서 표시(원하면 APPROVED만 표시로 바꿔도 됨)
+      const delBtn = `<button class="btn-delete" onclick="deleteUser(${id})">삭제</button>`;
+
+      if (role === 'ADMIN') {
+        return `<span class="muted">관리자 계정</span>`;
+      }
+
+      if (status === 'PENDING') {
+        return `
+          <button class="btn-approve" onclick="setStatus(${id}, 'APPROVED')">승인</button>
+          <button class="btn-reject" onclick="setStatus(${id}, 'REJECTED')">거절</button>
+          ${delBtn}
+        `;
+      }
+      if (status === 'APPROVED') {
+        return `
+          <button class="btn-suspend" onclick="setStatus(${id}, 'SUSPENDED')">중지</button>
+          ${delBtn}
+        `;
+      }
+      if (status === 'SUSPENDED' || status === 'REJECTED') {
+        return `
+          <button class="btn-approve" onclick="setStatus(${id}, 'APPROVED')">승인</button>
+          ${delBtn}
+        `;
+      }
+      // 알 수 없는 상태
+      return delBtn;
+    }
+
+    async function setStatus(userId, status) {
+      const r = await fetch('/api/admin/users/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, status, note: '' }),
+        credentials: 'include'
+      });
+
+      if (r.ok) location.reload();
+      else {
+        let msg = '처리 실패';
+        try { msg = (await r.json()).detail || msg; } catch (_) {}
+        alert(msg);
+      }
+    }
+
+    async function deleteUser(userId) {
+      // 2중 확인(실수 방지)
+      const c1 = confirm('정말 삭제하시겠습니까?\n삭제는 되돌릴 수 없습니다.');
+      if (!c1) return;
+
+      const typed = prompt('하드삭제를 진행하려면 DELETE 를 입력하십시오.');
+      if (typed !== 'DELETE') {
+        alert('취소되었습니다.');
+        return;
+      }
+
+      const r = await fetch('/api/admin/users/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+        credentials: 'include'
+      });
+
+      if (r.ok) location.reload();
+      else {
+        let msg = '삭제 실패';
+        try { msg = (await r.json()).detail || msg; } catch (_) {}
+        alert(msg);
+      }
+    }
+  </script>
+</body>
+</html>

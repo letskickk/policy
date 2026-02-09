@@ -1,0 +1,306 @@
+"""
+분석 실행 단일 서비스 레이어.
+캐시 조회 → 쿼터 체크 → OpenAI 호출 → usage_logs 기록 → 캐시 저장.
+"""
+import hashlib
+import json
+import logging
+import time
+from datetime import datetime, timezone, timedelta
+from typing import Any, Optional
+
+from backend.auth import STATUS_APPROVED, get_user
+from backend.config import (
+    CACHE_TTL_HOURS,
+    CHAT_MODEL,
+    OPENAI_MODEL,
+)
+from backend.database import get_connection
+from backend.quota_rate import check_quota
+from backend.usage_logger import log_usage, _estimate_cost
+
+logger = logging.getLogger(__name__)
+
+
+def _cache_key(normalized_input: str, options: str, model: str, vs_id: str) -> str:
+    raw = f"{normalized_input}|{options}|{model}|{vs_id}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _get_cached(user_id: int, cache_key: str) -> Optional[str]:
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "SELECT result_payload, expires_at FROM analysis_cache WHERE user_id = ? AND cache_key = ?",
+            (user_id, cache_key),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        expires = row["expires_at"]
+        if expires and datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+            conn.execute("DELETE FROM analysis_cache WHERE cache_key = ?", (cache_key,))
+            conn.commit()
+            return None
+        return row["result_payload"]
+    finally:
+        conn.close()
+
+
+def _set_cached(user_id: int, cache_key: str, fingerprint: str, result: str) -> None:
+    expires = (datetime.now(timezone.utc) + timedelta(hours=CACHE_TTL_HOURS)).isoformat()
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO analysis_cache (user_id, cache_key, request_fingerprint, result_payload, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, cache_key, fingerprint[:500], result, expires),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.warning("cache save failed: %s", e)
+    finally:
+        conn.close()
+
+
+def run_check_analysis(
+    user_id: int,
+    pledge_text: str,
+    ip: str,
+    vector_store_id: Optional[str],
+    regional_vector_store_id: Optional[str],
+    indexes: Optional[dict],
+) -> tuple[str, int, bool]:
+    """
+    당 부합 점검 실행.
+    Returns: (result_or_error, status_code, from_cache)
+    """
+    user = get_user(user_id)
+    if not user or user["status"] != STATUS_APPROVED:
+        return "승인되지 않은 사용자입니다.", 403, False
+
+    ok, msg = check_quota(user_id)
+    if not ok:
+        return msg, 429, False
+
+    normalized = (pledge_text or "").strip()
+    if not normalized:
+        return "공약 내용이 비어 있습니다.", 400, False
+
+    vs_id = vector_store_id or ""
+    regional_id = regional_vector_store_id or ""
+    opts = f"check|{vs_id}|{regional_id}"
+    cache_key = _cache_key(normalized, opts, OPENAI_MODEL, vs_id)
+
+    cached = _get_cached(user_id, cache_key)
+    if cached:
+        log_usage(
+            user_id=user_id,
+            ip=ip,
+            endpoint="/check",
+            action="cache_hit",
+            input_chars=len(normalized),
+            output_chars=len(cached),
+            model=OPENAI_MODEL,
+            token_in=0,
+            token_out=0,
+            cost_estimate=0.0,
+            status_code=200,
+            latency_ms=0,
+        )
+        return cached, 200, True
+
+    start = time.perf_counter()
+    try:
+        from backend.check_service import check_pledge_alignment
+
+        result = check_pledge_alignment(
+            normalized,
+            vector_store_id=vector_store_id,
+            regional_vector_store_id=regional_vector_store_id,
+            indexes=indexes,
+        )
+    except Exception as e:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        log_usage(
+            user_id=user_id,
+            ip=ip,
+            endpoint="/check",
+            action="analysis_run",
+            input_chars=len(normalized),
+            output_chars=0,
+            model=OPENAI_MODEL,
+            token_in=None,
+            token_out=None,
+            cost_estimate=None,
+            status_code=500,
+            latency_ms=elapsed_ms,
+            error_message=str(e)[:500],
+        )
+        raise
+
+    if result.startswith("오류:"):
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        log_usage(
+            user_id=user_id,
+            ip=ip,
+            endpoint="/check",
+            action="analysis_run",
+            input_chars=len(normalized),
+            output_chars=len(result),
+            model=OPENAI_MODEL,
+            token_in=None,
+            token_out=None,
+            cost_estimate=None,
+            status_code=503,
+            latency_ms=elapsed_ms,
+            error_message=result[:500],
+        )
+        return result, 503, False
+
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    token_in = len(normalized) // 2
+    token_out = len(result) // 2
+    cost = _estimate_cost(token_in, token_out, OPENAI_MODEL)
+
+    log_usage(
+        user_id=user_id,
+        ip=ip,
+        endpoint="/check",
+        action="analysis_run",
+        input_chars=len(normalized),
+        output_chars=len(result),
+        model=OPENAI_MODEL,
+        token_in=token_in,
+        token_out=token_out,
+        cost_estimate=cost,
+        status_code=200,
+        latency_ms=elapsed_ms,
+    )
+
+    _set_cached(user_id, cache_key, normalized, result)
+    return result, 200, False
+
+
+def run_verify_analysis(
+    user_id: int,
+    pledge_text: str,
+    ip: str,
+    options: dict,
+    vector_store_id: Optional[str],
+    regional_vector_store_id: Optional[str],
+    indexes: Optional[dict],
+) -> tuple[Any, int, bool]:
+    """
+    벡터 검색 기반 검증 리포트 실행.
+    Returns: (result_dict_or_error, status_code, from_cache)
+    """
+    user = get_user(user_id)
+    if not user or user["status"] != STATUS_APPROVED:
+        return {"detail": "승인되지 않은 사용자입니다."}, 403, False
+
+    ok, msg = check_quota(user_id)
+    if not ok:
+        return {"detail": msg}, 429, False
+
+    normalized = (pledge_text or "").strip()
+    if not normalized:
+        return {"detail": "공약 텍스트가 비어 있습니다."}, 400, False
+
+    vs_id = vector_store_id or ""
+    opts = json.dumps(options, sort_keys=True)
+    cache_key = _cache_key(normalized, opts, CHAT_MODEL, vs_id)
+
+    cached = _get_cached(user_id, cache_key)
+    if cached:
+        try:
+            data = json.loads(cached)
+            log_usage(
+                user_id=user_id,
+                ip=ip,
+                endpoint="/api/pledge/verify",
+                action="cache_hit",
+                input_chars=len(normalized),
+                output_chars=len(cached),
+                model=CHAT_MODEL,
+                token_in=0,
+                token_out=0,
+                cost_estimate=0.0,
+                status_code=200,
+                latency_ms=0,
+            )
+            return data, 200, True
+        except Exception:
+            pass
+
+    start = time.perf_counter()
+    use_vs = bool(vector_store_id)
+    try:
+        if use_vs:
+            from backend.config import FILE_SEARCH_MAX_RESULTS_QUICK
+            from backend.openai_vector_store import run_verify, run_verify_judge
+            max_results = FILE_SEARCH_MAX_RESULTS_QUICK if (options.get("phase") or "").strip().lower() == "quick" else None
+            if options.get("judge"):
+                result = run_verify_judge(
+                    vector_store_id, normalized, regional_vector_store_id or "", max_results
+                )
+            else:
+                result = run_verify(
+                    vector_store_id, normalized, regional_vector_store_id or "", max_results
+                )
+        else:
+            from backend.report import generate_report
+            result = generate_report(
+                normalized,
+                indexes.get("platform") if indexes else None,
+                indexes.get("pledge") if indexes else None,
+                indexes.get("regional") if indexes else None,
+                options.get("top_k_platform", 6),
+                options.get("top_k_pledge", 6),
+                options.get("top_k_regional", 8),
+            )
+    except Exception as e:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        log_usage(
+            user_id=user_id,
+            ip=ip,
+            endpoint="/api/pledge/verify",
+            action="analysis_run",
+            input_chars=len(normalized),
+            output_chars=0,
+            model=CHAT_MODEL,
+            token_in=None,
+            token_out=None,
+            cost_estimate=None,
+            status_code=500,
+            latency_ms=elapsed_ms,
+            error_message=str(e)[:500],
+        )
+        raise
+
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    out_str = json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
+    token_in = len(normalized) // 2
+    token_out = len(out_str) // 2
+    cost = _estimate_cost(token_in, token_out, CHAT_MODEL)
+
+    log_usage(
+        user_id=user_id,
+        ip=ip,
+        endpoint="/api/pledge/verify",
+        action="analysis_run",
+        input_chars=len(normalized),
+        output_chars=len(out_str),
+        model=CHAT_MODEL,
+        token_in=token_in,
+        token_out=token_out,
+        cost_estimate=cost,
+        status_code=200,
+        latency_ms=elapsed_ms,
+    )
+
+    _set_cached(user_id, cache_key, normalized, out_str)
+    return result, 200, False

@@ -83,3 +83,21 @@ OPENAI_REGIONAL_VECTOR_STORE_ID = os.getenv("OPENAI_REGIONAL_VECTOR_STORE_ID", "
 FILE_SEARCH_MAX_RESULTS = int(os.getenv("FILE_SEARCH_MAX_RESULTS", "6"))
 # quick phase용 (속도 우선, 기본 3)
 FILE_SEARCH_MAX_RESULTS_QUICK = int(os.getenv("FILE_SEARCH_MAX_RESULTS_QUICK", "3"))
+
+# 접근제어 / 쿼터 / 레이트리밋 (내부 정책 도구용)
+ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+# 이메일 인증 (1=활성화 시 가입 후 인증 메일 발송, 인증 완료 후 로그인 가능)
+EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "0") == "1"
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+# SMTP (이메일 인증 시 필요)
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
+FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER or "noreply@example.com")
+SESSION_SECRET = os.getenv("SESSION_SECRET", "").strip() or "change-me-in-production"
+QUOTA_DAILY = int(os.getenv("QUOTA_DAILY", "30"))
+QUOTA_MONTHLY = int(os.getenv("QUOTA_MONTHLY", "300"))
+RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
+RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
+CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
