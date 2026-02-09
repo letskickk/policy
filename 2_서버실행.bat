@@ -1,4 +1,5 @@
 @echo off
+REM 프로젝트 경로: 이 배치 파일이 있는 폴더(로컬, 예: c:\policy)
 chcp 65001 >nul
 cd /d "%~dp0"
 
