@@ -1,18 +1,20 @@
 """
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
+접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
 import locale
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from backend.config import (
+    ADMIN_EMAILS,
     ROOT_DIR,
     PDF_DIR,
     INDEX_CACHE_DIR,
@@ -25,7 +27,24 @@ from backend.config import (
     OPENAI_VECTOR_STORE_ID,
     _nfc,
 )
-from backend.check_service import check_pledge_alignment
+from backend.auth import (
+    STATUS_APPROVED,
+    STATUS_PENDING,
+    ROLE_ADMIN,
+    create_session_token,
+    verify_session_token,
+    signup as auth_signup,
+    login as auth_login,
+    verify_email_token,
+    resend_verification_email,
+    get_user,
+    list_users_pending,
+    list_users_all,
+    set_user_status,
+)
+from backend.database import init_db
+from backend.usage_logger import log_usage
+from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
 from backend.pdf_loader import (
     HAS_PDFPLUMBER,
     _iter_doc_files,
@@ -34,7 +53,6 @@ from backend.pdf_loader import (
     get_context_summary,
 )
 from backend.index_builder import build_all_indexes
-from backend.report import generate_report
 
 # 로깅 설정
 logging.basicConfig(
@@ -172,6 +190,7 @@ async def startup_event():
     logger.info(f"USE_OPENAI_VECTOR_STORE= {USE_OPENAI_VECTOR_STORE}")
 
     _startup_self_check()
+    init_db()
 
     if USE_OPENAI_VECTOR_STORE:
         from backend.config import OPENAI_REGIONAL_VECTOR_STORE_ID
@@ -218,6 +237,49 @@ async def startup_event():
     logger.info("준비 완료")
 
 STATIC_DIR = ROOT_DIR / "static"
+AUTH_COOKIE = "policy_auth"
+AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else (request.headers.get("x-forwarded-for", "").split(",")[0].strip() or "0.0.0.0")
+
+
+def get_current_user(request: Request) -> Optional[dict]:
+    token = request.cookies.get(AUTH_COOKIE)
+    return verify_session_token(token) if token else None
+
+
+def require_user(request: Request) -> dict:
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return user
+
+
+def require_approved(request: Request) -> dict:
+    user = require_user(request)
+    # ADMIN_EMAILS에 있으면 항상 승인된 것으로 처리
+    if user["email"] in ADMIN_EMAILS:
+        return user
+    if user["status"] != STATUS_APPROVED:
+        log_usage(
+            user_id=user["id"],
+            ip=_client_ip(request),
+            endpoint=request.url.path,
+            action="blocked_unapproved",
+            input_chars=0,
+            output_chars=0,
+            model="",
+            token_in=None,
+            token_out=None,
+            cost_estimate=None,
+            status_code=403,
+            latency_ms=0,
+            error_message="승인되지 않은 사용자",
+        )
+        raise HTTPException(status_code=403, detail="승인되지 않은 사용자입니다. 관리자 승인 후 이용 가능합니다.")
+    return user
 
 
 class PledgeCheckRequest(BaseModel):
@@ -244,13 +306,320 @@ def index():
     return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
 
 
+def _login_redirect(path: str):
+    from urllib.parse import quote
+    return RedirectResponse(url=f"/login?next={quote(path)}", status_code=302)
+
+
 @app.get("/pledge")
-def pledge_page():
-    """공약 입력·점검 폼 페이지."""
+def pledge_page(request: Request):
+    """공약 입력·점검 폼 페이지. (승인 사용자 전용)"""
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if user["status"] != STATUS_APPROVED:
+        return RedirectResponse(url="/pending", status_code=302)
     res = _serve_html("pledge.html")
     if res is not None:
         return res
     raise HTTPException(status_code=404, detail="pledge.html not found")
+
+
+@app.get("/signup")
+def signup_page():
+    res = _serve_html("signup.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="signup.html not found")
+
+
+@app.get("/login")
+def login_page():
+    res = _serve_html("login.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="login.html not found")
+
+
+@app.get("/pending")
+def pending_page():
+    res = _serve_html("pending.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="pending.html not found")
+
+
+@app.get("/dashboard")
+def dashboard_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    res = _serve_html("dashboard.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="dashboard.html not found")
+
+
+@app.get("/admin")
+def admin_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
+    res = _serve_html("admin/index.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="admin/index.html not found")
+
+
+@app.get("/admin/users")
+def admin_users_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
+    res = _serve_html("admin/users.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="admin/users.html not found")
+
+
+@app.get("/admin/usage")
+def admin_usage_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
+    res = _serve_html("admin/usage.html")
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="admin/usage.html not found")
+
+
+class SignupBody(BaseModel):
+    name: str = Field(..., description="이름")
+    phone: str = Field(..., description="전화번호")
+    email: str = Field(..., description="이메일")
+    password: str = Field(..., description="비밀번호")
+
+
+@app.post("/api/auth/signup")
+def api_signup(body: SignupBody):
+    ok, msg = auth_signup(body.email, body.password, name=body.name, phone=body.phone)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"message": msg}
+
+
+class LoginBody(BaseModel):
+    email: str = Field(..., description="이메일")
+    password: str = Field(..., description="비밀번호")
+    next: str = Field(default="", description="로그인 후 이동할 경로")
+
+
+@app.post("/api/auth/login")
+def api_login(body: LoginBody, request: Request):
+    user = auth_login(body.email, body.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+    if isinstance(user, dict) and user.get("error") == "email_not_verified":
+        raise HTTPException(status_code=401, detail="이메일 인증이 필요합니다. 아래 '인증 메일 다시 받기'를 이용하세요.")
+    token = create_session_token(user)
+    if user["email"] in ADMIN_EMAILS or user["role"] == ROLE_ADMIN:
+        redirect_url = "/admin"
+    elif user["status"] != STATUS_APPROVED:
+        redirect_url = "/pending"
+    else:
+        next_path = (body.next or "").strip()
+        if next_path and next_path.startswith("/") and next_path not in ("/login", "/signup"):
+            redirect_url = next_path
+        else:
+            redirect_url = "/"
+    from fastapi.responses import JSONResponse
+    resp = JSONResponse({"redirect": redirect_url})
+    resp.set_cookie(AUTH_COOKIE, token, max_age=AUTH_COOKIE_MAX_AGE, httponly=True, samesite="lax")
+    return resp
+
+
+class ResendVerificationBody(BaseModel):
+    email: str = Field(..., description="이메일")
+
+
+@app.post("/api/auth/resend-verification")
+def api_resend_verification(body: ResendVerificationBody):
+    ok, msg = resend_verification_email(body.email)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"message": msg}
+
+
+@app.get("/verify-email")
+def verify_email_page(token: str = Query(default="", alias="token")):
+    """이메일 인증 링크 처리. token 검증 후 로그인 페이지로 리다이렉트."""
+    from urllib.parse import quote
+    ok, msg = verify_email_token(token)
+    if ok:
+        return RedirectResponse(url="/login?verified=1", status_code=302)
+    return RedirectResponse(url=f"/login?verified=0&msg={quote(msg)}", status_code=302)
+
+
+@app.post("/api/auth/logout")
+def api_logout():
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.delete_cookie(AUTH_COOKIE)
+    return resp
+
+
+@app.get("/api/auth/me")
+def api_me(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인 필요")
+    return {"id": user["id"], "email": user["email"], "status": user["status"], "role": user["role"]}
+
+
+@app.get("/api/admin/users/pending")
+def api_admin_users_pending(request: Request):
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+    return {"users": list_users_pending()}
+
+
+@app.get("/api/admin/users")
+def api_admin_users_all(request: Request):
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+    return {"users": list_users_all()}
+
+
+class ApproveBody(BaseModel):
+    user_id: int = Field(..., description="사용자 ID")
+    status: str = Field(..., description="APPROVED | REJECTED | SUSPENDED")
+    note: str = Field(default="", description="결정 사유")
+
+
+@app.post("/api/admin/users/approve")
+def api_admin_approve(body: ApproveBody, request: Request):
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+    if body.status not in ("APPROVED", "REJECTED", "SUSPENDED"):
+        raise HTTPException(status_code=400, detail="status must be APPROVED, REJECTED, or SUSPENDED")
+    ok = set_user_status(body.user_id, body.status, user["id"], body.note)
+    if not ok:
+        raise HTTPException(status_code=400, detail="처리 실패")
+    return {"message": "처리 완료"}
+
+
+class DeleteUserBody(BaseModel):
+    user_id: int = Field(..., description="사용자 ID")
+
+
+@app.post("/api/admin/users/delete")
+def api_admin_delete_user(body: DeleteUserBody, request: Request):
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+    if body.user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="자기 자신은 삭제할 수 없습니다.")
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        # 사용자 존재 확인
+        cur = conn.execute("SELECT id, role FROM users WHERE id = ?", (body.user_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        if row["role"] == ROLE_ADMIN:
+            raise HTTPException(status_code=400, detail="관리자 계정은 삭제할 수 없습니다.")
+
+        # 연관 데이터 먼저 삭제 (FK cascade 없음)
+        conn.execute("DELETE FROM approval_requests WHERE user_id = ? OR decided_by = ?", (body.user_id, body.user_id))
+        conn.execute("DELETE FROM usage_logs WHERE user_id = ?", (body.user_id,))
+        conn.execute("DELETE FROM analysis_cache WHERE user_id = ?", (body.user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (body.user_id,))
+        conn.commit()
+        return {"message": "삭제 완료"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="삭제 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
+
+
+@app.get("/api/usage/summary")
+def api_usage_summary(request: Request):
+    u = require_user(request)
+    from backend.database import get_connection
+    import time
+    today = time.strftime("%Y-%m-%d")
+    month = time.strftime("%Y-%m")
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300) AS daily_used,
+                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300) AS monthly_used
+            """,
+            (u["id"], today, u["id"], month),
+        )
+        row = cur.fetchone()
+        from backend.config import QUOTA_DAILY, QUOTA_MONTHLY
+        return {
+            "daily_used": row["daily_used"] if row else 0,
+            "monthly_used": row["monthly_used"] if row else 0,
+            "daily_limit": QUOTA_DAILY,
+            "monthly_limit": QUOTA_MONTHLY,
+            "daily_remaining": max(0, QUOTA_DAILY - (row["daily_used"] if row else 0)),
+            "monthly_remaining": max(0, QUOTA_MONTHLY - (row["monthly_used"] if row else 0)),
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/admin/usage/stats")
+def api_admin_usage_stats(request: Request):
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+    period = request.query_params.get("period", "7")
+    days = min(90, max(1, int(period) if period.isdigit() else 7))
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            SELECT user_id, COUNT(*) as cnt, SUM(COALESCE(cost_estimate, 0)) as cost
+            FROM usage_logs
+            WHERE datetime(created_at) >= datetime('now', ?)
+            AND status_code >= 200 AND status_code < 300 AND action = 'analysis_run'
+            GROUP BY user_id
+            ORDER BY cnt DESC
+            """,
+            (f"-{days} days",),
+        )
+        rows = cur.fetchall()
+        users = {r["user_id"]: r for r in rows}
+        user_info = {}
+        for uid in users:
+            u = get_user(uid)
+            user_info[uid] = u["email"] if u else str(uid)
+        return {
+            "period_days": days,
+            "by_user": [{"user_id": r["user_id"], "email": user_info.get(r["user_id"], str(r["user_id"])), "count": r["cnt"], "cost_estimate": r["cost"] or 0} for r in rows],
+        }
+    finally:
+        conn.close()
 
 
 @app.get("/api")
@@ -649,21 +1018,31 @@ def debug_scan():
 
 
 @app.post("/check", response_model=PledgeCheckResponse)
-def check_pledge(body: PledgeCheckRequest):
-    """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다."""
-    pledge = (body.pledge or "").strip()
-    if not pledge:
-        raise HTTPException(status_code=400, detail="pledge 내용이 비어 있습니다.")
+def check_pledge(body: PledgeCheckRequest, request: Request):
+    """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다. (승인 사용자 전용)"""
+    user = require_approved(request)
+    ip = _client_ip(request)
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+    ok, msg = check_rate_limit_user(user["id"])
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
+    from backend.analysis_service import run_check_analysis
+    global _indexes, _vector_store_id, _regional_vector_store_id
     vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
     regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    result = check_pledge_alignment(
-        pledge,
-        vector_store_id=vs_id,
-        regional_vector_store_id=regional_vs_id,
-        indexes=_indexes if not USE_OPENAI_VECTOR_STORE else None,
+    result, status_code, _ = run_check_analysis(
+        user["id"],
+        body.pledge or "",
+        ip,
+        vs_id,
+        regional_vs_id,
+        _indexes if not USE_OPENAI_VECTOR_STORE else None,
     )
-    if result.startswith("오류:"):
-        raise HTTPException(status_code=503, detail=result)
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=result)
     return PledgeCheckResponse(result=result)
 
 
@@ -677,61 +1056,42 @@ class PledgeVerifyRequest(BaseModel):
 
 
 @app.post("/api/pledge/verify")
-def verify_pledge(body: PledgeVerifyRequest):
+def verify_pledge(body: PledgeVerifyRequest, request: Request):
     """
-    벡터 검색 기반 공약 검증 리포트를 생성한다.
-    
-    - 정강정책 부합 근거
-    - 우리당 공약 연결 근거
-    - 타지역 중복/유사성
-    - 상충/보완 제안
+    벡터 검색 기반 공약 검증 리포트를 생성한다. (승인 사용자 전용)
     """
+    user = require_approved(request)
+    ip = _client_ip(request)
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+    ok, msg = check_rate_limit_user(user["id"])
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
     global _indexes, _vector_store_id, _regional_vector_store_id
+    if USE_OPENAI_VECTOR_STORE and not _vector_store_id:
+        raise HTTPException(status_code=503, detail="Vector Store가 준비되지 않았습니다.")
+    if not USE_OPENAI_VECTOR_STORE and (not _indexes or not _indexes.get("pledge")):
+        raise HTTPException(status_code=503, detail="인덱스가 준비되지 않았습니다.")
 
-    pledge_text = (body.text or "").strip()
-    if not pledge_text:
-        raise HTTPException(status_code=400, detail="공약 텍스트가 비어 있습니다.")
-
-    if USE_OPENAI_VECTOR_STORE:
-        if not _vector_store_id:
-            raise HTTPException(
-                status_code=503,
-                detail="Vector Store가 준비되지 않았습니다. 서버를 재시작하세요."
-            )
-        try:
-            from backend.config import FILE_SEARCH_MAX_RESULTS_QUICK
-            from backend.openai_vector_store import run_verify, run_verify_judge
-            max_results = FILE_SEARCH_MAX_RESULTS_QUICK if (body.phase or "").strip().lower() == "quick" else None
-            if body.judge:
-                return run_verify_judge(_vector_store_id, pledge_text, _regional_vector_store_id or "", max_results)
-            return run_verify(_vector_store_id, pledge_text, _regional_vector_store_id or "", max_results)
-        except Exception as e:
-            logger.error(f"공약 검증 실패 (Vector Store): {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")
-    
-    if body.judge:
-        raise HTTPException(
-            status_code=400,
-            detail="judge 모드는 USE_OPENAI_VECTOR_STORE=1일 때만 사용 가능합니다."
-        )
-
-    if _indexes is None or not _indexes:
-        raise HTTPException(
-            status_code=503,
-            detail="인덱스가 준비되지 않았습니다. 서버를 재시작하세요."
-        )
-    
-    try:
-        report = generate_report(
-            pledge_text,
-            _indexes.get("platform"),
-            _indexes.get("pledge"),
-            _indexes.get("regional"),
-            body.top_k_platform,
-            body.top_k_pledge,
-            body.top_k_regional
-        )
-        return report
-    except Exception as e:
-        logger.error(f"공약 검증 실패: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"검증 중 오류 발생: {str(e)}")
+    from backend.analysis_service import run_verify_analysis
+    options = {
+        "top_k_platform": body.top_k_platform,
+        "top_k_pledge": body.top_k_pledge,
+        "top_k_regional": body.top_k_regional,
+        "phase": body.phase or "full",
+        "judge": body.judge,
+    }
+    result, status_code, _ = run_verify_analysis(
+        user["id"],
+        body.text or "",
+        ip,
+        options,
+        _vector_store_id if USE_OPENAI_VECTOR_STORE else None,
+        _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None,
+        _indexes if not USE_OPENAI_VECTOR_STORE else None,
+    )
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=result.get("detail", result) if isinstance(result, dict) else result)
+    return result

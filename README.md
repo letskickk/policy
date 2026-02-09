@@ -60,6 +60,26 @@ Policy/
 └── prompts/              # GPT 시스템/유저 프롬프트
 ```
 
+## 접근제어 (내부 정책 도구)
+
+공개 시 API 비용 폭증을 막기 위해 회원가입·관리자 승인·쿼터·레이트리밋이 적용됩니다.
+
+| 항목 | 설명 |
+|------|------|
+| **회원가입** | /signup에서 이메일·비밀번호로 가입. ADMIN_EMAILS에 해당 이메일이 있으면 자동 승인. |
+| **관리자 승인** | /admin/users에서 PENDING 사용자를 APPROVED/REJECTED/SUSPENDED로 변경 |
+| **쿼터** | 일일(QUOTA_DAILY, 기본 30회), 월간(QUOTA_MONTHLY, 기본 300회). `.env`에서 변경 가능 |
+| **레이트리밋** | IP당 분당(RATE_LIMIT_IP_PER_MIN, 기본 30회), 사용자당 분당(RATE_LIMIT_USER_PER_MIN, 기본 10회) |
+| **캐싱** | 동일 입력 24시간 내 재호출 시 OpenAI 미호출, 저장된 결과 반환 |
+
+**최초 실행 흐름**
+1. `python scripts/init_db.py` — DB 초기화
+2. `.env`에 `ADMIN_EMAILS=admin@example.com` 설정 (관리자 이메일)
+3. 회원가입 → ADMIN_EMAILS에 있으면 자동 승인, 없으면 관리자가 /admin/users에서 승인
+4. 승인 후 /pledge에서 분석 가능
+
+**쿼터/레이트리밋 변경**: `.env`에 `QUOTA_DAILY=50`, `QUOTA_MONTHLY=500` 등 추가
+
 ## 실행 방법
 
 1. **가상환경 및 패키지**
@@ -83,7 +103,12 @@ Policy/
    `.txt`는 UTF-8로 읽는다. 같은 이름의 .pdf와 .txt가 있으면 .pdf 우선.
    (폴더가 없어도 API는 동작하며, 해당 섹션은 비어있음으로 표시된다.)
 
-4. **서버 실행** (프로젝트 루트에서)
+4. **DB 초기화** (최초 1회)
+   ```bash
+   python scripts/init_db.py
+   ```
+
+5. **서버 실행** (프로젝트 루트에서)
    ```bash
    uvicorn backend.main:app --reload
    ```
@@ -94,7 +119,7 @@ Policy/
    - FAISS 모드: 서버 시작 시 PDF 스캔 → 청크 분할 → 임베딩 → 인덱스 구축. 첫 실행 시 시간이 걸릴 수 있음.  
    - Vector Store 모드: **서버 시작 시 ingest 없음**. 반드시 `scripts/ingest_vector_store.py`로 사전 인덱싱 후 서버를 실행.
 
-5. **API 호출 예시**
+6. **API 호출 예시** (로그인·승인 필요)
 
    **기존 방식 (전체 컨텍스트 사용)**:
    ```bash

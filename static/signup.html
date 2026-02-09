@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>회원가입 - 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; display: flex; align-items: center; justify-content: center; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 2rem; max-width: 420px; width: 100%; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
+    label { display: block; font-weight: 700; margin-bottom: 0.5rem; }
+    input { width: 100%; padding: 0.75rem; padding-right: 2.75rem; border-radius: 10px; border: 1px solid rgba(148,163,184,0.28); background: rgba(0,0,0,0.22); color: #fff; margin-bottom: 1rem; }
+    input:-webkit-autofill { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px rgba(0,0,0,0.22) inset; }
+    .pw-wrap { position: relative; margin-bottom: 1rem; }
+    .pw-wrap input { margin-bottom: 0; }
+    .pw-toggle { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.9rem; padding: 0.25rem; width: auto; }
+    .pw-toggle:hover { color: #fff; }
+    button[type="submit"] { width: 100%; padding: 0.9rem; font-weight: 900; background: #fff; color: #0f172a; border: none; border-radius: 12px; cursor: pointer; }
+    button[type="submit"]:hover { background: #f1f5f9; }
+    .msg { margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.14); border-radius: 10px; color: #ffd1d1; font-size: 0.9rem; display: none; }
+    .links { margin-top: 1.5rem; font-size: 0.9rem; }
+    .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>회원가입</h1>
+    <p class="hint" style="margin-bottom:1rem;font-size:0.9rem;color:#94a3b8;">회원가입은 공천이 확정된 후보자만 가능합니다.<br>
+      정보 입력 후 회원가입을 완료하면 이메일 인증 절차가 진행되며,<br>
+      인증 완료 후 공천 시 제출한 정보와의 일치 여부를 관리자가 확인합니다.<br>
+      관리자 승인 절차가 끝나야 시스템을 사용할 수 있습니다.</p>
+    <form id="form">
+      <label>이름</label>
+      <input type="text" name="name" required placeholder="홍길동" autocomplete="name">
+      <label>전화번호</label>
+      <input type="tel" name="phone" required placeholder="010-1234-5678" autocomplete="tel">
+      <label>이메일</label>
+      <input type="email" name="email" required placeholder="공천시스템 등록 이메일">
+      <label>비밀번호 (6자 이상)</label>
+      <div class="pw-wrap">
+        <input type="password" name="password" id="pw" required minlength="6" placeholder="6자 이상">
+        <button type="button" class="pw-toggle" aria-label="비밀번호 표시">보기</button>
+      </div>
+      <label>비밀번호 확인</label>
+      <div class="pw-wrap">
+        <input type="password" name="password_confirm" id="pw2" required minlength="6" placeholder="다시 입력">
+        <button type="button" class="pw-toggle" aria-label="비밀번호 확인 표시">보기</button>
+      </div>
+      <button type="submit">가입하기</button>
+    </form>
+    <div id="msg" class="msg"></div>
+    <div class="links">
+      이미 계정이 있으신가요? <a href="/login">로그인</a>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.pw-wrap').forEach(wrap => {
+      const input = wrap.querySelector('input');
+      const btn = wrap.querySelector('.pw-toggle');
+      if (!input || !btn) return;
+      btn.addEventListener('click', () => {
+        if (input.type === 'password') { input.type = 'text'; btn.textContent = '숨기기'; }
+        else { input.type = 'password'; btn.textContent = '보기'; }
+      });
+    });
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pw = document.getElementById('pw').value;
+      const pw2 = document.getElementById('pw2').value;
+      const msg = document.getElementById('msg');
+      msg.style.display = 'none';
+      if (pw !== pw2) {
+        msg.textContent = '비밀번호가 일치하지 않습니다.';
+        msg.style.display = 'block';
+        return;
+      }
+      const fd = new FormData(e.target);
+      try {
+        const r = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: fd.get('name'), phone: fd.get('phone'), email: fd.get('email'), password: fd.get('password') })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { msg.textContent = d.detail || '가입 실패'; msg.style.display = 'block'; return; }
+        msg.style.background = 'rgba(34,197,94,0.2)'; msg.style.color = '#86efac';
+        msg.textContent = d.message || '가입 완료. 이메일 인증 후 관리자 승인을 기다려 주세요.';
+        msg.style.display = 'block';
+      } catch (e) { msg.textContent = '서버 연결 실패'; msg.style.display = 'block'; }
+    });
+  </script>
+</body>
+</html>
