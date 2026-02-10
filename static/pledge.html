@@ -62,13 +62,20 @@
     }
 
     /* --- [네비게이션] --- */
-    .nav{
+    .nav {
       margin-bottom: 1.5rem;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
       flex-wrap: wrap;
+    }
+    .nav-left { display: flex; align-items: center; gap: 0.5rem; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-login { color: var(--muted); font-size: 0.88rem; white-space: nowrap; }
+    @media (max-width: 640px) {
+      .nav { gap: 0.75rem; }
+      .nav-right { order: 3; width: 100%; justify-content: space-between; margin-top: 0.25rem; padding-top: 0.75rem; border-top: 1px solid rgba(148,163,184,0.15); }
     }
 
     .nav-link{
@@ -93,64 +100,6 @@
       outline: none;
       box-shadow: 0 0 0 4px var(--cta-ring);
     }
-    .nav-text a:hover { color: var(--text-strong); text-decoration: underline; }
-
-    /* --- [글자 크기 조절 컨트롤] --- */
-    .font-ctrl{
-      display:inline-flex;
-      align-items:center;
-      gap: 0.45rem;
-      padding: 0.55rem 0.6rem;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-      backdrop-filter: blur(10px);
-    }
-    .font-btn{
-      width: 42px;
-      height: 42px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(0,0,0,0.18);
-      color: var(--text-strong);
-      font-weight: 950;
-      font-size: 1.15rem;
-      cursor: pointer;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.22);
-      user-select:none;
-    }
-    .font-btn:hover{
-      background: rgba(255,255,255,0.10);
-      transform: translateY(-1px);
-      box-shadow: 0 10px 18px rgba(0,0,0,0.26);
-    }
-    .font-btn:active{ transform: translateY(0); }
-    .font-btn:disabled{
-      opacity: 0.45;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-    .font-btn:focus-visible{
-      outline: none;
-      box-shadow: 0 0 0 4px var(--cta-ring), 0 10px 18px rgba(0,0,0,0.26);
-    }
-    .font-indicator{
-      min-width: 76px;
-      text-align:center;
-      color: var(--text-strong);
-      font-weight: 900;
-      font-size: 0.86rem;
-      letter-spacing: -0.02em;
-      padding: 0 0.35rem;
-      user-select:none;
-    }
-
     /* --- [브랜드] --- */
     .brand-container { margin-bottom: 1.5rem; }
     .brand-logo{
@@ -371,13 +320,12 @@
 
 <body>
   <nav class="nav">
-    <span class="nav-text"><a href="/" class="nav-link">← 메인으로 돌아가기</a></span>
-    <a href="/dashboard" class="nav-link">내 사용량</a>
-    <span id="loginInfo" class="nav-text" style="color:var(--muted);font-size:0.88rem;margin-left:auto;"></span>
-    <div class="font-ctrl" aria-label="글자 크기 조절">
-      <button type="button" class="font-btn" id="fontDown" aria-label="글자 크기 줄이기">−</button>
-      <div class="font-indicator" id="fontLabel">글자 100%</div>
-      <button type="button" class="font-btn" id="fontUp" aria-label="글자 크기 키우기">+</button>
+    <div class="nav-left">
+      <a href="/" class="nav-link">← 메인</a>
+      <a href="/dashboard" class="nav-link">내 사용량</a>
+    </div>
+    <div class="nav-right">
+      <span id="loginInfo" class="nav-login"></span>
     </div>
   </nav>
 
@@ -531,37 +479,6 @@
       }
     });
 
-    /* 글자 크기 조절(메인과 동일 키로 공유) - html 기준으로 rem 스케일 */
-    (function () {
-      const key = 'rpm_font_scale';
-      const min = 0.9;
-      const max = 1.7;
-      const step = 0.1;
-
-      const down = document.getElementById('fontDown');
-      const up = document.getElementById('fontUp');
-      const label = document.getElementById('fontLabel');
-
-      function clamp(v){ return Math.min(max, Math.max(min, v)); }
-
-      function getScale(){
-        const v = parseFloat(localStorage.getItem(key));
-        return isFinite(v) ? clamp(v) : 1;
-      }
-
-      function setScale(v){
-        const nv = clamp(v);
-        localStorage.setItem(key, String(nv));
-        document.documentElement.style.fontSize = (16 * nv) + 'px';
-        label.textContent = '글자 ' + Math.round(nv * 100) + '%';
-        down.disabled = nv <= min + 0.001;
-        up.disabled = nv >= max - 0.001;
-      }
-
-      setScale(getScale());
-      down.addEventListener('click', function(){ setScale(getScale() - step); });
-      up.addEventListener('click', function(){ setScale(getScale() + step); });
-    })();
   </script>
 </body>
 </html>
