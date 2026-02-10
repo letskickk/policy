@@ -297,6 +297,15 @@ def _serve_html(filename: str):
     return None
 
 
+@app.api_route("/og.svg", methods=["GET", "HEAD"])
+def og_image():
+    """Open Graph thumbnail image (for KakaoTalk link preview)."""
+    path = STATIC_DIR / "og.svg"
+    if path.exists():
+        return FileResponse(path, media_type="image/svg+xml; charset=utf-8")
+    raise HTTPException(status_code=404, detail="og.svg not found")
+
+
 @app.api_route("/", methods=["GET", "HEAD"])
 def index():
     """메인 페이지: 서비스 소개 및 공약 점검 진입."""
