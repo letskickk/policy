@@ -22,6 +22,6 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV INDEX_CACHE_DIR=/app/data/index_cache
 
-EXPOSE 8000
+EXPOSE 80
 # workers=1: 멀티워커 시 인덱스 미공유 이슈 회피. RAG 검색 시 단일 워커 권장.
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "1"]
