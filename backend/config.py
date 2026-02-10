@@ -88,7 +88,7 @@ FILE_SEARCH_MAX_RESULTS_QUICK = int(os.getenv("FILE_SEARCH_MAX_RESULTS_QUICK", "
 ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
 # 이메일 인증 (1=활성화 시 가입 후 인증 메일 발송, 인증 완료 후 로그인 가능)
 EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "0") == "1"
-APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1").rstrip("/")
 # SMTP (이메일 인증 시 필요)
 SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

@@ -10,7 +10,7 @@ if exist .venv\Scripts\activate.bat (
     pause
     exit /b 1
 )
-echo 서버 시작: http://127.0.0.1:8000
-echo API 문서: http://127.0.0.1:8000/docs
-uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+echo 서버 시작: http://127.0.0.1
+echo API 문서: http://127.0.0.1/docs
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 80
 pause

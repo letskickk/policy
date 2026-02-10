@@ -13,7 +13,7 @@ if [ ! -d .venv ]; then
     exit 1
 fi
 
-nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
+nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 80 > server.log 2>&1 &
 sleep 1
 
 echo ""
