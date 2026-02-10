@@ -297,7 +297,7 @@ def _serve_html(filename: str):
     return None
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def index():
     """메인 페이지: 서비스 소개 및 공약 점검 진입."""
     res = _serve_html("index.html")
@@ -311,7 +311,7 @@ def _login_redirect(path: str):
     return RedirectResponse(url=f"/login?next={quote(path)}", status_code=302)
 
 
-@app.get("/pledge")
+@app.api_route("/pledge", methods=["GET", "HEAD"])
 def pledge_page(request: Request):
     """공약 입력·점검 폼 페이지. (승인 사용자 전용)"""
     user = get_current_user(request)
@@ -325,7 +325,7 @@ def pledge_page(request: Request):
     raise HTTPException(status_code=404, detail="pledge.html not found")
 
 
-@app.get("/signup")
+@app.api_route("/signup", methods=["GET", "HEAD"])
 def signup_page():
     res = _serve_html("signup.html")
     if res:
@@ -333,7 +333,7 @@ def signup_page():
     raise HTTPException(status_code=404, detail="signup.html not found")
 
 
-@app.get("/login")
+@app.api_route("/login", methods=["GET", "HEAD"])
 def login_page():
     res = _serve_html("login.html")
     if res:
@@ -341,7 +341,7 @@ def login_page():
     raise HTTPException(status_code=404, detail="login.html not found")
 
 
-@app.get("/pending")
+@app.api_route("/pending", methods=["GET", "HEAD"])
 def pending_page():
     res = _serve_html("pending.html")
     if res:
@@ -349,7 +349,7 @@ def pending_page():
     raise HTTPException(status_code=404, detail="pending.html not found")
 
 
-@app.get("/dashboard")
+@app.api_route("/dashboard", methods=["GET", "HEAD"])
 def dashboard_page(request: Request):
     user = get_current_user(request)
     if not user:
@@ -360,7 +360,7 @@ def dashboard_page(request: Request):
     raise HTTPException(status_code=404, detail="dashboard.html not found")
 
 
-@app.get("/admin")
+@app.api_route("/admin", methods=["GET", "HEAD"])
 def admin_page(request: Request):
     user = get_current_user(request)
     if not user:
@@ -373,7 +373,7 @@ def admin_page(request: Request):
     raise HTTPException(status_code=404, detail="admin/index.html not found")
 
 
-@app.get("/admin/users")
+@app.api_route("/admin/users", methods=["GET", "HEAD"])
 def admin_users_page(request: Request):
     user = get_current_user(request)
     if not user:
@@ -386,7 +386,7 @@ def admin_users_page(request: Request):
     raise HTTPException(status_code=404, detail="admin/users.html not found")
 
 
-@app.get("/admin/usage")
+@app.api_route("/admin/usage", methods=["GET", "HEAD"])
 def admin_usage_page(request: Request):
     user = get_current_user(request)
     if not user:
@@ -456,7 +456,7 @@ def api_resend_verification(body: ResendVerificationBody):
     return {"message": msg}
 
 
-@app.get("/verify-email")
+@app.api_route("/verify-email", methods=["GET", "HEAD"])
 def verify_email_page(token: str = Query(default="", alias="token")):
     """이메일 인증 링크 처리. token 검증 후 로그인 페이지로 리다이렉트."""
     from urllib.parse import quote
