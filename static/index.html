@@ -92,56 +92,6 @@
       margin-top: 0.1rem;
     }
 
-    /* [추가] 글자 크기 조절 컨트롤 */
-    .font-ctrl{
-      display:inline-flex;
-      align-items:center;
-      gap: 0.45rem;
-      padding: 0.55rem 0.6rem;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.22);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-      backdrop-filter: blur(10px);
-    }
-    .font-btn{
-      width: 42px;
-      height: 42px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.24);
-      background: rgba(0,0,0,0.18);
-      color: var(--text-strong);
-      font-weight: 950;
-      font-size: 1.15rem;
-      cursor: pointer;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.22);
-      user-select:none;
-    }
-    .font-btn:hover{
-      background: rgba(255,255,255,0.10);
-      transform: translateY(-1px);
-      box-shadow: 0 10px 18px rgba(0,0,0,0.26);
-    }
-    .font-btn:active{ transform: translateY(0); }
-    .font-btn:focus-visible{
-      outline: none;
-      box-shadow: 0 0 0 4px var(--cta-ring), 0 10px 18px rgba(0,0,0,0.26);
-    }
-    .font-indicator{
-      min-width: 76px;
-      text-align:center;
-      color: rgba(226,232,240,0.92);
-      font-weight: 900;
-      font-size: 0.86rem;
-      letter-spacing: -0.02em;
-      padding: 0 0.35rem;
-      user-select:none;
-    }
-
     .hero{
       background: var(--card);
       border: 1px solid var(--border);
@@ -326,14 +276,6 @@
         </span>
       </p>
 
-      <!-- [변경] pill 삭제 + 글자크기 조절(-/+)만 유지 -->
-      <div class="top-right" aria-label="글자 크기 조절">
-        <div class="font-ctrl">
-          <button type="button" class="font-btn" id="fontDown" aria-label="글자 크기 줄이기">−</button>
-          <div class="font-indicator" id="fontLabel">글자 100%</div>
-          <button type="button" class="font-btn" id="fontUp" aria-label="글자 크기 키우기">+</button>
-        </div>
-      </div>
     </div>
 
     <div class="hero">
@@ -422,43 +364,6 @@
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
         }
       } catch (e) {}
-    })();
-  </script>
-  <!-- [추가] 글자 크기 조절 스크립트 (두 페이지 공통 키 사용) -->
-  <script>
-    (function () {
-      const key = 'rpm_font_scale';
-      const min = 0.92;
-      const max = 1.35;
-      const step = 0.06;
-
-      const down = document.getElementById('fontDown');
-      const up = document.getElementById('fontUp');
-      const label = document.getElementById('fontLabel');
-
-      function clamp(v){ return Math.min(max, Math.max(min, v)); }
-
-      function getScale(){
-        const v = parseFloat(localStorage.getItem(key));
-        return isFinite(v) ? clamp(v) : 1;
-      }
-
-      function setScale(v){
-        const nv = clamp(v);
-        localStorage.setItem(key, String(nv));
-        document.documentElement.style.setProperty('--font-scale', nv);
-        document.body.style.fontSize = (16 * nv) + 'px';
-        document.body.style.lineHeight = (1.6 * nv).toFixed(2);
-        label.textContent = '글자 ' + Math.round(nv * 100) + '%';
-        down.disabled = nv <= min + 0.0001;
-        up.disabled = nv >= max - 0.0001;
-      }
-
-      // 초기 적용
-      setScale(getScale());
-
-      down.addEventListener('click', function(){ setScale(getScale() - step); });
-      up.addEventListener('click', function(){ setScale(getScale() + step); });
     })();
   </script>
 </body>
