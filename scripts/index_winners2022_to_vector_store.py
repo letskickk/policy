@@ -89,48 +89,62 @@ def main() -> int:
         print(f"오류: 폴더에 문서가 없습니다: {target}")
         return 1
 
+    print(f"[1/4] 문서 {len(files)}개 발견: {[p.name for p in files]}")
+
     client = OpenAI(api_key=api_key)
 
     # build temp txt files
     import tempfile
 
     entries: list[tuple[str, str, str]] = []  # (rel, content, upload_name)
-    for p in files:
+    t0 = time.time()
+    for i, p in enumerate(files):
+        print(f"      [{i+1}/{len(files)}] 텍스트 추출 중: {p.name} ...", end="", flush=True)
         content = _create_txt_content(p)
+        elapsed = int(time.time() - t0)
         if not content:
+            print(f" 스킵 (빈 내용)")
             continue
         try:
             rel = str(p.relative_to(PDF_DIR)).replace("\\", "/")
         except ValueError:
             rel = p.name
         entries.append((rel, content, _safe_filename(p.name)))
+        print(f" 완료 ({len(content):,}자, 누적 {elapsed}초)")
 
     if not entries:
         print("오류: 텍스트 추출 결과가 비어 있습니다. (스캔 PDF거나 추출 실패)")
         return 1
 
+    print(f"[2/4] OpenAI 업로드 중 ({len(entries)}개) ...", flush=True)
     file_ids: list[str] = []
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdirp = Path(tmpdir)
-        for rel, content, filename in entries:
+        for j, (rel, content, filename) in enumerate(entries):
             path = tmpdirp / filename
             path.write_text(content, encoding="utf-8")
             with open(path, "rb") as f:
                 fobj = client.files.create(file=f, purpose="assistants")
                 file_ids.append(fobj.id)
+            print(f"      [{j+1}/{len(entries)}] 업로드 완료: {filename}", flush=True)
 
+    print(f"[3/4] Vector Store 생성 중 ...", flush=True)
     vs = client.vector_stores.create(name=args.store_name, file_ids=file_ids)
     vs_id = vs.id
-    print(f"Vector Store 생성: {vs_id}, 인덱싱 대기 중...")
+    print(f"      생성됨: {vs_id}")
+    print(f"[4/4] Vector Store 인덱싱 대기 중 (최대 30분) ...", flush=True)
 
     # wait up to ~30min (900 * 2s)
     for i in range(900):
         vs = client.vector_stores.retrieve(vs_id)
-        if vs.status == "completed":
-            print(f"완료 (대기 {i*2}초)")
+        status = getattr(vs, "status", "unknown")
+        if status == "completed":
+            print(f"      완료 (대기 {i*2}초)")
             break
-        if vs.status == "failed":
+        if status == "failed":
             raise RuntimeError(f"Vector Store 인덱싱 실패: {vs_id}")
+        if i > 0 and i % 15 == 0:
+            print(f"      ... {i*2}초 경과 (status={status})", flush=True)
         time.sleep(2)
     else:
         raise RuntimeError("Vector Store 처리 타임아웃 (1800초)")
