@@ -58,6 +58,16 @@
         </form>
       </div>
     </div>
+
+    <div class="card">
+      <h2 style="font-size:1.15rem;margin:0 0 0.8rem 0;color:#f8fafc;">최근 분석 결과</h2>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:-0.35rem 0 0.8rem 0;">
+        <button id="historyRefresh" type="button" style="background:rgba(0,0,0,0.18);border:1px solid rgba(148,163,184,0.22);color:#ffb37a;border-radius:12px;padding:0.55rem 0.75rem;cursor:pointer;font-weight:900;">새로고침</button>
+        <button id="historyClear" type="button" style="background:rgba(0,0,0,0.18);border:1px solid rgba(148,163,184,0.22);color:#fca5a5;border-radius:12px;padding:0.55rem 0.75rem;cursor:pointer;font-weight:900;">전체 삭제</button>
+      </div>
+      <div id="historyEmpty" style="display:none;color:#94a3b8;font-size:0.95rem;">아직 저장된 분석 결과가 없습니다.</div>
+      <div id="history" style="display:flex;flex-direction:column;gap:0.65rem;"></div>
+    </div>
   </div>
   <script>
     (async () => {
@@ -71,6 +81,85 @@
         document.getElementById('monthly').textContent = d.monthly_used ?? '-';
         document.getElementById('dailyLimit').textContent = d.daily_limit ?? '-';
         document.getElementById('monthlyLimit').textContent = d.monthly_limit ?? '-';
+
+        const esc = (s) => (s ?? '').toString().replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+        const fmt = (iso) => {
+          try { return new Date(iso.replace(' ', 'T') + 'Z').toLocaleString(); } catch { return iso || ''; }
+        };
+
+        async function loadHistory() {
+          const hr = await fetch('/api/history?limit=15', { credentials: 'include' });
+          if (!hr.ok) return;
+          const hd = await hr.json();
+          const items = hd.items || [];
+          const wrap = document.getElementById('history');
+          const empty = document.getElementById('historyEmpty');
+          if (!items.length) { empty.style.display = 'block'; wrap.innerHTML = ''; return; }
+          empty.style.display = 'none';
+          wrap.innerHTML = '';
+
+          for (const it of items) {
+            const row = document.createElement('div');
+            row.style.background = 'rgba(0,0,0,0.18)';
+            row.style.border = '1px solid rgba(148,163,184,0.18)';
+            row.style.borderRadius = '14px';
+            row.style.padding = '0.85rem 0.9rem';
+
+            const kindLabel = it.kind === 'verify' ? '검증' : '점검';
+            const title = `[${kindLabel}] ${fmt(it.created_at)}${it.from_cache ? ' (캐시)' : ''}`;
+            const inputPrev = it.input_preview || '';
+            const resultPrev = it.result_preview || '';
+
+            row.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                <div style="font-weight:900;color:#f8fafc;font-size:0.95rem;">${esc(title)}</div>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                  <button data-open="1" type="button" style="background:none;border:none;color:#ffb37a;cursor:pointer;font-weight:900;">열기</button>
+                  <button data-del="1" type="button" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-weight:900;">삭제</button>
+                </div>
+              </div>
+              <div style="margin-top:0.45rem;color:#cbd5e1;font-size:0.9rem;line-height:1.5;">
+                <div style="opacity:0.85"><span style="color:#94a3b8">입력</span> · ${esc(inputPrev)}</div>
+                <div style="margin-top:0.35rem;opacity:0.9"><span style="color:#94a3b8">결과</span> · ${esc(resultPrev)}</div>
+              </div>
+            `;
+
+            row.querySelector('button[data-open]').addEventListener('click', async () => {
+              const ir = await fetch('/api/history/' + encodeURIComponent(it.id), { credentials: 'include' });
+              if (!ir.ok) return;
+              const item = await ir.json();
+              let txt = item.result_text;
+              if (item.result_format === 'json') {
+                try { txt = JSON.stringify(JSON.parse(item.result_text), null, 2); } catch {}
+              }
+              const content = `[#${item.id}] ${kindLabel} · ${fmt(item.created_at)}\n\n[입력]\n${item.input_text}\n\n[결과]\n${txt}`;
+              const w = window.open('', '_blank');
+              if (!w) { alert('팝업이 차단되었습니다. 브라우저 설정을 확인하세요.'); return; }
+              w.document.title = '분석 결과 #' + item.id;
+              w.document.body.style.margin = '0';
+              w.document.body.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-word;padding:16px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">${esc(content)}</pre>`;
+            });
+
+            row.querySelector('button[data-del]').addEventListener('click', async () => {
+              if (!confirm('이 결과를 삭제할까요?')) return;
+              const dr = await fetch('/api/history/' + encodeURIComponent(it.id) + '/delete', { method: 'POST', credentials: 'include' });
+              if (!dr.ok) return;
+              await loadHistory();
+            });
+
+            wrap.appendChild(row);
+          }
+        }
+
+        document.getElementById('historyRefresh')?.addEventListener('click', loadHistory);
+        document.getElementById('historyClear')?.addEventListener('click', async () => {
+          if (!confirm('저장된 분석 결과를 모두 삭제할까요?')) return;
+          const cr = await fetch('/api/history/clear', { method: 'POST', credentials: 'include' });
+          if (!cr.ok) return;
+          await loadHistory();
+        });
+
+        await loadHistory();
       } catch (e) { console.error(e); }
     })();
   </script>
