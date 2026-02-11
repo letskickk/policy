@@ -74,7 +74,27 @@ def _create_txt_content(doc_path: Path, category: str) -> str | None:
             source_path = str(rel).replace("\\", "/")
         except ValueError:
             source_path = doc_path.name
-        return f"{header}\n출처: {source_path}\n원본파일: {doc_path.name}\n\n{text.strip()}"
+        marker = f"{header}\n출처: {source_path}\n원본파일: {doc_path.name}"
+
+        # 중요: OpenAI가 파일을 청크로 자를 때, 중간 청크에는 헤더/출처 라인이 없을 수 있음.
+        # 섹션별(폴더별) 분리를 안정적으로 하기 위해 marker를 본문에도 주기적으로 삽입한다.
+        lines = (text or "").strip().splitlines()
+        blocks: list[str] = []
+        buf: list[str] = []
+        buf_chars = 0
+        # 너무 촘촘하면 토큰이 과도해지고, 너무 띄우면 청크에서 출처가 빠질 수 있음 → 중간값
+        target_chars = 1200
+        for ln in lines:
+            buf.append(ln)
+            buf_chars += len(ln) + 1
+            if buf_chars >= target_chars:
+                blocks.append(marker + "\n\n" + "\n".join(buf).strip())
+                buf = []
+                buf_chars = 0
+        if buf:
+            blocks.append(marker + "\n\n" + "\n".join(buf).strip())
+
+        return "\n\n".join(blocks).strip()
     except Exception:
         return None
 

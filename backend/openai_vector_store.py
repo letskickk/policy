@@ -13,7 +13,8 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterable, List, Optional, Tuple
+import re
 
 from openai import OpenAI
 
@@ -89,7 +90,26 @@ def _create_txt_content(doc_path: Path, category: str) -> str | None:
             source_path = str(rel).replace("\\", "/")
         except ValueError:
             source_path = doc_path.name
-        return f"{header}\n출처: {source_path}\n\n{text.strip()}"
+        marker = f"{header}\n출처: {source_path}"
+
+        # 중요: Vector Store는 문서를 청크로 자르며, 중간 청크에는 marker가 포함되지 않을 수 있음.
+        # 섹션별(폴더별) 분리를 위해 marker를 본문에도 주기적으로 삽입한다.
+        lines = (text or "").strip().splitlines()
+        blocks: list[str] = []
+        buf: list[str] = []
+        buf_chars = 0
+        target_chars = 1200
+        for ln in lines:
+            buf.append(ln)
+            buf_chars += len(ln) + 1
+            if buf_chars >= target_chars:
+                blocks.append(marker + "\n\n" + "\n".join(buf).strip())
+                buf = []
+                buf_chars = 0
+        if buf:
+            blocks.append(marker + "\n\n" + "\n".join(buf).strip())
+
+        return "\n\n".join(blocks).strip()
     except Exception as e:
         logger.warning(f"문서 추출 실패 {doc_path}: {e}")
         return None
@@ -422,50 +442,213 @@ def run_check(
     max_results: int = 12,
 ) -> str:
     """
-    Vector Store file_search로 당 부합 점검 (마크다운 형식 반환).
-    로컬 PDF 의존 제거.
+    A안(전면 재설계):
+    - 모델에게 file_search 호출을 맡기지 않고,
+    - 서버가 4개 출처(정강정책/공약/지역별/2022당선인)를 각각 검색해 컨텍스트를 구성한 뒤
+    - 최종 답변만 생성한다.
     """
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
+
+    def _coalesce_text(content: object) -> str:
+        """Search result content -> text (SDK object/dict 모두 지원)."""
+        if not content:
+            return ""
+        parts: List[str] = []
+        if isinstance(content, list):
+            items = content
+        else:
+            items = [content]
+        for c in items:
+            c_type = getattr(c, "type", None) if not isinstance(c, dict) else c.get("type")
+            if c_type != "text":
+                continue
+            txt = getattr(c, "text", None) if not isinstance(c, dict) else c.get("text")
+            if txt:
+                parts.append(str(txt))
+        return "\n".join(parts).strip()
+
+    def _search(
+        client: OpenAI,
+        vs_id: str,
+        query: str | list[str],
+        k: int,
+        rewrite: bool = True,
+    ) -> List[Tuple[float, str, str]]:
+        """
+        Returns list of (score, filename, chunk_text).
+        """
+        if not vs_id:
+            return []
+        # OpenAI Python SDK 버전에 따라 시그니처가 조금 다를 수 있어 2가지 방식으로 시도
+        try:
+            page = client.vector_stores.search(
+                vector_store_id=vs_id,
+                query=query,
+                max_num_results=max(1, min(int(k), 50)),
+                rewrite_query=bool(rewrite),
+            )
+        except TypeError:
+            page = client.vector_stores.search(
+                vs_id,
+                query=query,
+                max_num_results=max(1, min(int(k), 50)),
+                rewrite_query=bool(rewrite),
+            )
+
+        data = getattr(page, "data", None) if not isinstance(page, dict) else page.get("data")
+        if not data:
+            return []
+        out: List[Tuple[float, str, str]] = []
+        for item in data:
+            score = getattr(item, "score", None) if not isinstance(item, dict) else item.get("score")
+            filename = getattr(item, "filename", None) if not isinstance(item, dict) else item.get("filename")
+            content = getattr(item, "content", None) if not isinstance(item, dict) else item.get("content")
+            text = _coalesce_text(content)
+            if not text:
+                continue
+            out.append((float(score or 0.0), str(filename or ""), text))
+        # score desc
+        out.sort(key=lambda t: t[0], reverse=True)
+        return out
+
+    def _dedup(items: Iterable[Tuple[float, str, str]]) -> List[Tuple[float, str, str]]:
+        seen: set[str] = set()
+        out: List[Tuple[float, str, str]] = []
+        for score, filename, text in items:
+            key = hashlib.sha256((filename + "\n" + text[:400]).encode("utf-8", errors="ignore")).hexdigest()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((score, filename, text))
+        return out
+
+    def _extract_source_path(text: str) -> str:
+        """
+        청크 안의 '출처: ...' 라인에서 폴더/파일 경로를 최대한 복원.
+        (청크가 잘려서 없을 수도 있음)
+        """
+        t = text or ""
+        m = re.search(r"^\s*출처:\s*(.+?)\s*$", t, flags=re.MULTILINE)
+        if not m:
+            return ""
+        return (m.group(1) or "").strip()
+
+    def _source_bucket(source_path: str) -> str:
+        """
+        폴더 기준 버킷 분리.
+        Returns: 'platform'|'pledge'|'regional'|'winners2022'|''
+        """
+        sp = (source_path or "").replace("\\", "/").strip()
+        if not sp:
+            return ""
+        if sp.startswith("정강정책/"):
+            return "platform"
+        if sp.startswith("공약/"):
+            return "pledge"
+        if sp.startswith("지역별 공약/"):
+            return "regional"
+        if sp.startswith("8회 당선인 공약/"):
+            return "winners2022"
+        return ""
+
+    def _fmt(items: List[Tuple[float, str, str]], max_chars: int) -> str:
+        chunks: List[str] = []
+        total = 0
+        for score, filename, text in items:
+            src = _extract_source_path(text)
+            src_line = f"\n[출처] {src}" if src else ""
+            block = f"--- {filename or 'document'} (score={score:.3f}) ---{src_line}\n{text.strip()}"
+            if total + len(block) > max_chars:
+                break
+            chunks.append(block)
+            total += len(block) + 2
+        return "\n\n".join(chunks)
+
+    def _has_prefix(text: str, prefix: str) -> bool:
+        return (text or "").lstrip().startswith(prefix)
+
+    pledge = (user_pledge or "").strip()
     client = OpenAI(api_key=OPENAI_API_KEY)
+
+    # 인덱싱 완료 여부
     _check_vector_store_ready(client, vector_store_id)
-    has_regional = bool(regional_vector_store_id)
-    has_winners2022 = bool(winners2022_vector_store_id)
-    if has_regional:
+    if regional_vector_store_id:
         _check_vector_store_ready(client, regional_vector_store_id)
-    if has_winners2022:
+    if winners2022_vector_store_id:
         _check_vector_store_ready(client, winners2022_vector_store_id)
 
-    instructions = _load_check_instructions(has_regional, has_winners2022)
-    input_text = f"다음 [출마자 공약]을 점검하라. file_search로 기준 문서를 검색한 뒤, 지정된 형식으로만 답변하라.\n\n[출마자 공약]\n{user_pledge}"
+    # 1) policy store에서 공약 유사 검색 (공약/정강정책 둘 다 섞여 있음)
+    # 청크는 문서 중간에서 잘릴 수 있어, "헤더"만으로는 분리가 깨짐.
+    # 폴더 기준을 유지하기 위해 '출처: <폴더/...>' 라인 우선으로 분리하고,
+    # 그조차 없을 때만 filename/헤더를 fallback으로 사용.
+    policy_hits = _search(client, vector_store_id, pledge, k=50, rewrite=True)
+    # 2) 정강정책은 공약 문장과 유사도가 낮아 잘 안 걸리므로, 정강 전용 키워드로 한 번 더 강제 검색
+    platform_hits_kw = _search(client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k=30, rewrite=False)
 
-    # 도구 1: policy + regional (1~3번) - 검색량 확대
-    main_ids = [vector_store_id]
-    if has_regional:
-        main_ids.append(regional_vector_store_id)
-    tools = [{"type": "file_search", "vector_store_ids": main_ids, "max_num_results": 40}]
-    # 도구 2: winners2022 전용 (4번). 별도 도구로 분리해 반드시 호출되게 함
-    if has_winners2022:
-        tools.append({"type": "file_search", "vector_store_ids": [winners2022_vector_store_id], "max_num_results": 15})
+    policy_all = _dedup([*policy_hits, *platform_hits_kw])
+    platform_hits: List[Tuple[float, str, str]] = []
+    pledges_hits: List[Tuple[float, str, str]] = []
+    unknown_hits: List[Tuple[float, str, str]] = []
 
-    response = client.responses.create(
+    for score, fn, txt in policy_all:
+        bucket = _source_bucket(_extract_source_path(txt))
+        if bucket == "platform":
+            platform_hits.append((score, fn, txt))
+        elif bucket == "pledge":
+            pledges_hits.append((score, fn, txt))
+        else:
+            unknown_hits.append((score, fn, txt))
+
+    # fallback: 출처 라인이 청크에 없으면 filename/헤더로만 보조 분류
+    for score, fn, txt in unknown_hits:
+        f = (fn or "")
+        if "정강정책" in f or "강령" in f or _has_prefix(txt, "[정강정책]"):
+            platform_hits.append((score, fn, txt))
+        else:
+            pledges_hits.append((score, fn, txt))
+
+    # 안전: platform에 들어간 청크는 pledge에서 제거
+    platform_key = {
+        hashlib.sha256((fn + "\n" + txt[:200]).encode("utf-8", errors="ignore")).hexdigest()
+        for _, fn, txt in platform_hits
+    }
+    pledges_hits = [
+        h for h in pledges_hits
+        if hashlib.sha256((h[1] + "\n" + h[2][:200]).encode("utf-8", errors="ignore")).hexdigest() not in platform_key
+    ]
+
+    # 3) regional store (선택)
+    regional_hits: List[Tuple[float, str, str]] = []
+    if regional_vector_store_id:
+        regional_hits = _search(client, regional_vector_store_id, pledge, k=25, rewrite=True)
+
+    # 4) winners2022 store (선택) - 인물/지역/직책 메타가 청크 밖에 있을 수 있어 더 넉넉히 가져온다
+    winners_hits: List[Tuple[float, str, str]] = []
+    if winners2022_vector_store_id:
+        winners_hits = _search(client, winners2022_vector_store_id, pledge, k=50, rewrite=True)
+
+    # 컨텍스트 구성 (섹션별로 분리 주입)
+    platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=12_000) or "(정강·정책 문서 없음)"
+    pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=18_000) or "(우리당 공약 문서 없음)"
+    regional_context = _fmt(regional_hits[:10], max_chars=10_000) if regional_hits else ""
+    winners2022_context = _fmt(winners_hits[:20], max_chars=22_000) if winners_hits else ""
+
+    # 프롬프트 생성 후 최종 답변만 생성
+    from backend.prompts import load_system_prompt, build_user_message
+
+    system = load_system_prompt()
+    user = build_user_message(platform_context, pledges_context, regional_context, pledge, winners2022_context)
+
+    resp = client.chat.completions.create(
         model=CHAT_MODEL,
-        input=input_text,
-        instructions=instructions,
-        tools=tools,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
-
-    if getattr(response, "status", None) != "completed":
-        raise RuntimeError(f"Responses API 실패: status={getattr(response, 'status', 'unknown')}")
-
-    text = ""
-    for item in response.output:
-        if getattr(item, "type", None) == "message":
-            for c in getattr(item, "content", []):
-                if getattr(c, "type", None) == "output_text":
-                    text = getattr(c, "text", "")
-                    break
-            break
-
-    if not text:
+    text = resp.choices[0].message.content or ""
+    if not text.strip():
         raise RuntimeError("모델이 텍스트를 반환하지 않음")
     return text.strip()
 
