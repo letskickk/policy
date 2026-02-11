@@ -72,6 +72,7 @@ def run_check_analysis(
     ip: str,
     vector_store_id: Optional[str],
     regional_vector_store_id: Optional[str],
+    winners2022_vector_store_id: Optional[str],
     indexes: Optional[dict],
 ) -> tuple[str, int, bool]:
     """
@@ -92,7 +93,8 @@ def run_check_analysis(
 
     vs_id = vector_store_id or ""
     regional_id = regional_vector_store_id or ""
-    opts = f"check|{vs_id}|{regional_id}"
+    winners2022_id = winners2022_vector_store_id or ""
+    opts = f"check|{vs_id}|{regional_id}|{winners2022_id}"
     cache_key = _cache_key(normalized, opts, OPENAI_MODEL, vs_id)
 
     cached = _get_cached(user_id, cache_key)
@@ -121,6 +123,7 @@ def run_check_analysis(
             normalized,
             vector_store_id=vector_store_id,
             regional_vector_store_id=regional_vector_store_id,
+            winners2022_vector_store_id=winners2022_vector_store_id,
             indexes=indexes,
         )
     except Exception as e:

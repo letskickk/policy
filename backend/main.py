@@ -71,6 +71,7 @@ app = FastAPI(
 _indexes = None
 _vector_store_id = None
 _regional_vector_store_id = None
+_winners2022_vector_store_id = None
 
 
 def _startup_self_check() -> int:
@@ -184,7 +185,7 @@ def _startup_self_check() -> int:
 @app.on_event("startup")
 async def startup_event():
     """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 또는 Vector Store 준비."""
-    global _indexes, _vector_store_id, _regional_vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
     logger.info("서버 시작: Self-Check 및 인덱스/Vector Store 준비 중...")
     logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
     logger.info(f"USE_OPENAI_VECTOR_STORE= {USE_OPENAI_VECTOR_STORE}")
@@ -198,7 +199,7 @@ async def startup_event():
 
         logger.info("[VECTOR_STORE] INGEST SKIPPED (runtime)")
 
-        policy_id, regional_id = get_vector_store_ids()
+        policy_id, regional_id, winners2022_id = get_vector_store_ids()
         if not policy_id and OPENAI_VECTOR_STORE_ID:
             policy_id = OPENAI_VECTOR_STORE_ID
             regional_id = OPENAI_REGIONAL_VECTOR_STORE_ID
@@ -212,7 +213,12 @@ async def startup_event():
 
         _vector_store_id = policy_id
         _regional_vector_store_id = regional_id
-        logger.info(f"[VECTOR_STORE] ID 사용: policy={_vector_store_id}, regional={_regional_vector_store_id or '(없음)'}")
+        _winners2022_vector_store_id = winners2022_id or None
+        logger.info(
+            f"[VECTOR_STORE] ID 사용: policy={_vector_store_id}, "
+            f"regional={_regional_vector_store_id or '(없음)'}, "
+            f"winners2022={_winners2022_vector_store_id or '(없음)'}"
+        )
     else:
         _indexes = build_all_indexes(force_rebuild=False)
         from backend.vector_index import VectorIndex
@@ -849,12 +855,13 @@ def debug_vectorstore():
     AWS 배포 시 벡터스토어 상태 확인용.
     """
     _debug_endpoint()
-    global _indexes, _vector_store_id, _regional_vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
     if USE_OPENAI_VECTOR_STORE:
         return {
             "mode": "openai_vector_store",
             "vector_store_id": _vector_store_id,
             "regional_vector_store_id": _regional_vector_store_id,
+            "winners2022_vector_store_id": _winners2022_vector_store_id,
             "persist_path": "N/A (OpenAI 호스팅)",
             "collection_names": ["policy-rag-store"],
             "total_count": "N/A",
@@ -1048,15 +1055,17 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
         raise HTTPException(status_code=429, detail=msg)
 
     from backend.analysis_service import run_check_analysis
-    global _indexes, _vector_store_id, _regional_vector_store_id
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
     vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
     regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    winners2022_vs_id = _winners2022_vector_store_id if USE_OPENAI_VECTOR_STORE else None
     result, status_code, from_cache = run_check_analysis(
         user["id"],
         body.pledge or "",
         ip,
         vs_id,
         regional_vs_id,
+        winners2022_vs_id,
         _indexes if not USE_OPENAI_VECTOR_STORE else None,
     )
     if status_code >= 400:

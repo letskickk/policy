@@ -25,16 +25,24 @@ def load_user_prompt_template() -> str:
     )
 
 
-def build_user_message(platform_context: str, pledges_context: str, regional_pledges_context: str, pledge: str) -> str:
+def build_user_message(
+    platform_context: str,
+    pledges_context: str,
+    regional_pledges_context: str,
+    pledge: str,
+    winners2022_pledges_context: str = "",
+) -> str:
     template = load_user_prompt_template()
     platform = platform_context.strip() or "(정강·정책 문서 없음. data/pdf/정강정책/ 폴더에 PDF를 넣어 주세요.)"
     pledges = pledges_context.strip() or "(우리당 공약 문서 없음. data/pdf/공약/ 폴더에 PDF를 넣어 주세요.)"
     regional_raw = regional_pledges_context.strip()
     regional = regional_raw or "(타지역 공약 문서 없음. data/pdf/지역별 공약/ 폴더에 PDF를 넣어 주세요.)"
+    winners2022 = (winners2022_pledges_context or "").strip() or "(2022 당선인 공약 문서 없음)"
     out = (
         template.replace("{{PLATFORM_CONTEXT}}", platform)
         .replace("{{PLEDGES_CONTEXT}}", pledges)
         .replace("{{REGIONAL_PLEDGES_CONTEXT}}", regional)
+        .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", winners2022)
         .replace("{{PLEDGE}}", pledge)
     )
     # 지역별 공약 문서가 없으면 타지역 유사성은 반드시 '없음'. 우리당 공약을 타지역으로 착각하지 말 것.
