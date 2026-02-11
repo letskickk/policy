@@ -1051,7 +1051,7 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
     global _indexes, _vector_store_id, _regional_vector_store_id
     vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
     regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    result, status_code, _ = run_check_analysis(
+    result, status_code, from_cache = run_check_analysis(
         user["id"],
         body.pledge or "",
         ip,
@@ -1061,6 +1061,20 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
     )
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=result)
+    try:
+        from backend.history import add_history
+
+        add_history(
+            user_id=user["id"],
+            kind="check",
+            input_text=body.pledge or "",
+            result=result,
+            status_code=status_code,
+            from_cache=from_cache,
+            options={"source": "check"},
+        )
+    except Exception:
+        pass
     return PledgeCheckResponse(result=result)
 
 
@@ -1101,7 +1115,7 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
         "phase": body.phase or "full",
         "judge": body.judge,
     }
-    result, status_code, _ = run_verify_analysis(
+    result, status_code, from_cache = run_verify_analysis(
         user["id"],
         body.text or "",
         ip,
@@ -1112,4 +1126,57 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
     )
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=result.get("detail", result) if isinstance(result, dict) else result)
+    try:
+        from backend.history import add_history
+
+        add_history(
+            user_id=user["id"],
+            kind="verify",
+            input_text=body.text or "",
+            result=result,
+            status_code=status_code,
+            from_cache=from_cache,
+            options=options,
+        )
+    except Exception:
+        pass
     return result
+
+
+@app.get("/api/history")
+def api_history(request: Request, limit: int = Query(default=20, ge=1, le=100)):
+    user = require_approved(request)
+    from backend.history import list_history
+
+    return {"items": list_history(user["id"], limit=limit)}
+
+
+@app.get("/api/history/{history_id}")
+def api_history_item(history_id: int, request: Request):
+    user = require_approved(request)
+    from backend.history import get_history_item
+
+    item = get_history_item(user["id"], history_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="not found")
+    return item
+
+
+@app.post("/api/history/{history_id}/delete")
+def api_history_delete(history_id: int, request: Request):
+    user = require_approved(request)
+    from backend.history import delete_history_item
+
+    ok = delete_history_item(user["id"], history_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="not found")
+    return {"ok": True}
+
+
+@app.post("/api/history/clear")
+def api_history_clear(request: Request):
+    user = require_approved(request)
+    from backend.history import clear_history
+
+    deleted = clear_history(user["id"])
+    return {"ok": True, "deleted": deleted}

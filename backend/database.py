@@ -83,6 +83,20 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_cache_key ON analysis_cache(cache_key);
         CREATE INDEX IF NOT EXISTS idx_cache_expires ON analysis_cache(expires_at);
+
+        CREATE TABLE IF NOT EXISTS analysis_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,                -- check | verify
+            input_text TEXT NOT NULL,
+            options_json TEXT,                 -- verify 옵션(phase/top_k 등)
+            result_text TEXT NOT NULL,         -- text 또는 json string
+            result_format TEXT NOT NULL,       -- text | json
+            status_code INTEGER NOT NULL,
+            from_cache INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_hist_user_created ON analysis_history(user_id, created_at);
         """)
         for stmt in [
             "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
