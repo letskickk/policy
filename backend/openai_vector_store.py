@@ -378,26 +378,37 @@ Output JSON only:
 """
 
 
-def _load_check_instructions(has_regional: bool) -> str:
+def _load_check_instructions(has_regional: bool, has_winners2022: bool = False) -> str:
     """당 부합 점검용 instructions (file_search 버전)."""
     sys_path = PROMPTS_DIR / "당_부합_점검_시스템.txt"
     user_path = PROMPTS_DIR / "당_부합_점검_유저.txt"
     system = sys_path.read_text(encoding="utf-8").strip() if sys_path.exists() else ""
     user_tpl = user_path.read_text(encoding="utf-8").strip() if user_path.exists() else ""
 
-    tool_desc = """
-file_search 도구 사용:
-1) 정강정책·공약 검색: 첫 번째 도구로 [정강·정책 문서], [우리당 공약] 관련 내용을 검색. 우리당 강령·중앙 공약.
-2) 지역별 공약 검색: 두 번째 도구(있는 경우)로 [타지역 공약] 관련 내용을 검색. 우리당 공약과 혼동하지 말 것.
+    if has_winners2022:
+        tool_desc = """
+file_search 도구가 2개 제공됨:
+1) 첫 번째 도구: 정강·공약·지역별 공약 (1~3번 섹션용)
+2) 두 번째 도구: 2022 당선인 공약 전용 (4번 섹션용). 반드시 이 도구를 호출하여 4번 섹션을 작성하라.
+4번 섹션은 두 번째 도구 검색 결과를 사용. 두 번째 도구를 호출하지 않으면 4번에 "없음"을 적지 말고, 먼저 호출한 뒤 결과에 따라 작성하라.
+"""
+    else:
+        tool_desc = """
+file_search 도구: 정강·공약·지역별 공약 검색.
 """
     if not has_regional:
         tool_desc += "\n지역별 공약 store가 없음. '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'만 표기."
+    if not has_winners2022:
+        tool_desc += "\n2022 당선인 공약 store가 없음. '4. 이전 당선인(2022) 공약과의 비교'에서는 반드시 '유사·참고 공약: 없음', '발전 방향: 없음'만 표기."
+
+    winners2022_ctx = "[file_search로 2022 당선인 공약 검색 (해당 store 있으면)]" if has_winners2022 else "(2022 당선인 공약 문서 없음)"
 
     # user 템플릿: 문서 블록은 file_search로 대체, PLEDGE는 입력에서 전달됨
     user_adapted = (
         user_tpl.replace("{{PLATFORM_CONTEXT}}", "[file_search로 정강·정책 문서 검색하여 사용]")
         .replace("{{PLEDGES_CONTEXT}}", "[file_search로 우리당 공약 검색하여 사용]")
         .replace("{{REGIONAL_PLEDGES_CONTEXT}}", "[file_search로 타지역 공약 검색 (지역별 store 있으면)]" if has_regional else "(타지역 공약 문서 없음)")
+        .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", winners2022_ctx)
         .replace("{{PLEDGE}}", "[입력으로 전달되는 출마자 공약]")
     )
     return f"{system}\n\n{tool_desc}\n\n{user_adapted}"
@@ -407,6 +418,7 @@ def run_check(
     vector_store_id: str,
     user_pledge: str,
     regional_vector_store_id: str = "",
+    winners2022_vector_store_id: str = "",
     max_results: int = 12,
 ) -> str:
     """
@@ -416,18 +428,23 @@ def run_check(
     client = OpenAI(api_key=OPENAI_API_KEY)
     _check_vector_store_ready(client, vector_store_id)
     has_regional = bool(regional_vector_store_id)
+    has_winners2022 = bool(winners2022_vector_store_id)
     if has_regional:
         _check_vector_store_ready(client, regional_vector_store_id)
+    if has_winners2022:
+        _check_vector_store_ready(client, winners2022_vector_store_id)
 
-    instructions = _load_check_instructions(has_regional)
+    instructions = _load_check_instructions(has_regional, has_winners2022)
     input_text = f"다음 [출마자 공약]을 점검하라. file_search로 기준 문서를 검색한 뒤, 지정된 형식으로만 답변하라.\n\n[출마자 공약]\n{user_pledge}"
 
-    def _tool(vs_id: str):
-        return {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": max_results}
-
-    tools = [_tool(vector_store_id)]
+    # 도구 1: policy + regional (1~3번)
+    main_ids = [vector_store_id]
     if has_regional:
-        tools.append(_tool(regional_vector_store_id))
+        main_ids.append(regional_vector_store_id)
+    tools = [{"type": "file_search", "vector_store_ids": main_ids, "max_num_results": 25}]
+    # 도구 2: winners2022 전용 (4번). 별도 도구로 분리해 반드시 호출되게 함
+    if has_winners2022:
+        tools.append({"type": "file_search", "vector_store_ids": [winners2022_vector_store_id], "max_num_results": 20})
 
     response = client.responses.create(
         model=CHAT_MODEL,

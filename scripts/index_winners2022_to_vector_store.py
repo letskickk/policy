@@ -7,7 +7,6 @@
 
 사용법 (프로젝트 루트에서):
   python scripts/index_winners2022_to_vector_store.py
-  python scripts/index_winners2022_to_vector_store.py --output-env
 """
 
 import argparse
@@ -68,7 +67,6 @@ def _create_txt_content(doc_path: Path) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="2022 당선인 공약 → OpenAI Vector Store 인덱싱")
-    parser.add_argument("--output-env", action="store_true", help=".env에 ID 자동 추가")
     parser.add_argument("--store-name", default="winners-2022-pledges-store", help="Vector Store name")
     args = parser.parse_args()
 
@@ -159,25 +157,14 @@ def main() -> int:
     MANIFEST_PATH.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"manifest 저장: {MANIFEST_PATH.name}")
 
-    print("\n=== 완료 ===")
-    print(f"OPENAI_WINNERS2022_VECTOR_STORE_ID={vs_id}")
+    # .rag/에 저장 (policy, regional과 동일 형식)
+    from backend.rag_registry import write_vector_store_ids
 
-    if args.output_env:
-        env_path = ROOT / ".env"
-        text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
-        key = "OPENAI_WINNERS2022_VECTOR_STORE_ID"
-        if f"{key}=" in text:
-            lines = []
-            for line in text.splitlines():
-                if line.strip().startswith(f"{key}="):
-                    lines.append(f"{key}={vs_id}")
-                else:
-                    lines.append(line)
-            text = "\n".join(lines) + "\n"
-        else:
-            text = text.rstrip() + f"\n\n{key}={vs_id}\n"
-        env_path.write_text(text, encoding="utf-8")
-        print(f".env에 저장됨: {env_path}")
+    write_vector_store_ids(policy_id="", regional_id="", winners2022_id=vs_id)
+    print(f".rag/vector_store_winners2022_id.txt 저장")
+
+    print("\n=== 완료 ===")
+    print(f"Vector Store ID: {vs_id}")
 
     return 0
 

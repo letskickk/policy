@@ -87,6 +87,7 @@ def check_pledge_alignment(
     pledge: str,
     vector_store_id: str | None = None,
     regional_vector_store_id: str | None = None,
+    winners2022_vector_store_id: str | None = None,
     indexes: dict[str, Any] | None = None,
 ) -> str:
     """
@@ -118,7 +119,12 @@ def check_pledge_alignment(
     if use_vector_store:
         logger.info("Vector Store 기반 점검...")
         from backend.openai_vector_store import run_check
-        result = run_check(vector_store_id, pledge_key, regional_vector_store_id or "")
+        result = run_check(
+            vector_store_id,
+            pledge_key,
+            regional_vector_store_id or "",
+            winners2022_vector_store_id or "",
+        )
         has_regional = bool(regional_vector_store_id)
     elif use_faiss_search:
         logger.info("FAISS 검색 기반 점검 (관련 청크만 사용)...")
@@ -141,7 +147,7 @@ def check_pledge_alignment(
             return "오류: 검색 결과가 없습니다. 인덱스를 확인하세요."
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key)
+        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "")
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -168,7 +174,7 @@ def check_pledge_alignment(
             logger.warning("공약 컨텍스트가 비어있습니다. GPT가 공약 비교를 제대로 할 수 없습니다.")
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key)
+        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "")
 
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
