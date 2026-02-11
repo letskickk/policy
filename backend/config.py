@@ -79,6 +79,8 @@ SKIP_PDF_SCAN_ON_STARTUP = os.getenv("SKIP_PDF_SCAN_ON_STARTUP", "0") == "1"
 OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID", "").strip()
 # 지역별 공약 전용 (타지역 유사성 검토 시 이 store만 검색)
 OPENAI_REGIONAL_VECTOR_STORE_ID = os.getenv("OPENAI_REGIONAL_VECTOR_STORE_ID", "").strip()
+# 2022(제8회) 당선인 공약 전용 (유사/벤치마킹 비교용)
+OPENAI_WINNERS2022_VECTOR_STORE_ID = os.getenv("OPENAI_WINNERS2022_VECTOR_STORE_ID", "").strip()
 # file_search 결과 개수 제한 (full phase 기본 6)
 FILE_SEARCH_MAX_RESULTS = int(os.getenv("FILE_SEARCH_MAX_RESULTS", "6"))
 # quick phase용 (속도 우선, 기본 3)

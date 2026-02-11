@@ -322,7 +322,7 @@
   <nav class="nav">
     <div class="nav-left">
       <a href="/" class="nav-link">← 메인</a>
-      <a href="/dashboard" class="nav-link">내 사용량</a>
+      <a href="/dashboard" class="nav-link">내 기록</a>
     </div>
     <div class="nav-right">
       <span id="loginInfo" class="nav-login"></span>
@@ -451,7 +451,7 @@
         if (!res.ok) {
           if (res.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
           if (res.status === 403) { window.location.href = '/pending'; return; }
-          if (res.status === 429) { showError((data.detail || '사용량을 모두 사용하셨습니다. 내일 또는 다음 달에 다시 이용해 주세요.') + '<br><a href="/dashboard" style="color:#ffb37a;">내 사용량 확인</a>'); resetBtn(); return; }
+          if (res.status === 429) { showError((data.detail || '사용량을 모두 사용하셨습니다. 내일 또는 다음 달에 다시 이용해 주세요.') + '<br><a href="/dashboard" style="color:#ffb37a;">내 기록 확인</a>'); resetBtn(); return; }
           throw new Error(data.detail || res.statusText || '서버 요청 실패');
         }
 
