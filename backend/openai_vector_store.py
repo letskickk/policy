@@ -437,14 +437,14 @@ def run_check(
     instructions = _load_check_instructions(has_regional, has_winners2022)
     input_text = f"다음 [출마자 공약]을 점검하라. file_search로 기준 문서를 검색한 뒤, 지정된 형식으로만 답변하라.\n\n[출마자 공약]\n{user_pledge}"
 
-    # 도구 1: policy + regional (1~3번)
+    # 도구 1: policy + regional (1~3번) - 검색량 확대
     main_ids = [vector_store_id]
     if has_regional:
         main_ids.append(regional_vector_store_id)
-    tools = [{"type": "file_search", "vector_store_ids": main_ids, "max_num_results": 25}]
+    tools = [{"type": "file_search", "vector_store_ids": main_ids, "max_num_results": 40}]
     # 도구 2: winners2022 전용 (4번). 별도 도구로 분리해 반드시 호출되게 함
     if has_winners2022:
-        tools.append({"type": "file_search", "vector_store_ids": [winners2022_vector_store_id], "max_num_results": 20})
+        tools.append({"type": "file_search", "vector_store_ids": [winners2022_vector_store_id], "max_num_results": 15})
 
     response = client.responses.create(
         model=CHAT_MODEL,
