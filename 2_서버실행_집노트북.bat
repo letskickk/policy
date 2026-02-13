@@ -52,8 +52,22 @@ echo   종료하려면 이 창에서 Ctrl+C 를 누르거나 창을 닫으시면
 echo ========================================
 echo.
 
+REM Python import 테스트 먼저
+echo.
+echo [디버그] Python import 테스트 중...
+%PYEXE% -c "import sys; print('Python 경로:', sys.executable); import backend.main; print('import 성공')" 2>&1
+if errorlevel 1 (
+    echo.
+    echo [오류] backend.main import 실패. 위의 에러 메시지를 확인하세요.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [디버그] uvicorn 시작 중...
 REM uvicorn으로 FastAPI 서버 실행
-%PYEXE% -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+REM 노트북 환경 안정성을 위해 --reload를 사용하지 않음
+%PYEXE% -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 REM 서버가 종료되면 (오류 포함) 아래 메시지 표시
 if errorlevel 1 (

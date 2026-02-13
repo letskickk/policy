@@ -1,0 +1,16 @@
+{
+  "generated_at_utc": "2026-02-13T11:12:05.489374+00:00",
+  "dry_run": true,
+  "db_path": "G:\\내 드라이브\\Policy\\data\\policy.db",
+  "map_path": "G:\\내 드라이브\\Policy\\data\\region_map.json",
+  "candidate_total": 0,
+  "already_valid_region_code": 0,
+  "mapped_from_region_text": 0,
+  "updated_rows": 0,
+  "mapping_success_rate_percent": 100.0,
+  "unmapped_count": 0,
+  "source_columns_used": [
+    "district_name"
+  ],
+  "unmapped_items_path": "G:\\내 드라이브\\Policy\\data\\reports\\region_unmapped_items.json"
+}

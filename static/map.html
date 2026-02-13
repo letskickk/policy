@@ -195,6 +195,34 @@
       color: var(--muted);
     }
 
+    .filter-row{
+      margin-top: 0.9rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
+    }
+
+    .filter-row label{
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .filter-select{
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      outline: none;
+    }
+
+    .filter-select:focus{
+      box-shadow: 0 0 0 3px var(--cta-ring);
+      border-color: rgba(255,255,255,0.32);
+    }
+
     /* 로딩/에러/빈 상태 */
     .state-message{
       text-align: center;
@@ -323,67 +351,7 @@
 
       <div class="map-container">
         <div class="map-wrapper">
-          <!-- 
-            더 정확한 한국 지도 SVG를 사용하려면 다음 링크에서 다운로드하세요:
-            - SimpleMaps: https://simplemaps.com/static/svg/country/kr/admin1/kr.svg
-            - GitHub: https://github.com/southkorea/southkorea-maps
-            - MapSVG: https://mapsvg.com/maps/south-korea
-            
-            다운로드한 SVG 파일의 각 path 요소에 data-region-code 속성을 추가하세요.
-            예: <path data-region-code="11" ... /> (서울특별시)
-          -->
-          <svg class="korea-map" viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도">
-            <!-- 서울특별시 (11) -->
-            <path data-region-code="11" d="M180 120 L200 115 L210 125 L205 140 L195 145 L180 140 Z" aria-label="서울특별시" tabindex="0"/>
-            
-            <!-- 인천광역시 (28) -->
-            <path data-region-code="28" d="M150 130 L170 125 L175 140 L165 145 L150 140 Z" aria-label="인천광역시" tabindex="0"/>
-            
-            <!-- 경기도 (41) -->
-            <path data-region-code="41" d="M120 100 L180 90 L220 95 L240 110 L250 130 L260 150 L240 160 L200 155 L150 150 L120 140 Z" aria-label="경기도" tabindex="0"/>
-            
-            <!-- 강원도 (42) -->
-            <path data-region-code="42" d="M240 50 L280 45 L300 60 L310 90 L300 120 L280 130 L260 125 L240 110 L230 90 L235 70 Z" aria-label="강원도" tabindex="0"/>
-            
-            <!-- 충청북도 (43) -->
-            <path data-region-code="43" d="M200 150 L240 145 L260 160 L250 180 L230 185 L210 180 L200 170 Z" aria-label="충청북도" tabindex="0"/>
-            
-            <!-- 충청남도 (44) -->
-            <path data-region-code="44" d="M150 180 L200 175 L220 185 L210 210 L190 215 L160 210 L150 195 Z" aria-label="충청남도" tabindex="0"/>
-            
-            <!-- 세종특별자치시 (36) -->
-            <path data-region-code="36" d="M210 170 L220 165 L225 175 L220 185 L210 180 Z" aria-label="세종특별자치시" tabindex="0"/>
-            
-            <!-- 대전광역시 (30) -->
-            <path data-region-code="30" d="M220 165 L235 160 L240 175 L235 185 L220 180 Z" aria-label="대전광역시" tabindex="0"/>
-            
-            <!-- 전라북도 (45) -->
-            <path data-region-code="45" d="M100 200 L150 195 L170 210 L160 240 L140 245 L110 240 L100 220 Z" aria-label="전라북도" tabindex="0"/>
-            
-            <!-- 전라남도 (46) -->
-            <path data-region-code="46" d="M80 240 L130 235 L150 250 L140 280 L120 285 L90 280 L80 260 Z" aria-label="전라남도" tabindex="0"/>
-            
-            <!-- 광주광역시 (29) -->
-            <path data-region-code="29" d="M120 230 L135 225 L140 240 L135 250 L120 245 Z" aria-label="광주광역시" tabindex="0"/>
-            
-            <!-- 경상북도 (47) -->
-            <path data-region-code="47" d="M260 180 L320 175 L340 190 L350 220 L340 250 L320 260 L280 255 L260 240 L250 210 Z" aria-label="경상북도" tabindex="0"/>
-            
-            <!-- 경상남도 (48) -->
-            <path data-region-code="48" d="M240 260 L300 255 L320 270 L310 300 L290 305 L260 300 L240 285 Z" aria-label="경상남도" tabindex="0"/>
-            
-            <!-- 부산광역시 (26) -->
-            <path data-region-code="26" d="M320 300 L335 295 L340 310 L335 320 L320 315 Z" aria-label="부산광역시" tabindex="0"/>
-            
-            <!-- 대구광역시 (27) -->
-            <path data-region-code="27" d="M280 220 L295 215 L300 230 L295 240 L280 235 Z" aria-label="대구광역시" tabindex="0"/>
-            
-            <!-- 울산광역시 (31) -->
-            <path data-region-code="31" d="M340 280 L355 275 L360 290 L355 300 L340 295 Z" aria-label="울산광역시" tabindex="0"/>
-            
-            <!-- 제주특별자치도 (50) -->
-            <path data-region-code="50" d="M180 380 L220 375 L230 390 L220 405 L190 400 L180 390 Z" aria-label="제주특별자치도" tabindex="0"/>
-          </svg>
+          <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
         </div>
       </div>
     </div>
@@ -392,6 +360,21 @@
       <div class="panel-header">
         <h2 class="panel-title" id="panel-title">지역을 선택하세요</h2>
         <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요</p>
+        <div class="filter-row">
+          <label for="electionTypeSelect">선거 타입</label>
+          <select id="electionTypeSelect" class="filter-select" aria-label="선거 타입 선택">
+            <option value="">전체</option>
+            <option value="local">지방선거(기본)</option>
+            <option value="mayor">단체장</option>
+            <option value="council">의원</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <label for="districtSelect">선거구 선택</label>
+          <select id="districtSelect" class="filter-select" disabled aria-label="선거구 선택">
+            <option value="">지역을 먼저 선택하세요</option>
+          </select>
+        </div>
       </div>
 
       <div id="panel-content">
@@ -407,7 +390,10 @@
     const panelTitle = document.getElementById('panel-title');
     const panelSubtitle = document.getElementById('panel-subtitle');
     const panelContent = document.getElementById('panel-content');
-    const mapPaths = document.querySelectorAll('.korea-map path[data-region-code]');
+    const koreaMap = document.getElementById('koreaMap');
+    const electionTypeSelect = document.getElementById('electionTypeSelect');
+    const districtSelect = document.getElementById('districtSelect');
+    let mapPaths = [];
     
     const regionNames = {
       '11': '서울특별시',
@@ -429,8 +415,89 @@
       '50': '제주특별자치도',
     };
 
+    const mapIdToRegionCode = {
+      seoul: '11',
+      busan: '26',
+      daegu: '27',
+      incheon: '28',
+      gwangju: '29',
+      daejeon: '30',
+      ulsan: '31',
+      sejong: '36',
+      gyeonggi: '41',
+      gangwon: '42',
+      'north-chungcheong': '43',
+      'south-chungcheong': '44',
+      'north-jeolla': '45',
+      'south-jeolla': '46',
+      'north-gyeongsang': '47',
+      'south-gyeongsang': '48',
+      jeju: '50',
+    };
+
     let selectedRegionCode = null;
+    let selectedDistrictCode = null;
     let regionData = {};
+
+    async function renderRealKoreaMap() {
+      try {
+        const mod = await import('https://unpkg.com/@svg-maps/south-korea@2.0.0/index.js');
+        const mapData = mod.default;
+        if (!mapData || !Array.isArray(mapData.locations)) {
+          throw new Error('지도 데이터 형식 오류');
+        }
+        koreaMap.setAttribute('viewBox', mapData.viewBox || '0 0 524 631');
+        koreaMap.innerHTML = mapData.locations
+          .filter((loc) => mapIdToRegionCode[loc.id])
+          .map((loc) => {
+            const regionCode = mapIdToRegionCode[loc.id];
+            const regionLabel = regionNames[regionCode] || loc.name || regionCode;
+            return `<path data-region-code="${regionCode}" d="${loc.path}" aria-label="${regionLabel}" tabindex="0"></path>`;
+          })
+          .join('');
+      } catch (e) {
+        console.warn('실지도 로드 실패, fallback 지도를 사용합니다.', e);
+        // fallback: 최소 형태 유지
+        koreaMap.innerHTML = `
+          <path data-region-code="11" d="M235 140 l20 -5 l15 20 l-8 18 l-25 4 z" aria-label="서울특별시" tabindex="0"></path>
+          <path data-region-code="41" d="M170 110 l60 -15 l80 20 l20 55 l-25 45 l-95 10 l-55 -18 l-15 -45 z" aria-label="경기도" tabindex="0"></path>
+          <path data-region-code="42" d="M310 40 l110 20 l35 85 l-18 90 l-60 20 l-47 -38 l-28 -74 z" aria-label="강원도" tabindex="0"></path>
+          <path data-region-code="44" d="M130 250 l105 -25 l40 30 l-18 62 l-60 22 l-54 -20 z" aria-label="충청남도" tabindex="0"></path>
+          <path data-region-code="43" d="M245 220 l85 -10 l42 36 l-15 60 l-65 20 l-43 -32 z" aria-label="충청북도" tabindex="0"></path>
+          <path data-region-code="45" d="M95 330 l95 -20 l55 28 l-10 70 l-66 26 l-55 -24 z" aria-label="전라북도" tabindex="0"></path>
+          <path data-region-code="46" d="M65 410 l95 -18 l52 28 l-8 85 l-60 28 l-60 -24 z" aria-label="전라남도" tabindex="0"></path>
+          <path data-region-code="47" d="M330 245 l108 -10 l44 45 l12 95 l-38 50 l-92 -8 l-44 -45 z" aria-label="경상북도" tabindex="0"></path>
+          <path data-region-code="48" d="M280 410 l115 -6 l52 36 l-10 74 l-76 30 l-66 -20 l-20 -48 z" aria-label="경상남도" tabindex="0"></path>
+          <path data-region-code="26" d="M435 520 l22 -4 l10 18 l-12 22 l-22 -2 z" aria-label="부산광역시" tabindex="0"></path>
+          <path data-region-code="27" d="M352 350 l26 -6 l10 20 l-12 16 l-22 2 z" aria-label="대구광역시" tabindex="0"></path>
+          <path data-region-code="31" d="M468 476 l18 -6 l10 16 l-10 20 l-16 2 z" aria-label="울산광역시" tabindex="0"></path>
+          <path data-region-code="29" d="M152 416 l24 -4 l8 20 l-14 14 l-20 -2 z" aria-label="광주광역시" tabindex="0"></path>
+          <path data-region-code="30" d="M260 275 l22 -4 l8 16 l-10 14 l-18 2 z" aria-label="대전광역시" tabindex="0"></path>
+          <path data-region-code="36" d="M243 258 l14 -2 l6 10 l-8 10 l-12 0 z" aria-label="세종특별자치시" tabindex="0"></path>
+          <path data-region-code="28" d="M165 155 l28 -5 l10 15 l-10 18 l-25 2 z" aria-label="인천광역시" tabindex="0"></path>
+          <path data-region-code="50" d="M215 575 l88 -6 l25 20 l-20 22 l-66 8 l-24 -18 z" aria-label="제주특별자치도" tabindex="0"></path>
+        `;
+      }
+      mapPaths = Array.from(document.querySelectorAll('.korea-map path[data-region-code]'));
+      bindMapEvents();
+    }
+
+    function bindMapEvents() {
+      mapPaths.forEach(path => {
+        path.addEventListener('click', function() {
+          const regionCode = this.getAttribute('data-region-code');
+          selectRegion(regionCode);
+        });
+
+        path.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const regionCode = this.getAttribute('data-region-code');
+            selectRegion(regionCode);
+          }
+        });
+      });
+    }
 
     // URL 쿼리 파라미터에서 지역 코드 읽기
     function getRegionFromURL() {
@@ -438,19 +505,39 @@
       return params.get('region_code');
     }
 
+    function getDistrictFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('district_code');
+    }
+
+    function getElectionTypeFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('election_type');
+    }
+
     // URL 업데이트
-    function updateURL(regionCode) {
+    function updateURL(regionCode, districtCode, electionType) {
       const url = new URL(window.location);
       if (regionCode) {
         url.searchParams.set('region_code', regionCode);
       } else {
         url.searchParams.delete('region_code');
       }
+      if (districtCode) {
+        url.searchParams.set('district_code', districtCode);
+      } else {
+        url.searchParams.delete('district_code');
+      }
+      if (electionType) {
+        url.searchParams.set('election_type', electionType);
+      } else {
+        url.searchParams.delete('election_type');
+      }
       window.history.pushState({}, '', url);
     }
 
     // 지역 선택
-    function selectRegion(regionCode) {
+    async function selectRegion(regionCode, initialDistrictCode = null, initialElectionType = null) {
       // 이전 선택 해제
       mapPaths.forEach(path => {
         path.classList.remove('selected');
@@ -459,13 +546,18 @@
       if (selectedRegionCode === regionCode) {
         // 같은 지역 클릭 시 선택 해제
         selectedRegionCode = null;
-        updateURL(null);
+        selectedDistrictCode = null;
+        updateURL(null, null, null);
         showEmptyState();
         return;
       }
 
       selectedRegionCode = regionCode;
-      updateURL(regionCode);
+      selectedDistrictCode = null;
+      if (initialElectionType) {
+        electionTypeSelect.value = initialElectionType;
+      }
+      updateURL(regionCode, null, electionTypeSelect.value || null);
 
       // 선택 상태 표시
       const selectedPath = document.querySelector(`path[data-region-code="${regionCode}"]`);
@@ -474,20 +566,114 @@
         selectedPath.focus();
       }
 
-      // 후보자 목록 로드
-      loadCandidates(regionCode);
+      const selectedElectionType = electionTypeSelect.value || null;
+      await loadDistricts(regionCode, initialDistrictCode, selectedElectionType);
+      loadCandidates(regionCode, selectedDistrictCode, selectedElectionType);
     }
 
     // 빈 상태 표시
     function showEmptyState() {
       panelTitle.textContent = '지역을 선택하세요';
       panelSubtitle.textContent = '지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요';
+      districtSelect.disabled = true;
+      districtSelect.innerHTML = '<option value="">지역을 먼저 선택하세요</option>';
       panelContent.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
           <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
         </div>
       `;
+    }
+
+    async function buildDistrictsFromCandidates(regionCode, electionType = null) {
+      const query = new URLSearchParams({ region_code: regionCode });
+      if (electionType) {
+        query.set('election_type', electionType);
+      }
+      const response = await fetch(`/api/candidates?${query.toString()}`);
+      if (!response.ok) {
+        throw new Error(response.statusText || '서버 오류');
+      }
+      const data = await response.json();
+      const candidates = Array.isArray(data) ? data : (data.candidates || []);
+      const map = new Map();
+      candidates.forEach(c => {
+        const code = c.district_code || (c.region_code && c.district_name ? `${c.region_code}:${String(c.district_name).replace(/\s+/g, '')}` : null);
+        if (!code) return;
+        const name = c.district_name || code;
+        const prev = map.get(code) || { district_code: code, district_name: name, candidate_count: 0 };
+        prev.candidate_count += 1;
+        map.set(code, prev);
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        if (b.candidate_count !== a.candidate_count) return b.candidate_count - a.candidate_count;
+        return String(a.district_name).localeCompare(String(b.district_name), 'ko');
+      });
+    }
+
+    async function loadDistricts(regionCode, preferredDistrictCode = null, electionType = null) {
+      const regionName = regionNames[regionCode] || '알 수 없음';
+      districtSelect.disabled = true;
+      districtSelect.innerHTML = '<option value="">선거구 불러오는 중...</option>';
+      let districts = [];
+      try {
+        const query = new URLSearchParams({ region_code: regionCode });
+        if (electionType) {
+          query.set('election_type', electionType);
+        }
+        const response = await fetch(`/api/districts?${query.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          districts = Array.isArray(data) ? data : (data.districts || []);
+        } else {
+          // 서버가 /api/districts를 실패해도 후보 응답으로 선거구 목록을 복구
+          districts = await buildDistrictsFromCandidates(regionCode, electionType);
+        }
+        districtSelect.innerHTML = '<option value="">전체 선거구</option>';
+        districts.forEach(d => {
+          const option = document.createElement('option');
+          option.value = d.district_code;
+          option.textContent = `${d.district_name} (${d.candidate_count})`;
+          districtSelect.appendChild(option);
+        });
+        districtSelect.disabled = false;
+        if (preferredDistrictCode) {
+          const exists = districts.some(d => d.district_code === preferredDistrictCode);
+          if (exists) {
+            districtSelect.value = preferredDistrictCode;
+            selectedDistrictCode = preferredDistrictCode;
+            updateURL(regionCode, preferredDistrictCode, electionType);
+          }
+        }
+      } catch (error) {
+        try {
+          districts = await buildDistrictsFromCandidates(regionCode, electionType);
+          districtSelect.innerHTML = '<option value="">전체 선거구</option>';
+          districts.forEach(d => {
+            const option = document.createElement('option');
+            option.value = d.district_code;
+            option.textContent = `${d.district_name} (${d.candidate_count})`;
+            districtSelect.appendChild(option);
+          });
+          districtSelect.disabled = false;
+          if (preferredDistrictCode) {
+            const exists = districts.some(d => d.district_code === preferredDistrictCode);
+            if (exists) {
+              districtSelect.value = preferredDistrictCode;
+              selectedDistrictCode = preferredDistrictCode;
+              updateURL(regionCode, preferredDistrictCode, electionType);
+            }
+          }
+          panelSubtitle.textContent = `${regionName} 선거구 목록 (후보 데이터 기준)`;
+        } catch (fallbackError) {
+          console.error('선거구 목록 로드 실패:', error, fallbackError);
+          districtSelect.innerHTML = '<option value="">선거구 로드 실패</option>';
+          districtSelect.disabled = true;
+          panelTitle.textContent = regionName;
+          panelSubtitle.textContent = '';
+          showError(`선거구 목록을 불러오는 중 오류가 발생했습니다.<br>(${error.message || '서버 연결 실패'})`);
+        }
+      }
     }
 
     // 로딩 상태 표시
@@ -508,20 +694,28 @@
     }
 
     // 후보자 목록 로드
-    async function loadCandidates(regionCode) {
+    async function loadCandidates(regionCode, districtCode = null, electionType = null) {
       const regionName = regionNames[regionCode] || '알 수 없음';
       panelTitle.textContent = regionName;
       panelSubtitle.textContent = '출마자 목록을 불러오는 중...';
       showLoading();
 
       try {
-        const response = await fetch(`/api/candidates?region_code=${regionCode}`);
+        const query = new URLSearchParams({ region_code: regionCode });
+        if (districtCode) {
+          query.set('district_code', districtCode);
+        }
+        if (electionType) {
+          query.set('election_type', electionType);
+        }
+        const response = await fetch(`/api/candidates?${query.toString()}`);
         if (!response.ok) {
           throw new Error(response.statusText || '서버 오류');
         }
 
         const data = await response.json();
-        renderCandidates(data);
+        const candidates = Array.isArray(data) ? data : (data.candidates || []);
+        renderCandidates(candidates, regionCode, districtCode, electionType);
       } catch (error) {
         console.error('후보자 목록 로드 실패:', error);
         panelTitle.textContent = regionName;
@@ -531,11 +725,13 @@
     }
 
     // 후보자 목록 렌더링
-    function renderCandidates(data) {
-      const { region_name, candidates } = data;
-      
-      panelTitle.textContent = region_name;
-      panelSubtitle.textContent = `총 ${candidates.length}명의 출마자`;
+    function renderCandidates(candidates, regionCode, districtCode = null, electionType = null) {
+      const regionName = regionNames[regionCode] || '알 수 없음';
+      panelTitle.textContent = regionName;
+      const typeText = electionType ? ` · ${electionType}` : '';
+      panelSubtitle.textContent = districtCode
+        ? `선택 선거구${typeText} · 총 ${candidates.length}명의 출마자`
+        : `${typeText ? typeText.slice(3) + ' · ' : ''}총 ${candidates.length}명의 출마자`;
 
       if (candidates.length === 0) {
         panelContent.innerHTML = `
@@ -552,7 +748,7 @@
           ${candidates.map(candidate => `
             <div class="candidate-card">
               <div class="candidate-name">${escapeHtml(candidate.name)}</div>
-              ${candidate.district ? `<div class="candidate-district">${escapeHtml(candidate.district)}</div>` : ''}
+              ${candidate.district_name ? `<div class="candidate-district">${escapeHtml(candidate.district_name)}</div>` : ''}
               ${candidate.pledges && candidate.pledges.length > 0 ? `
                 <div class="candidate-pledges">
                   ${candidate.pledges.slice(0, 3).map(pledge => `
@@ -575,31 +771,15 @@
       return div.innerHTML;
     }
 
-    // 지도 클릭 이벤트
-    mapPaths.forEach(path => {
-      path.addEventListener('click', function() {
-        const regionCode = this.getAttribute('data-region-code');
-        selectRegion(regionCode);
-      });
-
-      // 키보드 접근성
-      path.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          const regionCode = this.getAttribute('data-region-code');
-          selectRegion(regionCode);
-        }
-      });
-    });
-
     // 지역 데이터 로드 (배지 표시용)
     async function loadRegionData() {
       try {
         const response = await fetch('/api/regions');
         if (response.ok) {
           const data = await response.json();
+          const regions = Array.isArray(data) ? data : (data.regions || []);
           regionData = {};
-          data.regions.forEach(region => {
+          regions.forEach(region => {
             regionData[region.region_code] = region;
           });
           // 배지 업데이트는 필요시 구현
@@ -610,21 +790,48 @@
     }
 
     // 초기화
-    loadRegionData();
+    async function initializePage() {
+      await renderRealKoreaMap();
+      await loadRegionData();
 
-    // URL에서 지역 코드 읽어서 선택
-    const urlRegionCode = getRegionFromURL();
-    if (urlRegionCode) {
-      selectRegion(urlRegionCode);
+      const urlRegionCode = getRegionFromURL();
+      const urlDistrictCode = getDistrictFromURL();
+      const urlElectionType = getElectionTypeFromURL();
+      if (urlRegionCode) {
+        selectRegion(urlRegionCode, urlDistrictCode, urlElectionType);
+      }
     }
+    initializePage();
+
+    districtSelect.addEventListener('change', function() {
+      if (!selectedRegionCode) return;
+      selectedDistrictCode = this.value || null;
+      const selectedElectionType = electionTypeSelect.value || null;
+      updateURL(selectedRegionCode, selectedDistrictCode, selectedElectionType);
+      loadCandidates(selectedRegionCode, selectedDistrictCode, selectedElectionType);
+    });
+
+    electionTypeSelect.addEventListener('change', async function() {
+      if (!selectedRegionCode) {
+        updateURL(null, null, this.value || null);
+        return;
+      }
+      selectedDistrictCode = null;
+      await loadDistricts(selectedRegionCode, null, this.value || null);
+      updateURL(selectedRegionCode, null, this.value || null);
+      loadCandidates(selectedRegionCode, null, this.value || null);
+    });
 
     // 브라우저 뒤로가기/앞으로가기 처리
     window.addEventListener('popstate', function() {
       const urlRegionCode = getRegionFromURL();
+      const urlDistrictCode = getDistrictFromURL();
+      const urlElectionType = getElectionTypeFromURL();
       if (urlRegionCode) {
-        selectRegion(urlRegionCode);
+        selectRegion(urlRegionCode, urlDistrictCode, urlElectionType);
       } else {
         selectedRegionCode = null;
+        selectedDistrictCode = null;
         mapPaths.forEach(path => path.classList.remove('selected'));
         showEmptyState();
       }

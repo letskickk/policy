@@ -108,7 +108,33 @@ Policy/
    python scripts/init_db.py
    ```
 
-5. **서버 실행** (프로젝트 루트에서)
+5. **후보 `region_code` 정규화** (기존 데이터 보정)
+   ```bash
+   # 분석만
+   python scripts/normalize_candidate_regions.py --dry-run
+
+   # 실제 업데이트
+   python scripts/normalize_candidate_regions.py
+   ```
+   - 매핑 테이블: `data/region_map.json` 기준으로 `region_codes` 테이블 동기화
+   - 결과 리포트: `data/reports/region_normalization_report.json`
+   - 미매핑 목록: `data/reports/region_unmapped_items.json` (각 항목에 `suggested_region_codes` 자동 추천 포함)
+
+5-1. **선거구(시군구/선거구) 단위 조회**
+   - 후보 데이터는 `region_code`(시·도) + `district_code`(선거구 코드)를 함께 사용할 수 있습니다.
+   - 표준 선거구 코드 동기화:
+     ```bash
+     python scripts/sync_district_codes.py
+     ```
+     - 기준 파일: `data/district_map.json` (전국 시군구 전체 목록, 17개 시도)
+     - `district_map.json`은 `districts`(평탄화 포맷) 또는 `data`(시도별 배열 포맷) 둘 다 지원
+   - API:
+     - `GET /api/regions`
+     - `GET /api/districts?region_code=41&election_type=local`
+     - `GET /api/candidates?region_code=41&district_code=41:수원시장안구&election_type=local`
+   - `district_code`가 비어 있는 기존 데이터는 `region_code:district_name` 형태로 자동 파생되어 조회됩니다.
+
+6. **서버 실행** (프로젝트 루트에서)
    ```bash
    uvicorn backend.main:app --reload
    ```

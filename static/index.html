@@ -197,6 +197,11 @@
       transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
       box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
+    .cta.secondary{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+      border-color: rgba(148,163,184,0.35);
+    }
     .cta:hover{
       background: var(--cta-hover);
       transform: translateY(-1px);
@@ -275,6 +280,18 @@
     }
     .footer a:hover{ text-decoration: underline; }
 
+    .cta-group{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    @media (min-width: 720px){
+      .cta-group{
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
     @media (max-width: 640px){
       h1{ font-size: 1.75rem; }
       .hero{ padding: 1.25rem; border-radius: 16px; }
@@ -302,9 +319,9 @@
       <h1>중앙당의 정강·정책에 맞는 공약을<br />스스로 확인하세요</h1>
 
       <p class="hero-desc">
-        공약을 입력하면 중앙당의 정강정책, 공약 등과의 적합도를 판단합니다.
-        AI가 즉시 부합 여부, 근거, 수정·보완 체크리스트를 제공합니다.
-        지방선거 출마자가 중앙당 공약과의 적합도를 판단하고 공약을 발전시키는 데 도움을 줍니다.
+        공약을 입력하면 중앙당의 정강정책/공약 기준으로 적합도를 점검합니다.
+        이제 지역 지도에서 시도/선거구/선거타입별 후보 공약도 함께 조회할 수 있습니다.
+        분석과 비교를 한 화면 흐름으로 연결해 공약 보완 속도를 높입니다.
       </p>
 
       <div class="flow" aria-label="이용 흐름">
@@ -322,16 +339,14 @@
         </div>
       </div>
 
-<<<<<<< HEAD
-      <a href="/pledge" class="cta" id="btnPledge">공약 분석하기</a>
+      <div class="cta-group">
+        <a href="/pledge" class="cta" id="btnPledge">공약 분석하기</a>
+        <a href="/map" class="cta secondary" id="btnMap">지역·선거구 공약 보기</a>
+      </div>
       <p id="authLinks" style="margin-top: 1rem; font-size: 0.9rem; color: var(--muted);">
         회원가입 후 관리자 승인이 필요합니다.<br>
         <a href="/signup" style="color: #ffb37a; font-weight: 700;">회원가입</a> | <a href="/login" style="color: #ffb37a; font-weight: 700;">로그인</a>
       </p>
-=======
-      <a href="/pledge" class="cta">공약 분석하기</a>
-      <a href="/map" class="cta" style="margin-top: 0.75rem; background: rgba(255,255,255,0.1); color: var(--text-strong);">지역별 출마자 공약 보기</a>
->>>>>>> 02b4289 (지역별 공약 추가)
     </div>
 
     <section class="features">
@@ -350,11 +365,11 @@
           </div>
         </li>
         <li>
-  <span class="icon">🗳️</span>
-  <div class="txt">
-    <strong>지역 공약 비교</strong> — 해당 지역의 과거 주요 후보 공약 데이터를 분석해, 기존 공약과의 유사도를 확인하고 발전 방향을 제시 (추후 기능 업데이트 예정)
-  </div>
-</li>
+          <span class="icon">🗳️</span>
+          <div class="txt">
+            <strong>지역·선거구 공약 조회</strong> — 지도에서 시도 선택 후 선거구/선거타입으로 필터링해 후보 공약을 비교
+          </div>
+        </li>
 
         <li>
           <span class="icon">📄</span>
