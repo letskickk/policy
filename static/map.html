@@ -361,6 +361,12 @@
         <h2 class="panel-title" id="panel-title">지역을 선택하세요</h2>
         <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요</p>
         <div class="filter-row">
+          <label for="regionSelect">지역 선택</label>
+          <select id="regionSelect" class="filter-select" aria-label="지역 선택">
+            <option value="">지역 선택</option>
+          </select>
+        </div>
+        <div class="filter-row">
           <label for="electionTypeSelect">선거 타입</label>
           <select id="electionTypeSelect" class="filter-select" aria-label="선거 타입 선택">
             <option value="">전체</option>
@@ -391,8 +397,12 @@
     const panelSubtitle = document.getElementById('panel-subtitle');
     const panelContent = document.getElementById('panel-content');
     const koreaMap = document.getElementById('koreaMap');
+    const regionSelect = document.getElementById('regionSelect');
     const electionTypeSelect = document.getElementById('electionTypeSelect');
     const districtSelect = document.getElementById('districtSelect');
+    const REQUEST_TIMEOUT_MS = 15000;
+    const CANDIDATES_TIMEOUT_MS = 60000;
+    const DISTRICTS_TIMEOUT_MS = 30000;
     let mapPaths = [];
     
     const regionNames = {
@@ -438,6 +448,37 @@
     let selectedRegionCode = null;
     let selectedDistrictCode = null;
     let regionData = {};
+
+    async function fetchJsonWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          let detail = response.statusText || `HTTP ${response.status}`;
+          try {
+            const payload = await response.json();
+            detail = payload?.detail || payload?.message || detail;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+        return await response.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function fetchJsonWithRetry(url, timeoutMs) {
+      try {
+        return await fetchJsonWithTimeout(url, timeoutMs);
+      } catch (error) {
+        // 첫 요청 초기화 지연 시 AbortError가 발생할 수 있어 1회 재시도
+        if (error && (error.name === 'AbortError' || String(error.message || '').includes('aborted'))) {
+          return await fetchJsonWithTimeout(url, timeoutMs);
+        }
+        throw error;
+      }
+    }
 
     async function renderRealKoreaMap() {
       try {
@@ -537,23 +578,27 @@
     }
 
     // 지역 선택
-    async function selectRegion(regionCode, initialDistrictCode = null, initialElectionType = null) {
+    async function selectRegion(regionCode, initialDistrictCode = null, initialElectionType = null, allowToggleOff = true) {
       // 이전 선택 해제
       mapPaths.forEach(path => {
         path.classList.remove('selected');
       });
 
-      if (selectedRegionCode === regionCode) {
+      if (allowToggleOff && selectedRegionCode === regionCode) {
         // 같은 지역 클릭 시 선택 해제
         selectedRegionCode = null;
         selectedDistrictCode = null;
         updateURL(null, null, null);
+        if (regionSelect) regionSelect.value = "";
         showEmptyState();
         return;
       }
 
       selectedRegionCode = regionCode;
       selectedDistrictCode = null;
+      if (regionSelect && regionCode) {
+        regionSelect.value = regionCode;
+      }
       if (initialElectionType) {
         electionTypeSelect.value = initialElectionType;
       }
@@ -567,8 +612,12 @@
       }
 
       const selectedElectionType = electionTypeSelect.value || null;
+      // 후보 목록 우선 로드 후 선거구 목록 로드(초기화 시 동시 요청 병목 완화)
+      await loadCandidates(regionCode, null, selectedElectionType);
       await loadDistricts(regionCode, initialDistrictCode, selectedElectionType);
-      loadCandidates(regionCode, selectedDistrictCode, selectedElectionType);
+      if (selectedDistrictCode) {
+        await loadCandidates(regionCode, selectedDistrictCode, selectedElectionType);
+      }
     }
 
     // 빈 상태 표시
@@ -590,11 +639,7 @@
       if (electionType) {
         query.set('election_type', electionType);
       }
-      const response = await fetch(`/api/candidates?${query.toString()}`);
-      if (!response.ok) {
-        throw new Error(response.statusText || '서버 오류');
-      }
-      const data = await response.json();
+      const data = await fetchJsonWithRetry(`/api/candidates?${query.toString()}`, CANDIDATES_TIMEOUT_MS);
       const candidates = Array.isArray(data) ? data : (data.candidates || []);
       const map = new Map();
       candidates.forEach(c => {
@@ -621,14 +666,8 @@
         if (electionType) {
           query.set('election_type', electionType);
         }
-        const response = await fetch(`/api/districts?${query.toString()}`);
-        if (response.ok) {
-          const data = await response.json();
-          districts = Array.isArray(data) ? data : (data.districts || []);
-        } else {
-          // 서버가 /api/districts를 실패해도 후보 응답으로 선거구 목록을 복구
-          districts = await buildDistrictsFromCandidates(regionCode, electionType);
-        }
+        const data = await fetchJsonWithRetry(`/api/districts?${query.toString()}`, DISTRICTS_TIMEOUT_MS);
+        districts = Array.isArray(data) ? data : (data.districts || []);
         districtSelect.innerHTML = '<option value="">전체 선거구</option>';
         districts.forEach(d => {
           const option = document.createElement('option');
@@ -644,6 +683,9 @@
             selectedDistrictCode = preferredDistrictCode;
             updateURL(regionCode, preferredDistrictCode, electionType);
           }
+        }
+        if (districts.length === 0) {
+          districtSelect.innerHTML = '<option value="">등록된 선거구 없음</option>';
         }
       } catch (error) {
         try {
@@ -667,11 +709,10 @@
           panelSubtitle.textContent = `${regionName} 선거구 목록 (후보 데이터 기준)`;
         } catch (fallbackError) {
           console.error('선거구 목록 로드 실패:', error, fallbackError);
-          districtSelect.innerHTML = '<option value="">선거구 로드 실패</option>';
-          districtSelect.disabled = true;
+          districtSelect.innerHTML = '<option value="">전체 선거구</option>';
+          districtSelect.disabled = false;
           panelTitle.textContent = regionName;
-          panelSubtitle.textContent = '';
-          showError(`선거구 목록을 불러오는 중 오류가 발생했습니다.<br>(${error.message || '서버 연결 실패'})`);
+          panelSubtitle.textContent = '선거구 목록 로드 실패 - 전체 후보로 표시합니다';
         }
       }
     }
@@ -708,19 +749,17 @@
         if (electionType) {
           query.set('election_type', electionType);
         }
-        const response = await fetch(`/api/candidates?${query.toString()}`);
-        if (!response.ok) {
-          throw new Error(response.statusText || '서버 오류');
-        }
-
-        const data = await response.json();
+        const data = await fetchJsonWithRetry(`/api/candidates?${query.toString()}`, CANDIDATES_TIMEOUT_MS);
         const candidates = Array.isArray(data) ? data : (data.candidates || []);
         renderCandidates(candidates, regionCode, districtCode, electionType);
       } catch (error) {
         console.error('후보자 목록 로드 실패:', error);
         panelTitle.textContent = regionName;
         panelSubtitle.textContent = '';
-        showError(`출마자 정보를 불러오는 중 오류가 발생했습니다.<br>(${error.message || '서버 연결 실패'})`);
+        const msg = error && error.name === 'AbortError'
+          ? '서버 초기화가 지연되고 있습니다. 잠시 후 다시 시도해주세요.'
+          : (error.message || '서버 연결 실패');
+        showError(`출마자 정보를 불러오는 중 오류가 발생했습니다.<br>(${msg})`);
       }
     }
 
@@ -774,18 +813,32 @@
     // 지역 데이터 로드 (배지 표시용)
     async function loadRegionData() {
       try {
-        const response = await fetch('/api/regions');
-        if (response.ok) {
-          const data = await response.json();
-          const regions = Array.isArray(data) ? data : (data.regions || []);
-          regionData = {};
-          regions.forEach(region => {
-            regionData[region.region_code] = region;
-          });
-          // 배지 업데이트는 필요시 구현
-        }
+        const data = await fetchJsonWithTimeout('/api/regions');
+        const regions = Array.isArray(data) ? data : (data.regions || []);
+        regionData = {};
+        regions.forEach(region => {
+          regionData[region.region_code] = region;
+        });
+        const ordered = Object.keys(regionNames);
+        regionSelect.innerHTML = '<option value="">지역 선택</option>';
+        ordered.forEach((code) => {
+          const option = document.createElement('option');
+          const count = regionData[code]?.candidate_count ?? 0;
+          option.value = code;
+          option.textContent = `${regionNames[code]} (${count})`;
+          regionSelect.appendChild(option);
+        });
+        // 배지 업데이트는 필요시 구현
       } catch (error) {
         console.error('지역 데이터 로드 실패:', error);
+        const ordered = Object.keys(regionNames);
+        regionSelect.innerHTML = '<option value="">지역 선택</option>';
+        ordered.forEach((code) => {
+          const option = document.createElement('option');
+          option.value = code;
+          option.textContent = regionNames[code];
+          regionSelect.appendChild(option);
+        });
       }
     }
 
@@ -811,6 +864,19 @@
       loadCandidates(selectedRegionCode, selectedDistrictCode, selectedElectionType);
     });
 
+    regionSelect.addEventListener('change', function() {
+      const code = this.value || null;
+      if (!code) {
+        selectedRegionCode = null;
+        selectedDistrictCode = null;
+        updateURL(null, null, electionTypeSelect.value || null);
+        mapPaths.forEach(path => path.classList.remove('selected'));
+        showEmptyState();
+        return;
+      }
+      selectRegion(code, null, electionTypeSelect.value || null, false);
+    });
+
     electionTypeSelect.addEventListener('change', async function() {
       if (!selectedRegionCode) {
         updateURL(null, null, this.value || null);
@@ -828,10 +894,11 @@
       const urlDistrictCode = getDistrictFromURL();
       const urlElectionType = getElectionTypeFromURL();
       if (urlRegionCode) {
-        selectRegion(urlRegionCode, urlDistrictCode, urlElectionType);
+        selectRegion(urlRegionCode, urlDistrictCode, urlElectionType, false);
       } else {
         selectedRegionCode = null;
         selectedDistrictCode = null;
+        if (regionSelect) regionSelect.value = "";
         mapPaths.forEach(path => path.classList.remove('selected'));
         showEmptyState();
       }
