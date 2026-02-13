@@ -191,10 +191,21 @@ def _startup_self_check() -> int:
 
 
 _startup_done = False
+_db_ready = False
+
+
+def _ensure_db_ready():
+    """후보/관리자 API용 경량 초기화: DB만 보장."""
+    global _db_ready
+    if _db_ready:
+        return
+    from backend.database import init_db
+    init_db()
+    _db_ready = True
 
 def _ensure_startup():
     """지연 초기화: 첫 요청 시 한 번만 실행."""
-    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id, _startup_done
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id, _startup_done, _db_ready
     
     if _startup_done:
         return
@@ -214,6 +225,7 @@ def _ensure_startup():
     try:
         print("[1/2] DB 초기화...", flush=True)
         init_db()
+        _db_ready = True
         print("[1/2] DB 초기화 완료", flush=True)
         
         print("[2/2] 인덱스/Vector Store 준비...", flush=True)
@@ -1283,7 +1295,7 @@ class AdminCandidateUpsertBody(BaseModel):
 @app.post("/api/admin/candidates", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
 def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
     """관리자 전용 후보 등록 API. region_code 검증을 강제한다."""
-    _ensure_startup()
+    _ensure_db_ready()
     user = require_user(request)
     if user["role"] != ROLE_ADMIN:
         raise HTTPException(status_code=403, detail="관리자 전용")
@@ -1351,7 +1363,7 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
 @app.put("/api/admin/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
 def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, request: Request):
     """관리자 전용 후보 수정 API. region_code 검증을 강제한다."""
-    _ensure_startup()
+    _ensure_db_ready()
     user = require_user(request)
     if user["role"] != ROLE_ADMIN:
         raise HTTPException(status_code=403, detail="관리자 전용")
@@ -1428,7 +1440,7 @@ def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, re
 @app.get("/api/regions", response_model=list[RegionResponse], tags=["candidates"])
 def get_regions():
     """지역 코드 테이블 기준으로 후보 수를 집계해 반환한다."""
-    _ensure_startup()  # 지연 초기화
+    _ensure_db_ready()
     from backend.database import get_connection
 
     conn = get_connection()
@@ -1460,7 +1472,7 @@ def get_districts(
     election_type: Optional[str] = Query(default=None, description="선거 타입(local, mayor, etc)"),
 ):
     """선택한 시/도(region_code)의 선거구 목록과 후보 수를 반환한다."""
-    _ensure_startup()
+    _ensure_db_ready()
     code = _validate_region_code(region_code)
     selected_election_type = _normalize_election_type(election_type)
     from backend.database import get_connection
@@ -1529,7 +1541,7 @@ def get_candidates(
     election_type: Optional[str] = Query(default=None, description="선거 타입(local, mayor, etc)"),
 ):
     """지역별 후보 목록 + 핵심 공약(최대 3개)을 반환한다."""
-    _ensure_startup()  # 지연 초기화
+    _ensure_db_ready()
     code = _validate_region_code(region_code)
     selected_district_code = _normalize_district_code(district_code)
     selected_election_type = _normalize_election_type(election_type)
@@ -1575,7 +1587,7 @@ def get_candidates(
 @app.get("/api/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["candidates"])
 def get_candidate_detail(candidate_id: int):
     """후보 상세 정보와 공약 전체를 반환한다."""
-    _ensure_startup()  # 지연 초기화
+    _ensure_db_ready()
     from backend.database import get_connection
 
     conn = get_connection()
