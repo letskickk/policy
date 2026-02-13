@@ -5,6 +5,7 @@
 import locale
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Literal, Optional
@@ -42,17 +43,18 @@ from backend.auth import (
     list_users_all,
     set_user_status,
 )
-from backend.database import init_db
-from backend.usage_logger import log_usage
-from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
-from backend.pdf_loader import (
-    HAS_PDFPLUMBER,
-    _iter_doc_files,
-    load_platform_context,
-    load_pledges_context,
-    get_context_summary,
-)
-from backend.index_builder import build_all_indexes
+# 무거운 import는 지연 로딩으로 변경
+# from backend.database import init_db
+# from backend.usage_logger import log_usage
+# from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
+# from backend.pdf_loader import (
+#     HAS_PDFPLUMBER,
+#     _iter_doc_files,
+#     load_platform_context,
+#     load_pledges_context,
+#     get_context_summary,
+# )
+# from backend.index_builder import build_all_indexes
 
 # 로깅 설정
 logging.basicConfig(
@@ -66,6 +68,12 @@ app = FastAPI(
     description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
     version="0.1.0",
 )
+
+# 서버 시작 시 즉시 출력
+print("=" * 60, flush=True)
+print("FastAPI 앱 생성 완료", flush=True)
+print("서버가 시작됩니다...", flush=True)
+print("=" * 60, flush=True)
 
 # 전역 인덱스 (서버 시작 시 초기화). USE_OPENAI_VECTOR_STORE=1이면 _vector_store_id 사용.
 _indexes = None
@@ -182,65 +190,69 @@ def _startup_self_check() -> int:
     return pledge_pdf_count
 
 
-@app.on_event("startup")
-async def startup_event():
-    """서버 시작: Self-Check → (선택 S3 sync) → 인덱스 또는 Vector Store 준비."""
-    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
-    logger.info("서버 시작: Self-Check 및 인덱스/Vector Store 준비 중...")
-    logger.info(f"OPENAI_MODEL (check)= {OPENAI_MODEL!r}, CHAT_MODEL (verify/cards)= {CHAT_MODEL!r}")
-    logger.info(f"USE_OPENAI_VECTOR_STORE= {USE_OPENAI_VECTOR_STORE}")
+_startup_done = False
 
-    _startup_self_check()
-    init_db()
+def _ensure_startup():
+    """지연 초기화: 첫 요청 시 한 번만 실행."""
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id, _startup_done
+    
+    if _startup_done:
+        return
+    
+    import traceback
+    
+    # 지연 import
+    from backend.database import init_db
+    from backend.index_builder import build_all_indexes
+    from backend.vector_index import VectorIndex
+    from backend.config import EMBEDDING_DIMENSION, OPENAI_REGIONAL_VECTOR_STORE_ID
+    
+    print("=" * 60, flush=True)
+    print("서버 초기화 시작...", flush=True)
+    print("=" * 60, flush=True)
+    
+    try:
+        print("[1/2] DB 초기화...", flush=True)
+        init_db()
+        print("[1/2] DB 초기화 완료", flush=True)
+        
+        print("[2/2] 인덱스/Vector Store 준비...", flush=True)
+        if USE_OPENAI_VECTOR_STORE:
+            from backend.rag_registry import get_vector_store_ids
+            
+            policy_id, regional_id, winners2022_id = get_vector_store_ids()
+            if not policy_id and OPENAI_VECTOR_STORE_ID:
+                policy_id = OPENAI_VECTOR_STORE_ID
+                regional_id = OPENAI_REGIONAL_VECTOR_STORE_ID
+            
+            if not policy_id:
+                print("[경고] Vector Store ID 없음. 일부 기능이 작동하지 않을 수 있습니다.", flush=True)
+            else:
+                _vector_store_id = policy_id
+                _regional_vector_store_id = regional_id
+                _winners2022_vector_store_id = winners2022_id or None
+        else:
+            print("[인덱스] 빌드 중 (시간이 걸릴 수 있습니다)...", flush=True)
+            _indexes = build_all_indexes(force_rebuild=False)
+            if "platform" not in _indexes:
+                _indexes["platform"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+            if "pledge" not in _indexes:
+                _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+            if "regional" not in _indexes:
+                _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+        
+        _startup_done = True
+        print("=" * 60, flush=True)
+        print("서버 초기화 완료!", flush=True)
+        print("=" * 60, flush=True)
+    except Exception as e:
+        print(f"초기화 실패: {e}", flush=True)
+        traceback.print_exc()
+        raise
 
-    if USE_OPENAI_VECTOR_STORE:
-        from backend.config import OPENAI_REGIONAL_VECTOR_STORE_ID
-        from backend.rag_registry import get_vector_store_ids
 
-        logger.info("[VECTOR_STORE] INGEST SKIPPED (runtime)")
-
-        policy_id, regional_id, winners2022_id = get_vector_store_ids()
-        if not policy_id and OPENAI_VECTOR_STORE_ID:
-            policy_id = OPENAI_VECTOR_STORE_ID
-            regional_id = OPENAI_REGIONAL_VECTOR_STORE_ID
-            logger.warning("[VECTOR_STORE] .rag ID 없음 → .env ID 사용 (ingest는 실행하지 않음)")
-
-        if not policy_id:
-            raise RuntimeError(
-                "Vector Store ID가 없습니다. 먼저 ingest 스크립트를 실행하세요: "
-                "python scripts/ingest_vector_store.py"
-            )
-
-        _vector_store_id = policy_id
-        _regional_vector_store_id = regional_id
-        _winners2022_vector_store_id = winners2022_id or None
-        logger.info(
-            f"[VECTOR_STORE] ID 사용: policy={_vector_store_id}, "
-            f"regional={_regional_vector_store_id or '(없음)'}, "
-            f"winners2022={_winners2022_vector_store_id or '(없음)'}"
-        )
-    else:
-        _indexes = build_all_indexes(force_rebuild=False)
-        from backend.vector_index import VectorIndex
-        from backend.config import EMBEDDING_DIMENSION
-        if "platform" not in _indexes:
-            _indexes["platform"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-        if "pledge" not in _indexes:
-            _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-        if "regional" not in _indexes:
-            _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
-        platform_vectors = _indexes["platform"].size()
-        pledge_vectors = _indexes["pledge"].size()
-        regional_vectors = _indexes["regional"].size()
-        logger.info(f"platform_index: {platform_vectors} vectors")
-        logger.info(f"pledge_index: {pledge_vectors} vectors")
-        logger.info(f"regional_index: {regional_vectors} vectors")
-        if pledge_vectors == 0:
-            raise RuntimeError(
-                "pledge_index 벡터가 0입니다. PDF 추출 또는 인덱스 빌드가 실패한 상태로 서비스를 시작할 수 없습니다. "
-                "로그에서 [EXTRACT] final_chars, [SELF-CHECK] 공약 pdf count를 확인하세요."
-            )
-    logger.info("준비 완료")
+# startup_event 제거됨 - 서버가 즉시 시작되도록 함
+# 필요한 초기화는 _ensure_startup()에서 lazy loading으로 처리
 
 STATIC_DIR = ROOT_DIR / "static"
 AUTH_COOKIE = "policy_auth"
@@ -349,7 +361,6 @@ def pledge_page(request: Request):
     raise HTTPException(status_code=404, detail="pledge.html not found")
 
 
-<<<<<<< HEAD
 @app.api_route("/signup", methods=["GET", "HEAD"])
 def signup_page():
     res = _serve_html("signup.html")
@@ -645,7 +656,8 @@ def api_admin_usage_stats(request: Request):
         }
     finally:
         conn.close()
-=======
+
+
 @app.get("/map")
 def map_page():
     """지역별 출마자 공약 지도 페이지."""
@@ -653,7 +665,6 @@ def map_page():
     if res is not None:
         return res
     raise HTTPException(status_code=404, detail="map.html not found")
->>>>>>> 02b4289 (지역별 공약 추가)
 
 
 @app.get("/api")
@@ -1055,6 +1066,8 @@ def debug_scan():
 @app.post("/check", response_model=PledgeCheckResponse)
 def check_pledge(body: PledgeCheckRequest, request: Request):
     """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다. (승인 사용자 전용)"""
+    _ensure_startup()  # 지연 초기화
+    
     user = require_approved(request)
     ip = _client_ip(request)
     ok, msg = check_rate_limit_ip(ip)
@@ -1097,27 +1110,6 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
     return PledgeCheckResponse(result=result)
 
 
-# 한국 행정구역 코드 매핑
-REGION_CODE_MAP = {
-    "서울": "11", "서울특별시": "11",
-    "부산": "26", "부산광역시": "26",
-    "대구": "27", "대구광역시": "27",
-    "인천": "28", "인천광역시": "28",
-    "광주": "29", "광주광역시": "29",
-    "대전": "30", "대전광역시": "30",
-    "울산": "31", "울산광역시": "31",
-    "세종": "36", "세종특별자치시": "36",
-    "경기": "41", "경기도": "41",
-    "강원": "42", "강원도": "42",
-    "충북": "43", "충청북도": "43",
-    "충남": "44", "충청남도": "44",
-    "전북": "45", "전라북도": "45",
-    "전남": "46", "전라남도": "46",
-    "경북": "47", "경상북도": "47",
-    "경남": "48", "경상남도": "48",
-    "제주": "50", "제주특별자치도": "50", "제주도": "50",
-}
-
 REGION_NAME_MAP = {
     "11": "서울특별시",
     "26": "부산광역시",
@@ -1139,142 +1131,481 @@ REGION_NAME_MAP = {
 }
 
 
-def _extract_region_from_filename(filename: str) -> str | None:
-    """파일명에서 지역 코드를 추출한다."""
-    filename_lower = filename.lower()
-    for key, code in REGION_CODE_MAP.items():
-        if key in filename or key in filename_lower:
-            return code
-    return None
+class RegionResponse(BaseModel):
+    region_code: str = Field(..., description="행정구역 코드")
+    region_name: str = Field(..., description="행정구역 이름")
+    candidate_count: int = Field(..., description="등록된 후보 수")
 
 
-def _get_regional_candidates() -> dict[str, list[dict]]:
-    """지역별 공약 폴더에서 후보자 정보를 추출한다."""
-    pdf_dir = Path(PDF_DIR).resolve()
-    regional_dir = pdf_dir / _nfc("지역별 공약")
-    
-    if not regional_dir.exists():
-        return {}
-    
-    candidates_by_region: dict[str, list[dict]] = {}
-    
+class CandidatePledgeResponse(BaseModel):
+    title: str = Field(..., description="공약 제목")
+    category: Optional[str] = Field(default=None, description="공약 카테고리")
+
+
+class CandidateListItemResponse(BaseModel):
+    candidate_id: int = Field(..., description="후보 ID")
+    name: str = Field(..., description="후보명")
+    district_name: Optional[str] = Field(default=None, description="선거구명")
+    district_code: Optional[str] = Field(default=None, description="선거구 코드")
+    region_code: str = Field(..., description="행정구역 코드")
+    election_type: str = Field(..., description="선거 구분")
+    election_level: Optional[str] = Field(default=None, description="선거 레벨(광역/기초 등)")
+    pledges: list[CandidatePledgeResponse] = Field(default_factory=list, description="핵심 공약(최대 3개)")
+
+
+class CandidateDetailResponse(BaseModel):
+    candidate_id: int = Field(..., description="후보 ID")
+    name: str = Field(..., description="후보명")
+    district_name: Optional[str] = Field(default=None, description="선거구명")
+    district_code: Optional[str] = Field(default=None, description="선거구 코드")
+    region_code: str = Field(..., description="행정구역 코드")
+    region_name: str = Field(..., description="행정구역 이름")
+    election_type: str = Field(..., description="선거 구분")
+    election_level: Optional[str] = Field(default=None, description="선거 레벨(광역/기초 등)")
+    pledges: list[CandidatePledgeResponse] = Field(default_factory=list, description="공약 전체")
+
+
+class DistrictResponse(BaseModel):
+    district_code: str = Field(..., description="선거구 코드")
+    district_name: str = Field(..., description="선거구명")
+    region_code: str = Field(..., description="행정구역 코드")
+    candidate_count: int = Field(..., description="등록된 후보 수")
+
+
+def _validate_region_code(region_code: Optional[str]) -> str:
+    code = (region_code or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="region_code는 필수입니다.")
+    if code in REGION_NAME_MAP:
+        return code
+
+    from backend.database import get_connection
+
+    conn = get_connection()
     try:
-        files = list(_iter_doc_files(regional_dir))
-        for file_path in files:
-            filename = file_path.name
-            region_code = _extract_region_from_filename(filename)
-            
-            if not region_code:
-                # 파일명에 지역명이 없으면 파일명 전체를 후보자명으로 간주
-                region_code = "00"  # 미분류
-            
-            # 파일명에서 후보자 이름 추출
-            # 다양한 패턴 지원: "서울_홍길동_공약.pdf", "경기_김철수.pdf", "홍길동_공약.pdf" 등
-            name_parts = filename.replace(".pdf", "").replace(".txt", "").split("_")
-            candidate_name = name_parts[0] if len(name_parts) > 0 else filename.split(".")[0]
-            
-            # 지역명이 파일명에 포함된 경우 제거
-            for region_key in REGION_CODE_MAP.keys():
-                if region_key in candidate_name:
-                    candidate_name = candidate_name.replace(region_key, "").strip("_").strip()
-                    break
-            
-            if not candidate_name:
-                candidate_name = filename.split(".")[0]
-            
-            if region_code not in candidates_by_region:
-                candidates_by_region[region_code] = []
-            
-            # 중복 제거 (같은 이름과 파일명이면 스킵)
-            existing = next((
-                c for c in candidates_by_region[region_code] 
-                if c["name"] == candidate_name and c["filename"] == filename
-            ), None)
-            
-            if not existing:
-                candidates_by_region[region_code].append({
-                    "name": candidate_name,
-                    "filename": filename,
-                    "filepath": str(file_path.relative_to(regional_dir)),
-                })
-    except Exception as e:
-        logger.error(f"지역별 후보자 정보 추출 실패: {e}")
-    
-    return candidates_by_region
+        row = conn.execute("SELECT 1 FROM region_codes WHERE region_code = ? LIMIT 1", (code,)).fetchone()
+    except Exception:
+        row = None
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=400, detail=f"유효하지 않은 region_code: {code}")
+    return code
 
 
-@app.get("/api/regions")
+def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> list[CandidatePledgeResponse]:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT title, category
+            FROM candidate_pledges
+            WHERE candidate_id = ?
+            ORDER BY priority ASC, datetime(created_at) DESC, id DESC
+        """
+        params: tuple = (candidate_id,)
+        if limit is not None:
+            sql += " LIMIT ?"
+            params = (candidate_id, limit)
+        rows = conn.execute(sql, params).fetchall()
+        return [CandidatePledgeResponse(title=r["title"], category=r["category"]) for r in rows]
+    finally:
+        conn.close()
+
+
+def _resolve_region_name(code: str) -> str:
+    default_name = REGION_NAME_MAP.get(code, code)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT region_name FROM region_codes WHERE region_code = ? LIMIT 1",
+            (code,),
+        ).fetchone()
+        if row and row["region_name"]:
+            return str(row["region_name"])
+        return default_name
+    except Exception:
+        return default_name
+    finally:
+        conn.close()
+
+
+def _normalize_district_code(value: Optional[str]) -> Optional[str]:
+    code = (value or "").strip()
+    if not code:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9_-]{2,64}", code):
+        raise HTTPException(status_code=400, detail="district_code 형식이 올바르지 않습니다. (영문/숫자/_/-, 2~64자)")
+    return code
+
+
+def _derive_district_code(region_code: str, district_code: Optional[str], district_name: Optional[str]) -> Optional[str]:
+    if district_code:
+        return district_code
+    name = (district_name or "").strip()
+    if not name:
+        return None
+    norm = re.sub(r"\s+", "", name)
+    norm = re.sub(r"[^0-9A-Za-z가-힣_-]", "", norm)
+    if not norm:
+        return None
+    return f"{region_code}:{norm}"
+
+
+def _normalize_election_type(value: Optional[str]) -> Optional[str]:
+    text = (value or "").strip()
+    if not text:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", text):
+        raise HTTPException(status_code=400, detail="election_type 형식이 올바르지 않습니다.")
+    return text
+
+
+class AdminCandidatePledgeInput(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
+    category: Optional[str] = Field(default=None, max_length=100, description="공약 카테고리")
+    priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위(작을수록 상위)")
+
+
+class AdminCandidateUpsertBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80, description="후보명")
+    district_name: Optional[str] = Field(default=None, max_length=120, description="선거구명")
+    district_code: Optional[str] = Field(default=None, max_length=64, description="선거구 코드")
+    region_code: str = Field(..., description="행정구역 코드")
+    election_type: str = Field(default="local", min_length=1, max_length=40, description="선거 구분")
+    election_level: str = Field(default="regional", min_length=1, max_length=40, description="선거 레벨")
+    pledges: list[AdminCandidatePledgeInput] = Field(default_factory=list, description="후보 공약 목록")
+
+
+@app.post("/api/admin/candidates", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
+def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
+    """관리자 전용 후보 등록 API. region_code 검증을 강제한다."""
+    _ensure_startup()
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+
+    code = _validate_region_code(body.region_code)
+    district_code = _normalize_district_code(body.district_code)
+    election_type = _normalize_election_type(body.election_type) or "local"
+    resolved_district_code = _derive_district_code(code, district_code, body.district_name)
+    district_name_clean = (body.district_name or "").strip()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, election_level, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                body.name.strip(),
+                district_name_clean or None,
+                resolved_district_code,
+                code,
+                election_type,
+                (body.election_level or "regional").strip(),
+            ),
+        )
+        if resolved_district_code and district_name_clean:
+            conn.execute(
+                """
+                INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
+                VALUES (?, ?, ?, ?, '[]', datetime('now'))
+                ON CONFLICT(district_code) DO UPDATE SET
+                    district_name = excluded.district_name,
+                    region_code = excluded.region_code,
+                    election_type = excluded.election_type,
+                    updated_at = datetime('now')
+                """,
+                (resolved_district_code, district_name_clean, code, election_type),
+            )
+        candidate_id = int(cur.lastrowid)
+        for idx, pledge in enumerate(body.pledges):
+            conn.execute(
+                """
+                INSERT INTO candidate_pledges (candidate_id, title, category, priority)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    candidate_id,
+                    pledge.title.strip(),
+                    (pledge.category or "").strip() or None,
+                    pledge.priority if pledge.priority else (idx + 1),
+                ),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return get_candidate_detail(candidate_id)
+
+
+@app.put("/api/admin/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
+def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, request: Request):
+    """관리자 전용 후보 수정 API. region_code 검증을 강제한다."""
+    _ensure_startup()
+    user = require_user(request)
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="관리자 전용")
+
+    code = _validate_region_code(body.region_code)
+    district_code = _normalize_district_code(body.district_code)
+    election_type = _normalize_election_type(body.election_type) or "local"
+    resolved_district_code = _derive_district_code(code, district_code, body.district_name)
+    district_name_clean = (body.district_name or "").strip()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        existing = conn.execute("SELECT id FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
+
+        conn.execute(
+            """
+            UPDATE candidates
+            SET name = ?, district_name = ?, district_code = ?, region_code = ?, election_type = ?, election_level = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                body.name.strip(),
+                district_name_clean or None,
+                resolved_district_code,
+                code,
+                election_type,
+                (body.election_level or "regional").strip(),
+                candidate_id,
+            ),
+        )
+        if resolved_district_code and district_name_clean:
+            conn.execute(
+                """
+                INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
+                VALUES (?, ?, ?, ?, '[]', datetime('now'))
+                ON CONFLICT(district_code) DO UPDATE SET
+                    district_name = excluded.district_name,
+                    region_code = excluded.region_code,
+                    election_type = excluded.election_type,
+                    updated_at = datetime('now')
+                """,
+                (resolved_district_code, district_name_clean, code, election_type),
+            )
+        conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
+        for idx, pledge in enumerate(body.pledges):
+            conn.execute(
+                """
+                INSERT INTO candidate_pledges (candidate_id, title, category, priority)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    candidate_id,
+                    pledge.title.strip(),
+                    (pledge.category or "").strip() or None,
+                    pledge.priority if pledge.priority else (idx + 1),
+                ),
+            )
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return get_candidate_detail(candidate_id)
+
+
+@app.get("/api/regions", response_model=list[RegionResponse], tags=["candidates"])
 def get_regions():
-    """지역 목록과 각 지역의 후보자 수를 반환한다."""
-    candidates_by_region = _get_regional_candidates()
-    
-    regions = []
-    for code, name in REGION_NAME_MAP.items():
-        candidates = candidates_by_region.get(code, [])
-        regions.append({
-            "region_code": code,
-            "region_name": name,
-            "candidate_count": len(candidates),
-        })
-    
-    return {"regions": regions}
+    """지역 코드 테이블 기준으로 후보 수를 집계해 반환한다."""
+    _ensure_startup()  # 지연 초기화
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        count_rows = conn.execute(
+            """
+            SELECT region_code, COUNT(*) AS candidate_count
+            FROM candidates
+            GROUP BY region_code
+            """
+        ).fetchall()
+        count_map = {r["region_code"]: int(r["candidate_count"]) for r in count_rows}
+    finally:
+        conn.close()
+
+    return [
+        RegionResponse(
+            region_code=code,
+            region_name=name,
+            candidate_count=count_map.get(code, 0),
+        )
+        for code, name in REGION_NAME_MAP.items()
+    ]
 
 
-@app.get("/api/candidates")
-def get_candidates(region_code: str = Query(..., description="행정구역 코드")):
-    """특정 지역의 후보자 목록을 반환한다."""
-    if region_code not in REGION_NAME_MAP:
-        raise HTTPException(status_code=400, detail=f"유효하지 않은 지역 코드: {region_code}")
-    
-    candidates_by_region = _get_regional_candidates()
-    candidates = candidates_by_region.get(region_code, [])
-    
-    # 각 후보자의 핵심 공약 추출 (PDF에서 첫 몇 줄 추출)
-    result = []
-    pdf_dir = Path(PDF_DIR).resolve()
-    regional_dir = pdf_dir / _nfc("지역별 공약")
-    
-    for candidate in candidates:
-        pledges = []
-        district = None
-        
-        # 파일명에서 선거구 추출 시도 (예: "서울_강남구_홍길동.pdf")
-        filename_parts = candidate["filename"].replace(".pdf", "").replace(".txt", "").split("_")
-        if len(filename_parts) >= 2:
-            # 두 번째 부분이 선거구일 가능성
-            potential_district = filename_parts[1]
-            if "구" in potential_district or "시" in potential_district or "군" in potential_district:
-                district = potential_district
-        
-        # PDF에서 공약 추출 시도
-        try:
-            file_path = regional_dir / candidate["filepath"]
-            if file_path.exists():
-                from backend.pdf_loader import extract_text_from_file
-                text = extract_text_from_file(file_path)
-                if text:
-                    # 첫 2000자에서 줄바꿈으로 구분된 공약 추출
-                    lines = text[:2000].split("\n")
-                    pledge_lines = [line.strip() for line in lines if line.strip() and len(line.strip()) > 10]
-                    # 공약처럼 보이는 줄만 선택 (번호, 불릿, 특정 키워드 포함)
-                    for line in pledge_lines[:10]:  # 최대 10개
-                        if any(keyword in line for keyword in ["공약", "정책", "제안", "추진", "지원", "확대", "개선", "강화"]):
-                            pledges.append({"title": line[:100]})  # 최대 100자
-                        elif line[0].isdigit() or line.startswith("•") or line.startswith("-") or line.startswith("·"):
-                            pledges.append({"title": line[:100]})
-                        if len(pledges) >= 3:
-                            break
-        except Exception as e:
-            logger.warning(f"후보자 {candidate['name']}의 공약 추출 실패: {e}")
-        
-        result.append({
-            "name": candidate["name"],
-            "district": district,
-            "pledges": pledges[:3],  # 최대 3개
-            "filename": candidate["filename"],
-        })
-    
-    return {"region_code": region_code, "region_name": REGION_NAME_MAP[region_code], "candidates": result}
+@app.get("/api/districts", response_model=list[DistrictResponse], tags=["candidates"])
+def get_districts(
+    region_code: Optional[str] = Query(default=None, description="행정구역 코드"),
+    election_type: Optional[str] = Query(default=None, description="선거 타입(local, mayor, etc)"),
+):
+    """선택한 시/도(region_code)의 선거구 목록과 후보 수를 반환한다."""
+    _ensure_startup()
+    code = _validate_region_code(region_code)
+    selected_election_type = _normalize_election_type(election_type)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        candidate_sql = """
+            SELECT district_name, district_code, election_type
+            FROM candidates
+            WHERE region_code = ?
+              AND district_name IS NOT NULL
+              AND TRIM(district_name) <> ''
+        """
+        params: list[object] = [code]
+        if selected_election_type:
+            candidate_sql += " AND election_type = ?"
+            params.append(selected_election_type)
+        candidate_rows = conn.execute(candidate_sql, tuple(params)).fetchall()
+
+        district_rows = conn.execute(
+            """
+            SELECT district_code, district_name
+            FROM district_codes
+            WHERE region_code = ?
+              AND (? IS NULL OR election_type = ?)
+            """,
+            (code, selected_election_type, selected_election_type),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    count_map: dict[str, dict[str, object]] = {}
+    for r in district_rows:
+        d_code = (r["district_code"] or "").strip()
+        d_name = (r["district_name"] or "").strip() or d_code
+        if d_code:
+            count_map[d_code] = {"district_name": d_name, "candidate_count": 0}
+
+    for r in candidate_rows:
+        district_name = (r["district_name"] or "").strip()
+        district_code = _derive_district_code(code, r["district_code"], district_name)
+        if not district_code:
+            continue
+        if district_code not in count_map:
+            count_map[district_code] = {
+                "district_name": district_name or district_code,
+                "candidate_count": 0,
+            }
+        count_map[district_code]["candidate_count"] = int(count_map[district_code]["candidate_count"]) + 1
+
+    return [
+        DistrictResponse(
+            district_code=dcode,
+            district_name=str(meta["district_name"]),
+            region_code=code,
+            candidate_count=int(meta["candidate_count"]),
+        )
+        for dcode, meta in sorted(count_map.items(), key=lambda x: (-int(x[1]["candidate_count"]), str(x[1]["district_name"])))
+    ]
+
+
+@app.get("/api/candidates", response_model=list[CandidateListItemResponse], tags=["candidates"])
+def get_candidates(
+    region_code: Optional[str] = Query(default=None, description="행정구역 코드"),
+    district_code: Optional[str] = Query(default=None, description="선거구 코드"),
+    election_type: Optional[str] = Query(default=None, description="선거 타입(local, mayor, etc)"),
+):
+    """지역별 후보 목록 + 핵심 공약(최대 3개)을 반환한다."""
+    _ensure_startup()  # 지연 초기화
+    code = _validate_region_code(region_code)
+    selected_district_code = _normalize_district_code(district_code)
+    selected_election_type = _normalize_election_type(election_type)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT id, name, district_name, district_code, region_code, election_type, election_level
+            FROM candidates
+            WHERE region_code = ?
+        """
+        params: list[object] = [code]
+        if selected_election_type:
+            sql += " AND election_type = ?"
+            params.append(selected_election_type)
+        sql += " ORDER BY datetime(created_at) DESC, id DESC"
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    finally:
+        conn.close()
+
+    result: list[CandidateListItemResponse] = []
+    for r in rows:
+        candidate_id = int(r["id"])
+        resolved_district_code = _derive_district_code(code, r["district_code"], r["district_name"])
+        if selected_district_code and resolved_district_code != selected_district_code:
+            continue
+        result.append(
+            CandidateListItemResponse(
+                candidate_id=candidate_id,
+                name=r["name"],
+                district_name=r["district_name"],
+                district_code=resolved_district_code,
+                region_code=r["region_code"],
+                election_type=r["election_type"],
+                election_level=r["election_level"],
+                pledges=_fetch_candidate_pledges(candidate_id, limit=3),
+            )
+        )
+    return result
+
+
+@app.get("/api/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["candidates"])
+def get_candidate_detail(candidate_id: int):
+    """후보 상세 정보와 공약 전체를 반환한다."""
+    _ensure_startup()  # 지연 초기화
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT id, name, district_name, district_code, region_code, election_type, election_level
+            FROM candidates
+            WHERE id = ?
+            """,
+            (candidate_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
+
+    code = row["region_code"]
+    return CandidateDetailResponse(
+        candidate_id=int(row["id"]),
+        name=row["name"],
+        district_name=row["district_name"],
+        district_code=_derive_district_code(code, row["district_code"], row["district_name"]),
+        region_code=code,
+        region_name=_resolve_region_name(code),
+        election_type=row["election_type"],
+        election_level=row["election_level"],
+        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None),
+    )
 
 
 class PledgeVerifyRequest(BaseModel):
@@ -1291,6 +1622,8 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
     """
     벡터 검색 기반 공약 검증 리포트를 생성한다. (승인 사용자 전용)
     """
+    _ensure_startup()  # 지연 초기화
+    
     user = require_approved(request)
     ip = _client_ip(request)
     ok, msg = check_rate_limit_ip(ip)

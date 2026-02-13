@@ -1,0 +1,89 @@
+{
+  "regions": [
+    {
+      "region_code": "11",
+      "region_name": "서울특별시",
+      "aliases": ["서울", "서울시", "서울특별시"]
+    },
+    {
+      "region_code": "26",
+      "region_name": "부산광역시",
+      "aliases": ["부산", "부산시", "부산광역시"]
+    },
+    {
+      "region_code": "27",
+      "region_name": "대구광역시",
+      "aliases": ["대구", "대구시", "대구광역시"]
+    },
+    {
+      "region_code": "28",
+      "region_name": "인천광역시",
+      "aliases": ["인천", "인천시", "인천광역시"]
+    },
+    {
+      "region_code": "29",
+      "region_name": "광주광역시",
+      "aliases": ["광주", "광주시", "광주광역시"]
+    },
+    {
+      "region_code": "30",
+      "region_name": "대전광역시",
+      "aliases": ["대전", "대전시", "대전광역시"]
+    },
+    {
+      "region_code": "31",
+      "region_name": "울산광역시",
+      "aliases": ["울산", "울산시", "울산광역시"]
+    },
+    {
+      "region_code": "36",
+      "region_name": "세종특별자치시",
+      "aliases": ["세종", "세종시", "세종특별자치시"]
+    },
+    {
+      "region_code": "41",
+      "region_name": "경기도",
+      "aliases": ["경기", "경기도"]
+    },
+    {
+      "region_code": "42",
+      "region_name": "강원특별자치도",
+      "aliases": ["강원", "강원도", "강원특별자치도"]
+    },
+    {
+      "region_code": "43",
+      "region_name": "충청북도",
+      "aliases": ["충북", "충청북도"]
+    },
+    {
+      "region_code": "44",
+      "region_name": "충청남도",
+      "aliases": ["충남", "충청남도"]
+    },
+    {
+      "region_code": "45",
+      "region_name": "전북특별자치도",
+      "aliases": ["전북", "전라북도", "전북특별자치도"]
+    },
+    {
+      "region_code": "46",
+      "region_name": "전라남도",
+      "aliases": ["전남", "전라남도"]
+    },
+    {
+      "region_code": "47",
+      "region_name": "경상북도",
+      "aliases": ["경북", "경상북도"]
+    },
+    {
+      "region_code": "48",
+      "region_name": "경상남도",
+      "aliases": ["경남", "경상남도"]
+    },
+    {
+      "region_code": "50",
+      "region_name": "제주특별자치도",
+      "aliases": ["제주", "제주도", "제주특별자치도"]
+    }
+  ]
+}

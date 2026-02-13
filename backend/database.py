@@ -16,6 +16,7 @@ DB_PATH = ROOT_DIR / "data" / "policy.db"
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -97,6 +98,50 @@ def init_db() -> None:
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_hist_user_created ON analysis_history(user_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            district_name TEXT,
+            region_code TEXT NOT NULL,
+            election_type TEXT NOT NULL DEFAULT 'local',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_candidates_region_code ON candidates(region_code);
+        CREATE INDEX IF NOT EXISTS idx_candidates_region_election ON candidates(region_code, election_type);
+
+        CREATE TABLE IF NOT EXISTS candidate_pledges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            candidate_id INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            category TEXT,
+            priority INTEGER NOT NULL DEFAULT 100,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_candidate_pledges_candidate ON candidate_pledges(candidate_id);
+        CREATE INDEX IF NOT EXISTS idx_candidate_pledges_candidate_priority_created
+            ON candidate_pledges(candidate_id, priority, created_at);
+
+        CREATE TABLE IF NOT EXISTS region_codes (
+            region_code TEXT PRIMARY KEY,
+            region_name TEXT NOT NULL,
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS district_codes (
+            district_code TEXT PRIMARY KEY,
+            district_name TEXT NOT NULL,
+            region_code TEXT NOT NULL REFERENCES region_codes(region_code),
+            election_type TEXT NOT NULL DEFAULT 'local',
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_district_codes_region ON district_codes(region_code);
+        CREATE INDEX IF NOT EXISTS idx_district_codes_region_election ON district_codes(region_code, election_type);
         """)
         for stmt in [
             "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
@@ -104,12 +149,16 @@ def init_db() -> None:
             "ALTER TABLE users ADD COLUMN verification_expires_at TEXT",
             "ALTER TABLE users ADD COLUMN name TEXT",
             "ALTER TABLE users ADD COLUMN phone TEXT",
+            "ALTER TABLE candidates ADD COLUMN district_code TEXT",
+            "ALTER TABLE candidates ADD COLUMN election_level TEXT NOT NULL DEFAULT 'regional'",
         ]:
             try:
                 conn.execute(stmt)
             except sqlite3.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
                     raise
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_district_code ON candidates(district_code)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_region_district ON candidates(region_code, district_code)")
         conn.commit()
         logger.info("DB 초기화 완료: %s", DB_PATH)
     finally:
