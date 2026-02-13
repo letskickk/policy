@@ -487,7 +487,8 @@
         if (!mapData || !Array.isArray(mapData.locations)) {
           throw new Error('지도 데이터 형식 오류');
         }
-        koreaMap.setAttribute('viewBox', mapData.viewBox || '0 0 524 631');
+        // 울릉도 영역을 포함한 우측 여백을 줄이기 위해 본토 중심 viewBox를 사용
+        koreaMap.setAttribute('viewBox', '0 0 486 631');
         koreaMap.innerHTML = mapData.locations
           .filter((loc) => mapIdToRegionCode[loc.id])
           .map((loc) => {
