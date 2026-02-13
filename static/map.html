@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>지역별 출마자 공약 - 개혁신당 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root{
+      --bg1:#04162b;
+      --bg2:#073053;
+      --bg3:#0a3b69;
+
+      --text:#f1f5f9;
+      --text-strong:#ffffff;
+      --muted:#cbd5e1;
+
+      --brand:#ff7210;
+
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
+
+      --cta:#ffffff;
+      --cta-text:#0f172a;
+      --cta-hover:#f1f5f9;
+      --cta-ring: rgba(56, 189, 248, 0.35);
+
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --shadow2: 0 12px 26px rgba(0,0,0,0.32);
+
+      --selected: rgba(255,114,16,0.3);
+      --selected-border: #ff7210;
+    }
+
+    body{
+      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+                  linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      color: var(--text);
+      padding: 1.5rem 1rem;
+    }
+
+    .container{
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 2rem;
+    }
+
+    @media (max-width: 1024px){
+      .container{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 네비게이션 */
+    .nav{
+      margin-bottom: 1.5rem;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-link{
+      display:inline-flex;
+      align-items:center;
+      color: var(--text);
+      text-decoration:none;
+      font-size: 0.92rem;
+      font-weight: 800;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+    .nav-link:hover{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+      border-color: rgba(148,163,184,0.28);
+    }
+    .nav-link:focus-visible{
+      outline: none;
+      box-shadow: 0 0 0 4px var(--cta-ring);
+    }
+
+    /* 헤더 */
+    header{
+      margin-bottom: 1.5rem;
+    }
+    h1{
+      font-size: 2rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.03em;
+    }
+    .subtitle{
+      font-size: 1rem;
+      color: var(--text);
+      opacity: 0.9;
+    }
+
+    /* 지도 영역 */
+    .map-container{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .map-wrapper{
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    .korea-map{
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .korea-map path{
+      fill: rgba(255,255,255,0.1);
+      stroke: rgba(255,255,255,0.3);
+      stroke-width: 1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .korea-map path:hover{
+      fill: rgba(255,114,16,0.2);
+      stroke: var(--brand);
+      stroke-width: 2;
+    }
+
+    .korea-map path.selected{
+      fill: var(--selected);
+      stroke: var(--selected-border);
+      stroke-width: 2;
+    }
+
+    .korea-map path:focus{
+      outline: 3px solid var(--cta-ring);
+      outline-offset: 2px;
+    }
+
+    /* 배지 (후보자 수 표시) */
+    .region-badge{
+      font-size: 0.75rem;
+      font-weight: 900;
+      fill: var(--text-strong);
+      pointer-events: none;
+    }
+
+    /* 우측 패널 */
+    .panel{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+
+    .panel-header{
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title{
+      font-size: 1.5rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin-bottom: 0.25rem;
+    }
+
+    .panel-subtitle{
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    /* 로딩/에러/빈 상태 */
+    .state-message{
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text);
+    }
+
+    .state-message.loading{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .spinner{
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .error-message{
+      padding: 1rem 1.25rem;
+      background: rgba(255, 107, 107, 0.14);
+      border: 1px solid rgba(255, 107, 107, 0.40);
+      color: #ffd1d1;
+      border-radius: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .error-message::before{ content:"⚠️"; }
+
+    /* 후보자 카드 */
+    .candidates-list{
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .candidate-card{
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      transition: all 0.2s ease;
+    }
+
+    .candidate-card:hover{
+      border-color: rgba(255,114,16,0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .candidate-name{
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: var(--text-strong);
+      margin-bottom: 0.5rem;
+    }
+
+    .candidate-district{
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .candidate-pledges{
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .pledge-item{
+      font-size: 0.95rem;
+      color: var(--text);
+      padding-left: 1rem;
+      position: relative;
+      line-height: 1.6;
+    }
+
+    .pledge-item::before{
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--brand);
+      font-weight: 900;
+    }
+
+    .empty-state{
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+
+    .empty-state-icon{
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 640px){
+      body{ padding: 1rem 0.75rem; }
+      h1{ font-size: 1.75rem; }
+      .map-container, .panel{ padding: 1rem; border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div>
+      <nav class="nav">
+        <a href="/" class="nav-link">← 메인으로</a>
+        <a href="/pledge" class="nav-link">공약 분석하기</a>
+      </nav>
+
+      <header>
+        <h1>지역별 출마자 공약</h1>
+        <p class="subtitle">지도를 클릭하여 해당 지역의 출마자 공약을 확인하세요</p>
+      </header>
+
+      <div class="map-container">
+        <div class="map-wrapper">
+          <!-- 
+            더 정확한 한국 지도 SVG를 사용하려면 다음 링크에서 다운로드하세요:
+            - SimpleMaps: https://simplemaps.com/static/svg/country/kr/admin1/kr.svg
+            - GitHub: https://github.com/southkorea/southkorea-maps
+            - MapSVG: https://mapsvg.com/maps/south-korea
+            
+            다운로드한 SVG 파일의 각 path 요소에 data-region-code 속성을 추가하세요.
+            예: <path data-region-code="11" ... /> (서울특별시)
+          -->
+          <svg class="korea-map" viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도">
+            <!-- 서울특별시 (11) -->
+            <path data-region-code="11" d="M180 120 L200 115 L210 125 L205 140 L195 145 L180 140 Z" aria-label="서울특별시" tabindex="0"/>
+            
+            <!-- 인천광역시 (28) -->
+            <path data-region-code="28" d="M150 130 L170 125 L175 140 L165 145 L150 140 Z" aria-label="인천광역시" tabindex="0"/>
+            
+            <!-- 경기도 (41) -->
+            <path data-region-code="41" d="M120 100 L180 90 L220 95 L240 110 L250 130 L260 150 L240 160 L200 155 L150 150 L120 140 Z" aria-label="경기도" tabindex="0"/>
+            
+            <!-- 강원도 (42) -->
+            <path data-region-code="42" d="M240 50 L280 45 L300 60 L310 90 L300 120 L280 130 L260 125 L240 110 L230 90 L235 70 Z" aria-label="강원도" tabindex="0"/>
+            
+            <!-- 충청북도 (43) -->
+            <path data-region-code="43" d="M200 150 L240 145 L260 160 L250 180 L230 185 L210 180 L200 170 Z" aria-label="충청북도" tabindex="0"/>
+            
+            <!-- 충청남도 (44) -->
+            <path data-region-code="44" d="M150 180 L200 175 L220 185 L210 210 L190 215 L160 210 L150 195 Z" aria-label="충청남도" tabindex="0"/>
+            
+            <!-- 세종특별자치시 (36) -->
+            <path data-region-code="36" d="M210 170 L220 165 L225 175 L220 185 L210 180 Z" aria-label="세종특별자치시" tabindex="0"/>
+            
+            <!-- 대전광역시 (30) -->
+            <path data-region-code="30" d="M220 165 L235 160 L240 175 L235 185 L220 180 Z" aria-label="대전광역시" tabindex="0"/>
+            
+            <!-- 전라북도 (45) -->
+            <path data-region-code="45" d="M100 200 L150 195 L170 210 L160 240 L140 245 L110 240 L100 220 Z" aria-label="전라북도" tabindex="0"/>
+            
+            <!-- 전라남도 (46) -->
+            <path data-region-code="46" d="M80 240 L130 235 L150 250 L140 280 L120 285 L90 280 L80 260 Z" aria-label="전라남도" tabindex="0"/>
+            
+            <!-- 광주광역시 (29) -->
+            <path data-region-code="29" d="M120 230 L135 225 L140 240 L135 250 L120 245 Z" aria-label="광주광역시" tabindex="0"/>
+            
+            <!-- 경상북도 (47) -->
+            <path data-region-code="47" d="M260 180 L320 175 L340 190 L350 220 L340 250 L320 260 L280 255 L260 240 L250 210 Z" aria-label="경상북도" tabindex="0"/>
+            
+            <!-- 경상남도 (48) -->
+            <path data-region-code="48" d="M240 260 L300 255 L320 270 L310 300 L290 305 L260 300 L240 285 Z" aria-label="경상남도" tabindex="0"/>
+            
+            <!-- 부산광역시 (26) -->
+            <path data-region-code="26" d="M320 300 L335 295 L340 310 L335 320 L320 315 Z" aria-label="부산광역시" tabindex="0"/>
+            
+            <!-- 대구광역시 (27) -->
+            <path data-region-code="27" d="M280 220 L295 215 L300 230 L295 240 L280 235 Z" aria-label="대구광역시" tabindex="0"/>
+            
+            <!-- 울산광역시 (31) -->
+            <path data-region-code="31" d="M340 280 L355 275 L360 290 L355 300 L340 295 Z" aria-label="울산광역시" tabindex="0"/>
+            
+            <!-- 제주특별자치도 (50) -->
+            <path data-region-code="50" d="M180 380 L220 375 L230 390 L220 405 L190 400 L180 390 Z" aria-label="제주특별자치도" tabindex="0"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title" id="panel-title">지역을 선택하세요</h2>
+        <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요</p>
+      </div>
+
+      <div id="panel-content">
+        <div class="empty-state">
+          <div class="empty-state-icon">🗺️</div>
+          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const panelTitle = document.getElementById('panel-title');
+    const panelSubtitle = document.getElementById('panel-subtitle');
+    const panelContent = document.getElementById('panel-content');
+    const mapPaths = document.querySelectorAll('.korea-map path[data-region-code]');
+    
+    const regionNames = {
+      '11': '서울특별시',
+      '26': '부산광역시',
+      '27': '대구광역시',
+      '28': '인천광역시',
+      '29': '광주광역시',
+      '30': '대전광역시',
+      '31': '울산광역시',
+      '36': '세종특별자치시',
+      '41': '경기도',
+      '42': '강원도',
+      '43': '충청북도',
+      '44': '충청남도',
+      '45': '전라북도',
+      '46': '전라남도',
+      '47': '경상북도',
+      '48': '경상남도',
+      '50': '제주특별자치도',
+    };
+
+    let selectedRegionCode = null;
+    let regionData = {};
+
+    // URL 쿼리 파라미터에서 지역 코드 읽기
+    function getRegionFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('region_code');
+    }
+
+    // URL 업데이트
+    function updateURL(regionCode) {
+      const url = new URL(window.location);
+      if (regionCode) {
+        url.searchParams.set('region_code', regionCode);
+      } else {
+        url.searchParams.delete('region_code');
+      }
+      window.history.pushState({}, '', url);
+    }
+
+    // 지역 선택
+    function selectRegion(regionCode) {
+      // 이전 선택 해제
+      mapPaths.forEach(path => {
+        path.classList.remove('selected');
+      });
+
+      if (selectedRegionCode === regionCode) {
+        // 같은 지역 클릭 시 선택 해제
+        selectedRegionCode = null;
+        updateURL(null);
+        showEmptyState();
+        return;
+      }
+
+      selectedRegionCode = regionCode;
+      updateURL(regionCode);
+
+      // 선택 상태 표시
+      const selectedPath = document.querySelector(`path[data-region-code="${regionCode}"]`);
+      if (selectedPath) {
+        selectedPath.classList.add('selected');
+        selectedPath.focus();
+      }
+
+      // 후보자 목록 로드
+      loadCandidates(regionCode);
+    }
+
+    // 빈 상태 표시
+    function showEmptyState() {
+      panelTitle.textContent = '지역을 선택하세요';
+      panelSubtitle.textContent = '지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요';
+      panelContent.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🗺️</div>
+          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+        </div>
+      `;
+    }
+
+    // 로딩 상태 표시
+    function showLoading() {
+      panelContent.innerHTML = `
+        <div class="state-message loading">
+          <div class="spinner"></div>
+          <span>출마자 정보를 불러오는 중...</span>
+        </div>
+      `;
+    }
+
+    // 에러 상태 표시
+    function showError(message) {
+      panelContent.innerHTML = `
+        <div class="error-message">${message}</div>
+      `;
+    }
+
+    // 후보자 목록 로드
+    async function loadCandidates(regionCode) {
+      const regionName = regionNames[regionCode] || '알 수 없음';
+      panelTitle.textContent = regionName;
+      panelSubtitle.textContent = '출마자 목록을 불러오는 중...';
+      showLoading();
+
+      try {
+        const response = await fetch(`/api/candidates?region_code=${regionCode}`);
+        if (!response.ok) {
+          throw new Error(response.statusText || '서버 오류');
+        }
+
+        const data = await response.json();
+        renderCandidates(data);
+      } catch (error) {
+        console.error('후보자 목록 로드 실패:', error);
+        panelTitle.textContent = regionName;
+        panelSubtitle.textContent = '';
+        showError(`출마자 정보를 불러오는 중 오류가 발생했습니다.<br>(${error.message || '서버 연결 실패'})`);
+      }
+    }
+
+    // 후보자 목록 렌더링
+    function renderCandidates(data) {
+      const { region_name, candidates } = data;
+      
+      panelTitle.textContent = region_name;
+      panelSubtitle.textContent = `총 ${candidates.length}명의 출마자`;
+
+      if (candidates.length === 0) {
+        panelContent.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>해당 지역의 출마자 정보가 없습니다</p>
+          </div>
+        `;
+        return;
+      }
+
+      const html = `
+        <div class="candidates-list">
+          ${candidates.map(candidate => `
+            <div class="candidate-card">
+              <div class="candidate-name">${escapeHtml(candidate.name)}</div>
+              ${candidate.district ? `<div class="candidate-district">${escapeHtml(candidate.district)}</div>` : ''}
+              ${candidate.pledges && candidate.pledges.length > 0 ? `
+                <div class="candidate-pledges">
+                  ${candidate.pledges.slice(0, 3).map(pledge => `
+                    <div class="pledge-item">${escapeHtml(pledge.title || pledge)}</div>
+                  `).join('')}
+                </div>
+              ` : '<div class="candidate-pledges"><div class="pledge-item">공약 정보 없음</div></div>'}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      panelContent.innerHTML = html;
+    }
+
+    // HTML 이스케이프
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 지도 클릭 이벤트
+    mapPaths.forEach(path => {
+      path.addEventListener('click', function() {
+        const regionCode = this.getAttribute('data-region-code');
+        selectRegion(regionCode);
+      });
+
+      // 키보드 접근성
+      path.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const regionCode = this.getAttribute('data-region-code');
+          selectRegion(regionCode);
+        }
+      });
+    });
+
+    // 지역 데이터 로드 (배지 표시용)
+    async function loadRegionData() {
+      try {
+        const response = await fetch('/api/regions');
+        if (response.ok) {
+          const data = await response.json();
+          regionData = {};
+          data.regions.forEach(region => {
+            regionData[region.region_code] = region;
+          });
+          // 배지 업데이트는 필요시 구현
+        }
+      } catch (error) {
+        console.error('지역 데이터 로드 실패:', error);
+      }
+    }
+
+    // 초기화
+    loadRegionData();
+
+    // URL에서 지역 코드 읽어서 선택
+    const urlRegionCode = getRegionFromURL();
+    if (urlRegionCode) {
+      selectRegion(urlRegionCode);
+    }
+
+    // 브라우저 뒤로가기/앞으로가기 처리
+    window.addEventListener('popstate', function() {
+      const urlRegionCode = getRegionFromURL();
+      if (urlRegionCode) {
+        selectRegion(urlRegionCode);
+      } else {
+        selectedRegionCode = null;
+        mapPaths.forEach(path => path.classList.remove('selected'));
+        showEmptyState();
+      }
+    });
+  </script>
+</body>
+</html>

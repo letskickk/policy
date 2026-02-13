@@ -84,6 +84,7 @@ OPENAI_WINNERS2022_VECTOR_STORE_ID = os.getenv("OPENAI_WINNERS2022_VECTOR_STORE_
 # file_search 결과 개수 제한 (full phase 기본 6)
 FILE_SEARCH_MAX_RESULTS = int(os.getenv("FILE_SEARCH_MAX_RESULTS", "6"))
 # quick phase용 (속도 우선, 기본 3)
+<<<<<<< HEAD
 FILE_SEARCH_MAX_RESULTS_QUICK = int(os.getenv("FILE_SEARCH_MAX_RESULTS_QUICK", "3"))
 
 # 접근제어 / 쿼터 / 레이트리밋 (내부 정책 도구용)
@@ -103,3 +104,6 @@ QUOTA_MONTHLY = int(os.getenv("QUOTA_MONTHLY", "300"))
 RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
 RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
+=======
+FILE_SEARCH_MAX_RESULTS_QUICK = int(os.getenv("FILE_SEARCH_MAX_RESULTS_QUICK", "3"))
+>>>>>>> 02b4289 (지역별 공약 추가)

@@ -349,6 +349,7 @@ def pledge_page(request: Request):
     raise HTTPException(status_code=404, detail="pledge.html not found")
 
 
+<<<<<<< HEAD
 @app.api_route("/signup", methods=["GET", "HEAD"])
 def signup_page():
     res = _serve_html("signup.html")
@@ -644,6 +645,15 @@ def api_admin_usage_stats(request: Request):
         }
     finally:
         conn.close()
+=======
+@app.get("/map")
+def map_page():
+    """지역별 출마자 공약 지도 페이지."""
+    res = _serve_html("map.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="map.html not found")
+>>>>>>> 02b4289 (지역별 공약 추가)
 
 
 @app.get("/api")
@@ -1085,6 +1095,186 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
     except Exception:
         pass
     return PledgeCheckResponse(result=result)
+
+
+# 한국 행정구역 코드 매핑
+REGION_CODE_MAP = {
+    "서울": "11", "서울특별시": "11",
+    "부산": "26", "부산광역시": "26",
+    "대구": "27", "대구광역시": "27",
+    "인천": "28", "인천광역시": "28",
+    "광주": "29", "광주광역시": "29",
+    "대전": "30", "대전광역시": "30",
+    "울산": "31", "울산광역시": "31",
+    "세종": "36", "세종특별자치시": "36",
+    "경기": "41", "경기도": "41",
+    "강원": "42", "강원도": "42",
+    "충북": "43", "충청북도": "43",
+    "충남": "44", "충청남도": "44",
+    "전북": "45", "전라북도": "45",
+    "전남": "46", "전라남도": "46",
+    "경북": "47", "경상북도": "47",
+    "경남": "48", "경상남도": "48",
+    "제주": "50", "제주특별자치도": "50", "제주도": "50",
+}
+
+REGION_NAME_MAP = {
+    "11": "서울특별시",
+    "26": "부산광역시",
+    "27": "대구광역시",
+    "28": "인천광역시",
+    "29": "광주광역시",
+    "30": "대전광역시",
+    "31": "울산광역시",
+    "36": "세종특별자치시",
+    "41": "경기도",
+    "42": "강원도",
+    "43": "충청북도",
+    "44": "충청남도",
+    "45": "전라북도",
+    "46": "전라남도",
+    "47": "경상북도",
+    "48": "경상남도",
+    "50": "제주특별자치도",
+}
+
+
+def _extract_region_from_filename(filename: str) -> str | None:
+    """파일명에서 지역 코드를 추출한다."""
+    filename_lower = filename.lower()
+    for key, code in REGION_CODE_MAP.items():
+        if key in filename or key in filename_lower:
+            return code
+    return None
+
+
+def _get_regional_candidates() -> dict[str, list[dict]]:
+    """지역별 공약 폴더에서 후보자 정보를 추출한다."""
+    pdf_dir = Path(PDF_DIR).resolve()
+    regional_dir = pdf_dir / _nfc("지역별 공약")
+    
+    if not regional_dir.exists():
+        return {}
+    
+    candidates_by_region: dict[str, list[dict]] = {}
+    
+    try:
+        files = list(_iter_doc_files(regional_dir))
+        for file_path in files:
+            filename = file_path.name
+            region_code = _extract_region_from_filename(filename)
+            
+            if not region_code:
+                # 파일명에 지역명이 없으면 파일명 전체를 후보자명으로 간주
+                region_code = "00"  # 미분류
+            
+            # 파일명에서 후보자 이름 추출
+            # 다양한 패턴 지원: "서울_홍길동_공약.pdf", "경기_김철수.pdf", "홍길동_공약.pdf" 등
+            name_parts = filename.replace(".pdf", "").replace(".txt", "").split("_")
+            candidate_name = name_parts[0] if len(name_parts) > 0 else filename.split(".")[0]
+            
+            # 지역명이 파일명에 포함된 경우 제거
+            for region_key in REGION_CODE_MAP.keys():
+                if region_key in candidate_name:
+                    candidate_name = candidate_name.replace(region_key, "").strip("_").strip()
+                    break
+            
+            if not candidate_name:
+                candidate_name = filename.split(".")[0]
+            
+            if region_code not in candidates_by_region:
+                candidates_by_region[region_code] = []
+            
+            # 중복 제거 (같은 이름과 파일명이면 스킵)
+            existing = next((
+                c for c in candidates_by_region[region_code] 
+                if c["name"] == candidate_name and c["filename"] == filename
+            ), None)
+            
+            if not existing:
+                candidates_by_region[region_code].append({
+                    "name": candidate_name,
+                    "filename": filename,
+                    "filepath": str(file_path.relative_to(regional_dir)),
+                })
+    except Exception as e:
+        logger.error(f"지역별 후보자 정보 추출 실패: {e}")
+    
+    return candidates_by_region
+
+
+@app.get("/api/regions")
+def get_regions():
+    """지역 목록과 각 지역의 후보자 수를 반환한다."""
+    candidates_by_region = _get_regional_candidates()
+    
+    regions = []
+    for code, name in REGION_NAME_MAP.items():
+        candidates = candidates_by_region.get(code, [])
+        regions.append({
+            "region_code": code,
+            "region_name": name,
+            "candidate_count": len(candidates),
+        })
+    
+    return {"regions": regions}
+
+
+@app.get("/api/candidates")
+def get_candidates(region_code: str = Query(..., description="행정구역 코드")):
+    """특정 지역의 후보자 목록을 반환한다."""
+    if region_code not in REGION_NAME_MAP:
+        raise HTTPException(status_code=400, detail=f"유효하지 않은 지역 코드: {region_code}")
+    
+    candidates_by_region = _get_regional_candidates()
+    candidates = candidates_by_region.get(region_code, [])
+    
+    # 각 후보자의 핵심 공약 추출 (PDF에서 첫 몇 줄 추출)
+    result = []
+    pdf_dir = Path(PDF_DIR).resolve()
+    regional_dir = pdf_dir / _nfc("지역별 공약")
+    
+    for candidate in candidates:
+        pledges = []
+        district = None
+        
+        # 파일명에서 선거구 추출 시도 (예: "서울_강남구_홍길동.pdf")
+        filename_parts = candidate["filename"].replace(".pdf", "").replace(".txt", "").split("_")
+        if len(filename_parts) >= 2:
+            # 두 번째 부분이 선거구일 가능성
+            potential_district = filename_parts[1]
+            if "구" in potential_district or "시" in potential_district or "군" in potential_district:
+                district = potential_district
+        
+        # PDF에서 공약 추출 시도
+        try:
+            file_path = regional_dir / candidate["filepath"]
+            if file_path.exists():
+                from backend.pdf_loader import extract_text_from_file
+                text = extract_text_from_file(file_path)
+                if text:
+                    # 첫 2000자에서 줄바꿈으로 구분된 공약 추출
+                    lines = text[:2000].split("\n")
+                    pledge_lines = [line.strip() for line in lines if line.strip() and len(line.strip()) > 10]
+                    # 공약처럼 보이는 줄만 선택 (번호, 불릿, 특정 키워드 포함)
+                    for line in pledge_lines[:10]:  # 최대 10개
+                        if any(keyword in line for keyword in ["공약", "정책", "제안", "추진", "지원", "확대", "개선", "강화"]):
+                            pledges.append({"title": line[:100]})  # 최대 100자
+                        elif line[0].isdigit() or line.startswith("•") or line.startswith("-") or line.startswith("·"):
+                            pledges.append({"title": line[:100]})
+                        if len(pledges) >= 3:
+                            break
+        except Exception as e:
+            logger.warning(f"후보자 {candidate['name']}의 공약 추출 실패: {e}")
+        
+        result.append({
+            "name": candidate["name"],
+            "district": district,
+            "pledges": pledges[:3],  # 최대 3개
+            "filename": candidate["filename"],
+        })
+    
+    return {"region_code": region_code, "region_name": REGION_NAME_MAP[region_code], "candidates": result}
 
 
 class PledgeVerifyRequest(BaseModel):
