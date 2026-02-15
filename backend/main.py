@@ -1629,6 +1629,196 @@ class PledgeVerifyRequest(BaseModel):
     judge: bool = Field(default=False, description="true=strict judge 모드 (evidence, specificity cap, QUERY/VERIFY)")
 
 
+METRO_REGION_CODES = {"11", "26", "27", "28", "29", "30", "31", "36"}
+
+
+def _region_profile(region_code: str) -> str:
+    if region_code in METRO_REGION_CODES:
+        return "metro"
+    if region_code in {"43", "44", "45", "46", "47", "48", "50", "51", "52"}:
+        return "mixed"
+    return "local"
+
+
+def _build_tailor_tip(category: str, profile: str) -> str:
+    if profile == "metro":
+        if category in {"교통", "도시"}:
+            return "광역 환승·혼잡 완화 중심으로 KPI(혼잡도·통행시간)를 넣어주세요."
+        if category in {"주거", "청년"}:
+            return "역세권·직주근접 대상군을 명확히 적고 공급/지원 방식을 분리해 주세요."
+        return "생활밀착형 지표(민원 처리시간, 서비스 접근성)를 함께 제시해 주세요."
+    if profile == "mixed":
+        if category in {"농업", "경제"}:
+            return "도시-농촌 연계(판로·물류·로컬브랜드) 항목을 1개 이상 포함해 주세요."
+        if category in {"복지", "보건"}:
+            return "읍면동 접근성 기준(거리·대기시간)과 이동지원 수단을 함께 적어주세요."
+        return "권역별 차등 실행안(도심/외곽)을 2트랙으로 작성해 주세요."
+    if category in {"농업", "어촌", "환경"}:
+        return "기초 생활서비스 유지(의료·교통·돌봄)와 소득안정 대책을 동시에 넣어주세요."
+    return "소규모 지역은 단계별 예산·집행주체를 간단히 적어 실행가능성을 강조해 주세요."
+
+
+class RegionalTailorItem(BaseModel):
+    pledge_title: str
+    category: Optional[str] = None
+    recommendation: str
+
+
+class RegionalTailorResponse(BaseModel):
+    candidate_id: int
+    candidate_name: str
+    region_code: str
+    region_name: str
+    region_profile: str
+    election_level: Optional[str] = None
+    recommendations: list[RegionalTailorItem]
+    note: str
+
+
+class OnePageBriefingResponse(BaseModel):
+    candidate_id: int
+    title: str
+    key_message: str
+    target_voters: list[str]
+    top_pledges: list[str]
+    talk_track: list[str]
+    risk_checklist: list[str]
+    suggested_next_steps: list[str]
+    disclaimer: str
+
+
+class RapidIssueRequest(BaseModel):
+    issue_title: str = Field(..., min_length=3, max_length=160, description="이슈 제목")
+    issue_summary: str = Field(..., min_length=5, max_length=1200, description="현재 상황 요약")
+    requested_stance: Optional[str] = Field(default=None, max_length=500, description="원하는 대응 기조")
+    candidate_id: Optional[int] = Field(default=None, description="연결할 후보 ID")
+
+
+class RapidIssueResponse(BaseModel):
+    issue_title: str
+    first_response_window: str
+    fact_check_items: list[str]
+    core_position: str
+    response_messages: dict[str, str]
+    qa_pack: list[dict[str, str]]
+    execution_steps: list[str]
+    disclaimer: str
+
+
+@app.get("/api/experimental/candidates/{candidate_id}/regional-tailor", response_model=RegionalTailorResponse, tags=["experimental", "candidates"])
+def get_candidate_regional_tailor(candidate_id: int):
+    """A안(지역 맞춤 공약 엔진) 실험 구현: 후보 공약을 지역 프로파일에 맞춰 보완 권고한다."""
+    detail = get_candidate_detail(candidate_id)
+    profile = _region_profile(detail.region_code)
+    picks = detail.pledges[:5] if detail.pledges else []
+    recommendations = [
+        RegionalTailorItem(
+            pledge_title=p.title,
+            category=p.category,
+            recommendation=_build_tailor_tip(p.category or "기타", profile),
+        )
+        for p in picks
+    ]
+    if not recommendations:
+        recommendations = [
+            RegionalTailorItem(
+                pledge_title="(등록 공약 없음)",
+                category="기타",
+                recommendation="핵심 공약 3개를 먼저 입력하면 지역 맞춤 보완안을 생성할 수 있습니다.",
+            )
+        ]
+
+    return RegionalTailorResponse(
+        candidate_id=detail.candidate_id,
+        candidate_name=detail.name,
+        region_code=detail.region_code,
+        region_name=detail.region_name,
+        region_profile=profile,
+        election_level=detail.election_level,
+        recommendations=recommendations,
+        note="실험 기능: 중앙당 승인/인증이 아닌 후보 캠프용 보완 권고 초안입니다.",
+    )
+
+
+@app.get("/api/experimental/candidates/{candidate_id}/briefing", response_model=OnePageBriefingResponse, tags=["experimental", "candidates"])
+def get_candidate_one_page_briefing(candidate_id: int):
+    """B안(후보 캠프 1페이지 브리핑) 실험 구현."""
+    detail = get_candidate_detail(candidate_id)
+    top_titles = [p.title for p in detail.pledges[:3]] or ["핵심 공약 등록 필요"]
+    first = top_titles[0]
+    return OnePageBriefingResponse(
+        candidate_id=detail.candidate_id,
+        title=f"{detail.name} 후보 1페이지 브리핑",
+        key_message=f"{detail.region_name} 생활문제를 {first} 중심으로 해결합니다.",
+        target_voters=["청년/신혼", "생활밀착 이슈 유권자", "지역 자영업·근로층"],
+        top_pledges=top_titles,
+        talk_track=[
+            "문제: 지역 주민이 체감하는 불편을 한 문장으로 먼저 제시",
+            f"해법: {first}을 포함한 상위 공약 2~3개를 우선순위로 설명",
+            "실행: 연차별 일정·예산·협업기관을 짧게 제시",
+        ],
+        risk_checklist=[
+            "재원 조달 방식이 모호한지 확인",
+            "법령·조례 개정 필요 여부 사전 점검",
+            "반대 질문 대비(형평성/실현가능성) Q&A 준비",
+        ],
+        suggested_next_steps=[
+            "선거구 현장 민원 10건과 연결해 표현 보완",
+            "후보 연설용 30초/90초/3분 버전으로 재작성",
+            "캠프 공보팀과 카드뉴스 3장으로 전환",
+        ],
+        disclaimer="실험 기능: 본 브리핑은 중앙당 승인 문서가 아닌 캠프 실무용 초안입니다.",
+    )
+
+
+@app.post("/api/experimental/issues/rapid-response", response_model=RapidIssueResponse, tags=["experimental", "issues"])
+def build_rapid_issue_response(body: RapidIssueRequest):
+    """D안(이슈 대응 속보 체계) 실험 구현."""
+    linked_candidate = None
+    if body.candidate_id is not None:
+        try:
+            linked_candidate = get_candidate_detail(body.candidate_id)
+        except HTTPException:
+            linked_candidate = None
+
+    candidate_suffix = f" ({linked_candidate.name} 후보 연계)" if linked_candidate else ""
+    stance = (body.requested_stance or "사실 기반·생활밀착 중심 대응").strip()
+
+    return RapidIssueResponse(
+        issue_title=body.issue_title,
+        first_response_window="2시간 이내 1차 메시지 배포",
+        fact_check_items=[
+            "원출처 1차 확인(보도/발언 전문, 게시 시각, 맥락)",
+            "수치·예산·법령 근거의 최신성 확인",
+            "지역 현장 체감과 충돌 여부 확인",
+            "유사 이슈 기존 당 입장과 충돌 여부 확인",
+        ],
+        core_position=f"{stance}{candidate_suffix}",
+        response_messages={
+            "short": f"[핵심] {body.issue_title} 관련 사실을 우선 확인하고 주민 체감 기준으로 대안을 제시하겠습니다.",
+            "medium": f"{body.issue_title} 이슈는 확인되지 않은 주장보다 검증된 근거가 우선입니다. 현장 영향과 실행 가능한 대안을 함께 제시하겠습니다.",
+            "long": f"{body.issue_summary[:220]} ... 위 사안은 정쟁보다 생활 문제 해결 관점에서 접근해야 합니다. 사실관계와 재정·법적 타당성을 검토해 단계별 대응안을 공개하겠습니다.",
+        },
+        qa_pack=[
+            {
+                "question": "왜 지금 이 이슈에 입장을 내나요?",
+                "answer": "확인되지 않은 정보 확산을 막고 지역 주민에게 필요한 대응 우선순위를 제시하기 위해서입니다.",
+            },
+            {
+                "question": "상대 진영 공격 아닌가요?",
+                "answer": "공격이 아니라 사실 검증과 실행 대안 제시가 목적이며, 확인된 근거만 사용합니다.",
+            },
+        ],
+        execution_steps=[
+            "0~30분: 사실확인 담당이 원출처·핵심 수치 검증",
+            "30~90분: 정책팀이 반론 대응 Q&A 3개 작성",
+            "90~120분: 후보/대변인용 1차 메시지(30초) 배포",
+            "당일 종료 전: 상세 브리핑(FAQ 포함) 업데이트",
+        ],
+        disclaimer="실험 기능: 속보 템플릿은 참고용이며 최종 대외 발신 책임은 후보·캠프에 있습니다.",
+    )
+
+
 @app.post("/api/pledge/verify")
 def verify_pledge(body: PledgeVerifyRequest, request: Request):
     """
