@@ -733,46 +733,38 @@ def run_check(
             has_sufficient_meta = bool(meta['name'] and (meta['position'] or meta['region']))
             
             if not has_sufficient_meta:
-                # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회
+                # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회 (최적화: 쿼리 수 최소화)
                 source_path = _extract_source_path(text)
                 if source_path or filename:
-                    # 문서명/지역/직책 기반 재조회 (rewrite on/off 모두)
-                    doc_base = filename or source_path
-                    refine_queries = [
-                        f"{doc_base} 제8회 전국동시지방선거 당선인 이름 직책 지역",
-                        f"{doc_base} 시도지사 당선인 공약",
-                    ]
+                    # 최대 2개 쿼리만 사용 (타임아웃 방지)
+                    refine_queries = []
+                    
+                    # 우선순위 1: 지역/직책 기반 이름 찾기 (가장 정확)
                     if meta.get("region"):
-                        # 지역 기반 이름 찾기 (더 구체적으로)
                         refine_queries.append(f"{meta['region']} 당선인 이름")
-                        refine_queries.append(f"{meta['region']} 시장 당선인")
-                        refine_queries.append(f"{meta['region']} 지사 당선인")
-                    if meta.get("position"):
-                        # 직책 기반 이름 찾기 (더 구체적으로)
+                    elif meta.get("position"):
                         refine_queries.append(f"{meta['position']} 당선인 이름")
-                        refine_queries.append(f"{meta['position']} 후보 이름")
-                        # 직책에서 지역 추출하여 이름 찾기
-                        if "시장" in meta['position'] or "지사" in meta['position']:
-                            pos_region = meta['position'].replace("시장", "").replace("지사", "").replace("광역시", "").replace("특별시", "").replace("도", "").strip()
-                            if pos_region:
-                                refine_queries.append(f"{pos_region} 당선인 이름")
+                    
+                    # 우선순위 2: 일반적인 재조회 (지역/직책이 없을 때만)
+                    if not refine_queries:
+                        refine_queries.append("제8회 전국동시지방선거 당선인 이름 직책")
 
-                    for rq in refine_queries:
-                        enhance_hits = [
-                            *_search(client, vs_id, rq, k=6, rewrite=False),
-                            *_search(client, vs_id, rq, k=6, rewrite=True),
-                        ]
+                    # 최대 2개 쿼리만 실행, 각 쿼리는 rewrite=False만 사용 (k=4로 제한)
+                    for rq in refine_queries[:2]:
+                        enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
                         for _, _, enhance_text in enhance_hits:
                             enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
                             if enhance_meta['name']:
                                 meta['name'] = enhance_meta['name']
-                            if enhance_meta['position']:
+                            if enhance_meta['position'] and not meta['position']:
                                 meta['position'] = enhance_meta['position']
-                            if enhance_meta['region']:
+                            if enhance_meta['region'] and not meta['region']:
                                 meta['region'] = enhance_meta['region']
-                            if meta['name'] and (meta['position'] or meta['region']):
+                            # 이름을 찾으면 즉시 중단
+                            if meta['name']:
                                 break
-                        if meta['name'] and (meta['position'] or meta['region']):
+                        # 이름을 찾으면 다음 쿼리 스킵
+                        if meta['name']:
                             break
             
             # 메타 정보를 텍스트에 추가
