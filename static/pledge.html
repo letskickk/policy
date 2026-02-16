@@ -188,6 +188,23 @@
       background: var(--input-bg-focus);
       box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
     }
+    .input-text{
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-strong);
+      font-size: 0.98rem;
+      outline: none;
+      margin-bottom: 0.9rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    .input-text:focus{
+      border-color: rgba(255,255,255,0.45);
+      background: var(--input-bg-focus);
+      box-shadow: 0 0 0 4px var(--cta-ring);
+    }
 
     /* --- [버튼: 메인 CTA 톤(화이트)로 통일] --- */
     .btn-primary{
@@ -233,9 +250,90 @@
       width: 100%;
       white-space: pre-wrap;
       word-break: break-word;
-      line-height: 1.75;
-      font-size: 1.05rem;
+      line-height: 1.7;
+      font-size: 1rem;
       color: var(--text-strong);
+    }
+    .score-board{
+      margin-bottom: 1rem;
+      padding: 0.9rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .score-board .score{
+      font-size: 1rem;
+      font-weight: 900;
+      color: var(--text-strong);
+    }
+    .badge{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-radius: 999px;
+      padding: 0.35rem 0.7rem;
+      font-size: 0.85rem;
+      font-weight: 900;
+      border: 1px solid transparent;
+    }
+    .badge.green{ background: rgba(34,197,94,0.18); color: #bbf7d0; border-color: rgba(34,197,94,0.4); }
+    .badge.yellow{ background: rgba(250,204,21,0.16); color: #fef08a; border-color: rgba(250,204,21,0.38); }
+    .badge.red{ background: rgba(248,113,113,0.16); color: #fecaca; border-color: rgba(248,113,113,0.4); }
+    .result-actions{
+      margin: 1rem 0 0;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .btn-secondary{
+      padding: 0.65rem 0.95rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text-strong);
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-secondary:disabled{
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .result-summary{
+      margin-bottom: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      font-size: 0.9rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .metric-chip{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.3rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.25);
+    }
+    .metric-chip strong{
+      color: var(--text-strong);
+      font-weight: 900;
+    }
+    .analysis-text{
+      margin-top: 0.2rem;
+      line-height: 1.78;
     }
     .result-content.empty{
       text-align:center;
@@ -359,7 +457,6 @@
 공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
         </div>
       </div>
-
       <div class="disclaimer-box">
         본 분석 결과는 <strong><bold>AI를 활용하여 작성된 참고 자료</strong></bold>입니다.<br>
         최종 정책 수립 과정에서 검토를 <strong><bold>보조하는 용도로 활용</strong></bold>해 주시기 바랍니다.
@@ -421,6 +518,108 @@
       btnEl.textContent = 'AI 분석 시작하기';
     }
 
+    function signalLabel(signal) {
+      if (signal === 'green') return '녹색';
+      if (signal === 'yellow') return '노란색';
+      return '빨간색';
+    }
+
+    function signalIcon(signal) {
+      if (signal === 'green') return '🟢';
+      if (signal === 'yellow') return '🟡';
+      return '🔴';
+    }
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+    }
+
+    function toNumber(v) {
+      return (typeof v === 'number' && !Number.isNaN(v)) ? v : null;
+    }
+
+    function normalizeOutputText(text) {
+      const s = String(text || '');
+      return s.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function renderRubricList(title, items) {
+      if (!Array.isArray(items) || items.length === 0) return '';
+      const rows = items.map(it => {
+        const item = escapeHtml(it && it.item ? it.item : '-');
+        const score = (it && typeof it.score_0_5 === 'number') ? `${it.score_0_5}/5` : '-';
+        const note = escapeHtml(it && it.note ? it.note : '');
+        return `
+          <div style="padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.04);margin-bottom:0.5rem;">
+            <div style="display:flex;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <strong style="color:var(--text-strong);">${item}</strong>
+              <span style="font-weight:800;color:#ffb37a;">${score}</span>
+            </div>
+            ${note ? `<div style="margin-top:0.35rem;color:var(--text);font-size:0.92rem;line-height:1.6;">${note}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+      return `
+        <div style="margin-top:0.9rem;">
+          <div style="font-weight:900;color:var(--text-strong);margin-bottom:0.45rem;">${escapeHtml(title)}</div>
+          ${rows}
+        </div>
+      `;
+    }
+
+    function renderCombinedResult(baseText, data) {
+      const score = toNumber(data && data.total_score) ?? toNumber(data && data.fit_score);
+      const signal = (data.signal_light || (score !== null ? (score >= 80 ? 'green' : (score >= 60 ? 'yellow' : 'red')) : 'red')).toLowerCase();
+      const board = (score !== null)
+        ? `<div class="score-board"><div class="score">총점: ${score.toFixed(1)}점</div><span class="badge ${signal}">${signalIcon(signal)} ${signalLabel(signal)}</span></div>`
+        : '';
+
+      const confidence = toNumber(data && data.confidence);
+      const breakdown = (data && typeof data.breakdown === 'object' && data.breakdown) ? data.breakdown : {};
+      const platformScore = toNumber(breakdown.platform_score);
+      const pledgeScore = toNumber(breakdown.pledge_score);
+      const conflictPenalty = toNumber(breakdown.conflict_penalty);
+
+      let html = board;
+      const hasBreakdown = platformScore !== null || pledgeScore !== null || conflictPenalty !== null || confidence !== null;
+      if (hasBreakdown) {
+        const chips = [];
+        if (platformScore !== null) chips.push(`<span class="metric-chip"><strong>정강 부합</strong> ${platformScore}</span>`);
+        if (pledgeScore !== null) chips.push(`<span class="metric-chip"><strong>공약 유사도</strong> ${pledgeScore}</span>`);
+        if (conflictPenalty !== null) chips.push(`<span class="metric-chip"><strong>충돌·모순 감점</strong> ${conflictPenalty}</span>`);
+        if (confidence !== null) chips.push(`<span class="metric-chip"><strong>평가 신뢰도</strong> ${confidence}%</span>`);
+        html += `<div class="result-summary">${chips.join('')}</div>`;
+      }
+
+      let finalResult = '판단 보류';
+      let finalReason = '점수 정보가 충분하지 않아 자동 최종판단을 유보합니다.';
+      if (score !== null) {
+        if (score >= 80) {
+          finalResult = '적합 (제출 가능)';
+          finalReason = '정책 정합성과 실행 가능성이 기준 이상입니다.';
+        } else if (score >= 60) {
+          finalResult = '부분적 적합 (보완 필요)';
+          finalReason = '핵심 방향은 맞지만 세부 수단/근거 보강이 필요합니다. 보완 후 재검증을 권장합니다.';
+        } else {
+          finalResult = '부적합 (전면 수정 권고)';
+          finalReason = '정강·기존 공약 대비 정합성이 낮아 핵심 구조 재설계가 필요합니다.';
+        }
+      }
+      const finalBlock = [
+        '6. 최종판단',
+        '결과: ' + finalResult,
+        '판단 근거: ' + finalReason
+      ].join('\n');
+      const normalizedBaseText = normalizeOutputText(baseText);
+      const fullText = normalizedBaseText ? normalizedBaseText + '\n\n' + finalBlock : finalBlock;
+      html += `<div class="analysis-text">${escapeHtml(fullText).replace(/\n/g, '<br>')}</div>`;
+      showResult(html);
+    }
+
     pledgeEl.addEventListener('keydown', function(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
@@ -439,27 +638,39 @@
       showLoading();
 
       try {
-        const res = await fetch('/check', {
+        // 1) 본문은 기존 /check 결과(당_부합_점검 프롬프트 출력)를 그대로 사용
+        const checkRes = await fetch('/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pledge: text }),
           credentials: 'include'
         });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          if (res.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
-          if (res.status === 403) { window.location.href = '/pending'; return; }
-          if (res.status === 429) { showError((data.detail || '사용량을 모두 사용하셨습니다. 내일 또는 다음 달에 다시 이용해 주세요.') + '<br><a href="/dashboard" style="color:#ffb37a;">내 기록 확인</a>'); resetBtn(); return; }
-          throw new Error(data.detail || res.statusText || '서버 요청 실패');
+        const checkData = await checkRes.json().catch(() => ({}));
+        if (!checkRes.ok) {
+          if (checkRes.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
+          if (checkRes.status === 403) { window.location.href = '/pending'; return; }
+          if (checkRes.status === 429) { showError((checkData.detail || '사용량을 모두 사용하셨습니다. 내일 또는 다음 달에 다시 이용해 주세요.') + '<br><a href="/dashboard" style="color:#ffb37a;">내 기록 확인</a>'); resetBtn(); return; }
+          throw new Error(checkData.detail || checkRes.statusText || '서버 요청 실패');
         }
+        const baseText = (checkData && typeof checkData.result === 'string') ? checkData.result : '';
 
-        if (data.result) {
-          showResult(data.result);
-        } else {
-          showResult('분석 결과가 없습니다. 다시 시도해 주세요.');
+        // 2) 점수/신호등은 verify 결과를 사용
+        const reqBody = { text };
+        const verifyRes = await fetch('/api/pledge/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody),
+          credentials: 'include'
+        });
+        const verifyData = await verifyRes.json().catch(() => ({}));
+        if (!verifyRes.ok) {
+          if (verifyRes.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); return; }
+          if (verifyRes.status === 403) { window.location.href = '/pending'; return; }
+          if (verifyRes.status === 429) { showError((verifyData.detail || '사용량을 모두 사용하셨습니다. 내일 또는 다음 달에 다시 이용해 주세요.') + '<br><a href="/dashboard" style="color:#ffb37a;">내 기록 확인</a>'); resetBtn(); return; }
+          throw new Error(verifyData.detail || verifyRes.statusText || '서버 요청 실패');
         }
+        if (!verifyData || typeof verifyData !== 'object') throw new Error('분석 결과 형식이 올바르지 않습니다.');
+        renderCombinedResult(baseText, verifyData);
 
       } catch (e) {
         console.error(e);

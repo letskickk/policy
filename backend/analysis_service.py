@@ -66,6 +66,60 @@ def _set_cached(user_id: int, cache_key: str, fingerprint: str, result: str) -> 
         conn.close()
 
 
+def _extract_fit_score(result: Any) -> float:
+    """검증 결과(dict)에서 fit_score를 안전하게 추출한다."""
+    if not isinstance(result, dict):
+        return 0.0
+    for key in ("total_score", "fit_score"):
+        value = result.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    summary = result.get("summary")
+    if isinstance(summary, dict):
+        value = summary.get("fit_score")
+        if isinstance(value, (int, float)):
+            return float(value)
+    return 0.0
+
+
+def _signal_from_score(score: float) -> str:
+    if score >= 80:
+        return "green"
+    if score >= 60:
+        return "yellow"
+    return "red"
+
+
+def _enrich_verify_result(result: Any) -> Any:
+    """
+    검증 결과에 총점/신호등/PDF 가능 여부를 공통 필드로 보강한다.
+    - total_score: 0~100
+    - signal_light: green|yellow|red
+    - pdf_eligible: bool (80점 이상)
+    """
+    if not isinstance(result, dict):
+        return result
+
+    score = max(0.0, min(100.0, _extract_fit_score(result)))
+    score = round(score, 1)
+    signal = _signal_from_score(score)
+    eligible = score >= 80.0
+
+    result["total_score"] = score
+    result["signal_light"] = signal
+    result["pdf_eligible"] = eligible
+
+    summary = result.get("summary")
+    if not isinstance(summary, dict):
+        summary = {}
+        result["summary"] = summary
+    summary["fit_score"] = score
+    summary["total_score"] = score
+    summary["signal_light"] = signal
+    summary["pdf_eligible"] = eligible
+    return result
+
+
 def run_check_analysis(
     user_id: int,
     pledge_text: str,
@@ -125,6 +179,7 @@ def run_check_analysis(
             regional_vector_store_id=regional_vector_store_id,
             winners2022_vector_store_id=winners2022_vector_store_id,
             indexes=indexes,
+            user_id=user_id,
         )
     except Exception as e:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -221,6 +276,7 @@ def run_verify_analysis(
     if cached:
         try:
             data = json.loads(cached)
+            data = _enrich_verify_result(data)
             log_usage(
                 user_id=user_id,
                 ip=ip,
@@ -285,6 +341,7 @@ def run_verify_analysis(
         raise
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
+    result = _enrich_verify_result(result)
     out_str = json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
     token_in = len(normalized) // 2
     token_out = len(out_str) // 2

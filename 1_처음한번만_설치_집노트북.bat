@@ -18,22 +18,16 @@ echo.
 echo 현재 폴더: %cd%
 echo.
 
-REM Python 확인 (py -3 우선 → python → py)
-set PYEXE=
-where py >nul 2>&1 && set PYEXE=py -3
-if not defined PYEXE where python >nul 2>&1 && set PYEXE=python
-if not defined PYEXE where py >nul 2>&1 && set PYEXE=py
-if not defined PYEXE (
-    echo [오류] Python이 설치되어 있지 않거나 PATH에 없습니다.
-    echo.
-    echo 1. https://www.python.org/downloads/ 에서 Python 3.10 이상 설치
-    echo 2. 설치 시 "Add Python to PATH" 반드시 체크
-    echo 3. 설치 후 터미널 다시 열고 이 파일 다시 실행
-    echo.
+REM Python 확인 (단순 버전: py -3만 사용)
+set "PYEXE=py -3"
+%PYEXE% --version >nul 2>&1
+if errorlevel 1 (
+    echo [오류] py -3 를 실행할 수 없습니다.
+    echo python.org 에서 Python 설치 후 다시 실행해 주세요.
     pause
     exit /b 1
 )
-echo 사용 중인 Python: %PYEXE%
+echo 사용 중인 Python = %PYEXE%
 %PYEXE% --version
 echo.
 

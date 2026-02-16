@@ -4,7 +4,6 @@ SQLite 데이터베이스 설정. users, usage_logs, analysis_cache 테이블.
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Optional
 
 from backend.config import ROOT_DIR
 
@@ -88,11 +87,11 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS analysis_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            kind TEXT NOT NULL,                -- check | verify
+            kind TEXT NOT NULL,
             input_text TEXT NOT NULL,
-            options_json TEXT,                 -- verify 옵션(phase/top_k 등)
-            result_text TEXT NOT NULL,         -- text 또는 json string
-            result_format TEXT NOT NULL,       -- text | json
+            options_json TEXT,
+            result_text TEXT NOT NULL,
+            result_format TEXT NOT NULL,
             status_code INTEGER NOT NULL,
             from_cache INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -149,6 +148,11 @@ def init_db() -> None:
             "ALTER TABLE users ADD COLUMN verification_expires_at TEXT",
             "ALTER TABLE users ADD COLUMN name TEXT",
             "ALTER TABLE users ADD COLUMN phone TEXT",
+            "ALTER TABLE users ADD COLUMN election_position TEXT",
+            "ALTER TABLE users ADD COLUMN region_code TEXT",
+            "ALTER TABLE users ADD COLUMN region_name TEXT",
+            "ALTER TABLE users ADD COLUMN district_code TEXT",
+            "ALTER TABLE users ADD COLUMN district_name TEXT",
             "ALTER TABLE candidates ADD COLUMN district_code TEXT",
             "ALTER TABLE candidates ADD COLUMN election_level TEXT NOT NULL DEFAULT 'regional'",
         ]:

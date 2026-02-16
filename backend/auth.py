@@ -46,7 +46,17 @@ def _valid_email(email: str) -> bool:
     return bool(re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email))
 
 
-def signup(email: str, password: str, name: str = "", phone: str = "") -> tuple[bool, str]:
+def signup(
+    email: str,
+    password: str,
+    name: str = "",
+    phone: str = "",
+    election_position: str = "",
+    region_code: str = "",
+    region_name: str = "",
+    district_code: str = "",
+    district_name: str = "",
+) -> tuple[bool, str]:
     """
     회원가입. 성공 시 (True, 메시지), 실패 시 (False, 오류메시지).
     EMAIL_VERIFICATION_ENABLED 시 인증 메일 발송.
@@ -83,10 +93,15 @@ def signup(email: str, password: str, name: str = "", phone: str = "") -> tuple[
         )
         if cur.fetchone():
             return False, "이미 등록된 이메일입니다."
+        ep = (election_position or "").strip()
+        rc = (region_code or "").strip()
+        rn = (region_name or "").strip()
+        dc = (district_code or "").strip()
+        dn = (district_name or "").strip()
         conn.execute(
-            """INSERT INTO users (email, password_hash, status, role, email_verified, verification_token, verification_expires_at, name, phone)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (email, _hash_password(password), status, role, email_verified, verification_token, verification_expires_at, name, phone),
+            """INSERT INTO users (email, password_hash, status, role, email_verified, verification_token, verification_expires_at, name, phone, election_position, region_code, region_name, district_code, district_name)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (email, _hash_password(password), status, role, email_verified, verification_token, verification_expires_at, name, phone, ep or None, rc or None, rn or None, dc or None, dn or None),
         )
         conn.commit()
         if EMAIL_VERIFICATION_ENABLED and verification_token:
@@ -128,16 +143,25 @@ def login(email: str, password: str) -> Optional[dict]:
         # 관리자는 이메일 인증 건너뜀
         if EMAIL_VERIFICATION_ENABLED and email not in ADMIN_EMAILS and not row["email_verified"]:
             return {"error": "email_not_verified"}
-        conn.execute(
-            "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?",
-            (_now_utc(), _now_utc(), row["id"]),
-        )
+        status, role = row["status"], row["role"]
+        # ADMIN_EMAILS에 있으면 DB에서도 승인·관리자로 맞춰둠 (나중에 .env 추가한 경우 대비)
+        if email in ADMIN_EMAILS and (status != STATUS_APPROVED or role != ROLE_ADMIN):
+            status, role = STATUS_APPROVED, ROLE_ADMIN
+            conn.execute(
+                "UPDATE users SET status = ?, role = ?, last_login_at = ?, updated_at = ? WHERE id = ?",
+                (status, role, _now_utc(), _now_utc(), row["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?",
+                (_now_utc(), _now_utc(), row["id"]),
+            )
         conn.commit()
         return {
             "id": row["id"],
             "email": row["email"],
-            "status": row["status"],
-            "role": row["role"],
+            "status": status,
+            "role": role,
         }
     finally:
         conn.close()
@@ -229,7 +253,7 @@ def get_user(user_id: int) -> Optional[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role FROM users WHERE id = ?",
+            "SELECT id, email, status, role, election_position, region_code, region_name, district_code, district_name FROM users WHERE id = ?",
             (user_id,),
         )
         row = cur.fetchone()
@@ -264,7 +288,7 @@ def list_users_pending() -> list[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role, created_at, name, phone FROM users WHERE status = ? ORDER BY created_at",
+            "SELECT id, email, status, role, created_at, name, phone, election_position, region_code, region_name, district_code, district_name FROM users WHERE status = ? ORDER BY created_at",
             (STATUS_PENDING,),
         )
         return [dict(r) for r in cur.fetchall()]
@@ -276,7 +300,7 @@ def list_users_all() -> list[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role, created_at, last_login_at, name, phone FROM users ORDER BY created_at DESC"
+            "SELECT id, email, status, role, created_at, last_login_at, name, phone, election_position, region_code, region_name, district_code, district_name FROM users ORDER BY created_at DESC"
         )
         return [dict(r) for r in cur.fetchall()]
     finally:

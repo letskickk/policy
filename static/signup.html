@@ -36,6 +36,18 @@
       font-weight: 800;
     }
     label { display: block; font-weight: 700; margin-bottom: 0.5rem; }
+    select {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28);
+      background: rgba(0,0,0,0.22);
+      color: #fff;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    select option { background: #0f172a; color: #fff; }
     input {
       width: 100%;
       padding: 0.75rem;
@@ -88,11 +100,25 @@
     }
     .links { margin-top: 1.5rem; font-size: 0.9rem; }
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .district-label-block { margin-bottom: 0.5rem; }
+    .district-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .district-row select {
+      flex: 1;
+      margin-bottom: 0;
+      min-width: 0;
+    }
     @media (max-width: 480px) {
       body { padding: 1.5rem 1rem; }
       .card { padding: 1.5rem; border-radius: 16px; }
       h1 { font-size: 1.35rem; }
       .hint { font-size: 0.85rem; }
+      .district-row { flex-wrap: wrap; }
+      .district-row select { flex: 1 1 45%; min-width: 120px; }
     }
   </style>
 </head>
@@ -106,6 +132,34 @@
       승인 완료 후 시스템을 사용할 수 있습니다.
     </p>
     <form id="form">
+      <label>출마 유형</label>
+      <select name="election_position" id="election_position" required>
+        <option value="">선택하세요</option>
+        <option value="metro_mayor">광역 단체장</option>
+        <option value="regional_council">광역 의원</option>
+        <option value="local_mayor">기초 단체장</option>
+        <option value="local_council">기초 의원</option>
+      </select>
+      <label>시·도</label>
+      <select name="region_code" id="region_code" required>
+        <option value="">선택하세요</option>
+      </select>
+      <div id="district_block" style="display:none;">
+        <label class="district-label-block">선거구 (시군구, 가나다)</label>
+        <div class="district-row">
+          <select id="district_code" aria-label="시군구">
+            <option value="">선택하세요</option>
+          </select>
+          <div id="district_sub_wrap" style="display:none;">
+            <select id="district_sub" aria-label="가나다">
+              <option value="">선택하세요</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="region_name" id="region_name">
+      <input type="hidden" name="district_code" id="district_code_hidden">
+      <input type="hidden" name="district_name" id="district_name">
       <label>이름</label>
       <input type="text" name="name" required placeholder="홍길동" autocomplete="name">
       <label>전화번호</label>
@@ -139,6 +193,99 @@
         else { input.type = 'password'; btn.textContent = '보기'; }
       });
     });
+
+    const epEl = document.getElementById('election_position');
+    const rcEl = document.getElementById('region_code');
+    const rnEl = document.getElementById('region_name');
+    const dcEl = document.getElementById('district_code');
+    const subEl = document.getElementById('district_sub');
+    const subWrap = document.getElementById('district_sub_wrap');
+    const dcHidden = document.getElementById('district_code_hidden');
+    const dnEl = document.getElementById('district_name');
+    const districtBlock = document.getElementById('district_block');
+
+    function setDistrictHidden() {
+      const dc = (dcEl.value || '').trim();
+      const sub = (subEl.value || '').trim();
+      const dname = dcEl.selectedIndex >= 0 ? (dcEl.options[dcEl.selectedIndex].text || '').trim() : '';
+      if (!dc) { dcHidden.value = ''; dnEl.value = ''; return; }
+      const isSingle = !sub || sub === '단독';
+      dcHidden.value = isSingle ? dc : dc + ':' + sub;
+      dnEl.value = isSingle ? dname : dname + ' ' + sub;
+    }
+
+    async function loadRegions() {
+      try {
+        const r = await fetch('/api/signup/regions');
+        const data = await r.json();
+        if (!Array.isArray(data)) { rcEl.innerHTML = '<option value="">선택하세요</option>'; return; }
+        rcEl.innerHTML = '<option value="">선택하세요</option>' + data.map(x => `<option value="${(x.region_code||'')}">${(x.region_name||'').replace(/</g,'&lt;')}</option>`).join('');
+      } catch (e) { console.error('regions load error', e); }
+    }
+    loadRegions();
+
+    epEl.addEventListener('change', () => {
+      const pos = (epEl.value || '').toLowerCase();
+      if (pos === 'metro_mayor') {
+        districtBlock.style.display = 'none';
+        dcEl.innerHTML = '<option value="">선택하세요</option>';
+        subEl.innerHTML = '<option value="">선택하세요</option>';
+        if (subWrap) subWrap.style.display = 'none';
+        dcHidden.value = ''; dnEl.value = '';
+      } else {
+        districtBlock.style.display = 'block';
+        if (rcEl.value) loadDistricts(rcEl.value);
+      }
+    });
+
+    rcEl.addEventListener('change', () => {
+      const sel = rcEl.options[rcEl.selectedIndex];
+      rnEl.value = sel ? (sel.textContent || sel.text || '') : '';
+      dcEl.innerHTML = '<option value="">선택하세요</option>';
+      subEl.innerHTML = '<option value="">선택하세요</option>';
+      if (subWrap) subWrap.style.display = 'none';
+      dcHidden.value = ''; dnEl.value = '';
+      if (epEl.value && epEl.value !== 'metro_mayor') loadDistricts(rcEl.value);
+    });
+
+    async function loadDistricts(regionCode) {
+      if (!regionCode) return;
+      const pos = epEl.value || '';
+      try {
+        const r = await fetch('/api/signup/districts?region_code=' + encodeURIComponent(regionCode) + '&election_position=' + encodeURIComponent(pos));
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : (data.items || []);
+        dcEl.innerHTML = '<option value="">선택하세요</option>' + list.map(x => `<option value="${(x.district_code||'').replace(/"/g,'&quot;')}">${(x.district_name||'').replace(/</g,'&lt;')}</option>`).join('');
+        subEl.innerHTML = '<option value="">선택하세요</option>';
+        dcHidden.value = ''; dnEl.value = '';
+      } catch (e) { console.error('districts load error', e); dcEl.innerHTML = '<option value="">선택하세요</option>'; subEl.innerHTML = '<option value="">선택하세요</option>'; }
+    }
+
+    dcEl.addEventListener('change', () => {
+      const dc = (dcEl.value || '').trim();
+      subEl.innerHTML = '<option value="">선택하세요</option>';
+      if (subWrap) subWrap.style.display = 'none';
+      dcHidden.value = ''; dnEl.value = '';
+      if (!dc) return;
+      fetch('/api/signup/district-sub?district_code=' + encodeURIComponent(dc))
+        .then(r => r.json())
+        .then(list => {
+          let arr = Array.isArray(list) ? list : [];
+          // 선택지가 2개 이상이면 "단독" 제외(백엔드와 동일 로직)
+          if (arr.length > 1) arr = arr.filter(x => (x.sub_code || '').trim() !== '단독' && (x.sub_name || '').trim() !== '단독');
+          subEl.innerHTML = '<option value="">선택하세요</option>' + arr.map(x => `<option value="${(x.sub_code||'').replace(/"/g,'&quot;')}">${(x.sub_name||'').replace(/</g,'&lt;')}</option>`).join('');
+          if (arr.length > 1) {
+            if (subWrap) subWrap.style.display = '';
+          } else {
+            if (arr.length === 1) subEl.selectedIndex = 1;
+          }
+          setDistrictHidden();
+        })
+        .catch(e => { console.error('district-sub load error', e); setDistrictHidden(); });
+    });
+
+    subEl.addEventListener('change', setDistrictHidden);
+
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const pw = document.getElementById('pw').value;
@@ -150,12 +297,28 @@
         msg.style.display = 'block';
         return;
       }
+      if (districtBlock.style.display !== 'none' && !(dcHidden.value || '').trim()) {
+        msg.textContent = '선거구(시군구)를 선택하세요.';
+        msg.style.display = 'block';
+        return;
+      }
       const fd = new FormData(e.target);
+      const body = {
+        name: fd.get('name'),
+        phone: fd.get('phone'),
+        email: fd.get('email'),
+        password: fd.get('password'),
+        election_position: fd.get('election_position') || '',
+        region_code: fd.get('region_code') || '',
+        region_name: fd.get('region_name') || '',
+        district_code: fd.get('district_code') || '',
+        district_name: fd.get('district_name') || '',
+      };
       try {
         const r = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: fd.get('name'), phone: fd.get('phone'), email: fd.get('email'), password: fd.get('password') })
+          body: JSON.stringify(body)
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { msg.textContent = d.detail || '가입 실패'; msg.style.display = 'block'; return; }
