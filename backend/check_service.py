@@ -12,7 +12,7 @@ from openai import OpenAI
 
 from backend.config import OPENAI_API_KEY, OPENAI_MODEL
 from backend.pdf_loader import load_platform_context, load_pledges_context, load_regional_pledges_context
-from backend.prompts import build_user_message, load_system_prompt
+from backend.prompts import build_user_message, build_pledge_meta_from_user, load_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ def check_pledge_alignment(
     regional_vector_store_id: str | None = None,
     winners2022_vector_store_id: str | None = None,
     indexes: dict[str, Any] | None = None,
+    user_id: int | None = None,
 ) -> str:
     """
     출마자 공약(pledge)에 대해:
@@ -107,6 +108,12 @@ def check_pledge_alignment(
         logger.info("캐시된 결과 반환")
         return cached
 
+    user_meta = None
+    if user_id is not None:
+        from backend.auth import get_user
+        user = get_user(user_id)
+        user_meta = build_pledge_meta_from_user(user)
+
     use_vector_store = bool(vector_store_id)
     use_faiss_search = (
         not use_vector_store
@@ -124,6 +131,7 @@ def check_pledge_alignment(
             pledge_key,
             regional_vector_store_id or "",
             winners2022_vector_store_id or "",
+            user_meta=user_meta,
         )
         has_regional = bool(regional_vector_store_id)
     elif use_faiss_search:
@@ -147,7 +155,7 @@ def check_pledge_alignment(
             return "오류: 검색 결과가 없습니다. 인덱스를 확인하세요."
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "")
+        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "", user_meta=user_meta)
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -174,7 +182,7 @@ def check_pledge_alignment(
             logger.warning("공약 컨텍스트가 비어있습니다. GPT가 공약 비교를 제대로 할 수 없습니다.")
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "")
+        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "", user_meta=user_meta)
 
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(

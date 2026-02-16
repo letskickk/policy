@@ -103,3 +103,6 @@ QUOTA_MONTHLY = int(os.getenv("QUOTA_MONTHLY", "300"))
 RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
 RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
+
+# 공공데이터포털(중앙선거관리위원회 코드정보) API - 시·도/시군구/선거구 목록
+DATA_GO_KR_API_KEY = os.getenv("DATA_GO_KR_API_KEY", "").strip().replace("\r", "").replace("\n", "")

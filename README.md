@@ -126,9 +126,10 @@ Policy/
      ```bash
      python scripts/sync_district_codes.py
      ```
-     - 기준 파일: `data/district_map.json` (전국 시군구 전체 목록, 17개 시도)
-     - `district_map.json`은 `districts`(평탄화 포맷) 또는 `data`(시도별 배열 포맷) 둘 다 지원
-   - API:
+    - 기준 파일: `data/district_map.json` (전국 시군구 전체 목록, 17개 시도)
+    - `district_map.json`은 `districts`(평탄화 포맷) 또는 `data`(시도별 배열 포맷) 둘 다 지원
+  - 지방선거 세부선거구(가나다): `data/district_sub_map.json`. 공공데이터 API로 채우려면 `.env`에 `DATA_GO_KR_API_KEY` 설정 후 `python scripts/build_district_sub_from_api.py` 실행 (활용신청: [코드정보 API](https://www.data.go.kr/data/15000897/openapi.do)).
+  - API:
      - `GET /api/regions`
      - `GET /api/districts?region_code=41&election_type=local`
      - `GET /api/candidates?region_code=41&district_code=41:수원시장안구&election_type=local`

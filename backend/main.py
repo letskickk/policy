@@ -2,6 +2,7 @@
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
+import json
 import locale
 import logging
 import os
@@ -26,6 +27,7 @@ from backend.config import (
     USE_OPENAI_VECTOR_STORE,
     SKIP_PDF_SCAN_ON_STARTUP,
     OPENAI_VECTOR_STORE_ID,
+    DATA_GO_KR_API_KEY,
     _nfc,
 )
 from backend.auth import (
@@ -43,10 +45,10 @@ from backend.auth import (
     list_users_all,
     set_user_status,
 )
+from backend.usage_logger import log_usage
+from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
 # 무거운 import는 지연 로딩으로 변경
 # from backend.database import init_db
-# from backend.usage_logger import log_usage
-# from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
 # from backend.pdf_loader import (
 #     HAS_PDFPLUMBER,
 #     _iter_doc_files,
@@ -287,10 +289,18 @@ def require_user(request: Request) -> dict:
     return user
 
 
+def require_admin(request: Request) -> dict:
+    user = require_user(request)
+    # role 컬럼과 ADMIN_EMAILS 둘 중 하나라도 관리자 조건이면 허용
+    if user["role"] == ROLE_ADMIN or user["email"] in ADMIN_EMAILS:
+        return user
+    raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
+
+
 def require_approved(request: Request) -> dict:
     user = require_user(request)
-    # ADMIN_EMAILS에 있으면 항상 승인된 것으로 처리
-    if user["email"] in ADMIN_EMAILS:
+    # ADMIN_EMAILS/관리자는 항상 승인된 것으로 처리
+    if user["email"] in ADMIN_EMAILS or user["role"] == ROLE_ADMIN:
         return user
     if user["status"] != STATUS_APPROVED:
         log_usage(
@@ -365,7 +375,12 @@ def pledge_page(request: Request):
     user = get_current_user(request)
     if not user:
         return _login_redirect(request.url.path)
-    if user["status"] != STATUS_APPROVED:
+    # ADMIN_EMAILS/관리자는 승인 대기 화면으로 보내지 않음
+    if (
+        user["status"] != STATUS_APPROVED
+        and user["email"] not in ADMIN_EMAILS
+        and user["role"] != ROLE_ADMIN
+    ):
         return RedirectResponse(url="/pending", status_code=302)
     res = _serve_html("pledge.html")
     if res is not None:
@@ -413,7 +428,7 @@ def admin_page(request: Request):
     user = get_current_user(request)
     if not user:
         return _login_redirect(request.url.path)
-    if user["role"] != ROLE_ADMIN:
+    if user["role"] != ROLE_ADMIN and user["email"] not in ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
     res = _serve_html("admin/index.html")
     if res:
@@ -426,7 +441,7 @@ def admin_users_page(request: Request):
     user = get_current_user(request)
     if not user:
         return _login_redirect(request.url.path)
-    if user["role"] != ROLE_ADMIN:
+    if user["role"] != ROLE_ADMIN and user["email"] not in ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
     res = _serve_html("admin/users.html")
     if res:
@@ -439,7 +454,7 @@ def admin_usage_page(request: Request):
     user = get_current_user(request)
     if not user:
         return _login_redirect(request.url.path)
-    if user["role"] != ROLE_ADMIN:
+    if user["role"] != ROLE_ADMIN and user["email"] not in ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="관리자만 접근 가능합니다.")
     res = _serve_html("admin/usage.html")
     if res:
@@ -452,11 +467,203 @@ class SignupBody(BaseModel):
     phone: str = Field(..., description="전화번호")
     email: str = Field(..., description="이메일")
     password: str = Field(..., description="비밀번호")
+    election_position: str = Field(default="", description="출마 유형: metro_mayor|regional_council|local_mayor|local_council")
+    region_code: str = Field(default="", description="행정구역 코드")
+    region_name: str = Field(default="", description="행정구역명")
+    district_code: str = Field(default="", description="선거구 코드")
+    district_name: str = Field(default="", description="선거구명")
+
+
+def _data_gokr_gusigun(sd_name: Optional[str] = None, page_no: int = 1, num_of_rows: int = 500) -> list:
+    """공공데이터 getCommonGusigunCodeList. sgId=20220601(제8회 지방선거). sd_name 있으면 해당 시도만."""
+    if not DATA_GO_KR_API_KEY:
+        return []
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError
+    base = "https://apis.data.go.kr/9760000/CommonCodeService/getCommonGusigunCodeList"
+    params = {"ServiceKey": DATA_GO_KR_API_KEY, "sgId": "20220601", "pageNo": page_no, "numOfRows": num_of_rows, "resultType": "json"}
+    if sd_name:
+        params["sdName"] = sd_name
+    url = f"{base}?{urlencode(params)}"
+    req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
+    try:
+        with urlopen(req, timeout=15) as res:
+            data = json.loads(res.read().decode("utf-8"))
+    except (HTTPError, OSError, ValueError) as e:
+        logger.warning("공공데이터 구시군 API 오류: %s", e)
+        return []
+    body = data.get("response", {}).get("body", {}) or data.get("body", {})
+    items = body.get("items") or body.get("item")
+    if items is None:
+        return []
+    if isinstance(items, dict):
+        items = items.get("item")
+    return items if isinstance(items, list) else [items]
+
+
+@app.get("/api/signup/regions")
+def api_signup_regions():
+    """회원가입용 시/도 목록. 공공데이터 getCommonGusigunCodeList 응답에서 unique 시도명 추출 후 region_map으로 코드 매핑."""
+    import json as _json
+    if not DATA_GO_KR_API_KEY:
+        path = ROOT_DIR / "data" / "region_map.json"
+        if path.exists():
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            regions = data.get("regions", [])
+            if regions:
+                return [{"region_code": r.get("region_code", ""), "region_name": r.get("region_name", "")} for r in regions]
+        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
+    seen = set()
+    all_sd = []
+    page = 1
+    while True:
+        items = _data_gokr_gusigun(sd_name=None, page_no=page, num_of_rows=500)
+        if not items:
+            break
+        for it in items:
+            sd = (it.get("sdName") or it.get("SD_NAME") or "").strip()
+            if sd and sd not in seen:
+                seen.add(sd)
+                all_sd.append(sd)
+        if len(items) < 500:
+            break
+        page += 1
+    if not all_sd:
+        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
+    sd_to_code = {}
+    path = ROOT_DIR / "data" / "region_map.json"
+    if path.exists():
+        rm = _json.loads(path.read_text(encoding="utf-8"))
+        for r in rm.get("regions", []):
+            c = str(r.get("region_code", "")).strip()
+            n = str(r.get("region_name", "")).strip()
+            if c and n:
+                sd_to_code[n] = c
+                for a in r.get("aliases", []) or []:
+                    sd_to_code[str(a).strip()] = c
+    for code, name in REGION_NAME_MAP.items():
+        if name not in sd_to_code:
+            sd_to_code[name] = code
+    result = []
+    for sd in all_sd:
+        code = sd_to_code.get(sd)
+        if code:
+            result.append({"region_code": code, "region_name": sd})
+    if not result:
+        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
+    order = {c: i for i, (c, _) in enumerate(REGION_NAME_MAP.items())}
+    result.sort(key=lambda x: order.get(x["region_code"], 999))
+    return result
+
+
+@app.get("/api/signup/districts")
+def api_signup_districts(
+    region_code: str = Query(..., description="행정구역 코드"),
+    election_position: str = Query(default="", description="metro_mayor|regional_council|local_mayor|local_council"),
+):
+    """회원가입용 선거구(시군구) 목록. 광역 단체장이면 빈 배열. 그 외는 공공데이터 getCommonGusigunCodeList 기반."""
+    if (election_position or "").strip().lower() == "metro_mayor":
+        return []
+    code = (region_code or "").strip()
+    if not code:
+        return []
+    region_name = REGION_NAME_MAP.get(code, "")
+    if not region_name:
+        import json as _json
+        path = ROOT_DIR / "data" / "region_map.json"
+        if path.exists():
+            for r in _json.loads(path.read_text(encoding="utf-8")).get("regions", []):
+                if str(r.get("region_code", "")) == code:
+                    region_name = str(r.get("region_name", ""))
+                    break
+    if not region_name:
+        return []
+    if DATA_GO_KR_API_KEY:
+        items = _data_gokr_gusigun(sd_name=region_name, page_no=1, num_of_rows=1000)
+        if items:
+            result = []
+            seen_wiw = set()
+            for it in items:
+                wiw = (it.get("wiwName") or it.get("WIW_NAME") or "").strip()
+                wiw_norm = "".join(wiw.split()) or wiw
+                if wiw_norm and wiw_norm not in seen_wiw:
+                    seen_wiw.add(wiw_norm)
+                    result.append({"district_code": f"{code}:{wiw_norm}", "district_name": wiw, "region_code": code})
+            if result:
+                return result
+    path = ROOT_DIR / "data" / "district_map.json"
+    if not path.exists():
+        return []
+    import json as _json
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning("district_map.json load failed: %s", e)
+        return []
+    raw_groups = data.get("data", [])
+    region_aliases = {region_name}
+    region_map_path = ROOT_DIR / "data" / "region_map.json"
+    if region_map_path.exists():
+        rm = _json.loads(region_map_path.read_text(encoding="utf-8"))
+        for r in rm.get("regions", []):
+            if str(r.get("region_code", "")) == code:
+                region_aliases.add(str(r.get("region_name", "")).strip())
+                region_aliases.update(str(a).strip() for a in r.get("aliases", []))
+                break
+    for row in raw_groups or []:
+        if not isinstance(row, dict) or len(row) != 1:
+            continue
+        rname, district_names = next(iter(row.items()))
+        if str(rname).strip() not in region_aliases:
+            continue
+        names = list(district_names) if district_names else [rname]
+        return [{"district_code": f"{code}:{''.join(c for c in str(d).strip() if c not in ' \t')}", "district_name": str(d).strip(), "region_code": code} for d in names if str(d).strip()]
+    return []
+
+
+@app.get("/api/signup/district-sub")
+def api_signup_district_sub(
+    district_code: str = Query(..., description="시군구 코드 (예: 11:강북구)"),
+):
+    """시군구 선택 후 세부선거구(가나다) 목록. district_sub_map.json(공공 API getCommonSggCodeList로 생성) 기반. 없으면 단독 1개."""
+    key = (district_code or "").strip()
+    if not key:
+        return [{"sub_code": "단독", "sub_name": "단독"}]
+    path = ROOT_DIR / "data" / "district_sub_map.json"
+    default = [{"sub_code": "단독", "sub_name": "단독"}]
+    if not path.exists():
+        return default
+    import json as _json
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning("district_sub_map.json load failed: %s", e)
+        return default
+    subs = data.get("subs") or {}
+    names = subs.get(key)
+    if not names or not isinstance(names, list):
+        return default
+    # 선택지가 2개 이상이면 "단독"은 제외(실제 선거구만 노출)
+    filtered = [s for s in names if s and str(s).strip()]
+    if len(filtered) > 1:
+        filtered = [s for s in filtered if str(s).strip() != "단독"]
+    return [{"sub_code": str(s).strip(), "sub_name": str(s).strip()} for s in filtered if s]
 
 
 @app.post("/api/auth/signup")
 def api_signup(body: SignupBody):
-    ok, msg = auth_signup(body.email, body.password, name=body.name, phone=body.phone)
+    ok, msg = auth_signup(
+        body.email,
+        body.password,
+        name=body.name,
+        phone=body.phone,
+        election_position=body.election_position or "",
+        region_code=body.region_code or "",
+        region_name=body.region_name or "",
+        district_code=body.district_code or "",
+        district_name=body.district_name or "",
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"message": msg}
@@ -531,17 +738,13 @@ def api_me(request: Request):
 
 @app.get("/api/admin/users/pending")
 def api_admin_users_pending(request: Request):
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
     return {"users": list_users_pending()}
 
 
 @app.get("/api/admin/users")
 def api_admin_users_all(request: Request):
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
     return {"users": list_users_all()}
 
 
@@ -553,9 +756,7 @@ class ApproveBody(BaseModel):
 
 @app.post("/api/admin/users/approve")
 def api_admin_approve(body: ApproveBody, request: Request):
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
     if body.status not in ("APPROVED", "REJECTED", "SUSPENDED"):
         raise HTTPException(status_code=400, detail="status must be APPROVED, REJECTED, or SUSPENDED")
     ok = set_user_status(body.user_id, body.status, user["id"], body.note)
@@ -570,9 +771,7 @@ class DeleteUserBody(BaseModel):
 
 @app.post("/api/admin/users/delete")
 def api_admin_delete_user(body: DeleteUserBody, request: Request):
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
     if body.user_id == user["id"]:
         raise HTTPException(status_code=400, detail="자기 자신은 삭제할 수 없습니다.")
 
@@ -637,9 +836,7 @@ def api_usage_summary(request: Request):
 
 @app.get("/api/admin/usage/stats")
 def api_admin_usage_stats(request: Request):
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
     period = request.query_params.get("period", "7")
     days = min(90, max(1, int(period) if period.isdigit() else 7))
     from backend.database import get_connection
@@ -874,6 +1071,26 @@ def _debug_endpoint(allowed: bool = True):
         raise HTTPException(status_code=404, detail="Debug endpoint disabled (DEBUG_ENDPOINTS_ENABLED=0)")
 
 
+@app.get("/api/debug/admin-check")
+def debug_admin_check(request: Request):
+    """
+    ADMIN_EMAILS 로드 여부·현재 로그인 사용자 포함 여부 확인.
+    승인 우회가 안 될 때 점검용. 이메일 자체는 반환하지 않음.
+    """
+    _debug_endpoint()
+    user = get_current_user(request)
+    in_admin = user is not None and user.get("email") in ADMIN_EMAILS
+    return {
+        "admin_emails_count": len(ADMIN_EMAILS),
+        "admin_emails_loaded": ADMIN_EMAILS,
+        "logged_in": user is not None,
+        "user_email": user.get("email") if user else None,
+        "user_in_admin_list": in_admin,
+        "user_status": user.get("status") if user else None,
+        "user_role": user.get("role") if user else None,
+    }
+
+
 @app.get("/api/debug/fs")
 def debug_fs():
     """PDF 디렉터리 존재·폴더별 PDF 개수·샘플 파일명. AWS 배포 확인용."""
@@ -1078,48 +1295,54 @@ def debug_scan():
 @app.post("/check", response_model=PledgeCheckResponse)
 def check_pledge(body: PledgeCheckRequest, request: Request):
     """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다. (승인 사용자 전용)"""
-    _ensure_startup()  # 지연 초기화
-    
-    user = require_approved(request)
-    ip = _client_ip(request)
-    ok, msg = check_rate_limit_ip(ip)
-    if not ok:
-        raise HTTPException(status_code=429, detail=msg)
-    ok, msg = check_rate_limit_user(user["id"])
-    if not ok:
-        raise HTTPException(status_code=429, detail=msg)
-
-    from backend.analysis_service import run_check_analysis
-    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
-    vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    winners2022_vs_id = _winners2022_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-    result, status_code, from_cache = run_check_analysis(
-        user["id"],
-        body.pledge or "",
-        ip,
-        vs_id,
-        regional_vs_id,
-        winners2022_vs_id,
-        _indexes if not USE_OPENAI_VECTOR_STORE else None,
-    )
-    if status_code >= 400:
-        raise HTTPException(status_code=status_code, detail=result)
     try:
-        from backend.history import add_history
+        _ensure_startup()  # 지연 초기화
 
-        add_history(
-            user_id=user["id"],
-            kind="check",
-            input_text=body.pledge or "",
-            result=result,
-            status_code=status_code,
-            from_cache=from_cache,
-            options={"source": "check"},
+        user = require_approved(request)
+        ip = _client_ip(request)
+        ok, msg = check_rate_limit_ip(ip)
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_rate_limit_user(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+
+        from backend.analysis_service import run_check_analysis
+        global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
+        vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
+        regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+        winners2022_vs_id = _winners2022_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+        result, status_code, from_cache = run_check_analysis(
+            user["id"],
+            body.pledge or "",
+            ip,
+            vs_id,
+            regional_vs_id,
+            winners2022_vs_id,
+            _indexes if not USE_OPENAI_VECTOR_STORE else None,
         )
-    except Exception:
-        pass
-    return PledgeCheckResponse(result=result)
+        if status_code >= 400:
+            raise HTTPException(status_code=status_code, detail=result)
+        try:
+            from backend.history import add_history
+
+            add_history(
+                user_id=user["id"],
+                kind="check",
+                input_text=body.pledge or "",
+                result=result,
+                status_code=status_code,
+                from_cache=from_cache,
+                options={"source": "check"},
+            )
+        except Exception:
+            pass
+        return PledgeCheckResponse(result=result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("check_pledge 오류")
+        raise HTTPException(status_code=500, detail=str(e)[:500])
 
 
 REGION_NAME_MAP = {
@@ -1296,9 +1519,7 @@ class AdminCandidateUpsertBody(BaseModel):
 def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
     """관리자 전용 후보 등록 API. region_code 검증을 강제한다."""
     _ensure_db_ready()
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
 
     code = _validate_region_code(body.region_code)
     district_code = _normalize_district_code(body.district_code)
@@ -1364,9 +1585,7 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
 def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, request: Request):
     """관리자 전용 후보 수정 API. region_code 검증을 강제한다."""
     _ensure_db_ready()
-    user = require_user(request)
-    if user["role"] != ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="관리자 전용")
+    user = require_admin(request)
 
     code = _validate_region_code(body.region_code)
     district_code = _normalize_district_code(body.district_code)

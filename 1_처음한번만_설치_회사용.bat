@@ -16,21 +16,66 @@ echo.
 echo 현재 폴더: %cd%
 echo.
 
-REM Python 확인 (python 또는 py 시도)
-set PYEXE=
-where python >nul 2>&1 && set PYEXE=python
-if not defined PYEXE where py >nul 2>&1 && set PYEXE=py
+REM Python 확인: py -3 우선, 그 다음 WindowsApps 제외한 python.exe 자동 선택
+set "PYEXE="
+
+REM 1) Python Launcher (권장)
+REM - 패키지 호환성 때문에 3.12/3.11/3.10을 우선 사용합니다.
+where py >nul 2>&1
+if %errorlevel%==0 (
+    for %%V in (3.12 3.11 3.10) do (
+        py -%%V --version >nul 2>&1
+        if not errorlevel 1 (
+            set "PYEXE=py -%%V"
+            goto PY_FOUND
+        )
+    )
+    py -3 --version >nul 2>&1
+    if not errorlevel 1 (
+        set "PYEXE=py -3"
+        goto PY_FOUND
+    )
+    py --version >nul 2>&1
+    if not errorlevel 1 (
+        set "PYEXE=py"
+        goto PY_FOUND
+    )
+)
+
+REM 2) 흔한 사용자 설치 경로 우선 (WindowsApps 영향 없음)
 if not defined PYEXE (
-    echo [오류] Python이 설치되어 있지 않거나 PATH에 없습니다.
+    if exist "%LocalAppData%\Python\bin\python.exe" (
+        "%LocalAppData%\Python\bin\python.exe" -c "import sys" >nul 2>&1
+        if not errorlevel 1 set "PYEXE=\"%LocalAppData%\Python\bin\python.exe\""
+    )
+)
+
+REM 3) python.exe 경로 중 WindowsApps(스토어 별칭) 제외
+if not defined PYEXE (
+    for /f "delims=" %%P in ('where python 2^>nul') do (
+        echo %%P | find /i "WindowsApps" >nul
+        if errorlevel 1 (
+            "%%P" -c "import sys" >nul 2>&1
+            if not errorlevel 1 (
+                set "PYEXE="%%P""
+                goto PY_FOUND
+            )
+        )
+    )
+)
+:PY_FOUND
+
+if not defined PYEXE (
+    echo [오류] 사용 가능한 Python을 찾을 수 없습니다.
     echo.
-    echo 1. https://www.python.org/downloads/ 에서 Python 설치
-    echo 2. 설치 시 "Add Python to PATH" 체크
-    echo 3. 설치 후 컴퓨터 재시작 또는 명령 프롬프트 다시 열기
+    echo [방법] 아래 둘 중 하나를 한 번만 처리하세요
+    echo   1. python.org 에서 Python 3.12 권장 설치 + Add Python to PATH 체크
+    echo   2. 설정 - 앱 - 고급 앱 설정 - 앱 실행 별칭에서 python.exe/python3.exe 끔
     echo.
     pause
     exit /b 1
 )
-echo 사용 중인 Python: %PYEXE%
+echo 사용 중인 Python = %PYEXE%
 %PYEXE% --version
 echo.
 

@@ -64,9 +64,14 @@ if errorlevel 1 (
 )
 
 echo.
-echo [디버그] uvicorn 시작 중...
-REM uvicorn으로 FastAPI 서버 실행
-REM 노트북 환경 안정성을 위해 --reload를 사용하지 않음
+REM 8000 포트 사용 중이면 기존 프로세스 자동 종료
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8000" ^| findstr "LISTENING"') do (
+    taskkill /PID %%a /F >nul 2>&1
+    echo [확인] 기존 8000 포트 프로세스 종료 (PID %%a)
+)
+timeout /t 2 /nobreak >nul 2>&1
+
+echo [시작] uvicorn...
 %PYEXE% -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 REM 서버가 종료되면 (오류 포함) 아래 메시지 표시
@@ -76,11 +81,10 @@ if errorlevel 1 (
     echo [오류] 서버 실행 중 문제가 발생했습니다.
     echo ========================================
     echo.
-    echo 가능한 원인:
-    echo - uvicorn이 설치되지 않았습니다.
-    echo   → '1_처음한번만_설치_집노트북.bat' 파일을 먼저 실행하세요
-    echo - 8000번 포트가 이미 사용 중일 수 있습니다
-    echo - 위쪽의 에러 메시지를 확인해 주세요
+    echo Possible causes:
+    echo   - uvicorn not installed: run 1_처음한번만_설치_집노트북.bat
+    echo   - port 8000 in use: kill process using port, then retry
+    echo   - check error above
     echo.
 )
 

@@ -59,6 +59,7 @@
             <th>이름</th>
             <th>전화번호</th>
             <th>이메일</th>
+            <th>출마/선거구</th>
             <th>상태</th>
             <th>역할</th>
             <th>가입일</th>
@@ -87,6 +88,15 @@
       const t = String(s ?? '');
       return t.length >= 10 ? t.slice(0, 10) : t;
     }
+    const ELECTION_LABEL = { metro_mayor: '광역 단체장', regional_council: '광역 의원', local_mayor: '기초 단체장', local_council: '기초 의원' };
+    function formatElection(u) {
+      const ep = ELECTION_LABEL[u.election_position] || u.election_position || '-';
+      const rn = (u.region_name || '').trim();
+      const dn = (u.district_name || '').trim();
+      if (!rn) return ep;
+      if (!dn) return ep + ' / ' + rn;
+      return ep + ' / ' + rn + ' ' + dn;
+    }
 
     (async () => {
       const r = await fetch('/api/admin/users', { credentials: 'include' });
@@ -111,11 +121,13 @@
         const created = escapeHtml(ymd(u.created_at || ''));
 
         const actions = buildActionsHtml(u);
+        const election = escapeHtml(formatElection(u));
 
         tr.innerHTML =
           `<td>${name}</td>` +
           `<td>${phone}</td>` +
           `<td>${email}</td>` +
+          `<td>${election}</td>` +
           `<td><span class="status ${escapeHtml(statusCls)}">${escapeHtml(statusCls)}</span></td>` +
           `<td>${role}</td>` +
           `<td>${created}</td>` +

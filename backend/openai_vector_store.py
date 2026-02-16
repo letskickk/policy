@@ -430,6 +430,13 @@ file_search 도구: 정강·공약·지역별 공약 검색.
         .replace("{{REGIONAL_PLEDGES_CONTEXT}}", "[file_search로 타지역 공약 검색 (지역별 store 있으면)]" if has_regional else "(타지역 공약 문서 없음)")
         .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", winners2022_ctx)
         .replace("{{PLEDGE}}", "[입력으로 전달되는 출마자 공약]")
+        .replace("{{ELECTION_TYPE}}", "[입력 메타정보에서 전달]")
+        .replace("{{REGION_LEVEL}}", "[입력 메타정보에서 전달]")
+        .replace("{{REGION_PROVINCE}}", "[입력 메타정보에서 전달]")
+        .replace("{{REGION_CITY}}", "[입력 메타정보에서 전달]")
+        .replace("{{DISTRICT_NAME}}", "[입력 메타정보에서 전달]")
+        # 구버전 템플릿 호환
+        .replace("{{REGION_NAME}}", "[입력 메타정보에서 전달]")
     )
     return f"{system}\n\n{tool_desc}\n\n{user_adapted}"
 
@@ -440,6 +447,7 @@ def run_check(
     regional_vector_store_id: str = "",
     winners2022_vector_store_id: str = "",
     max_results: int = 12,
+    user_meta: dict | None = None,
 ) -> str:
     """
     A안(전면 재설계):
@@ -638,7 +646,9 @@ def run_check(
     from backend.prompts import load_system_prompt, build_user_message
 
     system = load_system_prompt()
-    user = build_user_message(platform_context, pledges_context, regional_context, pledge, winners2022_context)
+    user = build_user_message(
+        platform_context, pledges_context, regional_context, pledge, winners2022_context, user_meta=user_meta
+    )
 
     resp = client.chat.completions.create(
         model=CHAT_MODEL,
