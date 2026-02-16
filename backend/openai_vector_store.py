@@ -616,12 +616,45 @@ def run_check(
             return r + "장"
         return None
 
+    def _extract_pledge_title(text: str) -> str | None:
+        """
+        공약 제목 추출 (공약 1, 공약 2 등 다음 텍스트 또는 따옴표 안 텍스트).
+        """
+        if not text:
+            return None
+        
+        # 패턴 1: "공약 1", "공약 2" 등 다음 텍스트
+        match = re.search(r'공약\s*\d+\s*[:\s]*([^\n]{10,80}?)(?:\n|목표|이행방법|$)', text, re.MULTILINE)
+        if match:
+            title = match.group(1).strip()
+            # 따옴표 제거
+            title = re.sub(r'^["\'「」『』]|["\'「」『』]$', '', title).strip()
+            if len(title) >= 5:
+                return title
+        
+        # 패턴 2: 따옴표 안 텍스트
+        for quote in ['"', "'", '「', '」', '『', '』']:
+            match = re.search(rf'{quote}([^{quote}]{{10,80}}?){quote}', text)
+            if match:
+                title = match.group(1).strip()
+                if len(title) >= 5:
+                    return title
+        
+        # 패턴 3: 첫 번째 문장 (50자 이내)
+        lines = text.split('\n')
+        for line in lines[:5]:
+            line = line.strip()
+            if 10 <= len(line) <= 50 and not line.startswith('[') and not line.startswith('출처'):
+                return line
+        
+        return None
+
     def _extract_winners2022_metadata(text: str, filename: str = "") -> dict:
         """
-        winners2022 청크에서 메타 정보 추출 (이름/직책/지역).
-        Returns: {'name': str|None, 'position': str|None, 'region': str|None}
+        winners2022 청크에서 메타 정보 추출 (이름/직책/지역/공약제목).
+        Returns: {'name': str|None, 'position': str|None, 'region': str|None, 'pledge_title': str|None}
         """
-        meta = {'name': None, 'position': None, 'region': None}
+        meta = {'name': None, 'position': None, 'region': None, 'pledge_title': None}
         if not text:
             return meta
 
@@ -629,24 +662,26 @@ def run_check(
         compact_text = _compact_spaced_hangul(text)
         scan_text = f"{text}\n{compact_text}"
 
+        # 공약 제목 추출 (먼저)
+        meta['pledge_title'] = _extract_pledge_title(text)
+
         # 이름 추출 (직책 앞/뒤, 당선인 표기, 시도명+이름 표기 모두 대응)
         # 우선순위: 시도명+이름 > 직책+이름 > 이름+직책 > 당선인 표기
+        # 더 정확한 패턴: 시도명/직책 바로 다음에 오는 이름만 매칭
         name_patterns = [
-            # 시도명 + 이름 (가장 정확)
-            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s+([가-힣]{2,4})(?:\s|$|[0-9])",
-            # 직책 + 이름
-            r"(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)\s+([가-힣]{2,4})(?:\s|$|[0-9])",
-            # 이름 + 직책
+            # 시도명 + 이름 (가장 정확, 바로 다음에 오는 이름만)
+            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s+([가-힣]{2,4})(?:\s|$|[0-9]|공약)",
+            # 직책 + 이름 (직책 바로 다음)
+            r"(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)\s+([가-힣]{2,4})(?:\s|$|[0-9]|공약)",
+            # 이름 + 직책 (이름 바로 다음)
             r"([가-힣]{2,4})\s+(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)",
-            # 당선인/후보 표기
-            r"(?:당선인|후보|공약자|성명|이름)\s*[:：]?\s*([가-힣]{2,4})",
         ]
         for p in name_patterns:
             name_match = re.search(p, scan_text)
             if name_match:
                 name = name_match.group(1)
-                # 잘못된 추출 검증: 한 글자나 너무 긴 이름 제외
-                if 2 <= len(name) <= 4:
+                # 잘못된 추출 검증: 한 글자나 너무 긴 이름 제외, 일반적인 이름 패턴만
+                if 2 <= len(name) <= 4 and not name in ['특별', '광역', '자치', '시도', '지사', '시장', '구청', '군수']:
                     meta['name'] = name
                     break
 
@@ -728,51 +763,55 @@ def run_check(
         for score, filename, text in hits[:max_enhance]:
             meta = _extract_winners2022_metadata(text, filename)
             
-            # 메타 보강 기준: 직책/지역만 확인 (이름 제외)
-            has_sufficient_meta = bool(meta['position'] or meta['region'])
+            # 메타 보강: 이름/직책/지역이 없으면 재조회
+            needs_enhancement = not (meta['name'] and meta['position'] and meta['region'])
             
-            if not has_sufficient_meta:
+            if needs_enhancement:
                 # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회 (최적화: 쿼리 수 최소화)
                 source_path = _extract_source_path(text)
                 if source_path or filename:
-                    # 직책/지역만 찾는 쿼리 (이름 제외)
                     refine_queries = []
                     
-                    # 지역/직책 찾기
-                    if not meta.get("region") and not meta.get("position"):
-                        refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역")
+                    # 우선순위: 지역/직책 기반 이름 찾기
+                    if meta.get("region") and not meta.get("name"):
+                        refine_queries.append(f"{meta['region']} 당선인 이름")
+                    elif meta.get("position") and not meta.get("name"):
+                        refine_queries.append(f"{meta['position']} 당선인 이름")
+                    elif not meta.get("region") and not meta.get("position"):
+                        refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역 이름")
 
                     # 최대 1개 쿼리만 실행, rewrite=False만 사용 (k=4로 제한)
                     for rq in refine_queries[:1]:
                         enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
                         for _, _, enhance_text in enhance_hits:
                             enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
+                            if enhance_meta['name'] and not meta['name']:
+                                meta['name'] = enhance_meta['name']
                             if enhance_meta['position'] and not meta['position']:
                                 meta['position'] = enhance_meta['position']
                             if enhance_meta['region'] and not meta['region']:
                                 meta['region'] = enhance_meta['region']
-                            # 직책과 지역을 모두 찾으면 즉시 중단
-                            if meta['position'] and meta['region']:
+                            # 이름, 직책, 지역을 모두 찾으면 즉시 중단
+                            if meta['name'] and meta['position'] and meta['region']:
                                 break
-                        # 직책과 지역을 모두 찾으면 다음 쿼리 스킵
-                        if meta['position'] and meta['region']:
+                        if meta['name'] and meta['position'] and meta['region']:
                             break
             
-            # 메타 정보를 텍스트에 추가 (이름 제외, 직책/지역만)
-            meta_lines = []
-            
+            # 메타 정보를 간단한 형식으로 텍스트에 추가
+            meta_parts = []
             if meta['position']:
-                meta_lines.append(f"[메타-직책] {meta['position']}")
-            else:
-                meta_lines.append("[메타-직책] 확인 불가")
+                meta_parts.append(meta['position'])
+            if meta['name']:
+                meta_parts.append(meta['name'])
+            if meta['pledge_title']:
+                meta_parts.append(f'"{meta["pledge_title"]}"')
             
-            if meta['region']:
-                meta_lines.append(f"[메타-지역] {meta['region']}")
-            else:
-                meta_lines.append("[메타-지역] 확인 불가")
+            meta_header = ""
+            if meta_parts:
+                meta_header = f"[메타] {' '.join(meta_parts)}\n\n"
             
-        enhanced_text = "\n".join(meta_lines) + "\n\n" + text
-        enhanced.append((score, filename, enhanced_text))
+            enhanced_text = meta_header + text
+            enhanced.append((score, filename, enhanced_text))
         
         logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
         return enhanced
