@@ -630,40 +630,72 @@ def run_check(
         scan_text = f"{text}\n{compact_text}"
 
         # 이름 추출 (직책 앞/뒤, 당선인 표기, 시도명+이름 표기 모두 대응)
+        # 우선순위: 시도명+이름 > 직책+이름 > 이름+직책 > 당선인 표기
         name_patterns = [
+            # 시도명 + 이름 (가장 정확)
+            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s+([가-힣]{2,4})(?:\s|$|[0-9])",
+            # 직책 + 이름
+            r"(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)\s+([가-힣]{2,4})(?:\s|$|[0-9])",
+            # 이름 + 직책
+            r"([가-힣]{2,4})\s+(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)",
+            # 당선인/후보 표기
             r"(?:당선인|후보|공약자|성명|이름)\s*[:：]?\s*([가-힣]{2,4})",
-            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s*([가-힣]{2,4})",
-            r"(?:특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원)\s*([가-힣]{2,4})",
-            r"([가-힣]{2,4})\s*(?:특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원)",
         ]
         for p in name_patterns:
             name_match = re.search(p, scan_text)
             if name_match:
-                meta['name'] = name_match.group(1)
-                break
+                name = name_match.group(1)
+                # 잘못된 추출 검증: 한 글자나 너무 긴 이름 제외
+                if 2 <= len(name) <= 4:
+                    meta['name'] = name
+                    break
 
-        # 직책 추출
+        # 직책 추출 (완전한 형태 우선, 부분 매칭은 신중하게)
         position_patterns = [
             r"(서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장)",
             r"(경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사)",
-            r"([가-힣]+(?:구|시|군))\s*(구청장|시장|군수)",
             r"(국회의원|광역의원|기초의원|시의원|구의원|도의원|교육감)",
+            # 구/시/군 단위는 완전한 형태만 매칭 (잘못된 매칭 방지)
+            r"([가-힣]{2,}(?:구|시|군))\s*(?:구청장|시장|군수)",
             r"(특별시장|광역시장|시장|도지사|구청장|군수)",
         ]
         for pattern in position_patterns:
             match = re.search(pattern, scan_text)
             if match:
-                meta['position'] = re.sub(r"\s+", "", match.group(0))
-                break
+                pos = re.sub(r"\s+", "", match.group(0))
+                # 잘못된 추출 검증: "세출" 같은 잘못된 매칭 방지
+                invalid_prefixes = ["세출", "출구", "출시", "출군"]
+                if not any(pos.startswith(prefix) for prefix in invalid_prefixes):
+                    meta['position'] = pos
+                    break
 
-        # 지역 추출
-        region_match = re.search(
-            r"(서울|서울특별시|부산|부산광역시|대구|대구광역시|인천|인천광역시|광주|광주광역시|대전|대전광역시|울산|울산광역시|세종|세종특별자치시|경기|경기도|강원|강원도|충북|충청북도|충남|충청남도|전북|전라북도|전남|전라남도|경북|경상북도|경남|경상남도|제주|제주특별자치도|[가-힣]+(?:구|시|군))",
-            scan_text,
-        )
-        if region_match:
-            region = region_match.group(1)
-            meta['region'] = _normalize_region_name(region)
+        # 지역 추출 (완전한 형태 우선)
+        valid_regions = [
+            "서울특별시", "서울", "부산광역시", "부산", "대구광역시", "대구",
+            "인천광역시", "인천", "광주광역시", "광주", "대전광역시", "대전",
+            "울산광역시", "울산", "세종특별자치시", "세종",
+            "경기도", "경기", "강원도", "강원", "충청북도", "충북", "충청남도", "충남",
+            "전라북도", "전북", "전라남도", "전남", "경상북도", "경북", "경상남도", "경남",
+            "제주특별자치도", "제주"
+        ]
+        # 완전한 형태 우선 매칭
+        region_match = None
+        for region in valid_regions:
+            pattern = re.escape(region)
+            match = re.search(pattern, scan_text)
+            if match:
+                region_match = match
+                meta['region'] = _normalize_region_name(region)
+                break
+        
+        # 완전한 형태가 없으면 구/시/군 패턴 시도 (2자 이상만)
+        if not region_match:
+            region_match = re.search(r"([가-힣]{2,}(?:구|시|군))", scan_text)
+            if region_match:
+                region = region_match.group(1)
+                # 잘못된 추출 검증
+                if not any(region.startswith(prefix) for prefix in ["세출", "출구", "출시", "출군"]):
+                    meta['region'] = _normalize_region_name(region)
 
         # 직책에서 지역 역추론
         if not meta['region'] and meta['position']:
@@ -711,9 +743,19 @@ def run_check(
                         f"{doc_base} 시도지사 당선인 공약",
                     ]
                     if meta.get("region"):
-                        refine_queries.append(f"{doc_base} {meta['region']} 당선인 이름 직책")
+                        # 지역 기반 이름 찾기 (더 구체적으로)
+                        refine_queries.append(f"{meta['region']} 당선인 이름")
+                        refine_queries.append(f"{meta['region']} 시장 당선인")
+                        refine_queries.append(f"{meta['region']} 지사 당선인")
                     if meta.get("position"):
-                        refine_queries.append(f"{doc_base} {meta['position']} 당선인 이름")
+                        # 직책 기반 이름 찾기 (더 구체적으로)
+                        refine_queries.append(f"{meta['position']} 당선인 이름")
+                        refine_queries.append(f"{meta['position']} 후보 이름")
+                        # 직책에서 지역 추출하여 이름 찾기
+                        if "시장" in meta['position'] or "지사" in meta['position']:
+                            pos_region = meta['position'].replace("시장", "").replace("지사", "").replace("광역시", "").replace("특별시", "").replace("도", "").strip()
+                            if pos_region:
+                                refine_queries.append(f"{pos_region} 당선인 이름")
 
                     for rq in refine_queries:
                         enhance_hits = [
