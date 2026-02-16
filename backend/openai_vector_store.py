@@ -728,53 +728,38 @@ def run_check(
         for score, filename, text in hits[:max_enhance]:
             meta = _extract_winners2022_metadata(text, filename)
             
-            # 메타 보강 기준:
-            # 이름이 비어 있으면 직책/지역이 있어도 반드시 보강 시도한다.
-            has_sufficient_meta = bool(meta['name'] and (meta['position'] or meta['region']))
+            # 메타 보강 기준: 직책/지역만 확인 (이름 제외)
+            has_sufficient_meta = bool(meta['position'] or meta['region'])
             
             if not has_sufficient_meta:
                 # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회 (최적화: 쿼리 수 최소화)
                 source_path = _extract_source_path(text)
                 if source_path or filename:
-                    # 최대 2개 쿼리만 사용 (타임아웃 방지)
+                    # 직책/지역만 찾는 쿼리 (이름 제외)
                     refine_queries = []
                     
-                    # 우선순위 1: 지역/직책 기반 이름 찾기 (가장 정확)
-                    if meta.get("region"):
-                        refine_queries.append(f"{meta['region']} 당선인 이름")
-                    elif meta.get("position"):
-                        refine_queries.append(f"{meta['position']} 당선인 이름")
-                    
-                    # 우선순위 2: 일반적인 재조회 (지역/직책이 없을 때만)
-                    if not refine_queries:
-                        refine_queries.append("제8회 전국동시지방선거 당선인 이름 직책")
+                    # 지역/직책 찾기
+                    if not meta.get("region") and not meta.get("position"):
+                        refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역")
 
-                    # 최대 2개 쿼리만 실행, 각 쿼리는 rewrite=False만 사용 (k=4로 제한)
-                    for rq in refine_queries[:2]:
+                    # 최대 1개 쿼리만 실행, rewrite=False만 사용 (k=4로 제한)
+                    for rq in refine_queries[:1]:
                         enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
                         for _, _, enhance_text in enhance_hits:
                             enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
-                            if enhance_meta['name']:
-                                meta['name'] = enhance_meta['name']
                             if enhance_meta['position'] and not meta['position']:
                                 meta['position'] = enhance_meta['position']
                             if enhance_meta['region'] and not meta['region']:
                                 meta['region'] = enhance_meta['region']
-                            # 이름을 찾으면 즉시 중단
-                            if meta['name']:
+                            # 직책과 지역을 모두 찾으면 즉시 중단
+                            if meta['position'] and meta['region']:
                                 break
-                        # 이름을 찾으면 다음 쿼리 스킵
-                        if meta['name']:
+                        # 직책과 지역을 모두 찾으면 다음 쿼리 스킵
+                        if meta['position'] and meta['region']:
                             break
             
-            # 메타 정보를 텍스트에 추가
+            # 메타 정보를 텍스트에 추가 (이름 제외, 직책/지역만)
             meta_lines = []
-            if meta['name']:
-                meta_lines.append(f"[메타-이름] {meta['name']}")
-                metadata_resolved += 1
-            else:
-                meta_lines.append("[메타-이름] 확인 불가")
-                metadata_missing += 1
             
             if meta['position']:
                 meta_lines.append(f"[메타-직책] {meta['position']}")
@@ -786,10 +771,10 @@ def run_check(
             else:
                 meta_lines.append("[메타-지역] 확인 불가")
             
-            enhanced_text = "\n".join(meta_lines) + "\n\n" + text
-            enhanced.append((score, filename, enhanced_text))
+        enhanced_text = "\n".join(meta_lines) + "\n\n" + text
+        enhanced.append((score, filename, enhanced_text))
         
-        logger.debug(f"[WINNERS2022] 메타 보강: resolved={metadata_resolved}, missing={metadata_missing}")
+        logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
         return enhanced
 
     def _fmt(items: List[Tuple[float, str, str]], max_chars: int) -> str:
