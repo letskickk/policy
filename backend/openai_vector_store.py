@@ -696,8 +696,9 @@ def run_check(
         for score, filename, text in hits[:max_enhance]:
             meta = _extract_winners2022_metadata(text, filename)
             
-            # 메타가 충분한지 확인 (이름 또는 직책+지역 중 하나라도 있으면 OK)
-            has_sufficient_meta = meta['name'] or (meta['position'] and meta['region'])
+            # 메타 보강 기준:
+            # 이름이 비어 있으면 직책/지역이 있어도 반드시 보강 시도한다.
+            has_sufficient_meta = bool(meta['name'] and (meta['position'] or meta['region']))
             
             if not has_sufficient_meta:
                 # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회
