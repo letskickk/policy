@@ -47,9 +47,10 @@ def _safe_filename(name: str) -> str:
 
 def _create_txt_content(doc_path: Path) -> str | None:
     try:
-        from backend.pdf_loader import extract_text_from_file
+        from backend.pdf_loader import extract_text_from_file, clean_text_noise
 
         text = extract_text_from_file(doc_path)
+        text = clean_text_noise(text)  # OCR/목차 노이즈 제거
         text = (text or "").strip()
         if len(text) < 10:
             return None
