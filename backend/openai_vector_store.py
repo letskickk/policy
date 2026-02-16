@@ -912,13 +912,11 @@ def run_check(
                             if meta['name'] and meta['position'] and meta['region']:
                                 break
             
-            # 메타 정보를 명확한 형식으로 텍스트에 추가 (GPT가 정확히 매칭하도록)
+            # 메타 정보를 명확한 형식으로 텍스트에 추가
+            # 이름은 백엔드에서 추출하지 않고, GPT가 청크 본문에서 직접 찾도록 함
             meta_lines = []
             if meta['position']:
                 meta_lines.append(f"[직책] {meta['position']}")
-            if meta['name']:
-                # 이름이 이 청크에서 추출된 것임을 명시
-                meta_lines.append(f"[이름-이청크에서추출] {meta['name']}")
             if meta['region']:
                 meta_lines.append(f"[지역] {meta['region']}")
             if meta['pledge_title']:
@@ -926,7 +924,7 @@ def run_check(
             
             meta_header = ""
             if meta_lines:
-                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문]\n"
+                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문 - 여기서 이름을 찾으세요]\n"
             
             enhanced_text = meta_header + text
             enhanced.append((score, filename, enhanced_text))
