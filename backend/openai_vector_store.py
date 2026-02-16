@@ -560,6 +560,105 @@ def run_check(
             return "winners2022"
         return ""
 
+    def _extract_winners2022_metadata(text: str, filename: str = "") -> dict:
+        """
+        winners2022 청크에서 메타 정보 추출 (이름/직책/지역).
+        Returns: {'name': str|None, 'position': str|None, 'region': str|None}
+        """
+        meta = {'name': None, 'position': None, 'region': None}
+        if not text:
+            return meta
+        
+        # 이름 추출: 한글 이름 패턴 (2~4자, 성+이름)
+        name_match = re.search(r'([가-힣]{2,4})\s*(?:시장|구청장|군수|시의원|구의원|도지사|시도지사|시장|청장|의원)', text)
+        if not name_match:
+            name_match = re.search(r'(?:당선인|후보|공약자)[:\s]*([가-힣]{2,4})', text)
+        if name_match:
+            meta['name'] = name_match.group(1)
+        
+        # 직책 추출
+        position_patterns = [
+            r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s*(?:특별)?시장',
+            r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s*도지사',
+            r'([가-힣]+구|시|군|도)\s*(?:구청장|시장|군수)',
+            r'(광역|기초)\s*(?:의원|시의원|구의원|도의원)',
+        ]
+        for pattern in position_patterns:
+            match = re.search(pattern, text)
+            if match:
+                meta['position'] = match.group(0)
+                break
+        
+        # 지역 추출
+        region_match = re.search(r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|([가-힣]+구|시|군))', text)
+        if region_match:
+            meta['region'] = region_match.group(1)
+        
+        return meta
+    
+    def _enhance_winners2022_hits(
+        client: OpenAI,
+        vs_id: str,
+        hits: List[Tuple[float, str, str]],
+        max_enhance: int = 20
+    ) -> List[Tuple[float, str, str]]:
+        """
+        winners2022 hits에 메타 정보 보강.
+        메타가 부족한 hit에 대해 같은 문서에서 재조회하여 보강.
+        """
+        enhanced = []
+        metadata_resolved = 0
+        metadata_missing = 0
+        
+        for score, filename, text in hits[:max_enhance]:
+            meta = _extract_winners2022_metadata(text, filename)
+            
+            # 메타가 충분한지 확인 (이름 또는 직책+지역 중 하나라도 있으면 OK)
+            has_sufficient_meta = meta['name'] or (meta['position'] and meta['region'])
+            
+            if not has_sufficient_meta:
+                # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회
+                source_path = _extract_source_path(text)
+                if source_path or filename:
+                    # 문서명 기반 재조회
+                    doc_query = f"{filename or source_path} 제8회 전국동시지방선거 당선인 이름 직책 지역"
+                    enhance_hits = _search(client, vs_id, doc_query, k=5, rewrite=False)
+                    for _, _, enhance_text in enhance_hits:
+                        enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
+                        if enhance_meta['name']:
+                            meta['name'] = enhance_meta['name']
+                        if enhance_meta['position']:
+                            meta['position'] = enhance_meta['position']
+                        if enhance_meta['region']:
+                            meta['region'] = enhance_meta['region']
+                        if meta['name'] or (meta['position'] and meta['region']):
+                            break
+            
+            # 메타 정보를 텍스트에 추가
+            meta_lines = []
+            if meta['name']:
+                meta_lines.append(f"[메타-이름] {meta['name']}")
+                metadata_resolved += 1
+            else:
+                meta_lines.append("[메타-이름] 확인 불가")
+                metadata_missing += 1
+            
+            if meta['position']:
+                meta_lines.append(f"[메타-직책] {meta['position']}")
+            else:
+                meta_lines.append("[메타-직책] 확인 불가")
+            
+            if meta['region']:
+                meta_lines.append(f"[메타-지역] {meta['region']}")
+            else:
+                meta_lines.append("[메타-지역] 확인 불가")
+            
+            enhanced_text = "\n".join(meta_lines) + "\n\n" + text
+            enhanced.append((score, filename, enhanced_text))
+        
+        logger.debug(f"[WINNERS2022] 메타 보강: resolved={metadata_resolved}, missing={metadata_missing}")
+        return enhanced
+
     def _fmt(items: List[Tuple[float, str, str]], max_chars: int) -> str:
         chunks: List[str] = []
         total = 0
@@ -631,15 +730,50 @@ def run_check(
     if regional_vector_store_id:
         regional_hits = _search(client, regional_vector_store_id, pledge, k=25, rewrite=True)
 
-    # 4) winners2022 store (선택) - 인물/지역/직책 메타가 청크 밖에 있을 수 있어 더 넉넉히 가져온다
+    # 4) winners2022 store (선택) - 다중 질의로 리콜 강화
     winners_hits: List[Tuple[float, str, str]] = []
     if winners2022_vector_store_id:
-        winners_hits = _search(client, winners2022_vector_store_id, pledge, k=50, rewrite=True)
+        # 다중 질의 생성
+        queries = [pledge]
+        # 공약 원문 축약본 (첫 200자)
+        if len(pledge) > 200:
+            queries.append(pledge[:200] + "...")
+        # 2022 고정 앵커 질의
+        queries.append("제8회 전국동시지방선거 당선인 공약")
+        # user_meta 결합 질의
+        if user_meta:
+            meta_parts = []
+            if user_meta.get("election_type"):
+                meta_parts.append(user_meta["election_type"])
+            if user_meta.get("region_province"):
+                meta_parts.append(user_meta["region_province"])
+            if user_meta.get("region_city"):
+                meta_parts.append(user_meta["region_city"])
+            if meta_parts:
+                queries.append(f"{' '.join(meta_parts)} {pledge[:150]}")
+        
+        # 각 질의마다 rewrite=True/False 둘 다 조회
+        all_winners_hits = []
+        for q in queries:
+            all_winners_hits.extend(_search(client, winners2022_vector_store_id, q, k=30, rewrite=True))
+            all_winners_hits.extend(_search(client, winners2022_vector_store_id, q, k=30, rewrite=False))
+        
+        # dedup 후 상위 점수만 선택
+        winners_hits_raw = _dedup(all_winners_hits)[:50]
+        
+        logger.debug(f"[WINNERS2022] 다중 질의 {len(queries)}개, 총 hit {len(all_winners_hits)}개, dedup 후 {len(winners_hits_raw)}개")
+        
+        # 메타 보강: 유사 공약이 있으면 메타 정보를 보강
+        if winners_hits_raw:
+            winners_hits = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=20)
+        else:
+            winners_hits = []
 
     # 컨텍스트 구성 (섹션별로 분리 주입)
     platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=12_000) or "(정강·정책 문서 없음)"
     pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=18_000) or "(우리당 공약 문서 없음)"
     regional_context = _fmt(regional_hits[:10], max_chars=10_000) if regional_hits else ""
+    # winners2022: 유사 hit가 있으면 메타가 부족해도 컨텍스트에 포함 (false '없음' 방지)
     winners2022_context = _fmt(winners_hits[:20], max_chars=22_000) if winners_hits else ""
 
     # 프롬프트 생성 후 최종 답변만 생성

@@ -59,8 +59,42 @@ def _create_txt_content(doc_path: Path) -> str | None:
             source_path = str(rel).replace("\\", "/")
         except ValueError:
             source_path = doc_path.name
+        
+        # 문서 메타 섹션 강화: 검색 시 메타 hit 가능성 증가
+        # 텍스트 앞부분에서 이름/직책/지역 추출 시도
+        name_candidates = []
+        position_candidates = []
+        region_candidates = []
+        
+        # 간단한 패턴으로 메타 추출 시도 (첫 5000자만)
+        preview = text[:5000]
+        # 이름 후보: 한글 2-4자 패턴
+        name_matches = re.findall(r'([가-힣]{2,4})\s*(?:시장|구청장|군수|시의원|구의원|도지사|시도지사|청장|의원|당선인)', preview)
+        if name_matches:
+            name_candidates = list(set(name_matches[:5]))  # 중복 제거 후 최대 5개
+        
+        # 직책 후보
+        position_matches = re.findall(r'(시장|구청장|군수|시의원|구의원|도지사|시도지사|청장|의원)', preview)
+        if position_matches:
+            position_candidates = list(set(position_matches[:5]))
+        
+        # 지역 후보
+        region_matches = re.findall(r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|([가-힣]+구|시|군))', preview)
+        if region_matches:
+            region_candidates = list(set([r[0] if isinstance(r, tuple) else r for r in region_matches[:5]]))
+        
+        # 메타 헤더 구성
+        meta_lines = [
+            "[문서 메타]",
+            "선거: 제8회 전국동시지방선거 (2022)",
+            "직책 후보군: " + (", ".join(position_candidates) if position_candidates else "확인 필요"),
+            "지역 후보군: " + (", ".join(region_candidates) if region_candidates else "확인 필요"),
+            "이름 후보: " + (", ".join(name_candidates) if name_candidates else "확인 필요"),
+            ""
+        ]
+        
         header = "[2022당선인공약] 제8회 지방선거 당선인 공약 (비교/벤치마킹)"
-        return f"{header}\n출처: {source_path}\n원본파일: {doc_path.name}\n\n{text}"
+        return f"{header}\n출처: {source_path}\n원본파일: {doc_path.name}\n\n" + "\n".join(meta_lines) + f"\n{text}"
     except Exception as e:
         print(f"  [WARN] extract failed {doc_path.name}: {e}")
         return None
