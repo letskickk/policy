@@ -26,6 +26,7 @@ from backend.config import (
     FILE_SEARCH_MAX_RESULTS,
     FILE_SEARCH_MAX_RESULTS_QUICK,
     PROMPTS_DIR,
+    DATA_GO_KR_API_KEY,
     _nfc,
 )
 
@@ -616,6 +617,98 @@ def run_check(
             return r + "장"
         return None
 
+    def _get_winner_name_from_api(position: str, region: str) -> str | None:
+        """
+        공공데이터포털 당선인 정보 API로 이름 조회.
+        position: "서울특별시장", "경기도지사" 등
+        region: "서울특별시", "경기도" 등
+        Returns: 당선인 이름 또는 None
+        """
+        if not DATA_GO_KR_API_KEY:
+            return None
+        
+        try:
+            from urllib.parse import urlencode
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            
+            # 직책에서 sgTypecode 추론
+            sg_typecode = None
+            if "지사" in position:
+                sg_typecode = "2"  # 시도지사
+            elif "시장" in position or "구청장" in position or "군수" in position:
+                sg_typecode = "3"  # 시장/구청장/군수
+            elif "의원" in position:
+                if "광역" in position:
+                    sg_typecode = "4"  # 광역의원
+                else:
+                    sg_typecode = "5"  # 기초의원
+            
+            if not sg_typecode:
+                return None
+            
+            # 지역명 정규화
+            sd_name = _normalize_region_name(region)
+            if not sd_name:
+                return None
+            
+            # API 호출
+            base_url = "http://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire"
+            params = {
+                "ServiceKey": DATA_GO_KR_API_KEY,
+                "sgId": "20220601",  # 제8회 지방선거
+                "sgTypecode": sg_typecode,
+                "sdName": sd_name,
+                "resultType": "json",
+                "pageNo": "1",
+                "numOfRows": "100"
+            }
+            
+            url = f"{base_url}?{urlencode(params)}"
+            req = Request(url, headers={
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.data.go.kr/"
+            })
+            
+            with urlopen(req, timeout=10) as res:
+                data = json.loads(res.read().decode("utf-8"))
+            
+            # 응답 파싱
+            body = data.get("response", {}).get("body", {}) or data.get("body", {})
+            items = body.get("items") or body.get("item")
+            if not items:
+                return None
+            
+            if isinstance(items, dict):
+                items = items.get("item")
+            if not items:
+                return None
+            
+            if not isinstance(items, list):
+                items = [items]
+            
+            # 직책과 일치하는 당선인 찾기
+            for item in items:
+                name = (item.get("name") or item.get("NAME") or "").strip()
+                sgg_name = (item.get("sggName") or item.get("SGG_NAME") or "").strip()
+                
+                # 직책과 선거구명이 일치하는지 확인
+                if name and len(name) >= 2:
+                    # 시도지사/시장의 경우 선거구명이 없거나 지역명과 일치
+                    if sg_typecode in ("2", "3"):
+                        if not sgg_name or sd_name in sgg_name or sgg_name in sd_name:
+                            return name
+                    else:
+                        # 의원의 경우 선거구명 확인 필요 (일단 이름만 반환)
+                        return name
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"[API] 당선인 정보 조회 실패: {e}")
+            return None
+
     def _extract_pledge_title(text: str) -> str | None:
         """
         공약 제목 추출 (공약 1, 공약 2 등 다음 텍스트 또는 따옴표 안 텍스트).
@@ -755,60 +848,85 @@ def run_check(
         """
         winners2022 hits에 메타 정보 보강.
         메타가 부족한 hit에 대해 같은 문서에서 재조회하여 보강.
+        효율성: API 호출은 상위 3개 hit만, 캐싱으로 중복 호출 방지.
         """
         enhanced = []
-        metadata_resolved = 0
-        metadata_missing = 0
+        # API 호출 캐시 (직책+지역 → 이름)
+        api_cache: Dict[str, str] = {}
+        api_call_count = 0
+        max_api_calls = 3  # 상위 3개만 API 조회 (성능 최적화)
         
-        for score, filename, text in hits[:max_enhance]:
+        for idx, (score, filename, text) in enumerate(hits[:max_enhance]):
             meta = _extract_winners2022_metadata(text, filename)
             
             # 메타 보강: 이름/직책/지역이 없으면 재조회
             needs_enhancement = not (meta['name'] and meta['position'] and meta['region'])
             
             if needs_enhancement:
-                # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회 (최적화: 쿼리 수 최소화)
-                source_path = _extract_source_path(text)
-                if source_path or filename:
-                    refine_queries = []
+                # 우선순위 1: 공공API로 이름 조회 (직책+지역이 있고, 상위 3개만)
+                if meta.get('position') and meta.get('region') and not meta.get('name'):
+                    cache_key = f"{meta['position']}|{meta['region']}"
                     
-                    # 우선순위: 지역/직책 기반 이름 찾기
-                    if meta.get("region") and not meta.get("name"):
-                        refine_queries.append(f"{meta['region']} 당선인 이름")
-                    elif meta.get("position") and not meta.get("name"):
-                        refine_queries.append(f"{meta['position']} 당선인 이름")
-                    elif not meta.get("region") and not meta.get("position"):
-                        refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역 이름")
+                    # 캐시 확인
+                    if cache_key in api_cache:
+                        meta['name'] = api_cache[cache_key]
+                    # 상위 3개만 API 호출
+                    elif api_call_count < max_api_calls:
+                        api_name = _get_winner_name_from_api(meta['position'], meta['region'])
+                        api_call_count += 1
+                        if api_name:
+                            meta['name'] = api_name
+                            api_cache[cache_key] = api_name  # 캐시 저장
+                            logger.debug(f"[API] 이름 조회 성공: {meta['position']} {meta['region']} → {api_name}")
+                        else:
+                            api_cache[cache_key] = ""  # 실패도 캐시 (재시도 방지)
+                
+                # 우선순위 2: 벡터 스토어 재조회 (API 실패 시 또는 직책/지역이 없을 때)
+                if not meta['name'] or not meta['position'] or not meta['region']:
+                    source_path = _extract_source_path(text)
+                    if source_path or filename:
+                        refine_queries = []
+                        
+                        # 지역/직책 기반 이름 찾기
+                        if meta.get("region") and not meta.get("name"):
+                            refine_queries.append(f"{meta['region']} 당선인 이름")
+                        elif meta.get("position") and not meta.get("name"):
+                            refine_queries.append(f"{meta['position']} 당선인 이름")
+                        elif not meta.get("region") and not meta.get("position"):
+                            refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역 이름")
 
-                    # 최대 1개 쿼리만 실행, rewrite=False만 사용 (k=4로 제한)
-                    for rq in refine_queries[:1]:
-                        enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
-                        for _, _, enhance_text in enhance_hits:
-                            enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
-                            if enhance_meta['name'] and not meta['name']:
-                                meta['name'] = enhance_meta['name']
-                            if enhance_meta['position'] and not meta['position']:
-                                meta['position'] = enhance_meta['position']
-                            if enhance_meta['region'] and not meta['region']:
-                                meta['region'] = enhance_meta['region']
-                            # 이름, 직책, 지역을 모두 찾으면 즉시 중단
+                        # 최대 1개 쿼리만 실행, rewrite=False만 사용 (k=4로 제한)
+                        for rq in refine_queries[:1]:
+                            enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
+                            for _, _, enhance_text in enhance_hits:
+                                enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
+                                if enhance_meta['name'] and not meta['name']:
+                                    meta['name'] = enhance_meta['name']
+                                if enhance_meta['position'] and not meta['position']:
+                                    meta['position'] = enhance_meta['position']
+                                if enhance_meta['region'] and not meta['region']:
+                                    meta['region'] = enhance_meta['region']
+                                # 이름, 직책, 지역을 모두 찾으면 즉시 중단
+                                if meta['name'] and meta['position'] and meta['region']:
+                                    break
                             if meta['name'] and meta['position'] and meta['region']:
                                 break
-                        if meta['name'] and meta['position'] and meta['region']:
-                            break
             
-            # 메타 정보를 간단한 형식으로 텍스트에 추가
-            meta_parts = []
+            # 메타 정보를 명확한 형식으로 텍스트에 추가 (GPT가 정확히 매칭하도록)
+            meta_lines = []
             if meta['position']:
-                meta_parts.append(meta['position'])
+                meta_lines.append(f"[직책] {meta['position']}")
             if meta['name']:
-                meta_parts.append(meta['name'])
+                # 이름이 이 청크에서 추출된 것임을 명시
+                meta_lines.append(f"[이름-이청크에서추출] {meta['name']}")
+            if meta['region']:
+                meta_lines.append(f"[지역] {meta['region']}")
             if meta['pledge_title']:
-                meta_parts.append(f'"{meta["pledge_title"]}"')
+                meta_lines.append(f"[공약제목] {meta['pledge_title']}")
             
             meta_header = ""
-            if meta_parts:
-                meta_header = f"[메타] {' '.join(meta_parts)}\n\n"
+            if meta_lines:
+                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문]\n"
             
             enhanced_text = meta_header + text
             enhanced.append((score, filename, enhanced_text))
