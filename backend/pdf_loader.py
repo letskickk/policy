@@ -57,6 +57,36 @@ def _iter_doc_files(dir_path: Path):
             yield p
 
 
+def clean_text_noise(text: str) -> str:
+    """
+    PDF 추출 텍스트에서 OCR/목차 노이즈 제거.
+    - 반복 문자(CCCCC..., nnnnn... 등) 제거
+    - 목차/페이지 번호 패턴 정리
+    """
+    if not text:
+        return text
+    
+    import re
+    
+    # 1) 같은 문자가 5회 이상 연속 반복 제거 (공백/줄바꿈 제외)
+    text = re.sub(r'([^\s\n])\1{4,}', '', text)
+    
+    # 2) 숫자만 반복 (nnnnn... 같은 패턴)
+    text = re.sub(r'\b(\d)\1{4,}\b', '', text)
+    
+    # 3) 연속된 특수문자/구두점 정리 (예: ....., -----)
+    text = re.sub(r'([\.\-_=+]{5,})', '', text)
+    
+    # 4) 목차 패턴 제거 (예: "1. 2. 3." 같은 연속 번호)
+    text = re.sub(r'\b\d+\.\s*\d+\.\s*\d+\.', '', text)
+    
+    # 5) 연속 공백/줄바꿈 정리
+    text = re.sub(r'[ \t]{3,}', ' ', text)
+    text = re.sub(r'\n{4,}', '\n\n\n', text)
+    
+    return text.strip()
+
+
 def extract_text_from_file(path: Path) -> str:
     """PDF 또는 TXT 파일에서 텍스트 추출. .txt는 UTF-8로 읽음."""
     suf = (path.suffix or "").lower()
