@@ -331,6 +331,37 @@
       color: var(--text-strong);
       font-weight: 900;
     }
+    .score-cards-row{
+      margin: 0.7rem 0 0.9rem;
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .score-card{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.55rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.25);
+      background: rgba(255,255,255,0.05);
+      font-size: 0.82rem;
+      line-height: 1.1;
+    }
+    .score-card-label{
+      color: var(--text);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .score-card-value{
+      color: var(--text-strong);
+      font-weight: 900;
+      min-width: 2.2rem;
+      text-align: right;
+    }
+    .score-card.good{ border-color: rgba(34,197,94,0.45); }
+    .score-card.mid{ border-color: rgba(250,204,21,0.45); }
+    .score-card.low{ border-color: rgba(248,113,113,0.45); }
     .analysis-text{
       margin-top: 0.2rem;
       line-height: 1.78;
@@ -524,12 +555,6 @@
       return '빨간색';
     }
 
-    function signalIcon(signal) {
-      if (signal === 'green') return '🟢';
-      if (signal === 'yellow') return '🟡';
-      return '🔴';
-    }
-
     function escapeHtml(s) {
       return String(s || '')
         .replace(/&/g,'&amp;')
@@ -572,50 +597,98 @@
     }
 
     function renderCombinedResult(baseText, data) {
-      const score = toNumber(data && data.total_score) ?? toNumber(data && data.fit_score);
-      const signal = (data.signal_light || (score !== null ? (score >= 80 ? 'green' : (score >= 60 ? 'yellow' : 'red')) : 'red')).toLowerCase();
-      const board = (score !== null)
-        ? `<div class="score-board"><div class="score">총점: ${score.toFixed(1)}점</div><span class="badge ${signal}">${signalIcon(signal)} ${signalLabel(signal)}</span></div>`
+      // 총평 섹션에서 점수 파싱
+      let totalScore = null;
+      let platformFitScore = null;
+      let designScore = null;
+      let feasibilityScore = null;
+      let specificityScore = null;
+      let messageScore = null;
+
+      if (baseText) {
+        const lines = String(baseText).split(/\r?\n/).map(s => s.trim());
+        const pickNum = (line) => {
+          if (!line) return null;
+          const m = line.match(/(\d+(?:\.\d+)?)/);
+          return m ? toNumber(Number(m[1])) : null;
+        };
+        const findByKeyword = (...keywords) => {
+          const line = lines.find(l => keywords.every(k => l.includes(k)));
+          return pickNum(line);
+        };
+
+        // 총평 종합점수 (형식 흔들려도 라인 기준으로 추출)
+        totalScore =
+          findByKeyword("결과", "종합", "점수") ??
+          findByKeyword("종합", "점수");
+
+        // 5축 점수 (라벨 라인 기준)
+        platformFitScore = findByKeyword("정강정책", "부합도");
+        designScore = findByKeyword("정책", "설계", "완성도");
+        feasibilityScore = findByKeyword("실행", "가능성");
+        specificityScore = findByKeyword("구체성");
+        messageScore = findByKeyword("메시지", "경쟁력");
+      }
+
+      // 총평 축점수 기반 가중 합(총평 내부 규칙) 계산
+      function weightedTotalFromAxes() {
+        const axes = [
+          { v: platformFitScore, w: 0.30 },
+          { v: designScore, w: 0.25 },
+          { v: feasibilityScore, w: 0.20 },
+          { v: specificityScore, w: 0.15 },
+          { v: messageScore, w: 0.10 }
+        ].filter(x => x.v !== null);
+        if (!axes.length) return null;
+        const wSum = axes.reduce((a, b) => a + b.w, 0);
+        const vSum = axes.reduce((a, b) => a + (b.v * b.w), 0);
+        return Math.round((vSum / wSum) * 10) / 10;
+      }
+
+      // 1순위: 총평의 종합 점수, 2순위: 총평 5축 가중합, 3순위: verify 점수
+      if (totalScore === null) {
+        totalScore = weightedTotalFromAxes();
+      }
+      if (totalScore === null) {
+        totalScore = toNumber(data && data.total_score) ?? toNumber(data && data.fit_score);
+      }
+
+      const signal = (data && data.signal_light || (totalScore !== null ? (totalScore >= 80 ? 'green' : (totalScore >= 60 ? 'yellow' : 'red')) : 'red')).toLowerCase();
+      const board = (totalScore !== null)
+        ? `<div class="score-board"><div class="score">총점: ${totalScore.toFixed(1)}점</div><span class="badge ${signal}">${signalLabel(signal)}</span></div>`
         : '';
 
-      const confidence = toNumber(data && data.confidence);
-      const breakdown = (data && typeof data.breakdown === 'object' && data.breakdown) ? data.breakdown : {};
-      const platformScore = toNumber(breakdown.platform_score);
-      const pledgeScore = toNumber(breakdown.pledge_score);
-      const conflictPenalty = toNumber(breakdown.conflict_penalty);
-
       let html = board;
-      const hasBreakdown = platformScore !== null || pledgeScore !== null || conflictPenalty !== null || confidence !== null;
-      if (hasBreakdown) {
-        const chips = [];
-        if (platformScore !== null) chips.push(`<span class="metric-chip"><strong>정강 부합</strong> ${platformScore}</span>`);
-        if (pledgeScore !== null) chips.push(`<span class="metric-chip"><strong>공약 유사도</strong> ${pledgeScore}</span>`);
-        if (conflictPenalty !== null) chips.push(`<span class="metric-chip"><strong>충돌·모순 감점</strong> ${conflictPenalty}</span>`);
-        if (confidence !== null) chips.push(`<span class="metric-chip"><strong>평가 신뢰도</strong> ${confidence}%</span>`);
-        html += `<div class="result-summary">${chips.join('')}</div>`;
-      }
-
-      let finalResult = '판단 보류';
-      let finalReason = '점수 정보가 충분하지 않아 자동 최종판단을 유보합니다.';
-      if (score !== null) {
-        if (score >= 80) {
-          finalResult = '적합 (제출 가능)';
-          finalReason = '정책 정합성과 실행 가능성이 기준 이상입니다.';
-        } else if (score >= 60) {
-          finalResult = '부분적 적합 (보완 필요)';
-          finalReason = '핵심 방향은 맞지만 세부 수단/근거 보강이 필요합니다. 보완 후 재검증을 권장합니다.';
-        } else {
-          finalResult = '부적합 (전면 수정 권고)';
-          finalReason = '정강·기존 공약 대비 정합성이 낮아 핵심 구조 재설계가 필요합니다.';
+      const hasScores = platformFitScore !== null || designScore !== null || feasibilityScore !== null || specificityScore !== null || messageScore !== null;
+      if (hasScores) {
+        const scoreCards = [];
+        const scores = [
+          { label: '정강정책 부합도', value: platformFitScore },
+          { label: '정책 설계 완성도', value: designScore },
+          { label: '실행 가능성', value: feasibilityScore },
+          { label: '구체성', value: specificityScore },
+          { label: '메시지 경쟁력', value: messageScore }
+        ];
+        
+        scores.forEach(item => {
+          if (item.value !== null) {
+            const cls = item.value >= 80 ? 'good' : (item.value >= 60 ? 'mid' : 'low');
+            scoreCards.push(`
+              <div class="score-card ${cls}">
+                <span class="score-card-label">${item.label}</span>
+                <span class="score-card-value">${item.value.toFixed(0)}</span>
+              </div>
+            `);
+          }
+        });
+        
+        if (scoreCards.length > 0) {
+          html += `<div class="score-cards-row">${scoreCards.join('')}</div>`;
         }
       }
-      const finalBlock = [
-        '6. 최종판단',
-        '결과: ' + finalResult,
-        '판단 근거: ' + finalReason
-      ].join('\n');
+
       const normalizedBaseText = normalizeOutputText(baseText);
-      const fullText = normalizedBaseText ? normalizedBaseText + '\n\n' + finalBlock : finalBlock;
+      const fullText = normalizedBaseText || '';
       html += `<div class="analysis-text">${escapeHtml(fullText).replace(/\n/g, '<br>')}</div>`;
       showResult(html);
     }
