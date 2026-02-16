@@ -45,6 +45,16 @@ def _safe_filename(name: str) -> str:
     return (safe or "doc") + ".txt"
 
 
+def _compact_spaced_hangul(text: str) -> str:
+    if not text:
+        return text
+    return re.sub(
+        r"((?:[가-힣]\s+){1,}[가-힣])",
+        lambda m: re.sub(r"\s+", "", m.group(1)),
+        text,
+    )
+
+
 def _create_txt_content(doc_path: Path) -> str | None:
     try:
         from backend.pdf_loader import extract_text_from_file, clean_text_noise
@@ -66,22 +76,41 @@ def _create_txt_content(doc_path: Path) -> str | None:
         position_candidates = []
         region_candidates = []
         
-        # 간단한 패턴으로 메타 추출 시도 (첫 5000자만)
-        preview = text[:5000]
-        # 이름 후보: 한글 2-4자 패턴
-        name_matches = re.findall(r'([가-힣]{2,4})\s*(?:시장|구청장|군수|시의원|구의원|도지사|시도지사|청장|의원|당선인)', preview)
+        # 간단한 패턴으로 메타 추출 시도 (첫 9000자 + 한글 간격 정규화본)
+        preview = text[:9000]
+        preview_compact = _compact_spaced_hangul(preview)
+        preview_scan = f"{preview}\n{preview_compact}"
+
+        # 이름 후보: 시도명+이름, 직책 인접 이름, 당선인 표기
+        name_matches = re.findall(
+            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s*([가-힣]{2,4})",
+            preview_scan,
+        )
+        if not name_matches:
+            name_matches = re.findall(
+                r"([가-힣]{2,4})\s*(?:특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원|당선인)",
+                preview_scan,
+            )
+        if not name_matches:
+            name_matches = re.findall(r"(?:당선인|후보|성명|이름)\s*[:：]?\s*([가-힣]{2,4})", preview_scan)
         if name_matches:
             name_candidates = list(set(name_matches[:5]))  # 중복 제거 후 최대 5개
         
         # 직책 후보
-        position_matches = re.findall(r'(시장|구청장|군수|시의원|구의원|도지사|시도지사|청장|의원)', preview)
+        position_matches = re.findall(
+            r"(서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원)",
+            preview_scan,
+        )
         if position_matches:
             position_candidates = list(set(position_matches[:5]))
         
         # 지역 후보
-        region_matches = re.findall(r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|([가-힣]+구|시|군))', preview)
+        region_matches = re.findall(
+            r"(서울|서울특별시|부산|부산광역시|대구|대구광역시|인천|인천광역시|광주|광주광역시|대전|대전광역시|울산|울산광역시|세종|세종특별자치시|경기|경기도|강원|강원도|충북|충청북도|충남|충청남도|전북|전라북도|전남|전라남도|경북|경상북도|경남|경상남도|제주|제주특별자치도|[가-힣]+(?:구|시|군))",
+            preview_scan,
+        )
         if region_matches:
-            region_candidates = list(set([r[0] if isinstance(r, tuple) else r for r in region_matches[:5]]))
+            region_candidates = list(set(region_matches[:5]))
         
         # 메타 헤더 구성
         meta_lines = [

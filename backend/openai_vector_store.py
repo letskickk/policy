@@ -560,6 +560,62 @@ def run_check(
             return "winners2022"
         return ""
 
+    def _compact_spaced_hangul(text: str) -> str:
+        """
+        OCR/PDF 추출에서 '오 세 훈', '서 울 특 별 시'처럼
+        한 글자씩 띄어진 패턴을 '오세훈', '서울특별시'로 정규화.
+        """
+        if not text:
+            return text
+        return re.sub(
+            r"((?:[가-힣]\s+){1,}[가-힣])",
+            lambda m: re.sub(r"\s+", "", m.group(1)),
+            text,
+        )
+
+    def _normalize_region_name(region: str) -> str:
+        r = re.sub(r"\s+", "", (region or ""))
+        mapping = {
+            "서울": "서울특별시",
+            "부산": "부산광역시",
+            "대구": "대구광역시",
+            "인천": "인천광역시",
+            "광주": "광주광역시",
+            "대전": "대전광역시",
+            "울산": "울산광역시",
+            "세종": "세종특별자치시",
+            "경기": "경기도",
+            "강원": "강원도",
+            "충북": "충청북도",
+            "충남": "충청남도",
+            "전북": "전라북도",
+            "전남": "전라남도",
+            "경북": "경상북도",
+            "경남": "경상남도",
+            "제주": "제주특별자치도",
+        }
+        return mapping.get(r, r)
+
+    def _infer_position_from_region(region: str) -> str | None:
+        r = _normalize_region_name(region)
+        if not r:
+            return None
+        if r.endswith("특별시"):
+            return r[:-3] + "특별시장"
+        if r.endswith("광역시"):
+            return r[:-3] + "광역시장"
+        if r.endswith("도"):
+            return r + "지사"
+        if r.endswith("특별자치시"):
+            return r[:-5] + "특별자치시장"
+        if r.endswith(("시", "군", "구")):
+            if r.endswith("구"):
+                return r + "청장"
+            if r.endswith("군"):
+                return r + "수"
+            return r + "장"
+        return None
+
     def _extract_winners2022_metadata(text: str, filename: str = "") -> dict:
         """
         winners2022 청크에서 메타 정보 추출 (이름/직책/지역).
@@ -568,32 +624,59 @@ def run_check(
         meta = {'name': None, 'position': None, 'region': None}
         if not text:
             return meta
-        
-        # 이름 추출: 한글 이름 패턴 (2~4자, 성+이름)
-        name_match = re.search(r'([가-힣]{2,4})\s*(?:시장|구청장|군수|시의원|구의원|도지사|시도지사|시장|청장|의원)', text)
-        if not name_match:
-            name_match = re.search(r'(?:당선인|후보|공약자)[:\s]*([가-힣]{2,4})', text)
-        if name_match:
-            meta['name'] = name_match.group(1)
-        
+
+        # OCR 간격 정규화 텍스트까지 함께 스캔
+        compact_text = _compact_spaced_hangul(text)
+        scan_text = f"{text}\n{compact_text}"
+
+        # 이름 추출 (직책 앞/뒤, 당선인 표기, 시도명+이름 표기 모두 대응)
+        name_patterns = [
+            r"(?:당선인|후보|공약자|성명|이름)\s*[:：]?\s*([가-힣]{2,4})",
+            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s*([가-힣]{2,4})",
+            r"(?:특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원)\s*([가-힣]{2,4})",
+            r"([가-힣]{2,4})\s*(?:특별시장|광역시장|시장|도지사|구청장|군수|교육감|의원)",
+        ]
+        for p in name_patterns:
+            name_match = re.search(p, scan_text)
+            if name_match:
+                meta['name'] = name_match.group(1)
+                break
+
         # 직책 추출
         position_patterns = [
-            r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s*(?:특별)?시장',
-            r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s*도지사',
-            r'([가-힣]+구|시|군|도)\s*(?:구청장|시장|군수)',
-            r'(광역|기초)\s*(?:의원|시의원|구의원|도의원)',
+            r"(서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장)",
+            r"(경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사)",
+            r"([가-힣]+(?:구|시|군))\s*(구청장|시장|군수)",
+            r"(국회의원|광역의원|기초의원|시의원|구의원|도의원|교육감)",
+            r"(특별시장|광역시장|시장|도지사|구청장|군수)",
         ]
         for pattern in position_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, scan_text)
             if match:
-                meta['position'] = match.group(0)
+                meta['position'] = re.sub(r"\s+", "", match.group(0))
                 break
-        
+
         # 지역 추출
-        region_match = re.search(r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|([가-힣]+구|시|군))', text)
+        region_match = re.search(
+            r"(서울|서울특별시|부산|부산광역시|대구|대구광역시|인천|인천광역시|광주|광주광역시|대전|대전광역시|울산|울산광역시|세종|세종특별자치시|경기|경기도|강원|강원도|충북|충청북도|충남|충청남도|전북|전라북도|전남|전라남도|경북|경상북도|경남|경상남도|제주|제주특별자치도|[가-힣]+(?:구|시|군))",
+            scan_text,
+        )
         if region_match:
-            meta['region'] = region_match.group(1)
-        
+            region = region_match.group(1)
+            meta['region'] = _normalize_region_name(region)
+
+        # 직책에서 지역 역추론
+        if not meta['region'] and meta['position']:
+            m = re.match(r"([가-힣]+(?:특별시|광역시|도|시|군|구))", meta['position'])
+            if m:
+                meta['region'] = _normalize_region_name(m.group(1))
+
+        # 지역은 있는데 직책이 비어 있으면 지역으로 직책 추론
+        if meta['region'] and not meta['position']:
+            inferred = _infer_position_from_region(meta['region'])
+            if inferred:
+                meta['position'] = inferred
+
         return meta
     
     def _enhance_winners2022_hits(
@@ -620,18 +703,33 @@ def run_check(
                 # 메타 보강 시도: 같은 문서에서 제목/목차/헤더 재조회
                 source_path = _extract_source_path(text)
                 if source_path or filename:
-                    # 문서명 기반 재조회
-                    doc_query = f"{filename or source_path} 제8회 전국동시지방선거 당선인 이름 직책 지역"
-                    enhance_hits = _search(client, vs_id, doc_query, k=5, rewrite=False)
-                    for _, _, enhance_text in enhance_hits:
-                        enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
-                        if enhance_meta['name']:
-                            meta['name'] = enhance_meta['name']
-                        if enhance_meta['position']:
-                            meta['position'] = enhance_meta['position']
-                        if enhance_meta['region']:
-                            meta['region'] = enhance_meta['region']
-                        if meta['name'] or (meta['position'] and meta['region']):
+                    # 문서명/지역/직책 기반 재조회 (rewrite on/off 모두)
+                    doc_base = filename or source_path
+                    refine_queries = [
+                        f"{doc_base} 제8회 전국동시지방선거 당선인 이름 직책 지역",
+                        f"{doc_base} 시도지사 당선인 공약",
+                    ]
+                    if meta.get("region"):
+                        refine_queries.append(f"{doc_base} {meta['region']} 당선인 이름 직책")
+                    if meta.get("position"):
+                        refine_queries.append(f"{doc_base} {meta['position']} 당선인 이름")
+
+                    for rq in refine_queries:
+                        enhance_hits = [
+                            *_search(client, vs_id, rq, k=6, rewrite=False),
+                            *_search(client, vs_id, rq, k=6, rewrite=True),
+                        ]
+                        for _, _, enhance_text in enhance_hits:
+                            enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
+                            if enhance_meta['name']:
+                                meta['name'] = enhance_meta['name']
+                            if enhance_meta['position']:
+                                meta['position'] = enhance_meta['position']
+                            if enhance_meta['region']:
+                                meta['region'] = enhance_meta['region']
+                            if meta['name'] and (meta['position'] or meta['region']):
+                                break
+                        if meta['name'] and (meta['position'] or meta['region']):
                             break
             
             # 메타 정보를 텍스트에 추가
