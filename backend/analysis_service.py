@@ -148,7 +148,8 @@ def run_check_analysis(
     vs_id = vector_store_id or ""
     regional_id = regional_vector_store_id or ""
     winners2022_id = winners2022_vector_store_id or ""
-    opts = f"check|{vs_id}|{regional_id}|{winners2022_id}"
+    # v2: 4번 섹션 API fallback·캐시 무효화(예전 "없음" 결과 미사용)
+    opts = f"check|{vs_id}|{regional_id}|{winners2022_id}|v2"
     cache_key = _cache_key(normalized, opts, OPENAI_MODEL, vs_id)
 
     cached = _get_cached(user_id, cache_key)

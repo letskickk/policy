@@ -1946,7 +1946,7 @@ def run_check(
         region_only_hits = _filter_winners_by_user_meta(winners_enhanced, user_meta or {}, mode="region_only")
         final_hits = choose_winners_items(strict_hits, region_only_hits, winners_enhanced, user_meta or {})
     elif api_items:
-        # vector 히트가 전무하면 API 기반 컨텍스트를 보조로 사용 (election_type 없을 때만 제한적 허용)
+        # vector 히트가 전무하면 API 기반 컨텍스트를 보조로 사용 (이미 키워드 순 정렬됨)
         strict_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="strict")
         region_only_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="region_only")
         has_election_type = bool(user_meta and (user_meta.get("election_type") or "").strip())
@@ -1954,6 +1954,9 @@ def run_check(
             final_hits = choose_winners_items(strict_hits, region_only_hits, api_items, user_meta or {})
         else:
             final_hits = strict_hits or region_only_hits or api_items[:2]
+        # 역할 충돌로 전부 걸러져도 API 자료가 있으면 최소 1~2건은 노출 (4번 "없음" 방지)
+        if not final_hits and api_items:
+            final_hits = strict_hits or region_only_hits or api_items[:RUN_CHECK_WINNERS_MAX_ITEMS]
 
     # "없음"은 유사도 임계치 미달 + 보강 실패 + role-safe 후보 없음일 때만 허용
     has_similarity_hit = any(score >= WINNERS2022_MIN_SIMILARITY_SCORE for score, _f, _t in winners_dedup_hits)
