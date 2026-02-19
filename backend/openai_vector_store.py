@@ -61,7 +61,9 @@ ELECTION_TYPE_LABEL_TO_KEY = {v: k for k, v in ELECTION_TYPE_KEY_TO_LABEL.items(
 WINNERS2022_CONTEXT_EMPTY = "유사 공약: 없음"
 
 # 다중 쿼리 recall용: 최소 쿼리 개수(원문/직책+지역 등)
-WINNERS2022_MIN_QUERIES = 2
+WINNERS2022_MIN_QUERIES = 5
+WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS = 2
+WINNERS2022_MIN_SIMILARITY_SCORE = 0.18
 
 
 def _build_position_region_query(user_meta: dict) -> str:
@@ -92,6 +94,259 @@ def _build_position_region_query(user_meta: dict) -> str:
     if region_part:
         return f"{position_part} {region_part} 당선인 공약"
     return f"{position_part} 당선인 공약"
+
+
+def _extract_query_keywords(text: str, max_terms: int = 8) -> str:
+    """공약 텍스트에서 검색 리콜용 핵심 키워드(명사 유사 토큰) 추출."""
+    raw = re.sub(r"[^0-9A-Za-z가-힣\s]", " ", (text or ""))
+    tokens = [t.strip() for t in re.split(r"\s+", raw) if t and len(t.strip()) >= 2]
+    # 매우 일반적인 토큰은 제외해 쿼리 노이즈를 줄임
+    stop = {"공약", "정책", "추진", "개선", "확대", "강화", "지원", "도입", "지역", "사업"}
+    uniq: List[str] = []
+    seen: set[str] = set()
+    for t in tokens:
+        if t in stop or t in seen:
+            continue
+        seen.add(t)
+        uniq.append(t)
+        if len(uniq) >= max_terms:
+            break
+    return " ".join(uniq)
+
+
+def _build_winners2022_queries_for_vector(
+    pledge_text: str,
+    user_meta: dict | None = None,
+    max_queries: int = 6,
+) -> List[str]:
+    """
+    공약 중심 winners2022 검색 쿼리(최소 5종) 생성.
+    a) 원문 pledge, b) 첫 줄, c) 키워드 축약, d) region+키워드,
+    e) region+election_type+키워드, f) 백업 고정 쿼리.
+    """
+    p = (pledge_text or "").strip()
+    meta = user_meta or {}
+    province = (meta.get("region_province") or "").strip()
+    election = (meta.get("election_type") or "").strip()
+    out: List[str] = []
+    if p:
+        out.append(re.sub(r"\s+", " ", p)[:1500])  # a) 원문
+        first_line = next((ln.strip() for ln in p.splitlines() if ln.strip()), "")
+        if first_line:
+            out.append(first_line[:300])  # b) 첫 줄
+        kw = _extract_query_keywords(p, max_terms=10)
+        if kw:
+            out.append(kw)  # c) 키워드 축약
+            if province:
+                out.append(f"{_normalize_region_name(province)} {kw}")  # d) region + 키워드
+            if province and election:
+                out.append(f"{_normalize_region_name(province)} {election} {kw}")  # e) region + election + 키워드
+    out.append(_build_position_region_query(meta))  # 직책+지역 쿼리
+    out.append("제8회 지방선거 당선인 공약")  # f) 백업 고정 쿼리
+    # dedup + 최소 쿼리 수 보장
+    uniq: List[str] = []
+    seen: set[str] = set()
+    for q in out:
+        k = re.sub(r"\s+", " ", (q or "").strip())
+        if len(k) < 4 or k in seen:
+            continue
+        seen.add(k)
+        uniq.append(k)
+    if len(uniq) < WINNERS2022_MIN_QUERIES:
+        fallback_pool = [
+            "당선인 공약",
+            "제8회 전국동시지방선거 공약",
+            "지방선거 공약 비교",
+        ]
+        for q in fallback_pool:
+            if q not in seen:
+                uniq.append(q)
+                seen.add(q)
+            if len(uniq) >= WINNERS2022_MIN_QUERIES:
+                break
+    return uniq[:max_queries]
+
+
+def _winners_hit_fingerprint(text: str) -> str:
+    compact = re.sub(r"\s+", " ", (text or "").strip())
+    return hashlib.sha256(compact[:800].encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _dedup_winners_vector_hits(items: Iterable[Tuple[float, str, str]]) -> List[Tuple[float, str, str]]:
+    """
+    score + 텍스트 fingerprint 기준으로 중복 제거.
+    동일 fingerprint는 최고 score 항목만 유지.
+    """
+    best: Dict[str, Tuple[float, str, str]] = {}
+    for score, filename, text in items:
+        fp = _winners_hit_fingerprint(text)
+        prev = best.get(fp)
+        if prev is None or score > prev[0]:
+            best[fp] = (score, filename, text)
+    out = list(best.values())
+    out.sort(key=lambda t: t[0], reverse=True)
+    return out
+
+
+def _simple_token_jaccard(a: str, b: str) -> float:
+    ta = set(_extract_query_keywords(a, max_terms=30).split())
+    tb = set(_extract_query_keywords(b, max_terms=30).split())
+    if not ta or not tb:
+        return 0.0
+    inter = len(ta & tb)
+    union = len(ta | tb)
+    return (inter / union) if union else 0.0
+
+
+def _keyword_coverage_ratio(query: str, text: str) -> float:
+    q_tokens = _extract_query_keywords(query, max_terms=12).split()
+    if not q_tokens:
+        return 0.0
+    t = (text or "")
+    hit = sum(1 for tok in q_tokens if tok and tok in t)
+    return hit / max(len(q_tokens), 1)
+
+
+def rerank_winners_hits_by_similarity(
+    hits: List[Tuple[float, str, str]],
+    pledge_text: str,
+) -> List[Tuple[float, str, str]]:
+    """벡터 score + 문장 유사 + 키워드 포함률로 재정렬."""
+    ranked: List[Tuple[float, str, str]] = []
+    for score, filename, text in hits:
+        j = _simple_token_jaccard(pledge_text, text)
+        cov = _keyword_coverage_ratio(pledge_text, text)
+        final = float(score) * 0.55 + j * 0.30 + cov * 0.15
+        ranked.append((final, filename, text))
+    ranked.sort(key=lambda t: t[0], reverse=True)
+    return ranked
+
+
+def _normalize_election_key(election_type: str) -> str:
+    e = (election_type or "").strip().lower()
+    for key, label in ELECTION_TYPE_KEY_TO_LABEL.items():
+        if key in e or (label and label in e):
+            return key
+    return ""
+
+
+def _position_role_group(position: str) -> str:
+    p = (position or "").strip()
+    if "교육감" in p:
+        return "education"
+    if "의원" in p:
+        if "광역" in p:
+            return "regional_council"
+        return "local_council"
+    if "구청장" in p or "군수" in p:
+        return "local_mayor"
+    if "지사" in p:
+        return "metro_mayor"
+    if "시장" in p:
+        # 광역/기초 시장 혼재 가능. 안전하게 metro/local 모두와 잠정 호환 처리 위해 metro로 묶지 않고 mayor로 둔다.
+        return "mayor_generic"
+    return ""
+
+
+def is_explicit_role_conflict(position: str, user_meta: dict | None) -> bool:
+    """명백한 직책 충돌 여부(교육감 vs 시장/군수 등)."""
+    if not user_meta:
+        return False
+    expected = _normalize_election_key((user_meta or {}).get("election_type") or "")
+    if not expected:
+        return False
+    grp = _position_role_group(position)
+    if not grp:
+        return False
+    if expected == "education":
+        return grp in {"metro_mayor", "local_mayor", "regional_council", "local_council", "mayor_generic"}
+    if expected == "metro_mayor":
+        return grp in {"education", "regional_council", "local_council"}
+    if expected == "local_mayor":
+        return grp in {"education", "regional_council", "local_council", "metro_mayor"}
+    if expected == "regional_council":
+        return grp in {"education", "metro_mayor", "local_mayor", "mayor_generic", "local_council"}
+    if expected == "local_council":
+        return grp in {"education", "metro_mayor", "local_mayor", "mayor_generic", "regional_council"}
+    return False
+
+
+def choose_winners_items(
+    strict_items: List[Tuple[float, str, str, Dict]],
+    region_only_items: List[Tuple[float, str, str, Dict]],
+    enhanced_items: List[Tuple[float, str, str, Dict]],
+    user_meta: dict | None = None,
+) -> List[Tuple[float, str, str, Dict]]:
+    """
+    strict -> region_only 우선.
+    둘 다 비면 공약 유사도 상위 중 role 충돌 없는 항목 1~2건을 남긴다(recall-first + role-safe).
+    """
+    if strict_items:
+        return strict_items
+    if region_only_items:
+        return region_only_items
+    if not enhanced_items:
+        return []
+    role_safe: List[Tuple[float, str, str, Dict]] = []
+    for row in enhanced_items:
+        score, _fn, text, meta = row
+        pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+        if is_explicit_role_conflict(pos, user_meta):
+            continue
+        if score < WINNERS2022_MIN_SIMILARITY_SCORE:
+            continue
+        role_safe.append(row)
+    if role_safe:
+        return role_safe[:WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS]
+    return []
+
+
+def _extract_position_name_from_evidence(text: str) -> Tuple[str, str]:
+    """
+    근거 문단에서 [직책 + 이름] 동시 추출.
+    예: '경상남도 남해군수 장충남', '서울특별시교육감 조희연'
+    """
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if not t:
+        return ("", "")
+    patterns = [
+        r"((?:[가-힣]{2,}(?:특별시|광역시|도))?\s*[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원))\s*[:\-]?\s*([가-힣]{2,4})",
+        r"([가-힣]{2,4})\s*\(\s*((?:[가-힣]{2,}(?:특별시|광역시|도))?\s*[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원))\s*\)",
+    ]
+    for pat in patterns:
+        m = re.search(pat, t)
+        if not m:
+            continue
+        if len(m.groups()) == 2:
+            g1, g2 = (m.group(1) or "").strip(), (m.group(2) or "").strip()
+            if re.search(r"(교육감|시장|군수|구청장|지사|의원)$", g1):
+                return (g1, g2)
+            if re.search(r"(교육감|시장|군수|구청장|지사|의원)$", g2):
+                return (g2, g1)
+    return ("", "")
+
+
+def reconstruct_winner_identity(meta: Dict, evidence_text: str) -> Tuple[str, str]:
+    """
+    이름/직책 복원 규칙:
+    1) canonical 메타 우선
+    2) 근거발췌 regex 추출
+    3) 그래도 없으면 이름은 '확인불가'
+    """
+    pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+    name = (meta.get("canonical_name") or meta.get("name") or "").strip()
+    if pos and name:
+        return (pos, name)
+    ext_pos, ext_name = _extract_position_name_from_evidence(evidence_text or "")
+    if not pos and ext_pos:
+        pos = ext_pos
+    if not name and ext_name:
+        name = ext_name
+    if not name:
+        name = "확인불가"
+    if not pos:
+        pos = "확인불가"
+    return (pos, name)
 
 
 def _normalize_region_name(region: str) -> str:
@@ -977,7 +1232,7 @@ RUN_CHECK_K_POLICY = 22
 RUN_CHECK_K_PLATFORM = 14
 RUN_CHECK_K_REGIONAL = 12
 RUN_CHECK_K_WINNERS = 12
-RUN_CHECK_WINNERS_QUERIES_MAX = 3
+RUN_CHECK_WINNERS_QUERIES_MAX = 6
 RUN_CHECK_WINNERS_RAW_CAP = 20
 RUN_CHECK_MAX_ENHANCE = 10
 RUN_CHECK_PLATFORM_MAX_CHARS = 7_000
@@ -1423,18 +1678,18 @@ def run_check(
         blocks: List[str] = []
         total = 0
         for score, filename, text, meta in items:
-            # canonical_*가 있으면 무조건 우선 사용 (API-first)
-            name = (meta.get("canonical_name") or meta.get("name") or "미상").strip()
-            position = (meta.get("canonical_position") or meta.get("position") or "-").strip()
+            # canonical 우선 + 근거 기반 복원
+            position, name = reconstruct_winner_identity(meta, (meta.get("_excerpt") or text or ""))
             region = (meta.get("canonical_region") or meta.get("region") or "-").strip()
-            title = (meta.get("pledge_title") or "-").strip()
+            title = (meta.get("pledge_title") or _extract_pledge_title(text) or "-").strip()
             src = _extract_source_path(text) or filename or "-"
             excerpt = (meta.get("_excerpt") or text or "").strip()[:excerpt_len]
             if not meta.get("_excerpt") and len((text or "").strip()) > excerpt_len:
                 excerpt += "…"
-            name_line = name if name != "미상" else "미상(아래 근거발췌에서 직책과 같은 줄/문단의 2~4자 한글 이름을 찾아 기재)"
+            summary_line = f'2022 / {position} / {name} / "{title}"'
             block = (
-                f"당선인명: {name_line}\n"
+                f"요약라인: {summary_line}\n"
+                f"당선인명: {name}\n"
                 f"직책: {position}\n"
                 f"지역: {region}\n"
                 f"공약제목: {title}\n"
@@ -1529,25 +1784,22 @@ def run_check(
         if hashlib.sha256((h[1] + "\n" + h[2][:200]).encode("utf-8", errors="ignore")).hexdigest() not in platform_key
     ]
 
-    # 4) winners2022 — API-first (당선인/공약 API canonical + 벡터는 근거 보강용)
+    # 4) winners2022 — pledge-first retrieval -> metadata enhance -> role-safe filter
     winners2022_context = ""
     request_dedup: set = set()
+    api_items: List[Tuple[float, str, str, Dict]] = []
+
+    # API canonical 메타(있으면 이름/직책 보강용으로만 사용)
     if DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY:
         norm_meta = _normalize_user_meta_for_winners(user_meta or {})
         all_winner_rows: List[Dict[str, Any]] = []
-        # 요청당 master 로드 1회(선거유형별) 후 재사용
         for st in sorted(set(norm_meta["sgTypecodes"])):
             rows = _fetch_winners_api(
-                SG_ID_2022, st,
-                "", "",
-                DATA_GO_KR_WINNER_API_KEY, request_dedup,
+                SG_ID_2022, st, "", "", DATA_GO_KR_WINNER_API_KEY, request_dedup
             )
             for r in rows:
                 r["_sgTypecode"] = st
             all_winner_rows.extend(rows)
-        logger.debug(f"[WINNERS2022][API] winners master load: {len(all_winner_rows)}건")
-
-        # user_meta 1차 pre-filter (master 재사용)
         prefiltered_rows: List[Dict[str, Any]] = []
         for w in all_winner_rows:
             pos_label, region_label = _winner_row_to_position_region(
@@ -1558,194 +1810,132 @@ def run_check(
                 "canonical_region": region_label,
                 "sggName": (w.get("sggName") or "").strip(),
             }
-            if _is_meta_match(meta_probe, user_meta or {}, mode="strict"):
+            if _is_meta_match(meta_probe, user_meta or {}, mode="region_only"):
                 prefiltered_rows.append(w)
-        if not prefiltered_rows:
-            # strict 0건이면 region_only
-            for w in all_winner_rows:
-                pos_label, region_label = _winner_row_to_position_region(
-                    w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
-                )
-                meta_probe = {
-                    "canonical_position": pos_label,
-                    "canonical_region": region_label,
-                    "sggName": (w.get("sggName") or "").strip(),
-                }
-                if _is_meta_match(meta_probe, user_meta or {}, mode="region_only"):
-                    prefiltered_rows.append(w)
-        # election_type이 있으면 no_filter fallback 금지: 다른 직책으로 채우지 않음
-        if not prefiltered_rows and (user_meta and (user_meta.get("election_type") or "").strip()):
-            pass  # prefiltered_rows 유지 빈 리스트
-        elif not prefiltered_rows:
-            prefiltered_rows = list(all_winner_rows)
-        logger.debug(f"[WINNERS2022][API] winner row after prefilter: {len(prefiltered_rows)}건")
-
-        api_items: List[Tuple[float, str, str, Dict]] = []
         for w in prefiltered_rows:
             pos_label, region_label = _winner_row_to_position_region(
                 w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
             )
             pledges = _fetch_winner_pledges_api(
-                SG_ID_2022, w["_sgTypecode"], w["huboid"],
-                DATA_GO_KR_PLEDGE_API_KEY, request_dedup,
+                SG_ID_2022, w["_sgTypecode"], w["huboid"], DATA_GO_KR_PLEDGE_API_KEY, request_dedup
             )
             for pl in pledges[:5]:
                 title = (pl.get("prmsTitle") or "").strip() or (pl.get("prmsCont") or "")[:80]
-                cont = (pl.get("prmsCont") or "").strip()
-                meta = {
-                    # API canonical source
+                text = (pl.get("prmsCont") or "").strip() or title
+                api_items.append((1.0, "API", text, {
                     "canonical_name": (w.get("name") or "").strip(),
                     "canonical_position": pos_label,
                     "canonical_region": region_label,
-                    # fallback 호환 필드
                     "name": (w.get("name") or "").strip(),
                     "position": pos_label,
                     "region": region_label,
                     "sggName": (w.get("sggName") or "").strip(),
                     "pledge_title": title,
-                    "_api_canonical": True,
-                }
-                text = cont or title
-                api_items.append((1.0, "API", text, meta))
-        logger.debug(f"[WINNERS2022][API] pledge rows built: {len(api_items)}건")
+                }))
 
-        # strict -> region_only -> no_filter top-k fallback
-        strict_items = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="strict")
-        region_only_items = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="region_only")
-        no_filter_items = list(api_items)
-        logger.debug(
-            f"[WINNERS2022] fallback stages strict={len(strict_items)}, region_only={len(region_only_items)}, no_filter={len(no_filter_items)}"
+    winners_raw_hits: List[Tuple[float, str, str]] = []
+    winners_dedup_hits: List[Tuple[float, str, str]] = []
+    winners_enhanced: List[Tuple[float, str, str, Dict]] = []
+    strict_hits: List[Tuple[float, str, str, Dict]] = []
+    region_only_hits: List[Tuple[float, str, str, Dict]] = []
+    final_hits: List[Tuple[float, str, str, Dict]] = []
+
+    queries = _build_winners2022_queries_for_vector(
+        pledge, user_meta or {}, max_queries=RUN_CHECK_WINNERS_QUERIES_MAX
+    ) if winners2022_vector_store_id and pledge else []
+    if winners2022_vector_store_id and queries:
+        all_hits: List[Tuple[float, str, str]] = []
+        with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as executor:
+            futures = [
+                executor.submit(_search, client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True)
+                for q in queries
+            ]
+            for f in as_completed(futures):
+                res = f.result()
+                winners_raw_hits.extend(res)
+                all_hits.extend(res)
+        winners_dedup_hits = _dedup_winners_vector_hits(all_hits)[:RUN_CHECK_WINNERS_RAW_CAP]
+        winners_dedup_hits = rerank_winners_hits_by_similarity(winners_dedup_hits, pledge)[:RUN_CHECK_WINNERS_RAW_CAP]
+        winners_enhanced = _enhance_winners2022_hits(
+            client, winners2022_vector_store_id, winners_dedup_hits, max_enhance=RUN_CHECK_MAX_ENHANCE
         )
+        # canonical 우선 보강: role/region 일치하는 API 메타를 덮어씀
+        api_canonical_by_role_region: Dict[Tuple[str, str], Dict] = {}
+        for _s, _f, _t, meta in api_items:
+            k = (
+                (meta.get("canonical_position") or meta.get("position") or "").strip(),
+                (meta.get("canonical_region") or meta.get("region") or "").strip(),
+            )
+            if k[0] and k[1] and k not in api_canonical_by_role_region:
+                api_canonical_by_role_region[k] = meta
+        patched: List[Tuple[float, str, str, Dict]] = []
+        for score, fn, txt, meta in winners_enhanced:
+            pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+            reg = (meta.get("canonical_region") or meta.get("region") or "").strip()
+            can = api_canonical_by_role_region.get((pos, reg))
+            if can:
+                if can.get("canonical_name") and not meta.get("canonical_name"):
+                    meta["canonical_name"] = can.get("canonical_name")
+                if can.get("canonical_position") and not meta.get("canonical_position"):
+                    meta["canonical_position"] = can.get("canonical_position")
+                if can.get("canonical_region") and not meta.get("canonical_region"):
+                    meta["canonical_region"] = can.get("canonical_region")
+            patched.append((score, fn, txt, meta))
+        winners_enhanced = patched
 
-        # 벡터 검색: 2~3개 변형 쿼리(원문+직책·지역)로 recall 확대 후 role-safe 필터 유지
-        vec_hits: List[Tuple[float, str, str]] = []
-        evidence_queries: List[str] = []
-        if winners2022_vector_store_id and pledge:
-            evidence_queries.append((pledge[:500] + " 당선인 공약").strip())
-            q_pos_region = _build_position_region_query(user_meta or {})
-            if q_pos_region not in evidence_queries:
-                evidence_queries.append(q_pos_region)
-            evidence_queries = evidence_queries[:RUN_CHECK_WINNERS_QUERIES_MAX]
-        if winners2022_vector_store_id and api_items and evidence_queries:
-            all_vec: List[Tuple[float, str, str]] = []
-            with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as executor:
-                futures = [executor.submit(_search, client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True) for q in evidence_queries]
-                for f in as_completed(futures):
-                    all_vec.extend(f.result())
-            vec_hits_raw = _dedup(all_vec)[:RUN_CHECK_WINNERS_RAW_CAP]
-            vec_hits_raw.sort(key=lambda t: t[0], reverse=True)
-            election_raw = (user_meta or {}).get("election_type") or ""
-            label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "교육감")
-            is_education_user = "education" in election_raw.lower() or (label_edu and label_edu in election_raw)
-            if is_education_user:
-                vec_hits = [
-                    (sc, fn, txt) for sc, fn, txt in vec_hits_raw
-                    if "교육감" in (_extract_winners2022_metadata(txt, fn).get("position") or "")
-                ]
-                logger.debug(f"[WINNERS2022][VECTOR] education filter: {len(vec_hits_raw)} → {len(vec_hits)} (hit_position 교육감만)")
-            else:
-                vec_hits = vec_hits_raw
-            logger.debug(f"[WINNERS2022][VECTOR] evidence hit={len(vec_hits)} (queries={len(evidence_queries)})")
-            for _idx, (_, _fn, _txt, meta) in enumerate(api_items):
-                item_pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
-                for sc, _f, chunk_text in vec_hits:
-                    hit_meta = _extract_winners2022_metadata(chunk_text, _f)
-                    hit_pos = (hit_meta.get("position") or "").strip()
-                    if not hit_pos or not item_pos:
-                        continue
-                    same_role = ("교육감" in item_pos and "교육감" in hit_pos) or ("지사" in item_pos and "지사" in hit_pos) or ("시장" in item_pos and "시장" in hit_pos) or ("구청장" in item_pos and "구청장" in hit_pos) or ("군수" in item_pos and "군수" in hit_pos) or ("의원" in item_pos and "의원" in hit_pos)
-                    if same_role:
-                        excerpt = (_extract_pledge_title(chunk_text) or "") + "\n" + (chunk_text or "").strip()[:400]
-                        if excerpt.strip():
-                            meta["_excerpt"] = excerpt.strip()
-                        break
-                meta.pop("_api_canonical", None)
-
-        chosen_items = strict_items
-        if not chosen_items:
-            chosen_items = region_only_items
+    if winners_enhanced:
+        strict_hits = _filter_winners_by_user_meta(winners_enhanced, user_meta or {}, mode="strict")
+        region_only_hits = _filter_winners_by_user_meta(winners_enhanced, user_meta or {}, mode="region_only")
+        final_hits = choose_winners_items(strict_hits, region_only_hits, winners_enhanced, user_meta or {})
+    elif api_items:
+        # vector 히트가 전무하면 API 기반 컨텍스트를 보조로 사용 (election_type 없을 때만 제한적 허용)
+        strict_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="strict")
+        region_only_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="region_only")
         has_election_type = bool(user_meta and (user_meta.get("election_type") or "").strip())
-        if not chosen_items and has_election_type and winners2022_vector_store_id:
-            # 같은 직책군 재조회 1회: 직책+지역 쿼리로 벡터 검색 후 strict 필터
-            expand_q = _build_position_region_query(user_meta or {})
-            expand_hits = _search(client, winners2022_vector_store_id, expand_q, RUN_CHECK_K_WINNERS, True)
-            expand_hits = _dedup(expand_hits)[:RUN_CHECK_WINNERS_RAW_CAP]
-            if expand_hits:
-                expand_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, expand_hits, max_enhance=RUN_CHECK_MAX_ENHANCE)
-                expand_filtered = _filter_winners_by_user_meta(expand_enhanced, user_meta or {}, mode="strict")
-                if expand_filtered:
-                    chosen_items = expand_filtered
-                    logger.debug(f"[WINNERS2022] query expansion: {len(expand_filtered)}건 (no_filter 미사용)")
-        if not chosen_items and has_election_type:
-            winners2022_context = WINNERS2022_CONTEXT_EMPTY
-        elif not chosen_items:
-            chosen_items = no_filter_items[:3] if vec_hits else no_filter_items[: max(1, min(3, len(no_filter_items)))]
-        if chosen_items:
+        if has_election_type:
+            final_hits = choose_winners_items(strict_hits, region_only_hits, api_items, user_meta or {})
+        else:
+            final_hits = strict_hits or region_only_hits or api_items[:2]
+
+    # "없음"은 유사도 임계치 미달 + 보강 실패 + role-safe 후보 없음일 때만 허용
+    has_similarity_hit = any(score >= WINNERS2022_MIN_SIMILARITY_SCORE for score, _f, _t in winners_dedup_hits)
+    if final_hits:
+        winners2022_context = _build_structured_winners_context(
+            final_hits[:RUN_CHECK_WINNERS_MAX_ITEMS],
+            max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
+            excerpt_len=400,
+        )
+    elif has_similarity_hit:
+        # 메타가 부족해도 근거 본문 기반으로 role-safe 후보를 최대한 남긴다.
+        role_safe_relaxed: List[Tuple[float, str, str, Dict]] = []
+        for score, fn, txt, meta in winners_enhanced:
+            pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+            if is_explicit_role_conflict(pos, user_meta or {}):
+                continue
+            role_safe_relaxed.append((score, fn, txt, meta))
+            if len(role_safe_relaxed) >= WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS:
+                break
+        if role_safe_relaxed:
             winners2022_context = _build_structured_winners_context(
-                chosen_items[:RUN_CHECK_WINNERS_MAX_ITEMS],
+                role_safe_relaxed,
                 max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
                 excerpt_len=400,
             )
-    elif winners2022_vector_store_id:
-        # API 키 없을 때 벡터 검색 폴백: rewrite=True 1패스, hit 부족 시에만 rewrite=False
-        def _build_winners2022_queries(pledge_text: str, meta: dict) -> List[str]:
-            out: List[str] = []
-            p = (pledge_text or "").strip()
-            if not p:
-                return ["제8회 전국동시지방선거 당선인 공약"]
-            normalized = re.sub(r"\s+", " ", _compact_spaced_hangul(p)).strip()
-            if len(normalized) >= 15:
-                out.append(normalized[:2000])
-            lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
-            if lines and 10 <= len(lines[0]) <= 300:
-                out.append(lines[0])
-            out.append("제8회 전국동시지방선거 당선인 공약")
-            q_pos_region = _build_position_region_query(meta or {})
-            if q_pos_region not in out:
-                out.append(q_pos_region)
-            seen_set: set = set()
-            unique_list: List[str] = []
-            for q in out:
-                key = re.sub(r"\s+", " ", (q or "").strip())[:500]
-                if key not in seen_set and len(key) >= 8:
-                    seen_set.add(key)
-                    unique_list.append((q or "").strip())
-            return unique_list or ["제8회 전국동시지방선거 당선인 공약"]
+        else:
+            winners2022_context = WINNERS2022_CONTEXT_EMPTY
+    else:
+        winners2022_context = WINNERS2022_CONTEXT_EMPTY
 
-        queries = _build_winners2022_queries(pledge, user_meta or {})[:RUN_CHECK_WINNERS_QUERIES_MAX]
-        all_winners_hits: List[Tuple[float, str, str]] = []
-        with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as executor:
-            futures = [executor.submit(_search, client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True) for q in queries]
-            for f in as_completed(futures):
-                all_winners_hits.extend(f.result())
-        winners_hits_raw = _dedup(all_winners_hits)[:RUN_CHECK_WINNERS_RAW_CAP]
-        if len(winners_hits_raw) < 6 and queries:
-            fallback = _search(client, winners2022_vector_store_id, queries[0], RUN_CHECK_K_WINNERS, False)
-            winners_hits_raw = _dedup([*winners_hits_raw, *fallback])[:RUN_CHECK_WINNERS_RAW_CAP]
-        if winners_hits_raw:
-            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=RUN_CHECK_MAX_ENHANCE)
-            winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            has_election_type_vec = bool(user_meta and (user_meta.get("election_type") or "").strip())
-            if not winners_filtered and has_election_type_vec:
-                expand_q = _build_position_region_query(user_meta or {})
-                expand_hits = _search(client, winners2022_vector_store_id, expand_q, RUN_CHECK_K_WINNERS, True)
-                expand_hits = _dedup(expand_hits)[:RUN_CHECK_WINNERS_RAW_CAP]
-                if expand_hits:
-                    expand_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, expand_hits, max_enhance=RUN_CHECK_MAX_ENHANCE)
-                    expand_filtered = _filter_winners_by_user_meta(expand_enhanced, user_meta or {}, mode="strict")
-                    if expand_filtered:
-                        winners_filtered = expand_filtered
-                        logger.debug(f"[WINNERS2022][VECTOR] query expansion: {len(expand_filtered)}건")
-                if not winners_filtered:
-                    winners2022_context = WINNERS2022_CONTEXT_EMPTY
-            elif not winners_filtered:
-                winners_filtered = winners_enhanced[: max(1, min(3, len(winners_enhanced)))]
-            if winners_filtered:
-                winners2022_context = _build_structured_winners_context(
-                    winners_filtered[:RUN_CHECK_WINNERS_MAX_ITEMS],
-                    max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
-                    excerpt_len=400,
-                )
+    logger.info(
+        "[WINNERS2022] query_count=%s raw_hits=%s dedup_hits=%s enhanced_hits=%s strict_hits=%s region_only_hits=%s final_selected=%s",
+        len(queries),
+        len(winners_raw_hits),
+        len(winners_dedup_hits),
+        len(winners_enhanced),
+        len(strict_hits),
+        len(region_only_hits),
+        len(final_hits),
+    )
     t_winners = time.perf_counter()
     logger.info("[run_check] winners_search ms=%.0f", (t_winners - t_policy) * 1000)
 
