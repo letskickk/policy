@@ -835,6 +835,22 @@ file_search 도구: 정강·공약·지역별 공약 검색.
     return f"{system}\n\n{tool_desc}\n\n{user_adapted}"
 
 
+# run_check 검색/컨텍스트 상한 (대규모 문서·타임아웃 방지)
+RUN_CHECK_K_POLICY = 22
+RUN_CHECK_K_PLATFORM = 14
+RUN_CHECK_K_REGIONAL = 12
+RUN_CHECK_K_WINNERS = 12
+RUN_CHECK_WINNERS_QUERIES_MAX = 3
+RUN_CHECK_WINNERS_RAW_CAP = 20
+RUN_CHECK_MAX_ENHANCE = 10
+RUN_CHECK_PLATFORM_MAX_CHARS = 7_000
+RUN_CHECK_PLEDGES_MAX_CHARS = 10_000
+RUN_CHECK_REGIONAL_MAX_CHARS = 5_000
+RUN_CHECK_WINNERS_MAX_CHARS = 8_000
+RUN_CHECK_WINNERS_MAX_ITEMS = 8
+RUN_CHECK_MAX_WORKERS = 4
+
+
 def run_check(
     vector_store_id: str,
     user_pledge: str,
@@ -848,9 +864,11 @@ def run_check(
     - 모델에게 file_search 호출을 맡기지 않고,
     - 서버가 4개 출처(정강정책/공약/지역별/2022당선인)를 각각 검색해 컨텍스트를 구성한 뒤
     - 최종 답변만 생성한다.
+    - 대규모 문서 대비: 검색량·쿼리 수 상한, 병렬화, 단계별 캐시, 타임아웃 재시도.
     """
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
+    t_start = time.perf_counter()
 
     def _coalesce_text(content: object) -> str:
         """Search result content -> text (SDK object/dict 모두 지원)."""
@@ -1193,15 +1211,16 @@ def run_check(
         client: OpenAI,
         vs_id: str,
         hits: List[Tuple[float, str, str]],
-        max_enhance: int = 18,
+        max_enhance: int = 10,
     ) -> List[Tuple[float, str, str, Dict]]:
         """
         winners2022 hits에 메타 정보 보강.
         Returns: [(score, filename, raw_text, meta), ...]
-        동일 chunk 재파싱 방지용 메타 캐시, 공공 API 이름 보강은 상위 후보(idx<3)만 최대 3회.
+        동일 chunk 재파싱 금지: meta_cache(hash key)로 _extract_winners2022_metadata 결과 캐시.
+        공공 API 이름 보강은 상위 후보(idx<3)만 최대 3회.
         """
         enhanced: List[Tuple[float, str, str, Dict]] = []
-        meta_cache: Dict[str, Dict] = {}  # chunk_key -> meta (재파싱 방지)
+        meta_cache: Dict[str, Dict] = {}  # chunk_key (hash) -> meta, 같은 chunk 재파싱 금지
         api_cache: Dict[str, str] = {}
         api_call_count = 0
         max_api_calls = 3  # 상위 후보에만 제한
@@ -1212,7 +1231,7 @@ def run_check(
                 meta = dict(meta_cache[chunk_key])
             else:
                 meta = _extract_winners2022_metadata(text, filename)
-                meta_cache[chunk_key] = dict(meta)
+                meta_cache[chunk_key] = dict(meta)  # hash key 캐시로 동일 chunk 재파싱 금지
 
             needs_enhancement = not (meta["name"] and meta["position"] and meta["region"])
 
@@ -1396,7 +1415,7 @@ def run_check(
         if vs_id:
             _check_vector_store_ready(client, vs_id)
 
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as ex:
         ready_futures = [
             ex.submit(_ready, vector_store_id),
             ex.submit(_ready, regional_vector_store_id),
@@ -1404,23 +1423,22 @@ def run_check(
         ]
         for f in ready_futures:
             f.result()
+    t_ready = time.perf_counter()
+    logger.info("[run_check] ready_check ms=%.0f", (t_ready - t_start) * 1000)
 
-    # 1) policy 본문 + platform 키워드 + regional(있으면) — 병렬 검색
+    # 1) policy + platform 키워드 + regional — 병렬 검색 (per-request 캐시로 동일 쿼리 재호출 금지)
     policy_hits: List[Tuple[float, str, str]] = []
     platform_hits_kw: List[Tuple[float, str, str]] = []
     regional_hits: List[Tuple[float, str, str]] = []
-
-    # 검색량 축소로 응답 속도 개선 (타임아웃 완화)
-    k_policy = min(18, max(8, (max_results or 12) + 6))
-    k_platform = min(12, max(6, (max_results or 12)))
-    k_regional = min(10, max(4, (max_results or 12) // 2))
-    with ThreadPoolExecutor(max_workers=3) as ex:
-        f_policy = ex.submit(_search, client, vector_store_id, pledge, k_policy, True)
-        f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k_platform, False)
-        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, k_regional, True)
+    with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as ex:
+        f_policy = ex.submit(_search, client, vector_store_id, pledge, RUN_CHECK_K_POLICY, True)
+        f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", RUN_CHECK_K_PLATFORM, False)
+        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, RUN_CHECK_K_REGIONAL, True)
         policy_hits = f_policy.result()
         platform_hits_kw = f_platform.result()
         regional_hits = f_regional.result() if regional_vector_store_id else []
+    t_policy = time.perf_counter()
+    logger.info("[run_check] policy_search ms=%.0f (policy=%s platform_kw=%s regional=%s)", (t_policy - t_ready) * 1000, len(policy_hits), len(platform_hits_kw), len(regional_hits))
 
     policy_all = _dedup([*policy_hits, *platform_hits_kw])
     platform_hits: List[Tuple[float, str, str]] = []
@@ -1539,11 +1557,11 @@ def run_check(
             f"[WINNERS2022] fallback stages strict={len(strict_items)}, region_only={len(region_only_items)}, no_filter={len(no_filter_items)}"
         )
 
-        # 벡터 검색은 증거 보강용: 유사 청크가 있으면 근거발췌만 보강 (이름/직책/지역은 API 값 유지)
+        # 벡터 검색은 증거 보강용 (1패스, 캐시 사용)
         vec_hits: List[Tuple[float, str, str]] = []
         if winners2022_vector_store_id and api_items and pledge:
             q = (pledge[:500] + " 당선인 공약").strip()
-            vec_hits = _search(client, winners2022_vector_store_id, q, 10, True)
+            vec_hits = _search(client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True)
             logger.debug(f"[WINNERS2022][VECTOR] evidence hit={len(vec_hits)}")
             for idx, (_, _fn, _txt, meta) in enumerate(api_items):
                 if idx < len(vec_hits):
@@ -1557,14 +1575,16 @@ def run_check(
         if not chosen_items:
             chosen_items = region_only_items
         if not chosen_items:
-            # winners store hit가 1개라도 있으면 최소 1~3개 보장
+            # 비어도 최소 fallback: 무필터 top 1~3으로 "없음" 오탐 감소
             chosen_items = no_filter_items[:3] if vec_hits else no_filter_items[: max(1, min(3, len(no_filter_items)))]
         if chosen_items:
             winners2022_context = _build_structured_winners_context(
-                chosen_items, max_chars=14_000, excerpt_len=500
+                chosen_items[:RUN_CHECK_WINNERS_MAX_ITEMS],
+                max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
+                excerpt_len=400,
             )
     elif winners2022_vector_store_id:
-        # API 키 없을 때 기존 벡터 검색 폴백 (메타는 PDF 정규식)
+        # API 키 없을 때 벡터 검색 폴백: rewrite=True 1패스, hit 부족 시에만 rewrite=False
         def _build_winners2022_queries(pledge_text: str, meta: dict) -> List[str]:
             out: List[str] = []
             p = (pledge_text or "").strip()
@@ -1586,33 +1606,41 @@ def run_check(
                     unique_list.append((q or "").strip())
             return unique_list or ["제8회 전국동시지방선거 당선인 공약"]
 
-        queries = _build_winners2022_queries(pledge, user_meta or {})[:3]
-        all_winners_hits = []
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = []
-            for q in queries:
-                futures.append(executor.submit(_search, client, winners2022_vector_store_id, q, 20, True))
-                futures.append(executor.submit(_search, client, winners2022_vector_store_id, q, 20, False))
+        queries = _build_winners2022_queries(pledge, user_meta or {})[:RUN_CHECK_WINNERS_QUERIES_MAX]
+        all_winners_hits: List[Tuple[float, str, str]] = []
+        with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as executor:
+            futures = [executor.submit(_search, client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True) for q in queries]
             for f in as_completed(futures):
                 all_winners_hits.extend(f.result())
-        winners_hits_raw = _dedup(all_winners_hits)[:30]
+        winners_hits_raw = _dedup(all_winners_hits)[:RUN_CHECK_WINNERS_RAW_CAP]
+        if len(winners_hits_raw) < 6 and queries:
+            fallback = _search(client, winners2022_vector_store_id, queries[0], RUN_CHECK_K_WINNERS, False)
+            winners_hits_raw = _dedup([*winners_hits_raw, *fallback])[:RUN_CHECK_WINNERS_RAW_CAP]
         if winners_hits_raw:
-            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=12)
+            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=RUN_CHECK_MAX_ENHANCE)
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=10_000, excerpt_len=400)
+            if not winners_filtered:
+                winners_filtered = winners_enhanced[: max(1, min(3, len(winners_enhanced)))]
+            winners2022_context = _build_structured_winners_context(
+                winners_filtered[:RUN_CHECK_WINNERS_MAX_ITEMS],
+                max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
+                excerpt_len=400,
+            )
+    t_winners = time.perf_counter()
+    logger.info("[run_check] winners_search ms=%.0f", (t_winners - t_policy) * 1000)
 
-    # 컨텍스트 구성 (속도 우선: 아이템 수·길이 축소로 GPT 응답 시간 단축)
-    platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=6_000) or "(정강·정책 문서 없음)"
-    pledges_context = _fmt(pledges_hits[: max(8, max_results * 2)], max_chars=9_000) or "(우리당 공약 문서 없음)"
-    regional_context = _fmt(regional_hits[:6], max_chars=5_000) if regional_hits else ""
+    # 컨텍스트 슬림화 (대규모 문서 대비)
+    platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=RUN_CHECK_PLATFORM_MAX_CHARS) or "(정강·정책 문서 없음)"
+    pledges_context = _fmt(pledges_hits[: max(8, max_results * 2)], max_chars=RUN_CHECK_PLEDGES_MAX_CHARS) or "(우리당 공약 문서 없음)"
+    regional_context = _fmt(regional_hits[:6], max_chars=RUN_CHECK_REGIONAL_MAX_CHARS) if regional_hits else ""
 
-    # 프롬프트 생성 후 최종 답변만 생성
     from backend.prompts import load_system_prompt, build_user_message
 
     system = load_system_prompt()
     user = build_user_message(
         platform_context, pledges_context, regional_context, pledge, winners2022_context, user_meta=user_meta
     )
+    t_before_llm = time.perf_counter()
 
     resp = client.chat.completions.create(
         model=CHAT_MODEL,
@@ -1624,6 +1652,9 @@ def run_check(
     text = resp.choices[0].message.content or ""
     if not text.strip():
         raise RuntimeError("모델이 텍스트를 반환하지 않음")
+    t_llm = time.perf_counter()
+    logger.info("[run_check] llm_call ms=%.0f", (t_llm - t_before_llm) * 1000)
+    logger.info("[run_check] total ms=%.0f", (t_llm - t_start) * 1000)
     return text.strip()
 
 
