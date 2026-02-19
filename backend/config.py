@@ -7,17 +7,18 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv
-    load_dotenv(ROOT_DIR / ".env")
+    load_dotenv(ROOT_DIR / ".env", override=True)
 except ImportError:
     # dotenv 없으면 .env 수동 로드 (scripts/verify_winners_api.py 등)
     _env = ROOT_DIR / ".env"
     if _env.exists():
-        with open(_env, encoding="utf-8") as f:
+        with open(_env, encoding="utf-8-sig") as f:
             for line in f:
-                line = line.strip()
+                line = line.strip().replace("\r", "")
                 if line and not line.startswith("#") and "=" in line:
                     k, _, v = line.partition("=")
-                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    k = k.strip().lstrip("\ufeff").strip()
+                    v = v.strip().strip('"').strip("'")
                     if k:
                         os.environ.setdefault(k, v)
 
