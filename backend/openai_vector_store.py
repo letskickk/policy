@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 import re
+import xml.etree.ElementTree as ET
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -46,6 +47,100 @@ _data_go_kr_cache_lock = threading.Lock()
 WINNER_API_URL = "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire"
 PLEDGE_API_URL = "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire"
 SG_ID_2022 = "20220601"
+
+
+def _xml_local_name(tag: str) -> str:
+    """Element tag에서 로컬 이름만 (네임스페이스 제거)."""
+    return tag.split("}")[-1] if "}" in tag else tag
+
+
+def _xml_find(parent: Optional[ET.Element], local: str) -> Optional[ET.Element]:
+    """자식 중 local 이름이 일치하는 첫 요소 (네임스페이스 무시)."""
+    if parent is None:
+        return None
+    for c in parent:
+        if _xml_local_name(c.tag) == local:
+            return c
+    return None
+
+
+def _xml_findall(parent: Optional[ET.Element], local: str) -> List[ET.Element]:
+    """자식 중 local 이름이 일치하는 전체 (네임스페이스 무시)."""
+    if parent is None:
+        return []
+    return [c for c in parent if _xml_local_name(c.tag) == local]
+
+
+def _xml_text(el: Optional[ET.Element]) -> str:
+    return (el.text or "").strip() if el is not None and el.text else ""
+
+
+def _parse_winner_api_xml(raw: str) -> List[Dict[str, Any]]:
+    """당선인 API XML 응답 파싱 (서버가 _type=json 무시하고 XML 반환할 때, 네임스페이스 대응)."""
+    out: List[Dict[str, Any]] = []
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return out
+    body = _xml_find(root, "body") or root.find("body")
+    if body is None:
+        return out
+    items_el = _xml_find(body, "items") or body.find("items")
+    if items_el is not None:
+        items = _xml_findall(items_el, "item")
+    else:
+        one = _xml_find(body, "item") or body.find("item")
+        items = [one] if one is not None else []
+    for item in items:
+        if not isinstance(item, ET.Element):
+            continue
+        def text(tag: str) -> str:
+            for c in item:
+                if _xml_local_name(c.tag).lower() == tag.lower():
+                    return _xml_text(c)
+            el = item.find(tag) or item.find(tag.upper())
+            return _xml_text(el)
+        huboid = text("huboid") or text("HUBOID")
+        name = text("name") or text("NAME")
+        sd = text("sdName") or text("SDNAME")
+        sgg = text("sggName") or text("SGGNAME")
+        wiw = text("wiwName") or text("WIWNAME")
+        # API가 num, sgId, sgTypecode 등만 줄 수 있음 → 항목 있으면 수집
+        if any([huboid, name, sd, sgg, wiw]) or len(list(item)) > 0:
+            out.append({"huboid": str(huboid), "name": name, "sdName": sd, "sggName": sgg, "wiwName": wiw, "_raw": {}})
+    return out
+
+
+def _parse_pledge_api_xml(raw: str) -> List[Dict[str, Any]]:
+    """공약 API XML 응답 파싱 (네임스페이스 대응)."""
+    out: List[Dict[str, Any]] = []
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return out
+    body = _xml_find(root, "body") or root.find("body")
+    if body is None:
+        return out
+    item = _xml_find(body, "item") or body.find("item")
+    if item is None:
+        items_el = _xml_find(body, "items") or body.find("items")
+        if items_el is not None:
+            item = _xml_find(items_el, "item") or items_el.find("item")
+    if item is None or not isinstance(item, ET.Element):
+        return out
+    for i in range(1, 11):
+        def text(tag: str) -> str:
+            for c in item:
+                if _xml_local_name(c.tag).lower() == tag.lower():
+                    return _xml_text(c)
+            el = item.find(tag) or item.find(tag.upper())
+            return _xml_text(el)
+        t = text(f"prmsTitle{i}")
+        c = text(f"prmsCont{i}")
+        rn = text(f"prmsRealmName{i}")
+        if t or c:
+            out.append({"prmsTitle": t, "prmsCont": c, "prmsRealmName": rn})
+    return out
 
 MANIFEST_PATH = ROOT_DIR / "data" / "vector_store_manifest.json"
 
@@ -134,21 +229,28 @@ def _fetch_winners_api(
             req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
             with urlopen(req, timeout=10) as r:
                 raw = r.read().decode("utf-8", errors="replace")
+            out: List[Dict[str, Any]] = []
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
+                if "<response" in raw or raw.strip().startswith("<?xml"):
+                    out = _parse_winner_api_xml(raw)
+                    if out:
+                        if request_dedup is not None:
+                            request_dedup.add(cache_key)
+                        _api_cache_set(cache_key, out)
+                        return out
                 logger.warning("[Winner API] non-JSON response head: %s", (raw or "").strip().replace("\n", " ")[:240])
                 raise
             body = (data.get("response") or {}).get("body") or {}
             items = body.get("items") or body.get("item")
             if not items:
-                out = []
+                pass
             else:
                 if isinstance(items, dict):
                     items = [items]
                 elif not isinstance(items, list):
                     items = [items] if items else []
-                out = []
                 for it in items:
                     row = it if isinstance(it, dict) else {}
                     huboid = row.get("huboid") or row.get("HUBOID") or ""
@@ -207,22 +309,29 @@ def _fetch_winner_pledges_api(
             req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
             with urlopen(req, timeout=10) as r:
                 raw = r.read().decode("utf-8", errors="replace")
+            out_pledges: List[Dict[str, Any]] = []
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
+                if "<response" in raw or raw.strip().startswith("<?xml"):
+                    out_pledges = _parse_pledge_api_xml(raw)
+                    if out_pledges:
+                        if request_dedup is not None:
+                            request_dedup.add(cache_key)
+                        _api_cache_set(cache_key, out_pledges)
+                        return out_pledges
                 logger.warning("[Pledge API] non-JSON response head: %s", (raw or "").strip().replace("\n", " ")[:240])
                 raise
             body = (data.get("response") or {}).get("body") or {}
             total = int(body.get("totalCount") or 0)
             if total == 0:
-                out_pledges = []
+                pass
             else:
                 item = body.get("item") or body.get("items")
                 if isinstance(item, list):
                     row = item[0] if item and isinstance(item[0], dict) else {}
                 else:
                     row = item if isinstance(item, dict) else {}
-                out_pledges = []
                 for i in range(1, 11):
                     t = row.get(f"prmsTitle{i}") or row.get("prmsTitle%d" % i) or ""
                     c = row.get(f"prmsCont{i}") or row.get("prmsCont%d" % i) or ""
