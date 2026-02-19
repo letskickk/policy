@@ -1840,35 +1840,23 @@ def run_check(
         if hashlib.sha256((h[1] + "\n" + h[2][:200]).encode("utf-8", errors="ignore")).hexdigest() not in platform_key
     ]
 
-    # 4) winners2022 — pledge-first retrieval -> metadata enhance -> role-safe filter
+    # 4) winners2022 — 입력 공약과 유사한 2022 당선인 사례 검색
+    # 핵심: 4번 섹션은 유사 사례 비교용. 사용자 직책/지역으로 필터하지 않음.
     winners2022_context = ""
     request_dedup: set = set()
     api_items: List[Tuple[float, str, str, Dict]] = []
 
-    # API canonical 메타(있으면 이름/직책 보강용으로만 사용)
+    # API: 전 선거구분(3=광역단체장, 4=기초단체장, 11=교육감) 모두 조회 → 키워드 매칭 상위 선택
     if DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY:
-        norm_meta = _normalize_user_meta_for_winners(user_meta or {})
         all_winner_rows: List[Dict[str, Any]] = []
-        for st in sorted(set(norm_meta["sgTypecodes"])):
+        for st in ["3", "4", "11"]:
             rows = _fetch_winners_api(
                 SG_ID_2022, st, "", "", DATA_GO_KR_WINNER_API_KEY, request_dedup
             )
             for r in rows:
                 r["_sgTypecode"] = st
             all_winner_rows.extend(rows)
-        prefiltered_rows: List[Dict[str, Any]] = []
         for w in all_winner_rows:
-            pos_label, region_label = _winner_row_to_position_region(
-                w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
-            )
-            meta_probe = {
-                "canonical_position": pos_label,
-                "canonical_region": region_label,
-                "sggName": (w.get("sggName") or "").strip(),
-            }
-            if _is_meta_match(meta_probe, user_meta or {}, mode="region_only"):
-                prefiltered_rows.append(w)
-        for w in prefiltered_rows:
             pos_label, region_label = _winner_row_to_position_region(
                 w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
             )
@@ -1888,14 +1876,14 @@ def run_check(
                     "sggName": (w.get("sggName") or "").strip(),
                     "pledge_title": title,
                 }))
+        # 키워드 매칭 점수 순 정렬 후 상위만 유지 (전체 처리 방지)
         if pledge and api_items:
             api_items = _rank_api_items_by_pledge_keywords(api_items, pledge)
+        api_items = api_items[:RUN_CHECK_WINNERS_RAW_CAP]
 
     winners_raw_hits: List[Tuple[float, str, str]] = []
     winners_dedup_hits: List[Tuple[float, str, str]] = []
     winners_enhanced: List[Tuple[float, str, str, Dict]] = []
-    strict_hits: List[Tuple[float, str, str, Dict]] = []
-    region_only_hits: List[Tuple[float, str, str, Dict]] = []
     final_hits: List[Tuple[float, str, str, Dict]] = []
 
     queries = _build_winners2022_queries_for_vector(
@@ -1917,7 +1905,7 @@ def run_check(
         winners_enhanced = _enhance_winners2022_hits(
             client, winners2022_vector_store_id, winners_dedup_hits, max_enhance=RUN_CHECK_MAX_ENHANCE
         )
-        # canonical 우선 보강: role/region 일치하는 API 메타를 덮어씀
+        # canonical 보강: API 메타(이름/직책/지역)를 벡터 hit 메타에 덮어씀
         api_canonical_by_role_region: Dict[Tuple[str, str], Dict] = {}
         for _s, _f, _t, meta in api_items:
             k = (
@@ -1941,60 +1929,29 @@ def run_check(
             patched.append((score, fn, txt, meta))
         winners_enhanced = patched
 
+    # 4번은 유사 사례 비교: 사용자 직책/지역 필터 없이 유사도 상위 항목 그대로 사용
     if winners_enhanced:
-        strict_hits = _filter_winners_by_user_meta(winners_enhanced, user_meta or {}, mode="strict")
-        region_only_hits = _filter_winners_by_user_meta(winners_enhanced, user_meta or {}, mode="region_only")
-        final_hits = choose_winners_items(strict_hits, region_only_hits, winners_enhanced, user_meta or {})
+        final_hits = winners_enhanced[:RUN_CHECK_WINNERS_MAX_ITEMS]
     elif api_items:
-        # vector 히트가 전무하면 API 기반 컨텍스트를 보조로 사용 (이미 키워드 순 정렬됨)
-        strict_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="strict")
-        region_only_hits = _filter_winners_by_user_meta(api_items, user_meta or {}, mode="region_only")
-        has_election_type = bool(user_meta and (user_meta.get("election_type") or "").strip())
-        if has_election_type:
-            final_hits = choose_winners_items(strict_hits, region_only_hits, api_items, user_meta or {})
-        else:
-            final_hits = strict_hits or region_only_hits or api_items[:2]
-        # 역할 충돌로 전부 걸러져도 API 자료가 있으면 최소 1~2건은 노출 (4번 "없음" 방지)
-        if not final_hits and api_items:
-            final_hits = strict_hits or region_only_hits or api_items[:RUN_CHECK_WINNERS_MAX_ITEMS]
+        # 벡터 없으면 API 키워드 매칭 상위 항목 사용
+        final_hits = api_items[:RUN_CHECK_WINNERS_MAX_ITEMS]
 
-    # "없음"은 유사도 임계치 미달 + 보강 실패 + role-safe 후보 없음일 때만 허용
-    has_similarity_hit = any(score >= WINNERS2022_MIN_SIMILARITY_SCORE for score, _f, _t in winners_dedup_hits)
     if final_hits:
         winners2022_context = _build_structured_winners_context(
-            final_hits[:RUN_CHECK_WINNERS_MAX_ITEMS],
+            final_hits,
             max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
             excerpt_len=400,
         )
-    elif has_similarity_hit:
-        # 메타가 부족해도 근거 본문 기반으로 role-safe 후보를 최대한 남긴다.
-        role_safe_relaxed: List[Tuple[float, str, str, Dict]] = []
-        for score, fn, txt, meta in winners_enhanced:
-            pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
-            if is_explicit_role_conflict(pos, user_meta or {}):
-                continue
-            role_safe_relaxed.append((score, fn, txt, meta))
-            if len(role_safe_relaxed) >= WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS:
-                break
-        if role_safe_relaxed:
-            winners2022_context = _build_structured_winners_context(
-                role_safe_relaxed,
-                max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
-                excerpt_len=400,
-            )
-        else:
-            winners2022_context = WINNERS2022_CONTEXT_EMPTY
     else:
         winners2022_context = WINNERS2022_CONTEXT_EMPTY
 
     logger.info(
-        "[WINNERS2022] query_count=%s raw_hits=%s dedup_hits=%s enhanced_hits=%s strict_hits=%s region_only_hits=%s final_selected=%s",
+        "[WINNERS2022] query_count=%s raw_hits=%s dedup_hits=%s enhanced_hits=%s api_items=%s final_selected=%s",
         len(queries),
         len(winners_raw_hits),
         len(winners_dedup_hits),
         len(winners_enhanced),
-        len(strict_hits),
-        len(region_only_hits),
+        len(api_items),
         len(final_hits),
     )
     t_winners = time.perf_counter()
