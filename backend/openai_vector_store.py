@@ -769,12 +769,17 @@ def run_check(
             # 이름 + 직책 (이름 바로 다음)
             r"([가-힣]{2,4})\s+(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)",
         ]
+        # 당선인 이름 블랙리스트: 직책/일반 명사·접미사 (2~4자 한글만 허용 + 블랙리스트)
+        NAME_BLACKLIST = {
+            "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
+            "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행", "재단",
+            "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
+        }
         for p in name_patterns:
             name_match = re.search(p, scan_text)
             if name_match:
                 name = name_match.group(1)
-                # 잘못된 추출 검증: 한 글자나 너무 긴 이름 제외, 일반적인 이름 패턴만
-                if 2 <= len(name) <= 4 and not name in ['특별', '광역', '자치', '시도', '지사', '시장', '구청', '군수']:
+                if 2 <= len(name) <= 4 and re.match(r"^[가-힣]{2,4}$", name) and name not in NAME_BLACKLIST:
                     meta['name'] = name
                     break
 
@@ -912,19 +917,21 @@ def run_check(
                             if meta['name'] and meta['position'] and meta['region']:
                                 break
             
-            # 메타 정보를 명확한 형식으로 텍스트에 추가
-            # 이름은 백엔드에서 추출하지 않고, GPT가 청크 본문에서 직접 찾도록 함
+            # 메타 정보를 명확한 형식으로 텍스트에 추가 ([당선인명] 포함)
             meta_lines = []
+            if meta['name']:
+                meta_lines.append(f"[당선인명] {meta['name']}")
             if meta['position']:
                 meta_lines.append(f"[직책] {meta['position']}")
             if meta['region']:
                 meta_lines.append(f"[지역] {meta['region']}")
             if meta['pledge_title']:
                 meta_lines.append(f"[공약제목] {meta['pledge_title']}")
-            
+            if not meta['name'] and (meta['position'] or meta['region'] or meta['pledge_title']):
+                meta_lines.append("[당선인명] (청크 본문에서 확인)")
             meta_header = ""
             if meta_lines:
-                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문 - 여기서 이름을 찾으세요]\n"
+                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문]\n"
             
             enhanced_text = meta_header + text
             enhanced.append((score, filename, enhanced_text))
@@ -1006,25 +1013,58 @@ def run_check(
     # 4) winners2022 store (선택) - 다중 질의로 리콜 강화
     winners_hits: List[Tuple[float, str, str]] = []
     if winners2022_vector_store_id:
-        # 다중 질의 생성
-        queries = [pledge]
-        # 공약 원문 축약본 (첫 200자)
-        if len(pledge) > 200:
-            queries.append(pledge[:200] + "...")
-        # 2022 고정 앵커 질의
-        queries.append("제8회 전국동시지방선거 당선인 공약")
-        # user_meta 결합 질의
-        if user_meta:
-            meta_parts = []
-            if user_meta.get("election_type"):
-                meta_parts.append(user_meta["election_type"])
-            if user_meta.get("region_province"):
-                meta_parts.append(user_meta["region_province"])
-            if user_meta.get("region_city"):
-                meta_parts.append(user_meta["region_city"])
-            if meta_parts:
-                queries.append(f"{' '.join(meta_parts)} {pledge[:150]}")
-        
+        def _build_winners2022_queries(pledge_text: str, meta: dict) -> List[str]:
+            """복붙한 긴 공약 원문에서도 당선인 검색이 빠지지 않도록 다중 질의 생성. 중복 제거."""
+            out: List[str] = []
+            if not (pledge_text or "").strip():
+                return ["제8회 전국동시지방선거 당선인 공약"]
+            p = (pledge_text or "").strip()
+            # 정규화 원문 (띄어쓰기 압축 + 한글 간격 정규화)
+            normalized = re.sub(r"\s+", " ", _compact_spaced_hangul(p)).strip()
+            if len(normalized) >= 15:
+                out.append(normalized[:2000])  # 길면 앞 2000자
+            # 첫 줄 / 첫 문장
+            lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
+            if lines:
+                first_line = lines[0]
+                if 10 <= len(first_line) <= 300:
+                    out.append(first_line)
+                # 첫 문장 (마침표/물음표/느낌표까지)
+                first_sent = re.split(r"[.!?。！？]", first_line, maxsplit=1)[0].strip()
+                if first_sent != first_line and 10 <= len(first_sent) <= 200:
+                    out.append(first_sent)
+            # 본문 중간 스니펫 (긴 텍스트일 때)
+            if len(p) > 500:
+                start = len(p) // 3
+                snippet = p[start : start + 350].strip()
+                if len(snippet) >= 30:
+                    out.append(snippet)
+            # user_meta 결합 질의
+            if meta:
+                meta_parts = []
+                if meta.get("election_type"):
+                    meta_parts.append(meta["election_type"])
+                if meta.get("region_province"):
+                    meta_parts.append(meta["region_province"])
+                if meta.get("region_city"):
+                    meta_parts.append(meta["region_city"])
+                if meta_parts:
+                    head = " ".join(meta_parts)
+                    out.append(f"{head} {p[:200]}")
+            # 고정 앵커
+            out.append("제8회 전국동시지방선거 당선인 공약")
+            # 중복 제거 (정규화 후 동일한 질의 제거)
+            seen: set = set()
+            unique: List[str] = []
+            for q in out:
+                key = re.sub(r"\s+", " ", (q or "").strip())[:500]
+                if key not in seen and len(key) >= 8:
+                    seen.add(key)
+                    unique.append((q or "").strip())
+            return unique if unique else ["제8회 전국동시지방선거 당선인 공약"]
+
+        queries = _build_winners2022_queries(pledge, user_meta or {})
+
         # 각 질의마다 rewrite=True/False 둘 다 조회
         all_winners_hits = []
         for q in queries:
