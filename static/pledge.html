@@ -255,8 +255,8 @@
       color: var(--text-strong);
     }
     .score-board{
-      margin-bottom: 1rem;
-      padding: 0.9rem 1rem;
+      margin-bottom: 0.85rem;
+      padding: 0.75rem 1rem;
       border-radius: 12px;
       border: 1px solid var(--border);
       background: rgba(0,0,0,0.2);
@@ -332,21 +332,21 @@
       font-weight: 900;
     }
     .score-cards-row{
-      margin: 0.7rem 0 0.9rem;
+      margin: 0.6rem 0 0.75rem;
       display: flex;
-      gap: 0.45rem;
       flex-wrap: wrap;
+      gap: 0.4rem;
     }
     .score-card{
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.4rem 0.55rem;
-      border-radius: 10px;
+      gap: 0.35rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
       border: 1px solid rgba(148,163,184,0.25);
       background: rgba(255,255,255,0.05);
-      font-size: 0.82rem;
-      line-height: 1.1;
+      font-size: 0.8rem;
+      line-height: 1.2;
     }
     .score-card-label{
       color: var(--text);
@@ -356,63 +356,65 @@
     .score-card-value{
       color: var(--text-strong);
       font-weight: 900;
-      min-width: 2.2rem;
-      text-align: right;
     }
     .score-card.good{ border-color: rgba(34,197,94,0.45); }
     .score-card.mid{ border-color: rgba(250,204,21,0.45); }
     .score-card.low{ border-color: rgba(248,113,113,0.45); }
     .analysis-text{
       margin-top: 0.5rem;
-      line-height: 1.78;
+      line-height: 1.7;
       font-size: 0.98rem;
     }
     .analysis-section{
-      margin-bottom: 1.35rem;
-      padding-left: 0;
+      margin-bottom: 1.25rem;
       border-left: 3px solid rgba(255, 179, 122, 0.35);
-      padding-left: 1rem;
-      margin-left: 0;
+      padding-left: 0.85rem;
     }
     .analysis-section:last-child{ margin-bottom: 0; }
     .analysis-section-title{
       font-weight: 900;
       color: var(--text-strong);
-      font-size: 1.02rem;
-      margin-bottom: 0.5rem;
-      letter-spacing: -0.01em;
+      font-size: 1rem;
+      margin-bottom: 0.45rem;
     }
     .analysis-section-body{
       color: var(--text);
-      line-height: 1.75;
+      line-height: 1.7;
     }
-    .analysis-section-body .analysis-label{
-      display: inline-block;
+    .analysis-line{
+      display: flex;
+      gap: 0.4rem;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+    .analysis-line:last-child{ margin-bottom: 0; }
+    .analysis-label{
+      flex: 0 0 auto;
       font-weight: 800;
       color: var(--muted);
-      min-width: 10em;
-      vertical-align: top;
     }
-    .analysis-section-body .analysis-line{
-      margin-bottom: 0.55rem;
+    .analysis-value{
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
     }
-    .analysis-section-body .analysis-line:last-child{ margin-bottom: 0; }
+    .analysis-line.br{ display: block; margin-bottom: 0.25rem; }
     .analysis-winner-item{
       display: block;
       padding: 0.4rem 0.6rem;
-      margin: 0.35rem 0;
+      margin: 0.3rem 0;
       background: rgba(255,255,255,0.05);
       border-radius: 8px;
       border: 1px solid var(--border);
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       line-height: 1.5;
       color: var(--text);
     }
     .analysis-improve-item{
-      margin: 0.4rem 0 0.4rem 1rem;
+      margin: 0.35rem 0 0.35rem 0.75rem;
       padding-left: 0.5rem;
       border-left: 2px solid rgba(255, 179, 122, 0.4);
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       color: var(--text);
     }
     .result-content.empty{
@@ -655,10 +657,10 @@
             if (labelM) {
               var label = escapeHtml(labelM[1] + (labelM[2] || '') + (labelM[3] || ':'));
               var after = escapeHtml(trimmed.slice(labelM[0].length).trim());
-              return '<div class="analysis-line"><span class="analysis-label">' + label + '</span> ' + after + '</div>';
+              return '<div class="analysis-line"><span class="analysis-label">' + label + '</span><span class="analysis-value">' + after + '</span></div>';
             }
-            if (trimmed === '') return '<br>';
-            return '<div class="analysis-line">' + rest + '</div>';
+            if (trimmed === '') return '<div class="analysis-line br"></div>';
+            return '<div class="analysis-line"><span class="analysis-value">' + rest + '</span></div>';
           }).join('');
           out.push('<div class="analysis-section"><div class="analysis-section-title">' + title + '</div><div class="analysis-section-body">' + bodyHtml + '</div></div>');
           continue;
