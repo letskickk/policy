@@ -789,24 +789,70 @@ def run_check(
         m_pos = re.search(r"직책 후보군\s*:\s*([^\n]+)", text)
         m_reg = re.search(r"지역 후보군\s*:\s*([^\n]+)", text)
         m_name = re.search(r"이름 후보\s*:\s*([^\n]+)", text)
+        NAME_BLACKLIST_FAST = {
+            "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
+            "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행",
+            "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
+        }
+
+        pos_candidates: List[str] = []
+        reg_candidates: List[str] = []
+
         if m_pos and m_pos.group(1).strip() != "확인 필요":
-            candidates = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
-            if candidates:
-                meta['position'] = candidates[0]
+            pos_candidates = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
         if m_reg and m_reg.group(1).strip() != "확인 필요":
-            candidates = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
-            if candidates:
-                meta['region'] = _normalize_region_name(candidates[0])
+            reg_candidates = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
         if m_name and m_name.group(1).strip() != "확인 필요":
-            NAME_BLACKLIST_FAST = {
-                "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
-                "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행",
-                "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
-            }
             for cand in [c.strip() for c in m_name.group(1).split(",") if c.strip()]:
                 if 2 <= len(cand) <= 4 and re.match(r"^[가-힣]{2,4}$", cand) and cand not in NAME_BLACKLIST_FAST:
                     meta['name'] = cand
                     break
+
+        # 지역은 후보군 중 가장 앞에 있는 것을 사용
+        if reg_candidates:
+            meta['region'] = _normalize_region_name(reg_candidates[0])
+
+        # 직책은 지역과 일치하는 것을 우선 선택.
+        # 직책 후보군에서 hit region을 포함하는 것을 먼저 찾고, 없으면 첫 번째 사용.
+        # 예: 지역=전라남도인데 직책 후보군=[경기도지사, 도지사, 군수] → "도지사"/"군수" 선택
+        if pos_candidates:
+            region_norm = _normalize_region_name(reg_candidates[0]) if reg_candidates else ""
+            matched_pos = None
+            for p in pos_candidates:
+                # 직책이 지역명을 포함하면 가장 정확한 후보
+                if region_norm and region_norm.replace("특별시", "").replace("광역시", "").replace("특별자치시", "").replace("도", "").replace("특별자치도", "") in p:
+                    matched_pos = p
+                    break
+            if not matched_pos:
+                # 지역 접두어가 없는 일반 직책(구청장, 군수, 시장, 도지사 등)을 우선
+                generic = ["구청장", "군수", "시장", "도지사", "교육감", "의원"]
+                for p in pos_candidates:
+                    if any(g in p for g in generic) and not any(
+                        other_prov in p
+                        for other_prov in ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기", "강원", "충청", "전라", "경상", "제주"]
+                        if not (region_norm and other_prov in region_norm)
+                    ):
+                        matched_pos = p
+                        break
+            meta['position'] = matched_pos or pos_candidates[0]
+
+        # 직책에서 지역 역추론 (지역이 없고 직책만 있을 때)
+        # 단, 직책이 타 지역을 명시(경기도지사 등)하면 지역도 함께 교정
+        if meta['position'] and not meta['region']:
+            m = re.match(r"([가-힣]+(?:특별시|광역시|도|시|군|구))", meta['position'])
+            if m:
+                meta['region'] = _normalize_region_name(m.group(1))
+        elif meta['position'] and meta['region']:
+            # 직책에 타 지역이 명시되어 있고 그게 현재 지역과 다르면 직책에서 지역 부분을 제거
+            pos_region_m = re.match(r"([가-힣]+(?:특별시|광역시|도))(지사|시장)", meta['position'])
+            if pos_region_m:
+                pos_region = _normalize_region_name(pos_region_m.group(1))
+                if pos_region and meta['region'] and pos_region != meta['region']:
+                    # 직책이 틀렸을 가능성이 높음 → 지역으로 직책 재추론
+                    logger.debug(f"[META] 직책 지역 불일치: 직책={meta['position']} 지역={meta['region']} → 재추론")
+                    inferred = _infer_position_from_region(meta['region'])
+                    if inferred:
+                        meta['position'] = inferred
 
         # OCR 간격 정규화 텍스트까지 함께 스캔
         compact_text = _compact_spaced_hangul(text)
