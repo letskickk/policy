@@ -12,7 +12,7 @@ Type=simple
 User=ec2-user
 WorkingDirectory=/home/ec2-user/Policy
 Environment="PATH=/home/ec2-user/Policy/.venv/bin"
-ExecStart=/home/ec2-user/Policy/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 80
+ExecStart=/home/ec2-user/Policy/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 300
 Restart=always
 RestartSec=5
 
