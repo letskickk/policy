@@ -363,8 +363,57 @@
     .score-card.mid{ border-color: rgba(250,204,21,0.45); }
     .score-card.low{ border-color: rgba(248,113,113,0.45); }
     .analysis-text{
-      margin-top: 0.2rem;
+      margin-top: 0.5rem;
       line-height: 1.78;
+      font-size: 0.98rem;
+    }
+    .analysis-section{
+      margin-bottom: 1.35rem;
+      padding-left: 0;
+      border-left: 3px solid rgba(255, 179, 122, 0.35);
+      padding-left: 1rem;
+      margin-left: 0;
+    }
+    .analysis-section:last-child{ margin-bottom: 0; }
+    .analysis-section-title{
+      font-weight: 900;
+      color: var(--text-strong);
+      font-size: 1.02rem;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+    .analysis-section-body{
+      color: var(--text);
+      line-height: 1.75;
+    }
+    .analysis-section-body .analysis-label{
+      display: inline-block;
+      font-weight: 800;
+      color: var(--muted);
+      min-width: 10em;
+      vertical-align: top;
+    }
+    .analysis-section-body .analysis-line{
+      margin-bottom: 0.55rem;
+    }
+    .analysis-section-body .analysis-line:last-child{ margin-bottom: 0; }
+    .analysis-winner-item{
+      display: block;
+      padding: 0.4rem 0.6rem;
+      margin: 0.35rem 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+    .analysis-improve-item{
+      margin: 0.4rem 0 0.4rem 1rem;
+      padding-left: 0.5rem;
+      border-left: 2px solid rgba(255, 179, 122, 0.4);
+      font-size: 0.95rem;
+      color: var(--text);
     }
     .result-content.empty{
       text-align:center;
@@ -537,6 +586,7 @@
         <div class="loading-state">
           <div class="spinner"></div>
           <span>AI가 정책 데이터를 분석하고 있습니다...</span>
+          <small style="display:block;margin-top:0.5rem;color:var(--muted);font-weight:600;">최대 1~2분 걸릴 수 있습니다. 잠시만 기다려 주세요.</small>
         </div>
       `;
       resultEl.className = 'result-content';
@@ -570,6 +620,55 @@
     function normalizeOutputText(text) {
       const s = String(text || '');
       return s.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    var _labelPattern = /^(결과|근거|유사·중복 공약|차별화 포인트|유사 공약|유사성 분석|유사 공약\s*|보완 사항\s*|유사도\s*|정강정책 부합도|정책 설계 완성도|실행 가능성|구체성|메시지 경쟁력)(\s*\([^)]*\))?\s*([:：])/;
+    var _winnerPattern = /^[-*]?\s*(2022\s*\/\s*.+)$/;
+
+    function formatAnalysisHtml(text) {
+      const s = String(text || '').trim();
+      if (!s) return '';
+      const lines = s.split(/\r?\n/);
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const sectionMatch = line.match(/^(\d+\.\s+[^\n]+|##\s*\d+\.\s+[^\n]+)/);
+        if (sectionMatch) {
+          const title = escapeHtml(sectionMatch[1].replace(/^##\s*/, ''));
+          let bodyLines = [];
+          i += 1;
+          while (i < lines.length && !lines[i].match(/^\d+\.\s+|^##\s*\d+\./)) {
+            bodyLines.push(lines[i]);
+            i += 1;
+          }
+          var bodyHtml = bodyLines.map(function(ln) {
+            var trimmed = ln.trim();
+            var rest = escapeHtml(ln);
+            if (_winnerPattern.test(trimmed)) {
+              return '<div class="analysis-winner-item">' + escapeHtml(trimmed) + '</div>';
+            }
+            if (trimmed.startsWith('- ') && sectionMatch[1].indexOf('수정') !== -1) {
+              return '<div class="analysis-improve-item">' + rest + '</div>';
+            }
+            var labelM = trimmed.match(_labelPattern);
+            if (labelM) {
+              var label = escapeHtml(labelM[1] + (labelM[2] || '') + (labelM[3] || ':'));
+              var after = escapeHtml(trimmed.slice(labelM[0].length).trim());
+              return '<div class="analysis-line"><span class="analysis-label">' + label + '</span> ' + after + '</div>';
+            }
+            if (trimmed === '') return '<br>';
+            return '<div class="analysis-line">' + rest + '</div>';
+          }).join('');
+          out.push('<div class="analysis-section"><div class="analysis-section-title">' + title + '</div><div class="analysis-section-body">' + bodyHtml + '</div></div>');
+          continue;
+        }
+        i += 1;
+      }
+      if (out.length === 0) {
+        return '<div class="analysis-text">' + escapeHtml(s).replace(/\n/g, '<br>') + '</div>';
+      }
+      return '<div class="analysis-text">' + out.join('') + '</div>';
     }
 
     function renderRubricList(title, items) {
@@ -689,7 +788,7 @@
 
       const normalizedBaseText = normalizeOutputText(baseText);
       const fullText = normalizedBaseText || '';
-      html += `<div class="analysis-text">${escapeHtml(fullText).replace(/\n/g, '<br>')}</div>`;
+      html += formatAnalysisHtml(fullText) || `<div class="analysis-text">${escapeHtml(fullText).replace(/\n/g, '<br>')}</div>`;
       showResult(html);
     }
 
@@ -765,6 +864,7 @@
           showError(
             '분석 시간이 초과되었습니다.<br>' +
             '정책 분석에는 1~2분 걸릴 수 있습니다. 잠시 후 다시 시도해 주세요.<br>' +
+            '<button type="button" class="btn-secondary" style="margin-top:0.75rem;" onclick="document.getElementById(\'btn\').click()">다시 시도</button><br>' +
             '<small>(' + (msg || 'Gateway Time-out') + ')</small>'
           );
         } else {

@@ -131,6 +131,7 @@ def check_pledge_alignment(
             pledge_key,
             regional_vector_store_id or "",
             winners2022_vector_store_id or "",
+            max_results=10,
             user_meta=user_meta,
         )
         has_regional = bool(regional_vector_store_id)
