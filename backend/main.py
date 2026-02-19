@@ -1295,6 +1295,9 @@ def debug_scan():
 @app.post("/check", response_model=PledgeCheckResponse)
 def check_pledge(body: PledgeCheckRequest, request: Request):
     """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다. (승인 사용자 전용)"""
+    import time
+    t0 = time.perf_counter()
+    logger.info("[check] started")
     try:
         _ensure_startup()  # 지연 초기화
 
@@ -1337,11 +1340,13 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
             )
         except Exception:
             pass
+        elapsed = time.perf_counter() - t0
+        logger.info("[check] completed in %.1fs", elapsed)
         return PledgeCheckResponse(result=result)
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("check_pledge 오류")
+        logger.exception("check_pledge 오류 (after %.1fs)", time.perf_counter() - t0)
         raise HTTPException(status_code=500, detail=str(e)[:500])
 
 
@@ -1853,8 +1858,11 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
     """
     벡터 검색 기반 공약 검증 리포트를 생성한다. (승인 사용자 전용)
     """
+    import time
+    t0 = time.perf_counter()
+    logger.info("[verify] started")
     _ensure_startup()  # 지연 초기화
-    
+
     user = require_approved(request)
     ip = _client_ip(request)
     ok, msg = check_rate_limit_ip(ip)
@@ -1903,6 +1911,7 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
         )
     except Exception:
         pass
+    logger.info("[verify] completed in %.1fs", time.perf_counter() - t0)
     return result
 
 

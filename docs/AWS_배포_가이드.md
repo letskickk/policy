@@ -365,4 +365,8 @@ sudo systemctl restart nginx
   - **Nginx**: `proxy_read_timeout 300s;` `proxy_connect_timeout 300s;` `proxy_send_timeout 300s;` (location / 또는 /check, /api 포함 블록에).
   - **AWS ALB**: 로드 밸런서 → 해당 타깃 그룹 → 속성 → 유휴 제한 시간(Idle timeout)을 **300초**로 변경.
   - 서버 측에서는 검색량·컨텍스트 길이를 줄여 응답 시간을 단축해 두었음. 그래도 60초 미만 프록시에서는 타임아웃이 날 수 있으므로 위 설정 필수.
+- **타임아웃 원인 파악**: 서버 로그에서 `[check] started` / `[verify] started` 와 `completed in Xs` 를 확인.
+  - `started` 만 있고 `completed` 가 없으면 → **프록시가 먼저 연결을 끊은 것**(Nginx/ALB 타임아웃). 위처럼 300초로 올리면 해결.
+  - `completed in 120.5s` 처럼 60초 넘게 걸리면 → 백엔드는 정상 완료인데, 그 전에 프록시가 60초에 끊어서 504가 난 것. 역시 프록시 타임아웃 상향 필요.
+  - 로그 보는 법: `journalctl -u policy-app -f` (systemd) 또는 앱이 출력하는 로그 파일.
 - **API 키 오류**: 서버의 `Policy/.env` 에 `OPENAI_API_KEY`가 올바르게 들어 있는지 확인.

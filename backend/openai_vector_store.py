@@ -315,11 +315,10 @@ def _fetch_winner_pledges_api(
             except json.JSONDecodeError:
                 if "<response" in raw or raw.strip().startswith("<?xml"):
                     out_pledges = _parse_pledge_api_xml(raw)
-                    if out_pledges:
-                        if request_dedup is not None:
-                            request_dedup.add(cache_key)
-                        _api_cache_set(cache_key, out_pledges)
-                        return out_pledges
+                    if request_dedup is not None:
+                        request_dedup.add(cache_key)
+                    _api_cache_set(cache_key, out_pledges)
+                    return out_pledges
                 logger.warning("[Pledge API] non-JSON response head: %s", (raw or "").strip().replace("\n", " ")[:240])
                 raise
             body = (data.get("response") or {}).get("body") or {}
