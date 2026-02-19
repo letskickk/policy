@@ -969,29 +969,29 @@ def run_check(
             hit_region = (meta.get("region") or "").strip()
             hit_position = (meta.get("position") or "").strip()
             hit_region_norm = _norm(hit_region)
+            region_unknown = not hit_region or hit_region == "-"
 
-            if province:
+            if province and not region_unknown:
                 user_prov_norm = _norm(province)
-                if not user_prov_norm:
-                    pass
-                elif hit_region_norm != user_prov_norm and user_prov_norm not in hit_region_norm and hit_region_norm not in user_prov_norm:
-                    continue
-            if city:
+                if user_prov_norm:
+                    if hit_region_norm != user_prov_norm and user_prov_norm not in hit_region_norm and hit_region_norm not in user_prov_norm:
+                        continue
+            if city and not region_unknown:
                 if city not in hit_region and city not in hit_position:
                     continue
             if election:
                 el = election.lower()
                 if "metro_mayor" in el or ("광역" in election and "시장" in election):
-                    if "지사" not in hit_position:
+                    if hit_position and "지사" not in hit_position and "시장" not in hit_position:
                         continue
                 elif "regional_council" in el:
-                    if "광역의원" not in hit_position and "도의원" not in hit_position:
+                    if hit_position and "의원" not in hit_position:
                         continue
                 elif "local_mayor" in el:
-                    if "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
+                    if hit_position and "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
                         continue
                 elif "local_council" in el or "기초의원" in election:
-                    if "의원" not in hit_position:
+                    if hit_position and "의원" not in hit_position and "구청장" not in hit_position:
                         continue
             filtered.append((score, filename, text, meta))
         logger.debug(f"[WINNERS2022] user_meta 필터: {len(items)} → {len(filtered)}건")
@@ -1017,8 +1017,9 @@ def run_check(
             excerpt = (text or "").strip()[:excerpt_len]
             if len((text or "").strip()) > excerpt_len:
                 excerpt += "…"
+            name_line = name if name != "미상" else "미상(아래 근거발췌에서 직책과 같은 줄/문단의 2~4자 한글 이름을 찾아 기재)"
             block = (
-                f"당선인명: {name}\n"
+                f"당선인명: {name_line}\n"
                 f"직책: {position}\n"
                 f"지역: {region}\n"
                 f"공약제목: {title}\n"
