@@ -774,10 +774,39 @@ def run_check(
         """
         winners2022 청크에서 메타 정보 추출 (이름/직책/지역/공약제목).
         Returns: {'name': str|None, 'position': str|None, 'region': str|None, 'pledge_title': str|None}
+        ingest 시 삽입된 [문서 메타] 헤더(직책 후보군/지역 후보군/이름 후보)를 우선 파싱,
+        없으면 본문 전체에서 정규식으로 추출.
         """
         meta = {'name': None, 'position': None, 'region': None, 'pledge_title': None}
         if not text:
             return meta
+
+        # ── 우선순위 1: [문서 메타] 헤더 파싱 ─────────────────────────────
+        # ingest 시 헤더 형식:
+        #   직책 후보군: 구청장, 남구청장
+        #   지역 후보군: 광주, 광주광역시, 남구
+        #   이름 후보: 홍길동
+        m_pos = re.search(r"직책 후보군\s*:\s*([^\n]+)", text)
+        m_reg = re.search(r"지역 후보군\s*:\s*([^\n]+)", text)
+        m_name = re.search(r"이름 후보\s*:\s*([^\n]+)", text)
+        if m_pos and m_pos.group(1).strip() != "확인 필요":
+            candidates = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
+            if candidates:
+                meta['position'] = candidates[0]
+        if m_reg and m_reg.group(1).strip() != "확인 필요":
+            candidates = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
+            if candidates:
+                meta['region'] = _normalize_region_name(candidates[0])
+        if m_name and m_name.group(1).strip() != "확인 필요":
+            NAME_BLACKLIST_FAST = {
+                "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
+                "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행",
+                "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
+            }
+            for cand in [c.strip() for c in m_name.group(1).split(",") if c.strip()]:
+                if 2 <= len(cand) <= 4 and re.match(r"^[가-힣]{2,4}$", cand) and cand not in NAME_BLACKLIST_FAST:
+                    meta['name'] = cand
+                    break
 
         # OCR 간격 정규화 텍스트까지 함께 스캔
         compact_text = _compact_spaced_hangul(text)
@@ -785,6 +814,10 @@ def run_check(
 
         # 공약 제목 추출 (먼저)
         meta['pledge_title'] = _extract_pledge_title(text)
+
+        # 헤더로 이미 모두 채웠으면 본문 파싱 생략
+        if meta['name'] and meta['position'] and meta['region']:
+            return meta
 
         # 이름 추출 (직책 앞/뒤, 당선인 표기, 시도명+이름 표기 모두 대응)
         # 우선순위: 시도명+이름 > 직책+이름 > 이름+직책 > 당선인 표기
@@ -969,29 +1002,28 @@ def run_check(
             hit_region = (meta.get("region") or "").strip()
             hit_position = (meta.get("position") or "").strip()
             hit_region_norm = _norm(hit_region)
-            region_unknown = not hit_region or hit_region == "-"
 
-            if province and not region_unknown:
+            if province:
                 user_prov_norm = _norm(province)
-                if user_prov_norm:
+                if user_prov_norm and hit_region_norm:
                     if hit_region_norm != user_prov_norm and user_prov_norm not in hit_region_norm and hit_region_norm not in user_prov_norm:
                         continue
-            if city and not region_unknown:
+            if city and hit_region:
                 if city not in hit_region and city not in hit_position:
                     continue
-            if election:
+            if election and hit_position:
                 el = election.lower()
-                if "metro_mayor" in el or ("광역" in election and "시장" in election):
-                    if hit_position and "지사" not in hit_position and "시장" not in hit_position:
+                if "metro_mayor" in el:
+                    if "지사" not in hit_position and "시장" not in hit_position:
                         continue
                 elif "regional_council" in el:
-                    if hit_position and "의원" not in hit_position:
+                    if "의원" not in hit_position:
                         continue
                 elif "local_mayor" in el:
-                    if hit_position and "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
+                    if "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
                         continue
                 elif "local_council" in el or "기초의원" in election:
-                    if hit_position and "의원" not in hit_position and "구청장" not in hit_position:
+                    if "의원" not in hit_position and "구청장" not in hit_position:
                         continue
             filtered.append((score, filename, text, meta))
         logger.debug(f"[WINNERS2022] user_meta 필터: {len(items)} → {len(filtered)}건")
