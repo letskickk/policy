@@ -16,10 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# .env 로드
-from dotenv import load_dotenv
-load_dotenv(ROOT / ".env")
-
+# backend.config가 .env 로드 (dotenv 없으면 수동 로드)
 from backend.config import DATA_GO_KR_WINNER_API_KEY, DATA_GO_KR_PLEDGE_API_KEY
 from backend.openai_vector_store import (
     SG_ID_2022,
