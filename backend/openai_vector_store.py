@@ -1965,6 +1965,11 @@ def run_check(
     from backend.prompts import load_system_prompt, build_user_message
 
     system = load_system_prompt()
+    logger.info(
+        "[WINNERS2022_CTX] len=%d first200=%r",
+        len(winners2022_context),
+        winners2022_context[:200],
+    )
     user = build_user_message(
         platform_context, pledges_context, regional_context, pledge, winners2022_context, user_meta=user_meta
     )
