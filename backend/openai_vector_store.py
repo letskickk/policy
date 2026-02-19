@@ -1648,6 +1648,7 @@ def run_check(
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
+        timeout=180,
     )
     text = resp.choices[0].message.content or ""
     if not text.strip():
@@ -1697,6 +1698,7 @@ def run_verify_judge(
         input=input_text,
         instructions=_JUDGE_INSTRUCTIONS,
         tools=tools,
+        timeout=180,
     )
 
     if getattr(response, "status", None) != "completed":
@@ -1782,6 +1784,7 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
         input=input_text,
         instructions=_INSTRUCTIONS,
         tools=tools,
+        timeout=180,
     )
 
     if getattr(response, "status", None) != "completed":
