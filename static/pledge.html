@@ -362,60 +362,11 @@
     .score-card.low{ border-color: rgba(248,113,113,0.45); }
     .analysis-text{
       margin-top: 0.5rem;
-      line-height: 1.7;
-      font-size: 0.98rem;
-    }
-    .analysis-section{
-      margin-bottom: 1.25rem;
-      border-left: 3px solid rgba(255, 179, 122, 0.35);
-      padding-left: 0.85rem;
-    }
-    .analysis-section:last-child{ margin-bottom: 0; }
-    .analysis-section-title{
-      font-weight: 900;
-      color: var(--text-strong);
-      font-size: 1rem;
-      margin-bottom: 0.45rem;
-    }
-    .analysis-section-body{
-      color: var(--text);
-      line-height: 1.7;
-    }
-    .analysis-line{
-      display: flex;
-      gap: 0.4rem;
-      align-items: flex-start;
-      margin-bottom: 0.5rem;
-    }
-    .analysis-line:last-child{ margin-bottom: 0; }
-    .analysis-label{
-      flex: 0 0 auto;
-      font-weight: 800;
-      color: var(--muted);
-    }
-    .analysis-value{
-      flex: 1;
-      min-width: 0;
+      white-space: pre-wrap;
       word-break: break-word;
-    }
-    .analysis-line.br{ display: block; margin-bottom: 0.25rem; }
-    .analysis-winner-item{
-      display: block;
-      padding: 0.4rem 0.6rem;
-      margin: 0.3rem 0;
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      font-size: 0.9rem;
-      line-height: 1.5;
-      color: var(--text);
-    }
-    .analysis-improve-item{
-      margin: 0.35rem 0 0.35rem 0.75rem;
-      padding-left: 0.5rem;
-      border-left: 2px solid rgba(255, 179, 122, 0.4);
-      font-size: 0.92rem;
-      color: var(--text);
+      line-height: 1.7;
+      font-size: 1rem;
+      color: var(--text-strong);
     }
     .result-content.empty{
       text-align:center;
@@ -624,55 +575,6 @@
       return s.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     }
 
-    var _labelPattern = /^(결과|근거|유사·중복 공약|차별화 포인트|유사 공약|유사성 분석|유사 공약\s*|보완 사항\s*|유사도\s*|정강정책 부합도|정책 설계 완성도|실행 가능성|구체성|메시지 경쟁력)(\s*\([^)]*\))?\s*([:：])/;
-    var _winnerPattern = /^[-*]?\s*(2022\s*\/\s*.+)$/;
-
-    function formatAnalysisHtml(text) {
-      const s = String(text || '').trim();
-      if (!s) return '';
-      const lines = s.split(/\r?\n/);
-      const out = [];
-      let i = 0;
-      while (i < lines.length) {
-        const line = lines[i];
-        const sectionMatch = line.match(/^(\d+\.\s+[^\n]+|##\s*\d+\.\s+[^\n]+)/);
-        if (sectionMatch) {
-          const title = escapeHtml(sectionMatch[1].replace(/^##\s*/, ''));
-          let bodyLines = [];
-          i += 1;
-          while (i < lines.length && !lines[i].match(/^\d+\.\s+|^##\s*\d+\./)) {
-            bodyLines.push(lines[i]);
-            i += 1;
-          }
-          var bodyHtml = bodyLines.map(function(ln) {
-            var trimmed = ln.trim();
-            var rest = escapeHtml(ln);
-            if (_winnerPattern.test(trimmed)) {
-              return '<div class="analysis-winner-item">' + escapeHtml(trimmed) + '</div>';
-            }
-            if (trimmed.startsWith('- ') && sectionMatch[1].indexOf('수정') !== -1) {
-              return '<div class="analysis-improve-item">' + rest + '</div>';
-            }
-            var labelM = trimmed.match(_labelPattern);
-            if (labelM) {
-              var label = escapeHtml(labelM[1] + (labelM[2] || '') + (labelM[3] || ':'));
-              var after = escapeHtml(trimmed.slice(labelM[0].length).trim());
-              return '<div class="analysis-line"><span class="analysis-label">' + label + '</span><span class="analysis-value">' + after + '</span></div>';
-            }
-            if (trimmed === '') return '<div class="analysis-line br"></div>';
-            return '<div class="analysis-line"><span class="analysis-value">' + rest + '</span></div>';
-          }).join('');
-          out.push('<div class="analysis-section"><div class="analysis-section-title">' + title + '</div><div class="analysis-section-body">' + bodyHtml + '</div></div>');
-          continue;
-        }
-        i += 1;
-      }
-      if (out.length === 0) {
-        return '<div class="analysis-text">' + escapeHtml(s).replace(/\n/g, '<br>') + '</div>';
-      }
-      return '<div class="analysis-text">' + out.join('') + '</div>';
-    }
-
     function renderRubricList(title, items) {
       if (!Array.isArray(items) || items.length === 0) return '';
       const rows = items.map(it => {
@@ -790,7 +692,7 @@
 
       const normalizedBaseText = normalizeOutputText(baseText);
       const fullText = normalizedBaseText || '';
-      html += formatAnalysisHtml(fullText) || `<div class="analysis-text">${escapeHtml(fullText).replace(/\n/g, '<br>')}</div>`;
+      html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n/g, '<br>') + '</div>';
       showResult(html);
     }
 
