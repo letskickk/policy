@@ -3,12 +3,23 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 # 프로젝트 루트 (backend 기준 상위)
 ROOT_DIR = Path(__file__).resolve().parent.parent
-# .env는 항상 프로젝트 루트에서 로드 (실행 위치와 무관)
-load_dotenv(ROOT_DIR / ".env")
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    # dotenv 없으면 .env 수동 로드 (scripts/verify_winners_api.py 등)
+    _env = ROOT_DIR / ".env"
+    if _env.exists():
+        with open(_env, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if k:
+                        os.environ.setdefault(k, v)
 
 
 def _nfc(s: str) -> str:
