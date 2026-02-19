@@ -1410,10 +1410,14 @@ def run_check(
     platform_hits_kw: List[Tuple[float, str, str]] = []
     regional_hits: List[Tuple[float, str, str]] = []
 
+    # 검색량 축소로 응답 속도 개선 (타임아웃 완화)
+    k_policy = min(18, max(8, (max_results or 12) + 6))
+    k_platform = min(12, max(6, (max_results or 12)))
+    k_regional = min(10, max(4, (max_results or 12) // 2))
     with ThreadPoolExecutor(max_workers=3) as ex:
-        f_policy = ex.submit(_search, client, vector_store_id, pledge, 32, True)
-        f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", 18, False)
-        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, 16, True)
+        f_policy = ex.submit(_search, client, vector_store_id, pledge, k_policy, True)
+        f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k_platform, False)
+        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, k_regional, True)
         policy_hits = f_policy.result()
         platform_hits_kw = f_platform.result()
         regional_hits = f_regional.result() if regional_vector_store_id else []
@@ -1593,14 +1597,14 @@ def run_check(
                 all_winners_hits.extend(f.result())
         winners_hits_raw = _dedup(all_winners_hits)[:30]
         if winners_hits_raw:
-            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=18)
+            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=12)
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=14_000, excerpt_len=500)
+            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=10_000, excerpt_len=400)
 
-    # 컨텍스트 구성 (속도 우선: 아이템 수·길이 합리적 축소, 출력 포맷 유지)
-    platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=8_000) or "(정강·정책 문서 없음)"
-    pledges_context = _fmt(pledges_hits[: max(8, max_results * 2)], max_chars=12_000) or "(우리당 공약 문서 없음)"
-    regional_context = _fmt(regional_hits[:6], max_chars=6_000) if regional_hits else ""
+    # 컨텍스트 구성 (속도 우선: 아이템 수·길이 축소로 GPT 응답 시간 단축)
+    platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=6_000) or "(정강·정책 문서 없음)"
+    pledges_context = _fmt(pledges_hits[: max(8, max_results * 2)], max_chars=9_000) or "(우리당 공약 문서 없음)"
+    regional_context = _fmt(regional_hits[:6], max_chars=5_000) if regional_hits else ""
 
     # 프롬프트 생성 후 최종 답변만 생성
     from backend.prompts import load_system_prompt, build_user_message
