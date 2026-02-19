@@ -485,7 +485,7 @@ def run_check(
 
     def _is_retryable_err(e: Exception) -> bool:
         s = str(e).lower()
-        return "502" in s or "503" in s or "504" in s or "timeout" in s or "timed out" in s
+        return "502" in s or "503" in s or "504" in s or "timeout" in s or "timed out" in s or "gateway" in s
 
     def _search(
         client: OpenAI,
@@ -542,7 +542,7 @@ def run_check(
             except Exception as e:
                 last_error = e
                 if attempt < 2 and _is_retryable_err(e):
-                    time.sleep(1 + attempt)
+                    time.sleep(0.5 * (1 + attempt))  # 0.5s, 1.0s
                     continue
                 raise
         if last_error is not None:
@@ -876,25 +876,32 @@ def run_check(
         client: OpenAI,
         vs_id: str,
         hits: List[Tuple[float, str, str]],
-        max_enhance: int = 30,
+        max_enhance: int = 18,
     ) -> List[Tuple[float, str, str, Dict]]:
         """
         winners2022 hits에 메타 정보 보강.
-        Returns: [(score, filename, raw_text, meta), ...]  (meta: name, position, region, pledge_title)
-        이름 보강: API 조회 최소 10회, 2~4자 한글·블랙리스트 유지.
+        Returns: [(score, filename, raw_text, meta), ...]
+        동일 chunk 재파싱 방지용 메타 캐시, 공공 API 이름 보강은 상위 후보(idx<3)만 최대 3회.
         """
         enhanced: List[Tuple[float, str, str, Dict]] = []
+        meta_cache: Dict[str, Dict] = {}  # chunk_key -> meta (재파싱 방지)
         api_cache: Dict[str, str] = {}
         api_call_count = 0
-        max_api_calls = 10  # 이름 누락 최소화를 위해 10회까지 조회
+        max_api_calls = 3  # 상위 후보에만 제한
 
         for idx, (score, filename, text) in enumerate(hits[:max_enhance]):
-            meta = _extract_winners2022_metadata(text, filename)
+            chunk_key = hashlib.sha256((str(filename) + "\n" + (text or "")[:500]).encode("utf-8", errors="ignore")).hexdigest()
+            if chunk_key in meta_cache:
+                meta = dict(meta_cache[chunk_key])
+            else:
+                meta = _extract_winners2022_metadata(text, filename)
+                meta_cache[chunk_key] = dict(meta)
 
             needs_enhancement = not (meta["name"] and meta["position"] and meta["region"])
 
             if needs_enhancement:
-                if meta.get("position") and meta.get("region") and not meta.get("name"):
+                # 공공 API 이름 보강: 상위 3개 후보에만, 최대 3회
+                if idx < 3 and meta.get("position") and meta.get("region") and not meta.get("name"):
                     cache_key = f"{meta['position']}|{meta['region']}"
                     if cache_key in api_cache:
                         meta["name"] = api_cache[cache_key] or None
@@ -1044,17 +1051,32 @@ def run_check(
     pledge = (user_pledge or "").strip()
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # 인덱싱 완료 여부
-    _check_vector_store_ready(client, vector_store_id)
-    if regional_vector_store_id:
-        _check_vector_store_ready(client, regional_vector_store_id)
-    if winners2022_vector_store_id:
-        _check_vector_store_ready(client, winners2022_vector_store_id)
+    # 인덱싱 완료 여부 — 병렬 수행
+    def _ready(vs_id: str) -> None:
+        if vs_id:
+            _check_vector_store_ready(client, vs_id)
 
-    # 1) policy store에서 공약 유사 검색 (검색량 하향으로 응답속도 개선)
-    policy_hits = _search(client, vector_store_id, pledge, k=35, rewrite=True)
-    # 2) 정강정책 전용 키워드 강제 검색
-    platform_hits_kw = _search(client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k=20, rewrite=False)
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        ready_futures = [
+            ex.submit(_ready, vector_store_id),
+            ex.submit(_ready, regional_vector_store_id),
+            ex.submit(_ready, winners2022_vector_store_id),
+        ]
+        for f in ready_futures:
+            f.result()
+
+    # 1) policy 본문 + platform 키워드 + regional(있으면) — 병렬 검색
+    policy_hits: List[Tuple[float, str, str]] = []
+    platform_hits_kw: List[Tuple[float, str, str]] = []
+    regional_hits: List[Tuple[float, str, str]] = []
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_policy = ex.submit(_search, client, vector_store_id, pledge, 32, True)
+        f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", 18, False)
+        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, 16, True)
+        policy_hits = f_policy.result()
+        platform_hits_kw = f_platform.result()
+        regional_hits = f_regional.result() if regional_vector_store_id else []
 
     policy_all = _dedup([*policy_hits, *platform_hits_kw])
     platform_hits: List[Tuple[float, str, str]] = []
@@ -1087,11 +1109,6 @@ def run_check(
         h for h in pledges_hits
         if hashlib.sha256((h[1] + "\n" + h[2][:200]).encode("utf-8", errors="ignore")).hexdigest() not in platform_key
     ]
-
-    # 3) regional store (선택)
-    regional_hits: List[Tuple[float, str, str]] = []
-    if regional_vector_store_id:
-        regional_hits = _search(client, regional_vector_store_id, pledge, k=18, rewrite=True)
 
     # 4) winners2022 store (선택) - 다중 질의로 리콜 강화
     winners_hits: List[Tuple[float, str, str]] = []
@@ -1168,17 +1185,17 @@ def run_check(
             )
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
             winners2022_context = _build_structured_winners_context(
-                winners_filtered, max_chars=16_000, excerpt_len=600
+                winners_filtered, max_chars=14_000, excerpt_len=500
             )
         else:
             winners2022_context = ""
     else:
         winners2022_context = ""
 
-    # 컨텍스트 구성 (길이 하향으로 토큰/지연 감소, 메타 필터 구조 유지)
-    platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=10_000) or "(정강·정책 문서 없음)"
-    pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=14_000) or "(우리당 공약 문서 없음)"
-    regional_context = _fmt(regional_hits[:8], max_chars=8_000) if regional_hits else ""
+    # 컨텍스트 구성 (속도 우선: 아이템 수·길이 합리적 축소, 출력 포맷 유지)
+    platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=8_000) or "(정강·정책 문서 없음)"
+    pledges_context = _fmt(pledges_hits[: max(8, max_results * 2)], max_chars=12_000) or "(우리당 공약 문서 없음)"
+    regional_context = _fmt(regional_hits[:6], max_chars=6_000) if regional_hits else ""
 
     # 프롬프트 생성 후 최종 답변만 생성
     from backend.prompts import load_system_prompt, build_user_message
