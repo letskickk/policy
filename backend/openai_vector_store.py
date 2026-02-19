@@ -848,96 +848,154 @@ def run_check(
         client: OpenAI,
         vs_id: str,
         hits: List[Tuple[float, str, str]],
-        max_enhance: int = 20
-    ) -> List[Tuple[float, str, str]]:
+        max_enhance: int = 30,
+    ) -> List[Tuple[float, str, str, Dict]]:
         """
         winners2022 hits에 메타 정보 보강.
-        메타가 부족한 hit에 대해 같은 문서에서 재조회하여 보강.
-        효율성: API 호출은 상위 3개 hit만, 캐싱으로 중복 호출 방지.
+        Returns: [(score, filename, raw_text, meta), ...]  (meta: name, position, region, pledge_title)
+        이름 보강: API 조회 최소 10회, 2~4자 한글·블랙리스트 유지.
         """
-        enhanced = []
-        # API 호출 캐시 (직책+지역 → 이름)
+        enhanced: List[Tuple[float, str, str, Dict]] = []
         api_cache: Dict[str, str] = {}
         api_call_count = 0
-        max_api_calls = 3  # 상위 3개만 API 조회 (성능 최적화)
-        
+        max_api_calls = 10  # 이름 누락 최소화를 위해 10회까지 조회
+
         for idx, (score, filename, text) in enumerate(hits[:max_enhance]):
             meta = _extract_winners2022_metadata(text, filename)
-            
-            # 메타 보강: 이름/직책/지역이 없으면 재조회
-            needs_enhancement = not (meta['name'] and meta['position'] and meta['region'])
-            
+
+            needs_enhancement = not (meta["name"] and meta["position"] and meta["region"])
+
             if needs_enhancement:
-                # 우선순위 1: 공공API로 이름 조회 (직책+지역이 있고, 상위 3개만)
-                if meta.get('position') and meta.get('region') and not meta.get('name'):
+                if meta.get("position") and meta.get("region") and not meta.get("name"):
                     cache_key = f"{meta['position']}|{meta['region']}"
-                    
-                    # 캐시 확인
                     if cache_key in api_cache:
-                        meta['name'] = api_cache[cache_key]
-                    # 상위 3개만 API 호출
+                        meta["name"] = api_cache[cache_key] or None
                     elif api_call_count < max_api_calls:
-                        api_name = _get_winner_name_from_api(meta['position'], meta['region'])
+                        api_name = _get_winner_name_from_api(meta["position"], meta["region"])
                         api_call_count += 1
                         if api_name:
-                            meta['name'] = api_name
-                            api_cache[cache_key] = api_name  # 캐시 저장
-                            logger.debug(f"[API] 이름 조회 성공: {meta['position']} {meta['region']} → {api_name}")
+                            meta["name"] = api_name
+                            api_cache[cache_key] = api_name
+                            logger.debug(f"[API] 이름 조회: {meta['position']} {meta['region']} → {api_name}")
                         else:
-                            api_cache[cache_key] = ""  # 실패도 캐시 (재시도 방지)
-                
-                # 우선순위 2: 벡터 스토어 재조회 (API 실패 시 또는 직책/지역이 없을 때)
-                if not meta['name'] or not meta['position'] or not meta['region']:
+                            api_cache[cache_key] = ""
+
+                if not meta["name"] or not meta["position"] or not meta["region"]:
                     source_path = _extract_source_path(text)
                     if source_path or filename:
                         refine_queries = []
-                        
-                        # 지역/직책 기반 이름 찾기
                         if meta.get("region") and not meta.get("name"):
                             refine_queries.append(f"{meta['region']} 당선인 이름")
                         elif meta.get("position") and not meta.get("name"):
                             refine_queries.append(f"{meta['position']} 당선인 이름")
                         elif not meta.get("region") and not meta.get("position"):
                             refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역 이름")
-
-                        # 최대 1개 쿼리만 실행, rewrite=False만 사용 (k=4로 제한)
                         for rq in refine_queries[:1]:
                             enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
                             for _, _, enhance_text in enhance_hits:
                                 enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
-                                if enhance_meta['name'] and not meta['name']:
-                                    meta['name'] = enhance_meta['name']
-                                if enhance_meta['position'] and not meta['position']:
-                                    meta['position'] = enhance_meta['position']
-                                if enhance_meta['region'] and not meta['region']:
-                                    meta['region'] = enhance_meta['region']
-                                # 이름, 직책, 지역을 모두 찾으면 즉시 중단
-                                if meta['name'] and meta['position'] and meta['region']:
+                                if enhance_meta["name"] and not meta["name"]:
+                                    meta["name"] = enhance_meta["name"]
+                                if enhance_meta["position"] and not meta["position"]:
+                                    meta["position"] = enhance_meta["position"]
+                                if enhance_meta["region"] and not meta["region"]:
+                                    meta["region"] = enhance_meta["region"]
+                                if meta["name"] and meta["position"] and meta["region"]:
                                     break
-                            if meta['name'] and meta['position'] and meta['region']:
+                            if meta["name"] and meta["position"] and meta["region"]:
                                 break
-            
-            # 메타 정보를 명확한 형식으로 텍스트에 추가 ([당선인명] 포함)
-            meta_lines = []
-            if meta['name']:
-                meta_lines.append(f"[당선인명] {meta['name']}")
-            if meta['position']:
-                meta_lines.append(f"[직책] {meta['position']}")
-            if meta['region']:
-                meta_lines.append(f"[지역] {meta['region']}")
-            if meta['pledge_title']:
-                meta_lines.append(f"[공약제목] {meta['pledge_title']}")
-            if not meta['name'] and (meta['position'] or meta['region'] or meta['pledge_title']):
-                meta_lines.append("[당선인명] (청크 본문에서 확인)")
-            meta_header = ""
-            if meta_lines:
-                meta_header = "\n".join(meta_lines) + "\n\n[청크 본문]\n"
-            
-            enhanced_text = meta_header + text
-            enhanced.append((score, filename, enhanced_text))
-        
+
+            enhanced.append((score, filename, text, meta))
+
         logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
         return enhanced
+
+    def _filter_winners_by_user_meta(
+        items: List[Tuple[float, str, str, Dict]],
+        user_meta: dict,
+    ) -> List[Tuple[float, str, str, Dict]]:
+        """
+        user_meta(region_province, region_city, election_type) 기반으로
+        엉뚱한 지역/직책 후보 제거.
+        """
+        if not user_meta:
+            return items
+        province = (user_meta.get("region_province") or "").strip()
+        city = (user_meta.get("region_city") or "").strip()
+        election = (user_meta.get("election_type") or "").strip()
+        if not province and not city and not election:
+            return items
+
+        def _norm(s: str) -> str:
+            return _normalize_region_name(s) if s else ""
+
+        filtered = []
+        for score, filename, text, meta in items:
+            hit_region = (meta.get("region") or "").strip()
+            hit_position = (meta.get("position") or "").strip()
+            hit_region_norm = _norm(hit_region)
+
+            if province:
+                user_prov_norm = _norm(province)
+                if not user_prov_norm:
+                    pass
+                elif hit_region_norm != user_prov_norm and user_prov_norm not in hit_region_norm and hit_region_norm not in user_prov_norm:
+                    continue
+            if city:
+                if city not in hit_region and city not in hit_position:
+                    continue
+            if election:
+                el = election.lower()
+                if "metro_mayor" in el or ("광역" in election and "시장" in election):
+                    if "지사" not in hit_position:
+                        continue
+                elif "regional_council" in el:
+                    if "광역의원" not in hit_position and "도의원" not in hit_position:
+                        continue
+                elif "local_mayor" in el:
+                    if "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
+                        continue
+                elif "local_council" in el or "기초의원" in election:
+                    if "의원" not in hit_position:
+                        continue
+            filtered.append((score, filename, text, meta))
+        logger.debug(f"[WINNERS2022] user_meta 필터: {len(items)} → {len(filtered)}건")
+        return filtered
+
+    def _build_structured_winners_context(
+        items: List[Tuple[float, str, str, Dict]],
+        max_chars: int = 22_000,
+        excerpt_len: int = 800,
+    ) -> str:
+        """
+        구조화된 winners 컨텍스트 생성.
+        포맷: 당선인명, 직책, 지역, 공약제목, score, 출처, 근거발췌.
+        """
+        blocks: List[str] = []
+        total = 0
+        for score, filename, text, meta in items:
+            name = (meta.get("name") or "미상").strip()
+            position = (meta.get("position") or "-").strip()
+            region = (meta.get("region") or "-").strip()
+            title = (meta.get("pledge_title") or "-").strip()
+            src = _extract_source_path(text) or filename or "-"
+            excerpt = (text or "").strip()[:excerpt_len]
+            if len((text or "").strip()) > excerpt_len:
+                excerpt += "…"
+            block = (
+                f"당선인명: {name}\n"
+                f"직책: {position}\n"
+                f"지역: {region}\n"
+                f"공약제목: {title}\n"
+                f"score: {score:.3f}\n"
+                f"출처: {src}\n"
+                f"근거발췌: {excerpt}"
+            )
+            if total + len(block) > max_chars:
+                break
+            blocks.append(block)
+            total += len(block) + 2
+        return "\n\n---\n\n".join(blocks) if blocks else ""
 
     def _fmt(items: List[Tuple[float, str, str]], max_chars: int) -> str:
         chunks: List[str] = []
@@ -1073,21 +1131,25 @@ def run_check(
         
         # dedup 후 상위 점수만 선택
         winners_hits_raw = _dedup(all_winners_hits)[:50]
-        
+
         logger.debug(f"[WINNERS2022] 다중 질의 {len(queries)}개, 총 hit {len(all_winners_hits)}개, dedup 후 {len(winners_hits_raw)}개")
-        
-        # 메타 보강: 유사 공약이 있으면 메타 정보를 보강
+
+        # a. 다중 질의 검색 → b. 메타 보강 → c. user_meta 필터 → d. 구조화 컨텍스트
         if winners_hits_raw:
-            winners_hits = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=20)
+            winners_enhanced = _enhance_winners2022_hits(
+                client, winners2022_vector_store_id, winners_hits_raw, max_enhance=30
+            )
+            winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
+            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=22_000)
         else:
-            winners_hits = []
+            winners2022_context = ""
+    else:
+        winners2022_context = ""
 
     # 컨텍스트 구성 (섹션별로 분리 주입)
     platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=12_000) or "(정강·정책 문서 없음)"
     pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=18_000) or "(우리당 공약 문서 없음)"
     regional_context = _fmt(regional_hits[:10], max_chars=10_000) if regional_hits else ""
-    # winners2022: 유사 hit가 있으면 메타가 부족해도 컨텍스트에 포함 (false '없음' 방지)
-    winners2022_context = _fmt(winners_hits[:20], max_chars=22_000) if winners_hits else ""
 
     # 프롬프트 생성 후 최종 답변만 생성
     from backend.prompts import load_system_prompt, build_user_message
