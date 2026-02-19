@@ -11,12 +11,15 @@ manifest에는 content_hash를 저장해 머신 간 배포에서도 정확히 �
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 import re
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from openai import OpenAI
 
@@ -29,8 +32,277 @@ from backend.config import (
     FILE_SEARCH_MAX_RESULTS_QUICK,
     PROMPTS_DIR,
     DATA_GO_KR_API_KEY,
+    DATA_GO_KR_WINNER_API_KEY,
+    DATA_GO_KR_PLEDGE_API_KEY,
     _nfc,
 )
+
+# 공공데이터 API 캐시: data/api_cache/*.json, TTL 24h
+API_CACHE_DIR = ROOT_DIR / "data" / "api_cache"
+API_CACHE_TTL_SEC = 24 * 3600
+_data_go_kr_memory_cache: Dict[str, Tuple[float, Any]] = {}
+_data_go_kr_cache_lock = threading.Lock()
+
+WINNER_API_URL = "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire"
+PLEDGE_API_URL = "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire"
+SG_ID_2022 = "20220601"
+
+MANIFEST_PATH = ROOT_DIR / "data" / "vector_store_manifest.json"
+
+
+def _api_cache_key(prefix: str, *parts: str) -> str:
+    raw = "|".join(str(p) for p in parts)
+    return hashlib.sha256(f"{prefix}:{raw}".encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _api_cache_get(key: str) -> Optional[Any]:
+    with _data_go_kr_cache_lock:
+        if key in _data_go_kr_memory_cache:
+            ts, val = _data_go_kr_memory_cache[key]
+            if time.time() - ts < API_CACHE_TTL_SEC:
+                return val
+            del _data_go_kr_memory_cache[key]
+    API_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = API_CACHE_DIR / f"{key}.json"
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("_ts", 0) + API_CACHE_TTL_SEC < time.time():
+            path.unlink(missing_ok=True)
+            return None
+        with _data_go_kr_cache_lock:
+            _data_go_kr_memory_cache[key] = (data["_ts"], data.get("body"))
+        return data.get("body")
+    except Exception:
+        return None
+
+
+def _api_cache_set(key: str, value: Any) -> None:
+    API_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    ts = time.time()
+    with _data_go_kr_cache_lock:
+        _data_go_kr_memory_cache[key] = (ts, value)
+    path = API_CACHE_DIR / f"{key}.json"
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"_ts": ts, "body": value}, f, ensure_ascii=False)
+    except Exception as e:
+        logger.warning("API cache write failed: %s", e)
+
+
+def _fetch_winners_api(
+    sg_id: str,
+    sg_typecode: str,
+    sd_name: str = "",
+    sgg_name: str = "",
+    winner_key: str = "",
+    request_dedup: Optional[set] = None,
+) -> List[Dict[str, Any]]:
+    """
+    당선인 식별 API: 당선인 목록 조회.
+    Returns list of {huboid, name, sdName, sggName, wiwName, ...}.
+    retry 2회, timeout 10s, 캐시 키 (sgId, sgTypecode, sdName, sggName).
+    """
+    key_used = (sg_id, sg_typecode, sd_name or "", sgg_name or "")
+    cache_key = _api_cache_key("winner", *key_used)
+    if request_dedup is not None and cache_key in request_dedup:
+        return _api_cache_get(cache_key) or []
+    cached = _api_cache_get(cache_key)
+    if cached is not None:
+        return cached
+    if not winner_key:
+        return []
+    params = {
+        "serviceKey": winner_key,
+        "sgId": sg_id,
+        "sgTypecode": sg_typecode,
+        "pageNo": "1",
+        "numOfRows": "500",
+        "_type": "json",
+    }
+    if sd_name:
+        params["sdName"] = sd_name
+    if sgg_name:
+        params["sggName"] = sgg_name
+    from urllib.parse import urlencode
+    url = f"{WINNER_API_URL}?{urlencode(params)}"
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
+            with urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            body = (data.get("response") or {}).get("body") or {}
+            items = body.get("items") or body.get("item")
+            if not items:
+                out = []
+            else:
+                if isinstance(items, dict):
+                    items = [items]
+                elif not isinstance(items, list):
+                    items = [items] if items else []
+                out = []
+                for it in items:
+                    row = it if isinstance(it, dict) else {}
+                    huboid = row.get("huboid") or row.get("HUBOID") or ""
+                    name = (row.get("name") or row.get("NAME") or "").strip()
+                    sd = (row.get("sdName") or row.get("SDNAME") or "").strip()
+                    sgg = (row.get("sggName") or row.get("SGGNAME") or "").strip()
+                    wiw = (row.get("wiwName") or row.get("WIWNAME") or "").strip()
+                    out.append({"huboid": str(huboid), "name": name, "sdName": sd, "sggName": sgg, "wiwName": wiw, "_raw": row})
+            if request_dedup is not None:
+                request_dedup.add(cache_key)
+            _api_cache_set(cache_key, out)
+            return out
+        except (HTTPError, URLError, json.JSONDecodeError, OSError) as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(0.5 * (1 + attempt))
+                continue
+    logger.warning("Winner API failed: %s", last_err)
+    return []
+
+
+def _fetch_winner_pledges_api(
+    sg_id: str,
+    sg_typecode: str,
+    cnddt_id: str,
+    pledge_key: str = "",
+    request_dedup: Optional[set] = None,
+) -> List[Dict[str, Any]]:
+    """
+    공약 내용 API: 후보별 공약 목록/본문 조회.
+    Returns list of {prmsTitle, prmsCont, prmsRealmName, ...} per pledge.
+    retry 2회, timeout 10s, 캐시 키 (sgId, sgTypecode, cnddtId).
+    """
+    cache_key = _api_cache_key("pledge", sg_id, sg_typecode, cnddt_id)
+    if request_dedup is not None and cache_key in request_dedup:
+        return _api_cache_get(cache_key) or []
+    cached = _api_cache_get(cache_key)
+    if cached is not None:
+        return cached
+    if not pledge_key or not cnddt_id:
+        return []
+    from urllib.parse import urlencode
+    params = {
+        "serviceKey": pledge_key,
+        "sgId": sg_id,
+        "sgTypecode": sg_typecode,
+        "cnddtId": cnddt_id,
+        "pageNo": "1",
+        "numOfRows": "10",
+        "_type": "json",
+    }
+    url = f"{PLEDGE_API_URL}?{urlencode(params)}"
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
+            with urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            body = (data.get("response") or {}).get("body") or {}
+            total = int(body.get("totalCount") or 0)
+            if total == 0:
+                out_pledges = []
+            else:
+                item = body.get("item") or body.get("items")
+                if isinstance(item, list):
+                    row = item[0] if item and isinstance(item[0], dict) else {}
+                else:
+                    row = item if isinstance(item, dict) else {}
+                out_pledges = []
+                for i in range(1, 11):
+                    t = row.get(f"prmsTitle{i}") or row.get("prmsTitle%d" % i) or ""
+                    c = row.get(f"prmsCont{i}") or row.get("prmsCont%d" % i) or ""
+                    rn = row.get(f"prmsRealmName{i}") or row.get("prmsRealmName%d" % i) or ""
+                    if t or c:
+                        out_pledges.append({"prmsTitle": (t or "").strip(), "prmsCont": (c or "").strip(), "prmsRealmName": (rn or "").strip()})
+            if request_dedup is not None:
+                request_dedup.add(cache_key)
+            _api_cache_set(cache_key, out_pledges)
+            return out_pledges
+        except (HTTPError, URLError, json.JSONDecodeError, OSError) as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(0.5 * (1 + attempt))
+                continue
+    logger.warning("Pledge API failed (cnddtId=%s): %s", cnddt_id, last_err)
+    return []
+
+
+def _normalize_region_for_api(region: str) -> str:
+    """시도명 정규화 (API sdName 형식)."""
+    r = re.sub(r"\s+", "", (region or ""))
+    mapping = {
+        "서울": "서울특별시", "부산": "부산광역시", "대구": "대구광역시", "인천": "인천광역시",
+        "광주": "광주광역시", "대전": "대전광역시", "울산": "울산광역시", "세종": "세종특별자치시",
+        "경기": "경기도", "강원": "강원도", "충북": "충청북도", "충남": "충청남도",
+        "전북": "전라북도", "전남": "전라남도", "경북": "경상북도", "경남": "경상남도", "제주": "제주특별자치도",
+    }
+    return mapping.get(r, r)
+
+
+def _normalize_user_meta_for_winners(user_meta: dict | None) -> dict:
+    """
+    user_meta → API 조회용 정규화.
+    Returns: {sgTypecodes: ["3","4","11"], sdName: "", sggName: ""}
+    """
+    if not user_meta:
+        return {"sgTypecodes": ["3", "4", "11"], "sdName": "", "sggName": ""}
+    election = (user_meta.get("election_type") or "").strip().lower()
+    province = (user_meta.get("region_province") or "").strip()
+    city = (user_meta.get("region_city") or "").strip()
+    sg_typecodes: List[str] = []
+    if "metro_mayor" in election or "시도지사" in election:
+        sg_typecodes.append("3")
+    if "local_mayor" in election or "구청장" in election or "시장" in election or "군수" in election:
+        sg_typecodes.append("4")
+    if "education" in election or "교육감" in election:
+        sg_typecodes.append("11")
+    if "regional_council" in election or "광역의원" in election or "local_council" in election or "기초의원" in election:
+        sg_typecodes.extend(["4"])  # 의원은 선거구별 조회 시 sggName 매칭으로 필터
+    if not sg_typecodes:
+        sg_typecodes = ["3", "4", "11"]
+    return {
+        "sgTypecodes": sg_typecodes,
+        "sdName": _normalize_region_for_api(province) if province else "",
+        "sggName": city if city else "",
+    }
+
+
+def _winner_row_to_position_region(sg_typecode: str, sd_name: str, sgg_name: str, wiw_name: str) -> Tuple[str, str]:
+    """API 당선인 행 → (직책 레이블, 지역 레이블)."""
+    region = _normalize_region_for_api(sd_name) or sd_name
+    if sg_typecode == "3":
+        if region.endswith("특별시"):
+            pos = region[:-3] + "특별시장"
+        elif region.endswith("광역시"):
+            pos = region[:-3] + "광역시장"
+        elif region.endswith("특별자치시"):
+            pos = region[:-5] + "특별자치시장"
+        elif region.endswith("도"):
+            pos = region + "지사"
+        else:
+            pos = region + "지사"
+        return (pos, region)
+    if sg_typecode == "4":
+        # 구시군의장: wiwName 또는 sggName으로 표기
+        place = (wiw_name or sgg_name or "").strip()
+        if not place:
+            return ("구·시·군의장", region)
+        if place.endswith("구"):
+            return (place + "청장", f"{region} {place}")
+        if place.endswith("군"):
+            return (place + "수", f"{region} {place}")
+        if place.endswith("시"):
+            return (place + "장", f"{region} {place}")
+        return (place + "청장", f"{region} {place}")
+    if sg_typecode == "11":
+        return ("교육감", region)
+    return ("", region)
+
 
 MANIFEST_PATH = ROOT_DIR / "data" / "vector_store_manifest.json"
 # 지역별 공약 전용 manifest (타지역 유사성 검토 시 이 store만 검색)
@@ -774,183 +1046,28 @@ def run_check(
 
     def _extract_winners2022_metadata(text: str, filename: str = "") -> dict:
         """
-        winners2022 청크에서 메타 정보 추출 (이름/직책/지역/공약제목).
-        Returns: {'name': str|None, 'position': str|None, 'region': str|None, 'pledge_title': str|None}
-        ingest 시 삽입된 [문서 메타] 헤더(직책 후보군/지역 후보군/이름 후보)를 우선 파싱,
-        없으면 본문 전체에서 정규식으로 추출.
+        winners2022 청크에서 제목/근거 추출 보조. (API 사용 시 이름/직책/지역은 API 값으로 overwrite)
+        Returns: {'name', 'position', 'region', 'pledge_title'} — pledge_title 우선, 나머지는 폴백용.
         """
-        meta = {'name': None, 'position': None, 'region': None, 'pledge_title': None}
+        meta = {"name": None, "position": None, "region": None, "pledge_title": None}
         if not text:
             return meta
-
-        # ── 우선순위 1: [문서 메타] 헤더 파싱 ─────────────────────────────
-        # ingest 시 헤더 형식:
-        #   직책 후보군: 구청장, 남구청장
-        #   지역 후보군: 광주, 광주광역시, 남구
-        #   이름 후보: 홍길동
+        meta["pledge_title"] = _extract_pledge_title(text)
+        # 폴백: [문서 메타] 헤더만 간단 파싱 (정규식 의존 최소화)
         m_pos = re.search(r"직책 후보군\s*:\s*([^\n]+)", text)
         m_reg = re.search(r"지역 후보군\s*:\s*([^\n]+)", text)
         m_name = re.search(r"이름 후보\s*:\s*([^\n]+)", text)
-        NAME_BLACKLIST_FAST = {
-            "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
-            "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행",
-            "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
-        }
-
-        pos_candidates: List[str] = []
-        reg_candidates: List[str] = []
-
         if m_pos and m_pos.group(1).strip() != "확인 필요":
-            pos_candidates = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
+            cands = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
+            meta["position"] = cands[0] if cands else None
         if m_reg and m_reg.group(1).strip() != "확인 필요":
-            reg_candidates = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
+            cands = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
+            meta["region"] = _normalize_region_name(cands[0]) if cands else None
         if m_name and m_name.group(1).strip() != "확인 필요":
-            for cand in [c.strip() for c in m_name.group(1).split(",") if c.strip()]:
-                if 2 <= len(cand) <= 4 and re.match(r"^[가-힣]{2,4}$", cand) and cand not in NAME_BLACKLIST_FAST:
-                    meta['name'] = cand
+            for c in [x.strip() for x in m_name.group(1).split(",") if x.strip()]:
+                if 2 <= len(c) <= 4 and re.match(r"^[가-힣]{2,4}$", c):
+                    meta["name"] = c
                     break
-
-        # 지역은 후보군 중 가장 앞에 있는 것을 사용
-        if reg_candidates:
-            meta['region'] = _normalize_region_name(reg_candidates[0])
-
-        # 직책은 지역과 일치하는 것을 우선 선택.
-        # 직책 후보군에서 hit region을 포함하는 것을 먼저 찾고, 없으면 첫 번째 사용.
-        # 예: 지역=전라남도인데 직책 후보군=[경기도지사, 도지사, 군수] → "도지사"/"군수" 선택
-        if pos_candidates:
-            region_norm = _normalize_region_name(reg_candidates[0]) if reg_candidates else ""
-            matched_pos = None
-            for p in pos_candidates:
-                # 직책이 지역명을 포함하면 가장 정확한 후보
-                if region_norm and region_norm.replace("특별시", "").replace("광역시", "").replace("특별자치시", "").replace("도", "").replace("특별자치도", "") in p:
-                    matched_pos = p
-                    break
-            if not matched_pos:
-                # 지역 접두어가 없는 일반 직책(구청장, 군수, 시장, 도지사 등)을 우선
-                generic = ["구청장", "군수", "시장", "도지사", "교육감", "의원"]
-                for p in pos_candidates:
-                    if any(g in p for g in generic) and not any(
-                        other_prov in p
-                        for other_prov in ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기", "강원", "충청", "전라", "경상", "제주"]
-                        if not (region_norm and other_prov in region_norm)
-                    ):
-                        matched_pos = p
-                        break
-            meta['position'] = matched_pos or pos_candidates[0]
-
-        # 직책에서 지역 역추론 (지역이 없고 직책만 있을 때)
-        # 단, 직책이 타 지역을 명시(경기도지사 등)하면 지역도 함께 교정
-        if meta['position'] and not meta['region']:
-            m = re.match(r"([가-힣]+(?:특별시|광역시|도|시|군|구))", meta['position'])
-            if m:
-                meta['region'] = _normalize_region_name(m.group(1))
-        elif meta['position'] and meta['region']:
-            # 직책에 타 지역이 명시되어 있고 그게 현재 지역과 다르면 직책에서 지역 부분을 제거
-            pos_region_m = re.match(r"([가-힣]+(?:특별시|광역시|도))(지사|시장)", meta['position'])
-            if pos_region_m:
-                pos_region = _normalize_region_name(pos_region_m.group(1))
-                if pos_region and meta['region'] and pos_region != meta['region']:
-                    # 직책이 틀렸을 가능성이 높음 → 지역으로 직책 재추론
-                    logger.debug(f"[META] 직책 지역 불일치: 직책={meta['position']} 지역={meta['region']} → 재추론")
-                    inferred = _infer_position_from_region(meta['region'])
-                    if inferred:
-                        meta['position'] = inferred
-
-        # OCR 간격 정규화 텍스트까지 함께 스캔
-        compact_text = _compact_spaced_hangul(text)
-        scan_text = f"{text}\n{compact_text}"
-
-        # 공약 제목 추출 (먼저)
-        meta['pledge_title'] = _extract_pledge_title(text)
-
-        # 헤더로 이미 모두 채웠으면 본문 파싱 생략
-        if meta['name'] and meta['position'] and meta['region']:
-            return meta
-
-        # 이름 추출 (직책 앞/뒤, 당선인 표기, 시도명+이름 표기 모두 대응)
-        # 우선순위: 시도명+이름 > 직책+이름 > 이름+직책 > 당선인 표기
-        # 더 정확한 패턴: 시도명/직책 바로 다음에 오는 이름만 매칭
-        name_patterns = [
-            # 시도명 + 이름 (가장 정확, 바로 다음에 오는 이름만)
-            r"(?:서울특별시|서울시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도)\s+([가-힣]{2,4})(?:\s|$|[0-9]|공약)",
-            # 직책 + 이름 (직책 바로 다음)
-            r"(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)\s+([가-힣]{2,4})(?:\s|$|[0-9]|공약)",
-            # 이름 + 직책 (이름 바로 다음)
-            r"([가-힣]{2,4})\s+(?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|특별시장|광역시장|시장|도지사|구청장|군수|교육감)",
-        ]
-        # 당선인 이름 블랙리스트: 직책/일반 명사·접미사 (2~4자 한글만 허용 + 블랙리스트)
-        NAME_BLACKLIST = {
-            "특별", "광역", "자치", "시도", "지사", "시장", "구청", "군수", "당선인", "교육감",
-            "의원", "후보", "성명", "이름", "공약", "정책", "추진", "목표", "이행", "재단",
-            "위원", "회장", "단체", "협회", "센터", "기관", "담당", "관리",
-        }
-        for p in name_patterns:
-            name_match = re.search(p, scan_text)
-            if name_match:
-                name = name_match.group(1)
-                if 2 <= len(name) <= 4 and re.match(r"^[가-힣]{2,4}$", name) and name not in NAME_BLACKLIST:
-                    meta['name'] = name
-                    break
-
-        # 직책 추출 (완전한 형태 우선, 부분 매칭은 신중하게)
-        position_patterns = [
-            r"(서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장)",
-            r"(경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사)",
-            r"(국회의원|광역의원|기초의원|시의원|구의원|도의원|교육감)",
-            # 구/시/군 단위는 완전한 형태만 매칭 (잘못된 매칭 방지)
-            r"([가-힣]{2,}(?:구|시|군))\s*(?:구청장|시장|군수)",
-            r"(특별시장|광역시장|시장|도지사|구청장|군수)",
-        ]
-        for pattern in position_patterns:
-            match = re.search(pattern, scan_text)
-            if match:
-                pos = re.sub(r"\s+", "", match.group(0))
-                # 잘못된 추출 검증: "세출" 같은 잘못된 매칭 방지
-                invalid_prefixes = ["세출", "출구", "출시", "출군"]
-                if not any(pos.startswith(prefix) for prefix in invalid_prefixes):
-                    meta['position'] = pos
-                    break
-
-        # 지역 추출 (완전한 형태 우선)
-        valid_regions = [
-            "서울특별시", "서울", "부산광역시", "부산", "대구광역시", "대구",
-            "인천광역시", "인천", "광주광역시", "광주", "대전광역시", "대전",
-            "울산광역시", "울산", "세종특별자치시", "세종",
-            "경기도", "경기", "강원도", "강원", "충청북도", "충북", "충청남도", "충남",
-            "전라북도", "전북", "전라남도", "전남", "경상북도", "경북", "경상남도", "경남",
-            "제주특별자치도", "제주"
-        ]
-        # 완전한 형태 우선 매칭
-        region_match = None
-        for region in valid_regions:
-            pattern = re.escape(region)
-            match = re.search(pattern, scan_text)
-            if match:
-                region_match = match
-                meta['region'] = _normalize_region_name(region)
-                break
-        
-        # 완전한 형태가 없으면 구/시/군 패턴 시도 (2자 이상만)
-        if not region_match:
-            region_match = re.search(r"([가-힣]{2,}(?:구|시|군))", scan_text)
-            if region_match:
-                region = region_match.group(1)
-                # 잘못된 추출 검증
-                if not any(region.startswith(prefix) for prefix in ["세출", "출구", "출시", "출군"]):
-                    meta['region'] = _normalize_region_name(region)
-
-        # 직책에서 지역 역추론
-        if not meta['region'] and meta['position']:
-            m = re.match(r"([가-힣]+(?:특별시|광역시|도|시|군|구))", meta['position'])
-            if m:
-                meta['region'] = _normalize_region_name(m.group(1))
-
-        # 지역은 있는데 직책이 비어 있으면 지역으로 직책 추론
-        if meta['region'] and not meta['position']:
-            inferred = _infer_position_from_region(meta['region'])
-            if inferred:
-                meta['position'] = inferred
-
         return meta
     
     def _enhance_winners2022_hits(
@@ -1031,8 +1148,8 @@ def run_check(
         user_meta: dict,
     ) -> List[Tuple[float, str, str, Dict]]:
         """
-        user_meta(region_province, region_city, election_type) 기반으로
-        엉뚱한 지역/직책 후보 제거.
+        user_meta 기반 필터. 지역은 정규화 후 exact match 우선.
+        의원(광역/기초) 유형은 sggName 매칭 없으면 제외.
         """
         if not user_meta:
             return items
@@ -1049,18 +1166,26 @@ def run_check(
         for score, filename, text, meta in items:
             hit_region = (meta.get("region") or "").strip()
             hit_position = (meta.get("position") or "").strip()
+            hit_sgg = (meta.get("sggName") or "").strip()
             hit_region_norm = _norm(hit_region)
+            user_prov_norm = _norm(province) if province else ""
 
-            if province:
-                user_prov_norm = _norm(province)
-                if user_prov_norm and hit_region_norm:
-                    if hit_region_norm != user_prov_norm and user_prov_norm not in hit_region_norm and hit_region_norm not in user_prov_norm:
-                        continue
-            if city and hit_region:
-                if city not in hit_region and city not in hit_position:
+            # 지역 exact match (tok in region_norm 포함 비교 제거)
+            if user_prov_norm and hit_region_norm and hit_region_norm != user_prov_norm:
+                continue
+            if city and hit_region and city not in hit_region and city not in hit_position and (not hit_sgg or city not in hit_sgg):
+                continue
+
+            # 의원 유형: sggName 매칭 없으면 제외
+            el = election.lower()
+            is_council = "의원" in hit_position or "regional_council" in el or "local_council" in el or "기초의원" in election or "광역의원" in election
+            if is_council:
+                if not hit_sgg:
+                    continue  # sggName 없으면 제외
+                if city and hit_sgg and city not in hit_sgg and hit_sgg not in city:
                     continue
+
             if election and hit_position:
-                el = election.lower()
                 if "metro_mayor" in el:
                     if "지사" not in hit_position and "시장" not in hit_position:
                         continue
@@ -1094,8 +1219,8 @@ def run_check(
             region = (meta.get("region") or "-").strip()
             title = (meta.get("pledge_title") or "-").strip()
             src = _extract_source_path(text) or filename or "-"
-            excerpt = (text or "").strip()[:excerpt_len]
-            if len((text or "").strip()) > excerpt_len:
+            excerpt = (meta.get("_excerpt") or text or "").strip()[:excerpt_len]
+            if not meta.get("_excerpt") and len((text or "").strip()) > excerpt_len:
                 excerpt += "…"
             name_line = name if name != "미상" else "미상(아래 근거발췌에서 직책과 같은 줄/문단의 2~4자 한글 이름을 찾아 기재)"
             block = (
@@ -1191,62 +1316,87 @@ def run_check(
         if hashlib.sha256((h[1] + "\n" + h[2][:200]).encode("utf-8", errors="ignore")).hexdigest() not in platform_key
     ]
 
-    # 4) winners2022 store (선택) - 다중 질의로 리콜 강화
-    winners_hits: List[Tuple[float, str, str]] = []
-    if winners2022_vector_store_id:
+    # 4) winners2022 — 2개 공공 API 결합 파이프라인 (당선인 식별 + 공약 내용), 벡터는 증거 보강용
+    winners2022_context = ""
+    request_dedup: set = set()
+    if DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY:
+        norm_meta = _normalize_user_meta_for_winners(user_meta or {})
+        all_winner_rows: List[Dict[str, Any]] = []
+        for st in norm_meta["sgTypecodes"]:
+            rows = _fetch_winners_api(
+                SG_ID_2022, st,
+                norm_meta["sdName"], norm_meta["sggName"],
+                DATA_GO_KR_WINNER_API_KEY, request_dedup,
+            )
+            for r in rows:
+                r["_sgTypecode"] = st
+            all_winner_rows.extend(rows)
+
+        api_items: List[Tuple[float, str, str, Dict]] = []
+        for w in all_winner_rows:
+            pos_label, region_label = _winner_row_to_position_region(
+                w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
+            )
+            pledges = _fetch_winner_pledges_api(
+                SG_ID_2022, w["_sgTypecode"], w["huboid"],
+                DATA_GO_KR_PLEDGE_API_KEY, request_dedup,
+            )
+            for pl in pledges[:5]:
+                title = (pl.get("prmsTitle") or "").strip() or (pl.get("prmsCont") or "")[:80]
+                cont = (pl.get("prmsCont") or "").strip()
+                meta = {
+                    "name": (w.get("name") or "").strip(),
+                    "position": pos_label,
+                    "region": region_label,
+                    "sggName": (w.get("sggName") or "").strip(),
+                    "pledge_title": title,
+                    "_api_canonical": True,
+                }
+                text = cont or title
+                api_items.append((1.0, "API", text, meta))
+
+        api_items = _filter_winners_by_user_meta(api_items, user_meta or {})
+
+        # 벡터 검색은 증거 보강용: 유사 청크가 있으면 근거발췌만 보강 (이름/직책/지역은 API 값 유지)
+        if winners2022_vector_store_id and api_items and pledge:
+            q = (pledge[:500] + " 당선인 공약").strip()
+            vec_hits = _search(client, winners2022_vector_store_id, q, 10, True)
+            for idx, (_, _fn, _txt, meta) in enumerate(api_items):
+                if idx < len(vec_hits):
+                    _, _f, chunk_text = vec_hits[idx]
+                    excerpt = (_extract_pledge_title(chunk_text) or "") + "\n" + (chunk_text or "").strip()[:400]
+                    if excerpt.strip():
+                        meta["_excerpt"] = excerpt.strip()
+                meta.pop("_api_canonical", None)
+
+        if api_items:
+            winners2022_context = _build_structured_winners_context(
+                api_items, max_chars=14_000, excerpt_len=500
+            )
+    elif winners2022_vector_store_id:
+        # API 키 없을 때 기존 벡터 검색 폴백 (메타는 PDF 정규식)
         def _build_winners2022_queries(pledge_text: str, meta: dict) -> List[str]:
-            """복붙한 긴 공약 원문에서도 당선인 검색이 빠지지 않도록 다중 질의 생성. 중복 제거."""
             out: List[str] = []
-            if not (pledge_text or "").strip():
-                return ["제8회 전국동시지방선거 당선인 공약"]
             p = (pledge_text or "").strip()
-            # 정규화 원문 (띄어쓰기 압축 + 한글 간격 정규화)
+            if not p:
+                return ["제8회 전국동시지방선거 당선인 공약"]
             normalized = re.sub(r"\s+", " ", _compact_spaced_hangul(p)).strip()
             if len(normalized) >= 15:
-                out.append(normalized[:2000])  # 길면 앞 2000자
-            # 첫 줄 / 첫 문장
+                out.append(normalized[:2000])
             lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
-            if lines:
-                first_line = lines[0]
-                if 10 <= len(first_line) <= 300:
-                    out.append(first_line)
-                # 첫 문장 (마침표/물음표/느낌표까지)
-                first_sent = re.split(r"[.!?。！？]", first_line, maxsplit=1)[0].strip()
-                if first_sent != first_line and 10 <= len(first_sent) <= 200:
-                    out.append(first_sent)
-            # 본문 중간 스니펫 (긴 텍스트일 때)
-            if len(p) > 500:
-                start = len(p) // 3
-                snippet = p[start : start + 350].strip()
-                if len(snippet) >= 30:
-                    out.append(snippet)
-            # user_meta 결합 질의
-            if meta:
-                meta_parts = []
-                if meta.get("election_type"):
-                    meta_parts.append(meta["election_type"])
-                if meta.get("region_province"):
-                    meta_parts.append(meta["region_province"])
-                if meta.get("region_city"):
-                    meta_parts.append(meta["region_city"])
-                if meta_parts:
-                    head = " ".join(meta_parts)
-                    out.append(f"{head} {p[:200]}")
-            # 고정 앵커
+            if lines and 10 <= len(lines[0]) <= 300:
+                out.append(lines[0])
             out.append("제8회 전국동시지방선거 당선인 공약")
-            # 중복 제거 (정규화 후 동일한 질의 제거)
-            seen: set = set()
-            unique: List[str] = []
+            seen_set: set = set()
+            unique_list: List[str] = []
             for q in out:
                 key = re.sub(r"\s+", " ", (q or "").strip())[:500]
-                if key not in seen and len(key) >= 8:
-                    seen.add(key)
-                    unique.append((q or "").strip())
-            return unique if unique else ["제8회 전국동시지방선거 당선인 공약"]
+                if key not in seen_set and len(key) >= 8:
+                    seen_set.add(key)
+                    unique_list.append((q or "").strip())
+            return unique_list or ["제8회 전국동시지방선거 당선인 공약"]
 
-        queries = _build_winners2022_queries(pledge, user_meta or {})[:3]  # 상한 3개
-
-        # rewrite True/False 병렬 처리
+        queries = _build_winners2022_queries(pledge, user_meta or {})[:3]
         all_winners_hits = []
         with ThreadPoolExecutor(max_workers=6) as executor:
             futures = []
@@ -1256,22 +1406,10 @@ def run_check(
             for f in as_completed(futures):
                 all_winners_hits.extend(f.result())
         winners_hits_raw = _dedup(all_winners_hits)[:30]
-
-        logger.debug(f"[WINNERS2022] 질의 {len(queries)}개(상한3), hit dedup 후 {len(winners_hits_raw)}개")
-
-        # a. 다중 질의 검색 → b. 메타 보강 → c. user_meta 필터 → d. 구조화 컨텍스트
         if winners_hits_raw:
-            winners_enhanced = _enhance_winners2022_hits(
-                client, winners2022_vector_store_id, winners_hits_raw, max_enhance=18
-            )
+            winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=18)
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            winners2022_context = _build_structured_winners_context(
-                winners_filtered, max_chars=14_000, excerpt_len=500
-            )
-        else:
-            winners2022_context = ""
-    else:
-        winners2022_context = ""
+            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=14_000, excerpt_len=500)
 
     # 컨텍스트 구성 (속도 우선: 아이템 수·길이 합리적 축소, 출력 포맷 유지)
     platform_context = _fmt(platform_hits[: max(5, max_results)], max_chars=8_000) or "(정강·정책 문서 없음)"
