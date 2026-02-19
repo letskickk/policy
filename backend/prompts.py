@@ -8,18 +8,16 @@ from typing import Optional
 
 from backend.config import PROMPTS_DIR
 
-# 회원가입 election_position 값 → 프롬프트용 한글 라벨
-ELECTION_POSITION_TO_TYPE = {
-    "metro_mayor": "광역단체장",
-    "regional_council": "광역의원",
-    "local_mayor": "기초단체장",
-    "local_council": "기초의원",
-}
+# 회원가입 election_position 값 → 프롬프트용 한글 라벨 (openai_vector_store 매핑과 동일)
+from backend.openai_vector_store import ELECTION_TYPE_KEY_TO_LABEL
+
+ELECTION_POSITION_TO_TYPE = dict(ELECTION_TYPE_KEY_TO_LABEL)  # metro_mayor, local_mayor, education, regional_council, local_council
 ELECTION_POSITION_TO_LEVEL = {
     "metro_mayor": "광역",
     "regional_council": "광역",
     "local_mayor": "기초",
     "local_council": "기초",
+    "education": "광역",  # 교육감
 }
 
 

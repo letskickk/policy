@@ -48,6 +48,86 @@ WINNER_API_URL = "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWi
 PLEDGE_API_URL = "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire"
 SG_ID_2022 = "20220601"
 
+# 한글 선거유형 라벨 ↔ 내부 키 매핑 (일관 사용)
+ELECTION_TYPE_KEY_TO_LABEL: Dict[str, str] = {
+    "metro_mayor": "광역단체장",
+    "local_mayor": "기초단체장",
+    "education": "교육감",
+    "regional_council": "광역의원",
+    "local_council": "기초의원",
+}
+ELECTION_TYPE_LABEL_TO_KEY = {v: k for k, v in ELECTION_TYPE_KEY_TO_LABEL.items()}
+# 4번 섹션 비었을 때 고정 문구 (election_type 있을 때 no_filter 미사용)
+WINNERS2022_CONTEXT_EMPTY = "유사 공약: 없음"
+
+
+def _normalize_region_name(region: str) -> str:
+    """지역명 정규화 (매칭/표시용). run_check 내부 및 테스트에서 사용."""
+    r = re.sub(r"\s+", "", (region or ""))
+    mapping = {
+        "서울": "서울특별시", "부산": "부산광역시", "대구": "대구광역시", "인천": "인천광역시",
+        "광주": "광주광역시", "대전": "대전광역시", "울산": "울산광역시", "세종": "세종특별자치시",
+        "경기": "경기도", "강원": "강원도", "충북": "충청북도", "충남": "충청남도",
+        "전북": "전라북도", "전남": "전라남도", "경북": "경상북도", "경남": "경상남도", "제주": "제주특별자치도",
+    }
+    return mapping.get(r, r)
+
+
+def is_meta_match_for_winners(meta: Dict, user_meta: dict, mode: str = "strict") -> bool:
+    """
+    winners 메타 매칭. 교육감 user_meta일 때 hit_position에 "교육감" 포함된 경우만 통과.
+    테스트 및 run_check 내부에서 사용.
+    """
+    if not user_meta:
+        return True
+    province = (user_meta.get("region_province") or "").strip()
+    city = (user_meta.get("region_city") or "").strip()
+    election = (user_meta.get("election_type") or "").strip().lower()
+
+    hit_region = (meta.get("canonical_region") or meta.get("region") or "").strip()
+    hit_position = (meta.get("canonical_position") or meta.get("position") or "").strip()
+    hit_sgg = (meta.get("sggName") or "").strip()
+
+    hit_region_norm = _normalize_region_name(hit_region) if hit_region else ""
+    user_prov_norm = _normalize_region_name(province) if province else ""
+
+    if user_prov_norm and hit_region_norm and hit_region_norm != user_prov_norm:
+        return False
+    if city:
+        if hit_sgg:
+            if city not in hit_sgg and hit_sgg not in city:
+                return False
+        else:
+            if city not in hit_region and city not in hit_position:
+                return False
+
+    if mode == "region_only":
+        return True
+
+    if election and hit_position:
+        label_metro = ELECTION_TYPE_KEY_TO_LABEL.get("metro_mayor", "광역단체장")
+        label_local_mayor = ELECTION_TYPE_KEY_TO_LABEL.get("local_mayor", "기초단체장")
+        label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "교육감")
+        label_reg = ELECTION_TYPE_KEY_TO_LABEL.get("regional_council", "광역의원")
+        label_local_c = ELECTION_TYPE_KEY_TO_LABEL.get("local_council", "기초의원")
+        if "metro_mayor" in election or (label_metro and label_metro in election):
+            if "지사" not in hit_position and "시장" not in hit_position:
+                return False
+        elif "local_mayor" in election or (label_local_mayor and label_local_mayor in election):
+            if "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
+                return False
+        elif "education" in election or (label_edu and label_edu in election):
+            if "교육감" not in hit_position:
+                return False
+        elif "regional_council" in election or "local_council" in election or (label_reg and label_reg in election) or (label_local_c and label_local_c in election) or "기초의원" in election or "광역의원" in election:
+            if "의원" not in hit_position:
+                return False
+            if not hit_sgg:
+                return False
+            if city and city not in hit_sgg and hit_sgg not in city:
+                return False
+    return True
+
 
 def _xml_local_name(tag: str) -> str:
     """Element tag에서 로컬 이름만 (네임스페이스 제거)."""
@@ -365,6 +445,7 @@ def _normalize_region_for_api(region: str) -> str:
 def _normalize_user_meta_for_winners(user_meta: dict | None) -> dict:
     """
     user_meta → API 조회용 정규화.
+    한글 라벨(광역단체장/기초단체장/교육감/광역의원/기초의원) 및 내부 키(metro_mayor 등) 모두 인식.
     Returns: {sgTypecodes: ["3","4","11"], sdName: "", sggName: ""}
     """
     if not user_meta:
@@ -373,13 +454,18 @@ def _normalize_user_meta_for_winners(user_meta: dict | None) -> dict:
     province = (user_meta.get("region_province") or "").strip()
     city = (user_meta.get("region_city") or "").strip()
     sg_typecodes: List[str] = []
-    if "metro_mayor" in election or "시도지사" in election:
+    label_metro = ELECTION_TYPE_KEY_TO_LABEL.get("metro_mayor", "")
+    label_local_mayor = ELECTION_TYPE_KEY_TO_LABEL.get("local_mayor", "")
+    label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "")
+    label_reg_council = ELECTION_TYPE_KEY_TO_LABEL.get("regional_council", "")
+    label_local_council = ELECTION_TYPE_KEY_TO_LABEL.get("local_council", "")
+    if "metro_mayor" in election or (label_metro and label_metro in election) or "시도지사" in election:
         sg_typecodes.append("3")
-    if "local_mayor" in election or "구청장" in election or "시장" in election or "군수" in election:
+    if "local_mayor" in election or (label_local_mayor and label_local_mayor in election) or "구청장" in election or "시장" in election or "군수" in election:
         sg_typecodes.append("4")
-    if "education" in election or "교육감" in election:
+    if "education" in election or (label_edu and label_edu in election):
         sg_typecodes.append("11")
-    if "regional_council" in election or "광역의원" in election or "local_council" in election or "기초의원" in election:
+    if "regional_council" in election or (label_reg_council and label_reg_council in election) or "local_council" in election or (label_local_council and label_local_council in election):
         sg_typecodes.extend(["4"])  # 의원은 선거구별 조회 시 sggName 매칭으로 필터
     if not sg_typecodes:
         sg_typecodes = ["3", "4", "11"]
@@ -1010,29 +1096,6 @@ def run_check(
             text,
         )
 
-    def _normalize_region_name(region: str) -> str:
-        r = re.sub(r"\s+", "", (region or ""))
-        mapping = {
-            "서울": "서울특별시",
-            "부산": "부산광역시",
-            "대구": "대구광역시",
-            "인천": "인천광역시",
-            "광주": "광주광역시",
-            "대전": "대전광역시",
-            "울산": "울산광역시",
-            "세종": "세종특별자치시",
-            "경기": "경기도",
-            "강원": "강원도",
-            "충북": "충청북도",
-            "충남": "충청남도",
-            "전북": "전라북도",
-            "전남": "전라남도",
-            "경북": "경상북도",
-            "경남": "경상남도",
-            "제주": "제주특별자치도",
-        }
-        return mapping.get(r, r)
-
     def _infer_position_from_region(region: str) -> str | None:
         r = _normalize_region_name(region)
         if not r:
@@ -1280,64 +1343,7 @@ def run_check(
         logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
         return enhanced
 
-    def _is_meta_match(meta: Dict, user_meta: dict, mode: str = "strict") -> bool:
-        """
-        winners 메타 매칭.
-        - strict: 지역+선거유형 모두 적용
-        - region_only: 지역만 적용
-        포함 비교(tok in region_norm) 없이 정규화 exact match 우선.
-        """
-        if not user_meta:
-            return True
-        province = (user_meta.get("region_province") or "").strip()
-        city = (user_meta.get("region_city") or "").strip()
-        election = (user_meta.get("election_type") or "").strip().lower()
-
-        hit_region = (meta.get("canonical_region") or meta.get("region") or "").strip()
-        hit_position = (meta.get("canonical_position") or meta.get("position") or "").strip()
-        hit_sgg = (meta.get("sggName") or "").strip()
-
-        def _norm(s: str) -> str:
-            return _normalize_region_name(s) if s else ""
-
-        hit_region_norm = _norm(hit_region)
-        user_prov_norm = _norm(province) if province else ""
-
-        # 1) 지역 정합: exact match 우선
-        if user_prov_norm and hit_region_norm and hit_region_norm != user_prov_norm:
-            return False
-        if city:
-            if hit_sgg:
-                if city not in hit_sgg and hit_sgg not in city:
-                    return False
-            else:
-                # city가 있는데 sggName이 없으면 지역 라벨/직책에 city가 명시되어야 함
-                if city not in hit_region and city not in hit_position:
-                    return False
-
-        if mode == "region_only":
-            return True
-
-        # 2) 선거유형 정합
-        if election and hit_position:
-            if "metro_mayor" in election:
-                if "지사" not in hit_position and "시장" not in hit_position:
-                    return False
-            elif "local_mayor" in election:
-                if "시장" not in hit_position and "구청장" not in hit_position and "군수" not in hit_position:
-                    return False
-            elif "education" in election or "교육감" in election:
-                if "교육감" not in hit_position:
-                    return False
-            elif "regional_council" in election or "local_council" in election or "기초의원" in election or "광역의원" in election:
-                # 의원 유형: sggName 불일치/부재면 제외
-                if "의원" not in hit_position:
-                    return False
-                if not hit_sgg:
-                    return False
-                if city and city not in hit_sgg and hit_sgg not in city:
-                    return False
-        return True
+    _is_meta_match = is_meta_match_for_winners
 
     def _filter_winners_by_user_meta(
         items: List[Tuple[float, str, str, Dict]],
@@ -1515,7 +1521,10 @@ def run_check(
                 }
                 if _is_meta_match(meta_probe, user_meta or {}, mode="region_only"):
                     prefiltered_rows.append(w)
-        if not prefiltered_rows:
+        # election_type이 있으면 no_filter fallback 금지: 다른 직책으로 채우지 않음
+        if not prefiltered_rows and (user_meta and (user_meta.get("election_type") or "").strip()):
+            pass  # prefiltered_rows 유지 빈 리스트
+        elif not prefiltered_rows:
             prefiltered_rows = list(all_winner_rows)
         logger.debug(f"[WINNERS2022][API] winner row after prefilter: {len(prefiltered_rows)}건")
 
@@ -1556,25 +1565,46 @@ def run_check(
             f"[WINNERS2022] fallback stages strict={len(strict_items)}, region_only={len(region_only_items)}, no_filter={len(no_filter_items)}"
         )
 
-        # 벡터 검색은 증거 보강용 (1패스, 캐시 사용)
+        # 벡터 검색은 증거 보강용 (1패스, 캐시 사용). 교육감이면 hit_position에 "교육감" 포함된 청크만 사용
         vec_hits: List[Tuple[float, str, str]] = []
         if winners2022_vector_store_id and api_items and pledge:
             q = (pledge[:500] + " 당선인 공약").strip()
-            vec_hits = _search(client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True)
+            vec_hits_raw = _search(client, winners2022_vector_store_id, q, RUN_CHECK_K_WINNERS, True)
+            election_raw = (user_meta or {}).get("election_type") or ""
+            label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "교육감")
+            is_education_user = "education" in election_raw.lower() or (label_edu and label_edu in election_raw)
+            if is_education_user:
+                vec_hits = [
+                    (sc, fn, txt) for sc, fn, txt in vec_hits_raw
+                    if "교육감" in (_extract_winners2022_metadata(txt, fn).get("position") or "")
+                ]
+                logger.debug(f"[WINNERS2022][VECTOR] education filter: {len(vec_hits_raw)} → {len(vec_hits)} (hit_position에 교육감만)")
+            else:
+                vec_hits = vec_hits_raw
             logger.debug(f"[WINNERS2022][VECTOR] evidence hit={len(vec_hits)}")
-            for idx, (_, _fn, _txt, meta) in enumerate(api_items):
-                if idx < len(vec_hits):
-                    _, _f, chunk_text = vec_hits[idx]
-                    excerpt = (_extract_pledge_title(chunk_text) or "") + "\n" + (chunk_text or "").strip()[:400]
-                    if excerpt.strip():
-                        meta["_excerpt"] = excerpt.strip()
+            for _idx, (_, _fn, _txt, meta) in enumerate(api_items):
+                item_pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+                for sc, _f, chunk_text in vec_hits:
+                    hit_meta = _extract_winners2022_metadata(chunk_text, _f)
+                    hit_pos = (hit_meta.get("position") or "").strip()
+                    if not hit_pos or not item_pos:
+                        continue
+                    same_role = ("교육감" in item_pos and "교육감" in hit_pos) or ("지사" in item_pos and "지사" in hit_pos) or ("시장" in item_pos and "시장" in hit_pos) or ("구청장" in item_pos and "구청장" in hit_pos) or ("군수" in item_pos and "군수" in hit_pos) or ("의원" in item_pos and "의원" in hit_pos)
+                    if same_role:
+                        excerpt = (_extract_pledge_title(chunk_text) or "") + "\n" + (chunk_text or "").strip()[:400]
+                        if excerpt.strip():
+                            meta["_excerpt"] = excerpt.strip()
+                        break
                 meta.pop("_api_canonical", None)
 
         chosen_items = strict_items
         if not chosen_items:
             chosen_items = region_only_items
-        if not chosen_items:
-            # 비어도 최소 fallback: 무필터 top 1~3으로 "없음" 오탐 감소
+        has_election_type = bool(user_meta and (user_meta.get("election_type") or "").strip())
+        if not chosen_items and has_election_type:
+            # strict/region_only 모두 실패 시 election_type 있으면 no_filter 사용 금지 → 4번 섹션 "유사 공약: 없음"
+            winners2022_context = WINNERS2022_CONTEXT_EMPTY
+        elif not chosen_items:
             chosen_items = no_filter_items[:3] if vec_hits else no_filter_items[: max(1, min(3, len(no_filter_items)))]
         if chosen_items:
             winners2022_context = _build_structured_winners_context(
@@ -1618,13 +1648,17 @@ def run_check(
         if winners_hits_raw:
             winners_enhanced = _enhance_winners2022_hits(client, winners2022_vector_store_id, winners_hits_raw, max_enhance=RUN_CHECK_MAX_ENHANCE)
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            if not winners_filtered:
+            has_election_type_vec = bool(user_meta and (user_meta.get("election_type") or "").strip())
+            if not winners_filtered and has_election_type_vec:
+                winners2022_context = WINNERS2022_CONTEXT_EMPTY
+            elif not winners_filtered:
                 winners_filtered = winners_enhanced[: max(1, min(3, len(winners_enhanced)))]
-            winners2022_context = _build_structured_winners_context(
-                winners_filtered[:RUN_CHECK_WINNERS_MAX_ITEMS],
-                max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
-                excerpt_len=400,
-            )
+            if winners_filtered:
+                winners2022_context = _build_structured_winners_context(
+                    winners_filtered[:RUN_CHECK_WINNERS_MAX_ITEMS],
+                    max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
+                    excerpt_len=400,
+                )
     t_winners = time.perf_counter()
     logger.info("[run_check] winners_search ms=%.0f", (t_winners - t_policy) * 1000)
 
