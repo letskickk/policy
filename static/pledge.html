@@ -761,6 +761,12 @@
             `<a href="/login?next=${next}" style="color:#ffb37a;font-weight:700;">로그인</a> · ` +
             '<a href="/signup" style="color:#ffb37a;font-weight:700;">회원가입</a>'
           );
+        } else if (/Gateway|timeout|504|타임아웃/i.test(msg)) {
+          showError(
+            '분석 시간이 초과되었습니다.<br>' +
+            '정책 분석에는 1~2분 걸릴 수 있습니다. 잠시 후 다시 시도해 주세요.<br>' +
+            '<small>(' + (msg || 'Gateway Time-out') + ')</small>'
+          );
         } else {
           showError(`분석 중 오류가 발생했습니다.<br>(${msg || '서버 연결 실패'})`);
         }

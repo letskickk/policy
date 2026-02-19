@@ -361,4 +361,7 @@ sudo systemctl restart nginx
 
 - **접속 안 됨**: 보안 그룹에서 해당 포트(8000 또는 80) 인바운드 허용 여부 확인.
 - **502 Bad Gateway**: Nginx 쓰는 경우 `sudo systemctl status policy-app` 로 앱이 8000에서 떠 있는지 확인.
+- **504 Gateway Time-out** (분석 중): 당 부합 점검(/check, /api/pledge/verify)은 GPT·벡터 검색으로 1~2분 걸릴 수 있음. 프록시 타임아웃을 60초 이상으로 올려야 함.
+  - **Nginx**: `proxy_read_timeout 300s;` `proxy_connect_timeout 300s;` `proxy_send_timeout 300s;` (location / 또는 /check, /api 포함 블록에).
+  - **AWS ALB**: 로드 밸런서 → 해당 타깃 그룹 → 속성 → 유휴 제한 시간(Idle timeout)을 300초 등으로 변경.
 - **API 키 오류**: 서버의 `Policy/.env` 에 `OPENAI_API_KEY`가 올바르게 들어 있는지 확인.
