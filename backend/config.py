@@ -112,5 +112,8 @@ RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
 RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
 
-# 공공데이터포털(중앙선거관리위원회 코드정보) API - 시·도/시군구/선거구 목록
+# 공공데이터포털 중앙선거관리위원회 API (동일 인증키 공통 사용)
+# - 당선인 정보: https://apis.data.go.kr/9760000/WinnerInfoInqireService2
+# - 선거공약 정보: https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService
+# - 코드정보(시·도/시군구): CommonCodeService
 DATA_GO_KR_API_KEY = os.getenv("DATA_GO_KR_API_KEY", "").strip().replace("\r", "").replace("\n", "")

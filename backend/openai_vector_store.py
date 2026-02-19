@@ -660,17 +660,19 @@ def run_check(
             from urllib.request import Request, urlopen
             from urllib.error import HTTPError
             
-            # 직책에서 sgTypecode 추론
+            # 직책에서 sgTypecode 추론 (선거공약/당선인 API 공통: 3=시도지사, 4=구시군의장, 11=교육감)
             sg_typecode = None
-            if "지사" in position:
-                sg_typecode = "2"  # 시도지사
+            if "지사" in position and "시장" not in position:
+                sg_typecode = "3"  # 시·도지사선거
             elif "시장" in position or "구청장" in position or "군수" in position:
-                sg_typecode = "3"  # 시장/구청장/군수
+                sg_typecode = "4"  # 구·시·군의장선거
+            elif "교육감" in position:
+                sg_typecode = "11"  # 교육감선거
             elif "의원" in position:
                 if "광역" in position:
-                    sg_typecode = "4"  # 광역의원
+                    sg_typecode = "4"
                 else:
-                    sg_typecode = "5"  # 기초의원
+                    sg_typecode = "5"
             
             if not sg_typecode:
                 return None
@@ -680,16 +682,16 @@ def run_check(
             if not sd_name:
                 return None
             
-            # API 호출
-            base_url = "http://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire"
+            # API 호출 (당선인정보 v3.11: https://apis.data.go.kr/9760000/WinnerInfoInqireService2)
+            base_url = "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire"
             params = {
-                "ServiceKey": DATA_GO_KR_API_KEY,
-                "sgId": "20220601",  # 제8회 지방선거
+                "serviceKey": DATA_GO_KR_API_KEY,
+                "sgId": "20220601",  # 제8회 전국동시지방선거
                 "sgTypecode": sg_typecode,
                 "sdName": sd_name,
-                "resultType": "json",
+                "_type": "json",
                 "pageNo": "1",
-                "numOfRows": "100"
+                "numOfRows": "100",
             }
             
             url = f"{base_url}?{urlencode(params)}"
