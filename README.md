@@ -80,6 +80,22 @@ Policy/
 
 **쿼터/레이트리밋 변경**: `.env`에 `QUOTA_DAILY=50`, `QUOTA_MONTHLY=500` 등 추가
 
+**이메일 인증 (회원가입 시 인증 메일 발송)**  
+인증 메일을 쓰려면 `.env`에 아래를 설정한 뒤 서버를 재시작하세요.
+
+| 변수 | 설명 | 예시 |
+|------|------|------|
+| `EMAIL_VERIFICATION_ENABLED` | 1이면 가입 후 이메일 인증 필요 | `1` |
+| `SMTP_HOST` | SMTP 서버 주소 | `smtp.gmail.com` |
+| `SMTP_PORT` | 포트 (TLS 587) | `587` |
+| `SMTP_USER` | 발송 계정 이메일 | `your@gmail.com` |
+| `SMTP_PASS` | 발송 계정 비밀번호(또는 앱 비밀번호) | — |
+| `FROM_EMAIL` | (선택) 발신 주소, 없으면 SMTP_USER 사용 | — |
+| `APP_BASE_URL` | 인증 링크에 들어갈 사이트 주소 | `https://your-domain.com` |
+
+- Gmail: [앱 비밀번호](https://myaccount.google.com/apppasswords) 사용 권장.  
+- 설정이 없거나 잘못되면 가입 시 "이메일 발송 실패. 관리자에게 문의하세요." 메시지가 나올 수 있습니다.
+
 ## 실행 방법
 
 1. **가상환경 및 패키지**

@@ -97,6 +97,14 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
 FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER or "noreply@example.com")
+
+# 이메일 인증 사용 시 SMTP 미설정이면 가입 시 메일이 안 나감 → 시작 시 한 번 경고
+if EMAIL_VERIFICATION_ENABLED and (not SMTP_HOST or not SMTP_USER):
+    import logging
+    logging.getLogger(__name__).warning(
+        "EMAIL_VERIFICATION_ENABLED=1 이지만 SMTP_HOST/SMTP_USER가 비어 있어 인증 메일이 발송되지 않습니다. .env에 SMTP 설정을 추가하세요."
+    )
+
 SESSION_SECRET = os.getenv("SESSION_SECRET", "").strip() or "change-me-in-production"
 QUOTA_DAILY = int(os.getenv("QUOTA_DAILY", "30"))
 QUOTA_MONTHLY = int(os.getenv("QUOTA_MONTHLY", "300"))
