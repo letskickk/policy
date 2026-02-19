@@ -11,7 +11,9 @@ manifest에는 content_hash를 저장해 머신 간 배포에서도 정확히 �
 import hashlib
 import json
 import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 import re
@@ -477,6 +479,14 @@ def run_check(
                 parts.append(str(txt))
         return "\n".join(parts).strip()
 
+    # 동일 요청 내 동일 쿼리 재호출 방지 캐시 (스레드 세이프)
+    search_cache: Dict[str, List[Tuple[float, str, str]]] = {}
+    search_cache_lock = threading.Lock()
+
+    def _is_retryable_err(e: Exception) -> bool:
+        s = str(e).lower()
+        return "502" in s or "503" in s or "504" in s or "timeout" in s or "timed out" in s
+
     def _search(
         client: OpenAI,
         vs_id: str,
@@ -486,40 +496,58 @@ def run_check(
     ) -> List[Tuple[float, str, str]]:
         """
         Returns list of (score, filename, chunk_text).
+        일시적 오류(502/503/504/timeout) 시 최대 2회 재시도, 짧은 백오프. 동일 쿼리 캐시 사용.
         """
         if not vs_id:
             return []
-        # OpenAI Python SDK 버전에 따라 시그니처가 조금 다를 수 있어 2가지 방식으로 시도
-        try:
-            page = client.vector_stores.search(
-                vector_store_id=vs_id,
-                query=query,
-                max_num_results=max(1, min(int(k), 50)),
-                rewrite_query=bool(rewrite),
-            )
-        except TypeError:
-            page = client.vector_stores.search(
-                vs_id,
-                query=query,
-                max_num_results=max(1, min(int(k), 50)),
-                rewrite_query=bool(rewrite),
-            )
-
-        data = getattr(page, "data", None) if not isinstance(page, dict) else page.get("data")
-        if not data:
-            return []
-        out: List[Tuple[float, str, str]] = []
-        for item in data:
-            score = getattr(item, "score", None) if not isinstance(item, dict) else item.get("score")
-            filename = getattr(item, "filename", None) if not isinstance(item, dict) else item.get("filename")
-            content = getattr(item, "content", None) if not isinstance(item, dict) else item.get("content")
-            text = _coalesce_text(content)
-            if not text:
-                continue
-            out.append((float(score or 0.0), str(filename or ""), text))
-        # score desc
-        out.sort(key=lambda t: t[0], reverse=True)
-        return out
+        q_repr = (query if isinstance(query, str) else "|".join(str(x) for x in query))[:500]
+        cache_key = hashlib.sha256(f"{vs_id}|{q_repr}|{k}|{rewrite}".encode("utf-8", errors="ignore")).hexdigest()
+        with search_cache_lock:
+            if cache_key in search_cache:
+                return list(search_cache[cache_key])
+        last_error: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                try:
+                    page = client.vector_stores.search(
+                        vector_store_id=vs_id,
+                        query=query,
+                        max_num_results=max(1, min(int(k), 50)),
+                        rewrite_query=bool(rewrite),
+                    )
+                except TypeError:
+                    page = client.vector_stores.search(
+                        vs_id,
+                        query=query,
+                        max_num_results=max(1, min(int(k), 50)),
+                        rewrite_query=bool(rewrite),
+                    )
+                data = getattr(page, "data", None) if not isinstance(page, dict) else page.get("data")
+                if not data:
+                    out: List[Tuple[float, str, str]] = []
+                else:
+                    out = []
+                    for item in data:
+                        score = getattr(item, "score", None) if not isinstance(item, dict) else item.get("score")
+                        filename = getattr(item, "filename", None) if not isinstance(item, dict) else item.get("filename")
+                        content = getattr(item, "content", None) if not isinstance(item, dict) else item.get("content")
+                        text = _coalesce_text(content)
+                        if not text:
+                            continue
+                        out.append((float(score or 0.0), str(filename or ""), text))
+                    out.sort(key=lambda t: t[0], reverse=True)
+                with search_cache_lock:
+                    search_cache[cache_key] = out
+                return out
+            except Exception as e:
+                last_error = e
+                if attempt < 2 and _is_retryable_err(e):
+                    time.sleep(1 + attempt)
+                    continue
+                raise
+        if last_error is not None:
+            raise last_error
+        return []
 
     def _dedup(items: Iterable[Tuple[float, str, str]]) -> List[Tuple[float, str, str]]:
         seen: set[str] = set()
@@ -1023,13 +1051,10 @@ def run_check(
     if winners2022_vector_store_id:
         _check_vector_store_ready(client, winners2022_vector_store_id)
 
-    # 1) policy store에서 공약 유사 검색 (공약/정강정책 둘 다 섞여 있음)
-    # 청크는 문서 중간에서 잘릴 수 있어, "헤더"만으로는 분리가 깨짐.
-    # 폴더 기준을 유지하기 위해 '출처: <폴더/...>' 라인 우선으로 분리하고,
-    # 그조차 없을 때만 filename/헤더를 fallback으로 사용.
-    policy_hits = _search(client, vector_store_id, pledge, k=50, rewrite=True)
-    # 2) 정강정책은 공약 문장과 유사도가 낮아 잘 안 걸리므로, 정강 전용 키워드로 한 번 더 강제 검색
-    platform_hits_kw = _search(client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k=30, rewrite=False)
+    # 1) policy store에서 공약 유사 검색 (검색량 하향으로 응답속도 개선)
+    policy_hits = _search(client, vector_store_id, pledge, k=35, rewrite=True)
+    # 2) 정강정책 전용 키워드 강제 검색
+    platform_hits_kw = _search(client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", k=20, rewrite=False)
 
     policy_all = _dedup([*policy_hits, *platform_hits_kw])
     platform_hits: List[Tuple[float, str, str]] = []
@@ -1066,7 +1091,7 @@ def run_check(
     # 3) regional store (선택)
     regional_hits: List[Tuple[float, str, str]] = []
     if regional_vector_store_id:
-        regional_hits = _search(client, regional_vector_store_id, pledge, k=25, rewrite=True)
+        regional_hits = _search(client, regional_vector_store_id, pledge, k=18, rewrite=True)
 
     # 4) winners2022 store (선택) - 다중 질의로 리콜 강화
     winners_hits: List[Tuple[float, str, str]] = []
@@ -1121,35 +1146,39 @@ def run_check(
                     unique.append((q or "").strip())
             return unique if unique else ["제8회 전국동시지방선거 당선인 공약"]
 
-        queries = _build_winners2022_queries(pledge, user_meta or {})
+        queries = _build_winners2022_queries(pledge, user_meta or {})[:3]  # 상한 3개
 
-        # 각 질의마다 rewrite=True/False 둘 다 조회
+        # rewrite True/False 병렬 처리
         all_winners_hits = []
-        for q in queries:
-            all_winners_hits.extend(_search(client, winners2022_vector_store_id, q, k=30, rewrite=True))
-            all_winners_hits.extend(_search(client, winners2022_vector_store_id, q, k=30, rewrite=False))
-        
-        # dedup 후 상위 점수만 선택
-        winners_hits_raw = _dedup(all_winners_hits)[:50]
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = []
+            for q in queries:
+                futures.append(executor.submit(_search, client, winners2022_vector_store_id, q, 20, True))
+                futures.append(executor.submit(_search, client, winners2022_vector_store_id, q, 20, False))
+            for f in as_completed(futures):
+                all_winners_hits.extend(f.result())
+        winners_hits_raw = _dedup(all_winners_hits)[:30]
 
-        logger.debug(f"[WINNERS2022] 다중 질의 {len(queries)}개, 총 hit {len(all_winners_hits)}개, dedup 후 {len(winners_hits_raw)}개")
+        logger.debug(f"[WINNERS2022] 질의 {len(queries)}개(상한3), hit dedup 후 {len(winners_hits_raw)}개")
 
         # a. 다중 질의 검색 → b. 메타 보강 → c. user_meta 필터 → d. 구조화 컨텍스트
         if winners_hits_raw:
             winners_enhanced = _enhance_winners2022_hits(
-                client, winners2022_vector_store_id, winners_hits_raw, max_enhance=30
+                client, winners2022_vector_store_id, winners_hits_raw, max_enhance=18
             )
             winners_filtered = _filter_winners_by_user_meta(winners_enhanced, user_meta or {})
-            winners2022_context = _build_structured_winners_context(winners_filtered, max_chars=22_000)
+            winners2022_context = _build_structured_winners_context(
+                winners_filtered, max_chars=16_000, excerpt_len=600
+            )
         else:
             winners2022_context = ""
     else:
         winners2022_context = ""
 
-    # 컨텍스트 구성 (섹션별로 분리 주입)
-    platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=12_000) or "(정강·정책 문서 없음)"
-    pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=18_000) or "(우리당 공약 문서 없음)"
-    regional_context = _fmt(regional_hits[:10], max_chars=10_000) if regional_hits else ""
+    # 컨텍스트 구성 (길이 하향으로 토큰/지연 감소, 메타 필터 구조 유지)
+    platform_context = _fmt(platform_hits[: max(6, max_results)], max_chars=10_000) or "(정강·정책 문서 없음)"
+    pledges_context = _fmt(pledges_hits[: max(10, max_results * 2)], max_chars=14_000) or "(우리당 공약 문서 없음)"
+    regional_context = _fmt(regional_hits[:8], max_chars=8_000) if regional_hits else ""
 
     # 프롬프트 생성 후 최종 답변만 생성
     from backend.prompts import load_system_prompt, build_user_message
