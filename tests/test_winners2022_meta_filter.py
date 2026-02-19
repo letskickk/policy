@@ -2,6 +2,7 @@ from backend.openai_vector_store import (
     WINNERS2022_MIN_QUERIES,
     _build_winners2022_queries_for_vector,
     _dedup_winners_vector_hits,
+    _rank_api_items_by_pledge_keywords,
     choose_winners_items,
     is_meta_match_for_winners,
     reconstruct_winner_identity,
@@ -83,3 +84,44 @@ def test_F_identity_fallback_marks_unknown_when_missing():
     pos, name = reconstruct_winner_identity(meta, "근거발췌: 공약 내용만 있고 인명 표기가 없음")
     assert pos == "확인불가"
     assert name == "확인불가"
+
+
+def test_G_spelling_variant_belly_in_queries_when_pledge_has_balley():
+    """사용자 입력 '밸리'일 때 검색 쿼리에 '벨리' 변형 포함되어 리콜 보강."""
+    pledge = "망운산 산림휴양밸리 조성"
+    queries = _build_winners2022_queries_for_vector(pledge, None, max_queries=10)
+    joined = " ".join(queries)
+    assert "밸리" in joined
+    assert "벨리" in joined
+
+
+def test_H_rank_api_items_by_pledge_keywords_puts_matching_first():
+    """API만 있을 때 망운산/안심소득 키워드 매칭 항목이 상위로 정렬."""
+    api_items = [
+        (1.0, "API", "다른 지역 공원 조성", {"pledge_title": "공원", "position": "A", "region": "B"}),
+        (1.0, "API", "망운산 산림휴양벨리 조성 사업", {"pledge_title": "망운산", "position": "남해군수", "region": "경남"}),
+        (1.0, "API", "일반 복지 확대", {"pledge_title": "복지", "position": "C", "region": "D"}),
+    ]
+    ranked = _rank_api_items_by_pledge_keywords(api_items, "망운산 산림휴양밸리 조성")
+    texts = [r[2] for r in ranked]
+    assert texts[0] == "망운산 산림휴양벨리 조성 사업"
+
+    api_items2 = [
+        (1.0, "API", "교통 정책", {"pledge_title": "교통", "position": "X", "region": "Y"}),
+        (1.0, "API", "서울 안심소득으로 복지 사각지대 해소", {"pledge_title": "안심소득", "position": "시장", "region": "서울"}),
+    ]
+    ranked2 = _rank_api_items_by_pledge_keywords(api_items2, "서울 안심소득")
+    assert "안심소득" in ranked2[0][2]
+
+
+def test_I_choose_winners_items_fallback_one_below_threshold():
+    """유사도 임계 미달이어도 비충돌 후보가 있으면 최소 1건 반환."""
+    user_meta = {"election_type": "기초단체장", "region_province": "경상남도"}
+    strict = []
+    region_only = []
+    enhanced = [
+        _row(0.10, "망운산 산림휴양벨리 조성", position="남해군수", region="경상남도 남해군", name="장충남"),
+    ]
+    chosen = choose_winners_items(strict, region_only, enhanced, user_meta)
+    assert len(chosen) == 1
+    assert "망운산" in chosen[0][2]

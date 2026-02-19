@@ -63,7 +63,7 @@ WINNERS2022_CONTEXT_EMPTY = "유사 공약: 없음"
 # 다중 쿼리 recall용: 최소 쿼리 개수(원문/직책+지역 등)
 WINNERS2022_MIN_QUERIES = 5
 WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS = 2
-WINNERS2022_MIN_SIMILARITY_SCORE = 0.18
+WINNERS2022_MIN_SIMILARITY_SCORE = 0.12
 
 
 def _build_position_region_query(user_meta: dict) -> str:
@@ -96,6 +96,13 @@ def _build_position_region_query(user_meta: dict) -> str:
     return f"{position_part} 당선인 공약"
 
 
+# 흔한 표기 변형(검색 리콜용). 문서는 "벨리"인데 사용자가 "밸리" 입력 등
+_QUERY_SPELLING_VARIANTS: List[Tuple[str, str]] = [
+    ("밸리", "벨리"),
+    ("벨리", "밸리"),
+]
+
+
 def _extract_query_keywords(text: str, max_terms: int = 8) -> str:
     """공약 텍스트에서 검색 리콜용 핵심 키워드(명사 유사 토큰) 추출."""
     raw = re.sub(r"[^0-9A-Za-z가-힣\s]", " ", (text or ""))
@@ -123,6 +130,7 @@ def _build_winners2022_queries_for_vector(
     공약 중심 winners2022 검색 쿼리(최소 5종) 생성.
     a) 원문 pledge, b) 첫 줄, c) 키워드 축약, d) region+키워드,
     e) region+election_type+키워드, f) 백업 고정 쿼리.
+    밸리/벨리 등 표기 변형 쿼리 추가로 리콜 보강.
     """
     p = (pledge_text or "").strip()
     meta = user_meta or {}
@@ -131,12 +139,27 @@ def _build_winners2022_queries_for_vector(
     out: List[str] = []
     if p:
         out.append(re.sub(r"\s+", " ", p)[:1500])  # a) 원문
+        # 표기 변형(밸리↔벨리 등)으로 한 번 더 검색
+        p_variant = p
+        for a, b in _QUERY_SPELLING_VARIANTS:
+            if a in p_variant:
+                p_variant = p_variant.replace(a, b, 1)
+                break
+        if p_variant != p and p_variant.strip():
+            out.append(re.sub(r"\s+", " ", p_variant)[:800])
         first_line = next((ln.strip() for ln in p.splitlines() if ln.strip()), "")
         if first_line:
             out.append(first_line[:300])  # b) 첫 줄
         kw = _extract_query_keywords(p, max_terms=10)
         if kw:
             out.append(kw)  # c) 키워드 축약
+            kw_variant = kw
+            for a, b in _QUERY_SPELLING_VARIANTS:
+                if a in kw_variant:
+                    kw_variant = kw_variant.replace(a, b)
+                    break
+            if kw_variant != kw:
+                out.append(kw_variant)
             if province:
                 out.append(f"{_normalize_region_name(province)} {kw}")  # d) region + 키워드
             if province and election:
@@ -186,6 +209,32 @@ def _dedup_winners_vector_hits(items: Iterable[Tuple[float, str, str]]) -> List[
     out = list(best.values())
     out.sort(key=lambda t: t[0], reverse=True)
     return out
+
+
+def _rank_api_items_by_pledge_keywords(
+    api_items: List[Tuple[float, str, str, Dict]],
+    pledge: str,
+) -> List[Tuple[float, str, str, Dict]]:
+    """API 공약 목록을 사용자 공약 키워드 매칭 수로 정렬. 벡터 없을 때 관련 공약 우선 노출."""
+    if not pledge or not api_items:
+        return api_items
+    kw_raw = _extract_query_keywords(pledge, max_terms=12)
+    keywords = set(k for k in kw_raw.split() if k)
+    for a, b in _QUERY_SPELLING_VARIANTS:
+        if a in pledge or a in kw_raw:
+            keywords.add(b)
+        if b in pledge or b in kw_raw:
+            keywords.add(a)
+    if not keywords:
+        return api_items
+    scored: List[Tuple[int, float, Tuple[float, str, str, Dict]]] = []
+    for row in api_items:
+        s, fn, text, meta = row
+        searchable = (text or "") + " " + (meta.get("pledge_title") or "")
+        cnt = sum(1 for k in keywords if k in searchable)
+        scored.append((cnt, s, row))
+    scored.sort(key=lambda x: (-x[0], -x[1]))
+    return [row for _c, _s, row in scored]
 
 
 def _simple_token_jaccard(a: str, b: str) -> float:
@@ -298,6 +347,13 @@ def choose_winners_items(
         role_safe.append(row)
     if role_safe:
         return role_safe[:WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS]
+    # 유사도 임계 미달이어도 비충돌 후보가 있으면 최소 1건은 노출(리콜 우선)
+    for row in sorted(enhanced_items, key=lambda r: (-r[0], r[2][:50])):
+        score, _fn, text, meta = row
+        pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
+        if is_explicit_role_conflict(pos, user_meta):
+            continue
+        return [row]
     return []
 
 
@@ -1832,6 +1888,8 @@ def run_check(
                     "sggName": (w.get("sggName") or "").strip(),
                     "pledge_title": title,
                 }))
+        if pledge and api_items:
+            api_items = _rank_api_items_by_pledge_keywords(api_items, pledge)
 
     winners_raw_hits: List[Tuple[float, str, str]] = []
     winners_dedup_hits: List[Tuple[float, str, str]] = []
