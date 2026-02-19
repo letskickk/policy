@@ -115,7 +115,7 @@ def _fetch_winners_api(
     if not winner_key:
         return []
     params = {
-        "serviceKey": winner_key,
+        "ServiceKey": winner_key,
         "sgId": sg_id,
         "sgTypecode": sg_typecode,
         "pageNo": "1",
@@ -133,7 +133,12 @@ def _fetch_winners_api(
         try:
             req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
             with urlopen(req, timeout=10) as r:
-                data = json.loads(r.read().decode("utf-8"))
+                raw = r.read().decode("utf-8", errors="replace")
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.warning("[Winner API] non-JSON response head: %s", (raw or "").strip().replace("\n", " ")[:240])
+                raise
             body = (data.get("response") or {}).get("body") or {}
             items = body.get("items") or body.get("item")
             if not items:
@@ -187,7 +192,7 @@ def _fetch_winner_pledges_api(
         return []
     from urllib.parse import urlencode
     params = {
-        "serviceKey": pledge_key,
+        "ServiceKey": pledge_key,
         "sgId": sg_id,
         "sgTypecode": sg_typecode,
         "cnddtId": cnddt_id,
@@ -201,7 +206,12 @@ def _fetch_winner_pledges_api(
         try:
             req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
             with urlopen(req, timeout=10) as r:
-                data = json.loads(r.read().decode("utf-8"))
+                raw = r.read().decode("utf-8", errors="replace")
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.warning("[Pledge API] non-JSON response head: %s", (raw or "").strip().replace("\n", " ")[:240])
+                raise
             body = (data.get("response") or {}).get("body") or {}
             total = int(body.get("totalCount") or 0)
             if total == 0:
