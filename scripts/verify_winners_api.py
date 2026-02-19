@@ -75,21 +75,26 @@ def test_pledge_api(winner_row):
         print(f"     예시: {pledges[0].get('prmsTitle', '')[:50]}...")
 
 
-def test_smoke_no_other_region():
-    """스모크: 서울/시도지사일 때 API 결과에 타지역(경기, 전남 등) 직책/이름 없어야 함"""
+def _fetch_metro_mayor_rows(province_name: str):
+    """시도지사(코드 3) 당선인 조회 헬퍼."""
     key = DATA_GO_KR_WINNER_API_KEY
     if not key:
         print("[SKIP] API 키 없음")
-        return
+        return []
     norm = _normalize_user_meta_for_winners({
-        "region_province": "서울",
+        "region_province": province_name,
         "election_type": "metro_mayor",
     })
     request_dedup = set()
-    # 시도지사(3)만 조회 + sdName=서울특별시
-    rows = _fetch_winners_api(
-        SG_ID_2022, "3", norm["sdName"], norm["sggName"], key, request_dedup
-    )
+    return _fetch_winners_api(SG_ID_2022, "3", norm["sdName"], norm["sggName"], key, request_dedup)
+
+
+def test_smoke_seoul_only():
+    """스모크1: 서울/시도지사일 때 타지역 이름/직책 미출력"""
+    rows = _fetch_metro_mayor_rows("서울")
+    if not rows:
+        print("[WARN] 서울 시도지사 조회 0건")
+        return
     other_regions = ["경기", "전남", "전북", "경남", "경북", "부산", "대구", "인천", "광주", "대전", "울산", "강원", "충청", "제주"]
     for r in rows:
         sd = (r.get("sdName") or "").strip()
@@ -98,7 +103,26 @@ def test_smoke_no_other_region():
             if other in sd or (other in reg and "서울" not in reg):
                 print(f"[FAIL] 서울 조회 결과에 타지역 포함: sdName={sd}, region={reg}")
                 sys.exit(1)
-    print("[OK] 스모크: 서울/시도지사 조회 시 타지역 없음")
+        if "경기도지사" in pos:
+            print(f"[FAIL] 서울 조회 결과에 타직책 포함: position={pos}")
+            sys.exit(1)
+    print("[OK] 스모크1: 서울/시도지사 조회 시 타지역·타직책 없음")
+
+
+def test_smoke_gyeonggi_only():
+    """스모크2: 경기도/시도지사일 때 서울시장 이름 미출력"""
+    rows = _fetch_metro_mayor_rows("경기")
+    if not rows:
+        print("[WARN] 경기도 시도지사 조회 0건")
+        return
+    for r in rows:
+        name = (r.get("name") or "").strip()
+        sd = (r.get("sdName") or "").strip()
+        pos, reg = _winner_row_to_position_region("3", r["sdName"], r["sggName"], r["wiwName"])
+        if "서울" in sd or "서울" in reg or "서울시장" in pos or "서울특별시장" in pos:
+            print(f"[FAIL] 경기도 조회 결과에 서울시장 계열 포함: name={name}, sd={sd}, pos={pos}, region={reg}")
+            sys.exit(1)
+    print("[OK] 스모크2: 경기도/시도지사 조회 시 서울시장 계열 없음")
 
 
 def main():
@@ -106,7 +130,8 @@ def main():
     test_normalize_user_meta()
     winner = test_winner_api_seoul()
     test_pledge_api(winner)
-    test_smoke_no_other_region()
+    test_smoke_seoul_only()
+    test_smoke_gyeonggi_only()
     print("\n=== 검증 완료 ===")
 
 
