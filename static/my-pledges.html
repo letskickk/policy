@@ -295,9 +295,12 @@
           credentials: 'include',
           body: JSON.stringify({ pledges }),
         });
-        const data = await res.json().catch(() => ({}));
+        const text = await res.text();
+        let data = {};
+        try { data = JSON.parse(text); } catch (_) {}
         if (!res.ok) {
-          showMsg(data.detail || '저장 실패', false);
+          showMsg(data.detail || '저장 실패 (' + res.status + ')', false);
+          console.error('Save error:', res.status, text);
           submitBtn.disabled = false;
           return;
         }
