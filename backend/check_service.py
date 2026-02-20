@@ -11,7 +11,7 @@ from typing import Any
 from openai import OpenAI
 
 from backend.config import OPENAI_API_KEY, OPENAI_MODEL
-from backend.pdf_loader import load_platform_context, load_pledges_context, load_regional_pledges_context
+from backend.pdf_loader import load_platform_context, load_pledges_context
 from backend.prompts import build_user_message, build_pledge_meta_from_user, load_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,8 @@ _RESULT_CACHE: "OrderedDict[str, str]" = OrderedDict()
 _RESULT_CACHE_MAX = 128
 
 
-def apply_check_postprocessing(result: str, has_regional: bool, pledge: str) -> str:
-    """GPT 응답 후처리: 섹션 2 형식, 지역별 없음 보정, 명칭만 제시 시 보정."""
+def apply_check_postprocessing(result: str, pledge: str) -> str:
+    """GPT 응답 후처리: 섹션 2 형식, 명칭만 제시 시 보정."""
     # 유사·중복 공약: 없음. (긴 설명...) → "없음"만 유지
     result = re.sub(
         r'(유사·중복 공약:\s*)없음\.?\s*\([^)]+\)',
@@ -39,10 +39,6 @@ def apply_check_postprocessing(result: str, has_regional: bool, pledge: str) -> 
             _start = _idx + _m.start()
             _end = _idx + _m.end()
             result = result[:_start] + f"결과: 유사도({_m.group(1)}점)" + result[_end:]
-
-    if not has_regional:
-        result = result.replace("유사 공약: 있음", "유사 공약: 없음")
-        result = re.sub(r"유사성 분석:\s*[^\n]+", "유사성 분석: 없음", result, count=1)
 
     if len(pledge.strip()) < 80:
         result = re.sub(
@@ -83,6 +79,16 @@ def _context_from_hits(hits: list) -> str:
     )
 
 
+def _load_candidates_context() -> str:
+    """DB에 등록된 출마자 공약을 컨텍스트 텍스트로 로드."""
+    try:
+        from backend.candidate_context import load_candidates_pledges_context
+        return load_candidates_pledges_context()
+    except Exception as e:
+        logger.warning("출마자 공약 컨텍스트 로드 실패: %s", e)
+        return ""
+
+
 def check_pledge_alignment(
     pledge: str,
     vector_store_id: str | None = None,
@@ -114,11 +120,13 @@ def check_pledge_alignment(
         user = get_user(user_id)
         user_meta = build_pledge_meta_from_user(user)
 
+    candidates_context = _load_candidates_context()
+
     use_vector_store = bool(vector_store_id)
     use_faiss_search = (
         not use_vector_store
         and indexes
-        and all(indexes.get(k) for k in ("platform", "pledge", "regional"))
+        and all(indexes.get(k) for k in ("platform", "pledge"))
         and indexes["platform"].size() > 0
         and indexes["pledge"].size() > 0
     )
@@ -129,12 +137,12 @@ def check_pledge_alignment(
         result = run_check(
             vector_store_id,
             pledge_key,
-            regional_vector_store_id or "",
+            "",
             winners2022_vector_store_id or "",
             max_results=10,
             user_meta=user_meta,
+            candidates_context=candidates_context,
         )
-        has_regional = bool(regional_vector_store_id)
     elif use_faiss_search:
         logger.info("FAISS 검색 기반 점검 (관련 청크만 사용)...")
         from backend.report import search_all_indexes
@@ -142,21 +150,23 @@ def check_pledge_alignment(
             pledge_key,
             indexes["platform"],
             indexes["pledge"],
-            indexes["regional"],
+            indexes.get("regional"),
             top_k_platform=12,
             top_k_pledge=20,
-            top_k_regional=10,
+            top_k_regional=0,
         )
         platform_context = _context_from_hits(hits["platform"])
         pledges_context = _context_from_hits(hits["pledge"])
-        regional_pledges_context = _context_from_hits(hits["regional"]) if hits["regional"] else ""
-        has_regional = bool(regional_pledges_context.strip())
 
         if not platform_context.strip() and not pledges_context.strip():
             return "오류: 검색 결과가 없습니다. 인덱스를 확인하세요."
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "", user_meta=user_meta)
+        user = build_user_message(
+            platform_context, pledges_context, pledge_key, "",
+            candidates_pledges_context=candidates_context,
+            user_meta=user_meta,
+        )
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -170,11 +180,9 @@ def check_pledge_alignment(
         logger.info("PDF 컨텍스트 로드 시작...")
         platform_context = load_platform_context()
         pledges_context = load_pledges_context()
-        regional_pledges_context = load_regional_pledges_context()
 
         logger.info(f"정강정책 컨텍스트 길이: {len(platform_context)}자")
         logger.info(f"공약 컨텍스트 길이: {len(pledges_context)}자")
-        logger.info(f"지역별 공약 컨텍스트 길이: {len(regional_pledges_context)}자")
 
         if not platform_context.strip() and not pledges_context.strip():
             return "오류: 기준 문서가 없습니다. data/pdf/정강정책/ 와 data/pdf/공약/ 폴더에 PDF를 넣어 주세요."
@@ -183,7 +191,11 @@ def check_pledge_alignment(
             logger.warning("공약 컨텍스트가 비어있습니다. GPT가 공약 비교를 제대로 할 수 없습니다.")
 
         system = load_system_prompt()
-        user = build_user_message(platform_context, pledges_context, regional_pledges_context, pledge_key, "", user_meta=user_meta)
+        user = build_user_message(
+            platform_context, pledges_context, pledge_key, "",
+            candidates_pledges_context=candidates_context,
+            user_meta=user_meta,
+        )
 
         client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
@@ -194,9 +206,8 @@ def check_pledge_alignment(
             ],
         )
         result = response.choices[0].message.content or ""
-        has_regional = bool(regional_pledges_context.strip())
 
     logger.info(f"GPT 응답 길이: {len(result)}자")
-    result = apply_check_postprocessing(result, has_regional, pledge_key)
+    result = apply_check_postprocessing(result, pledge_key)
     _set_cached_result(pledge_key, result)
     return result

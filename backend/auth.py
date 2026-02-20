@@ -84,7 +84,7 @@ def signup(
         email_verified = 0
         verification_token = secrets.token_urlsafe(32)
         from datetime import timedelta
-        verification_expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        verification_expires_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
 
     conn = get_connection()
     try:
@@ -170,6 +170,7 @@ def login(email: str, password: str) -> Optional[dict]:
 def verify_email_token(token: str) -> tuple[bool, str]:
     """
     인증 토큰으로 이메일 인증 완료.
+    토큰은 인증 후에도 유지하여 재방문 시 "이미 완료" 응답 가능.
     Returns: (성공여부, 메시지)
     """
     if not token or not token.strip():
@@ -177,25 +178,36 @@ def verify_email_token(token: str) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, verification_expires_at FROM users WHERE verification_token = ?",
+            "SELECT id, email, COALESCE(email_verified, 0) as email_verified, verification_expires_at FROM users WHERE verification_token = ?",
             (token.strip(),),
         )
         row = cur.fetchone()
         if not row:
             return False, "유효하지 않거나 만료된 링크입니다."
+
+        if row["email_verified"]:
+            return True, "이메일 인증이 이미 완료되었습니다. 로그인해 주세요."
+
+        user_email = (row["email"] or "").strip().lower()
+        is_admin = user_email in ADMIN_EMAILS
         expires = row["verification_expires_at"]
-        if expires:
-            from datetime import datetime, timezone
+        if expires and not is_admin:
             try:
                 exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
                 if datetime.now(timezone.utc) > exp_dt:
-                    return False, "인증 링크가 만료되었습니다. 다시 회원가입하거나 비밀번호 재설정을 이용해 주세요."
+                    return False, "인증 링크가 만료되었습니다. 로그인 페이지에서 '인증 메일 다시 받기'를 이용해 주세요."
             except Exception:
                 pass
-        conn.execute(
-            "UPDATE users SET email_verified = 1, verification_token = NULL, verification_expires_at = NULL, updated_at = ? WHERE id = ?",
-            (_now_utc(), row["id"]),
-        )
+        if is_admin:
+            conn.execute(
+                "UPDATE users SET email_verified = 1, verification_expires_at = NULL, status = ?, role = ?, updated_at = ? WHERE id = ?",
+                (STATUS_APPROVED, ROLE_ADMIN, _now_utc(), row["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET email_verified = 1, verification_expires_at = NULL, updated_at = ? WHERE id = ?",
+                (_now_utc(), row["id"]),
+            )
         conn.commit()
         return True, "이메일 인증이 완료되었습니다. 로그인해 주세요."
     except Exception as e:
@@ -231,7 +243,7 @@ def resend_verification_email(email: str) -> tuple[bool, str]:
             return False, "이미 인증된 계정입니다. 로그인해 주세요."
         token = secrets.token_urlsafe(32)
         from datetime import timedelta
-        expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
         conn.execute(
             "UPDATE users SET verification_token = ?, verification_expires_at = ?, updated_at = ? WHERE id = ?",
             (token, expires_at, _now_utc(), row["id"]),

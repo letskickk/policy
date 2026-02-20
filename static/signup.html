@@ -132,18 +132,21 @@
       승인 완료 후 시스템을 사용할 수 있습니다.
     </p>
     <form id="form">
-      <label>출마 유형</label>
+      <label>가입 유형</label>
       <select name="election_position" id="election_position" required>
         <option value="">선택하세요</option>
         <option value="metro_mayor">광역 단체장</option>
         <option value="regional_council">광역 의원</option>
         <option value="local_mayor">기초 단체장</option>
         <option value="local_council">기초 의원</option>
+        <option value="party_official">당직자</option>
       </select>
+      <div id="region_section">
       <label>시·도</label>
-      <select name="region_code" id="region_code" required>
+      <select name="region_code" id="region_code">
         <option value="">선택하세요</option>
       </select>
+      </div>
       <div id="district_block" style="display:none;">
         <label class="district-label-block">선거구 (시군구, 가나다)</label>
         <div class="district-row">
@@ -226,13 +229,23 @@
 
     epEl.addEventListener('change', () => {
       const pos = (epEl.value || '').toLowerCase();
-      if (pos === 'metro_mayor') {
+      const regionSection = document.getElementById('region_section');
+      if (pos === 'party_official') {
+        regionSection.style.display = 'none';
+        districtBlock.style.display = 'none';
+        dcEl.innerHTML = '<option value="">선택하세요</option>';
+        subEl.innerHTML = '<option value="">선택하세요</option>';
+        if (subWrap) subWrap.style.display = 'none';
+        rcEl.value = ''; rnEl.value = ''; dcHidden.value = ''; dnEl.value = '';
+      } else if (pos === 'metro_mayor') {
+        regionSection.style.display = 'block';
         districtBlock.style.display = 'none';
         dcEl.innerHTML = '<option value="">선택하세요</option>';
         subEl.innerHTML = '<option value="">선택하세요</option>';
         if (subWrap) subWrap.style.display = 'none';
         dcHidden.value = ''; dnEl.value = '';
       } else {
+        regionSection.style.display = 'block';
         districtBlock.style.display = 'block';
         if (rcEl.value) loadDistricts(rcEl.value);
       }
@@ -295,6 +308,12 @@
       msg.style.display = 'none';
       if (pw !== pw2) {
         msg.textContent = '비밀번호가 일치하지 않습니다.';
+        msg.style.display = 'block';
+        return;
+      }
+      const pos = (epEl.value || '').toLowerCase();
+      if (pos !== 'party_official' && !(rcEl.value || '').trim()) {
+        msg.textContent = '시·도를 선택하세요.';
         msg.style.display = 'block';
         return;
       }

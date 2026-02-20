@@ -46,6 +46,29 @@
     .links { margin-bottom: 1rem; }
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
     .muted { color: rgba(226,232,240,0.75); font-size: 0.9rem; margin-top: 0.5rem; }
+    .btn-edit { background: #3b82f6; color: #fff; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #0f172a; border: 1px solid rgba(148,163,184,0.3);
+      border-radius: 18px; padding: 1.5rem; width: 90%; max-width: 480px;
+      color: #e2e8f0;
+    }
+    .modal h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #f8fafc; }
+    .modal label { display: block; font-weight: 700; margin-bottom: 0.35rem; font-size: 0.9rem; }
+    .modal select, .modal input[type="text"] {
+      width: 100%; padding: 0.6rem 0.75rem; border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28); background: rgba(0,0,0,0.22);
+      color: #fff; margin-bottom: 1rem; font-size: 1rem;
+    }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .modal-actions button { padding: 0.5rem 1rem; }
+    .btn-save { background: #ff7210; color: #fff; }
+    .btn-cancel { background: rgba(148,163,184,0.2); color: #e2e8f0; }
   </style>
 </head>
 <body>
@@ -74,6 +97,42 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h2>출마 정보 수정</h2>
+      <input type="hidden" id="edit_user_id" />
+      <label>가입 유형</label>
+      <select id="edit_position">
+        <option value="">선택하세요</option>
+        <option value="metro_mayor">광역 단체장</option>
+        <option value="regional_council">광역 의원</option>
+        <option value="local_mayor">기초 단체장</option>
+        <option value="local_council">기초 의원</option>
+        <option value="party_official">당직자</option>
+      </select>
+      <label>시·도</label>
+      <select id="edit_region">
+        <option value="">선택하세요</option>
+      </select>
+      <div id="edit_district_block">
+        <label>선거구</label>
+        <select id="edit_district">
+          <option value="">선택하세요</option>
+        </select>
+        <div id="edit_sub_wrap" style="display:none;">
+          <label>세부선거구</label>
+          <select id="edit_sub">
+            <option value="">선택하세요</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeEditModal()">취소</button>
+        <button class="btn-save" onclick="saveUserProfile()">저장</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function escapeHtml(s) {
       return String(s ?? '')
@@ -88,7 +147,7 @@
       const t = String(s ?? '');
       return t.length >= 10 ? t.slice(0, 10) : t;
     }
-    const ELECTION_LABEL = { metro_mayor: '광역 단체장', regional_council: '광역 의원', local_mayor: '기초 단체장', local_council: '기초 의원' };
+    const ELECTION_LABEL = { metro_mayor: '광역 단체장', regional_council: '광역 의원', local_mayor: '기초 단체장', local_council: '기초 의원', party_official: '당직자' };
     function formatElection(u) {
       const ep = ELECTION_LABEL[u.election_position] || u.election_position || '-';
       const rn = (u.region_name || '').trim();
@@ -107,10 +166,11 @@
       }
 
       const d = await r.json();
+      _usersCache = d.users || [];
       const tbody = document.getElementById('list');
       tbody.innerHTML = '';
 
-      for (const u of (d.users || [])) {
+      for (const u of _usersCache) {
         const tr = document.createElement('tr');
 
         const statusCls = (u.status || 'PENDING');
@@ -137,13 +197,15 @@
       }
     })();
 
+    let _usersCache = [];
+
     function buildActionsHtml(u) {
       const id = Number(u.id);
       const status = String(u.status || 'PENDING');
       const role = String(u.role || 'USER');
 
-      // 삭제 버튼은 전 상태에서 표시(원하면 APPROVED만 표시로 바꿔도 됨)
       const delBtn = `<button class="btn-delete" onclick="deleteUser(${id})">삭제</button>`;
+      const editBtn = `<button class="btn-edit" onclick="openEditModal(${id})">수정</button>`;
 
       if (role === 'ADMIN') {
         return `<span class="muted">관리자 계정</span>`;
@@ -153,23 +215,22 @@
         return `
           <button class="btn-approve" onclick="setStatus(${id}, 'APPROVED')">승인</button>
           <button class="btn-reject" onclick="setStatus(${id}, 'REJECTED')">거절</button>
-          ${delBtn}
+          ${editBtn} ${delBtn}
         `;
       }
       if (status === 'APPROVED') {
         return `
           <button class="btn-suspend" onclick="setStatus(${id}, 'SUSPENDED')">중지</button>
-          ${delBtn}
+          ${editBtn} ${delBtn}
         `;
       }
       if (status === 'SUSPENDED' || status === 'REJECTED') {
         return `
           <button class="btn-approve" onclick="setStatus(${id}, 'APPROVED')">승인</button>
-          ${delBtn}
+          ${editBtn} ${delBtn}
         `;
       }
-      // 알 수 없는 상태
-      return delBtn;
+      return `${editBtn} ${delBtn}`;
     }
 
     async function setStatus(userId, status) {
@@ -213,6 +274,164 @@
         alert(msg);
       }
     }
+
+    // ── 사용자 출마정보 수정 모달 ──
+    const editModal = document.getElementById('editModal');
+    const editUserId = document.getElementById('edit_user_id');
+    const editPos = document.getElementById('edit_position');
+    const editRegion = document.getElementById('edit_region');
+    const editDistrict = document.getElementById('edit_district');
+    const editDistrictBlock = document.getElementById('edit_district_block');
+    const editSubWrap = document.getElementById('edit_sub_wrap');
+    const editSub = document.getElementById('edit_sub');
+
+    (async () => {
+      try {
+        const r = await fetch('/api/signup/regions');
+        const data = await r.json();
+        if (Array.isArray(data)) {
+          editRegion.innerHTML = '<option value="">선택하세요</option>' +
+            data.map(x => `<option value="${escapeHtml(x.region_code||'')}" data-name="${escapeHtml(x.region_name||'')}">${escapeHtml(x.region_name||'')}</option>`).join('');
+        }
+      } catch (e) { console.error(e); }
+    })();
+
+    function openEditModal(userId) {
+      const u = _usersCache.find(x => x.id === userId);
+      if (!u) return;
+      editUserId.value = userId;
+      editPos.value = u.election_position || '';
+      editRegion.value = u.region_code || '';
+      editDistrict.innerHTML = '<option value="">선택하세요</option>';
+      editSub.innerHTML = '<option value="">선택하세요</option>';
+      editSubWrap.style.display = 'none';
+      updateDistrictBlockVisibility();
+      if (u.region_code && editPos.value !== 'metro_mayor' && editPos.value !== 'party_official') {
+        loadEditDistricts(u.region_code).then(() => {
+          const dc = (u.district_code || '').trim();
+          if (dc) {
+            const baseDc = dc.includes(':') ? dc.split(':').slice(0, 2).join(':') : dc;
+            for (let i = 0; i < editDistrict.options.length; i++) {
+              if (editDistrict.options[i].value === baseDc || editDistrict.options[i].value === dc) {
+                editDistrict.selectedIndex = i; break;
+              }
+            }
+          }
+        });
+      }
+      editModal.classList.add('open');
+    }
+
+    function closeEditModal() {
+      editModal.classList.remove('open');
+    }
+
+    function updateDistrictBlockVisibility() {
+      const pos = (editPos.value || '').toLowerCase();
+      if (pos === 'metro_mayor' || pos === 'party_official') {
+        editDistrictBlock.style.display = 'none';
+      } else {
+        editDistrictBlock.style.display = 'block';
+      }
+    }
+
+    editPos.addEventListener('change', () => {
+      updateDistrictBlockVisibility();
+      if (editPos.value === 'party_official') {
+        editRegion.value = '';
+      }
+      if (editRegion.value && editPos.value !== 'metro_mayor' && editPos.value !== 'party_official') {
+        loadEditDistricts(editRegion.value);
+      }
+    });
+
+    editRegion.addEventListener('change', () => {
+      editDistrict.innerHTML = '<option value="">선택하세요</option>';
+      editSub.innerHTML = '<option value="">선택하세요</option>';
+      editSubWrap.style.display = 'none';
+      if (editRegion.value && editPos.value !== 'metro_mayor' && editPos.value !== 'party_official') {
+        loadEditDistricts(editRegion.value);
+      }
+    });
+
+    async function loadEditDistricts(regionCode) {
+      const pos = editPos.value || '';
+      try {
+        const r = await fetch('/api/signup/districts?region_code=' + encodeURIComponent(regionCode) + '&election_position=' + encodeURIComponent(pos));
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : [];
+        editDistrict.innerHTML = '<option value="">선택하세요</option>' +
+          list.map(x => `<option value="${escapeHtml(x.district_code||'')}">${escapeHtml(x.district_name||'')}</option>`).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    editDistrict.addEventListener('change', () => {
+      const dc = (editDistrict.value || '').trim();
+      editSub.innerHTML = '<option value="">선택하세요</option>';
+      editSubWrap.style.display = 'none';
+      if (!dc) return;
+      const pos = (editPos.value || '').trim();
+      fetch('/api/signup/district-sub?district_code=' + encodeURIComponent(dc) + '&election_position=' + encodeURIComponent(pos))
+        .then(r => r.json())
+        .then(list => {
+          let arr = Array.isArray(list) ? list : [];
+          if (arr.length > 1) arr = arr.filter(x => (x.sub_code||'').trim() !== '단독');
+          editSub.innerHTML = '<option value="">선택하세요</option>' +
+            arr.map(x => `<option value="${escapeHtml(x.sub_code||'')}">${escapeHtml(x.sub_name||'')}</option>`).join('');
+          if (arr.length > 1) editSubWrap.style.display = '';
+          else if (arr.length === 1) editSub.selectedIndex = 1;
+        })
+        .catch(e => console.error(e));
+    });
+
+    async function saveUserProfile() {
+      const userId = parseInt(editUserId.value, 10);
+      if (!userId) return;
+      const pos = (editPos.value || '').trim();
+      const regionCode = (editRegion.value || '').trim();
+      const regionOpt = editRegion.options[editRegion.selectedIndex];
+      const regionName = regionOpt ? (regionOpt.getAttribute('data-name') || regionOpt.textContent || '').trim() : '';
+
+      let districtCode = '';
+      let districtName = '';
+      if (pos !== 'metro_mayor' && pos !== 'party_official') {
+        const dc = (editDistrict.value || '').trim();
+        const sub = (editSub.value || '').trim();
+        const dOpt = editDistrict.options[editDistrict.selectedIndex];
+        const dName = dOpt ? (dOpt.textContent || '').trim() : '';
+        const isSingle = !sub || sub === '단독';
+        districtCode = isSingle ? dc : dc + ':' + sub;
+        districtName = isSingle ? dName : (dName + ' ' + sub).trim();
+      }
+
+      try {
+        const r = await fetch('/api/admin/users/update-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            user_id: userId,
+            election_position: pos,
+            region_code: regionCode,
+            region_name: regionName,
+            district_code: districtCode,
+            district_name: districtName,
+          }),
+        });
+        if (r.ok) {
+          closeEditModal();
+          location.reload();
+        } else {
+          let msg = '수정 실패';
+          try { msg = (await r.json()).detail || msg; } catch (_) {}
+          alert(msg);
+        }
+      } catch (e) { alert('서버 연결 실패'); }
+    }
+
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) closeEditModal();
+    });
   </script>
 </body>
 </html>

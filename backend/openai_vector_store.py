@@ -1526,6 +1526,7 @@ def run_check(
     winners2022_vector_store_id: str = "",
     max_results: int = 12,
     user_meta: dict | None = None,
+    candidates_context: str = "",
 ) -> str:
     """
     A안(전면 재설계):
@@ -2275,7 +2276,9 @@ def run_check(
         winners2022_context[:200],
     )
     user = build_user_message(
-        platform_context, pledges_context, regional_context, pledge, winners2022_context, user_meta=user_meta
+        platform_context, pledges_context, pledge, winners2022_context,
+        candidates_pledges_context=candidates_context,
+        user_meta=user_meta,
     )
     t_before_llm = time.perf_counter()
 
@@ -2311,6 +2314,7 @@ def run_verify_judge(
     user_pledge: str,
     regional_vector_store_id: str = "",
     max_results: int | None = None,
+    candidates_context: str = "",
 ) -> Dict:
     """
     Strict policy judge: JSON output with evidence, specificity cap, QUERY/VERIFY mode.
@@ -2321,7 +2325,10 @@ def run_verify_judge(
         _check_vector_store_ready(client, regional_vector_store_id)
     limit = max_results if max_results is not None else FILE_SEARCH_MAX_RESULTS
 
-    input_text = f"Evaluate the following pledge. Return only valid JSON.\n\n{user_pledge}"
+    cand_block = ""
+    if candidates_context.strip():
+        cand_block = f"\n\n===== [등록된 출마자 공약] =====\n{candidates_context.strip()}"
+    input_text = f"Evaluate the following pledge. Return only valid JSON.\n\n{user_pledge}{cand_block}"
 
     def _tool(vs_id: str):
         return {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": limit}
@@ -2395,7 +2402,7 @@ def _check_vector_store_ready(client: OpenAI, vs_id: str) -> None:
         raise RuntimeError("Vector Store 인덱싱 중입니다. 잠시 후 다시 시도하세요.")
 
 
-def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id: str = "", max_results: int | None = None) -> Dict:
+def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id: str = "", max_results: int | None = None, candidates_context: str = "") -> Dict:
     """
     Responses API (file_search)로 검증 리포트 JSON 반환.
     max_results: file_search로 가져올 결과 개수 제한 (기본 FILE_SEARCH_MAX_RESULTS).
@@ -2406,7 +2413,10 @@ def run_verify(vector_store_id: str, user_pledge: str, regional_vector_store_id:
         _check_vector_store_ready(client, regional_vector_store_id)
     limit = max_results if max_results is not None else FILE_SEARCH_MAX_RESULTS
 
-    input_text = f"다음 출마자 공약을 검증하고, 지정된 JSON 형식만 반환해라:\n\n{user_pledge}"
+    cand_block = ""
+    if candidates_context.strip():
+        cand_block = f"\n\n===== [등록된 출마자 공약] (타 후보 비교·벤치마킹용) =====\n{candidates_context.strip()}"
+    input_text = f"다음 출마자 공약을 검증하고, 지정된 JSON 형식만 반환해라:\n\n{user_pledge}{cand_block}"
 
     def _tool(vs_id: str):
         t = {"type": "file_search", "vector_store_ids": [vs_id], "max_num_results": limit}

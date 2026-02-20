@@ -213,9 +213,16 @@
       padding: 0.55rem 0.65rem;
       border-radius: 10px;
       border: 1px solid var(--border);
-      background: rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.35);
       color: var(--text);
       outline: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .filter-select option{
+      background: #0f172a;
+      color: #e2e8f0;
     }
 
     .filter-select:focus{
@@ -263,59 +270,168 @@
     }
     .error-message::before{ content:"⚠️"; }
 
-    /* 후보자 카드 */
+    /* 후보자 카드 — 아코디언 */
     .candidates-list{
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.5rem;
     }
 
     .candidate-card{
       background: var(--card2);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 1.25rem;
       transition: all 0.2s ease;
+      overflow: hidden;
     }
 
     .candidate-card:hover{
       border-color: rgba(255,114,16,0.4);
+    }
+
+    .candidate-card.open{
+      border-color: rgba(255,114,16,0.35);
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
-    .candidate-name{
-      font-size: 1.2rem;
-      font-weight: 900;
-      color: var(--text-strong);
-      margin-bottom: 0.5rem;
-    }
-
-    .candidate-district{
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-bottom: 1rem;
-    }
-
-    .candidate-pledges{
+    .candidate-header{
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      user-select: none;
       gap: 0.5rem;
     }
 
+    .candidate-header:hover{
+      background: rgba(255,255,255,0.03);
+    }
+
+    .candidate-name{
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: var(--text-strong);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .candidate-arrow{
+      font-size: 0.75rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .candidate-card.open .candidate-arrow{
+      transform: rotate(90deg);
+      color: var(--brand);
+    }
+
+    .candidate-pledges{
+      display: none;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0 1rem 0.85rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .candidate-card.open .candidate-pledges{
+      display: flex;
+      padding-top: 0.65rem;
+    }
+
     .pledge-item{
-      font-size: 0.95rem;
+      font-size: 0.93rem;
       color: var(--text);
-      padding-left: 1rem;
       position: relative;
       line-height: 1.6;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+      border-radius: 6px;
+      padding: 0.3rem 0.4rem 0.3rem 1.1rem;
+    }
+
+    .pledge-item:hover{
+      background: rgba(255,255,255,0.04);
     }
 
     .pledge-item::before{
-      content: "•";
+      content: "▸";
       position: absolute;
-      left: 0;
+      left: 0.1rem;
       color: var(--brand);
       font-weight: 900;
+      transition: transform 0.2s;
+    }
+
+    .pledge-item.expanded::before{
+      transform: rotate(90deg);
+    }
+
+    .pledge-content{
+      display: none;
+      font-size: 0.86rem;
+      color: var(--muted);
+      line-height: 1.7;
+      padding: 0.4rem 0.4rem 0.25rem 1.1rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow: hidden;
+    }
+
+    .pledge-content.show{
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+    }
+
+    .pledge-content.show.full{
+      display: block;
+      -webkit-line-clamp: unset;
+    }
+
+    .read-more-link{
+      display: inline-block;
+      font-size: 0.8rem;
+      color: var(--brand);
+      cursor: pointer;
+      padding: 0.15rem 0.4rem 0.35rem 1.1rem;
+      user-select: none;
+      font-weight: 700;
+    }
+
+    .read-more-link:hover{
+      text-decoration: underline;
+    }
+
+    .show-more-btn{
+      display: block;
+      width: 100%;
+      padding: 0.7rem;
+      margin-top: 0.5rem;
+      border-radius: 12px;
+      border: 1px dashed rgba(148,163,184,0.3);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .show-more-btn:hover{
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-color: rgba(148,163,184,0.5);
+    }
+
+    .candidate-card.hidden-card{
+      display: none;
     }
 
     .empty-state{
@@ -370,9 +486,10 @@
           <label for="electionTypeSelect">선거 타입</label>
           <select id="electionTypeSelect" class="filter-select" aria-label="선거 타입 선택">
             <option value="">전체</option>
-            <option value="local">지방선거(기본)</option>
-            <option value="mayor">단체장</option>
-            <option value="council">의원</option>
+            <option value="metro_mayor">광역단체장 (시도지사)</option>
+            <option value="local_mayor">기초단체장 (구청장·시장·군수)</option>
+            <option value="regional_council">광역의원 (시도의원)</option>
+            <option value="local_council">기초의원 (구의원·시의원·군의원)</option>
           </select>
         </div>
         <div class="filter-row">
@@ -404,7 +521,15 @@
     const CANDIDATES_TIMEOUT_MS = 60000;
     const DISTRICTS_TIMEOUT_MS = 30000;
     let mapPaths = [];
-    
+
+    const electionTypeLabels = {
+      'metro_mayor': '광역단체장',
+      'local_mayor': '기초단체장',
+      'regional_council': '광역의원',
+      'local_council': '기초의원',
+      'party_official': '당직자',
+    };
+
     const regionNames = {
       '11': '서울특별시',
       '26': '부산광역시',
@@ -659,6 +784,13 @@
 
     async function loadDistricts(regionCode, preferredDistrictCode = null, electionType = null) {
       const regionName = regionNames[regionCode] || '알 수 없음';
+
+      if (electionType === 'metro_mayor') {
+        districtSelect.innerHTML = '<option value="">해당 없음 (광역 단체장)</option>';
+        districtSelect.disabled = true;
+        return;
+      }
+
       districtSelect.disabled = true;
       districtSelect.innerHTML = '<option value="">선거구 불러오는 중...</option>';
       let districts = [];
@@ -768,10 +900,11 @@
     function renderCandidates(candidates, regionCode, districtCode = null, electionType = null) {
       const regionName = regionNames[regionCode] || '알 수 없음';
       panelTitle.textContent = regionName;
-      const typeText = electionType ? ` · ${electionType}` : '';
+      const typeLabel = electionType ? (electionTypeLabels[electionType] || electionType) : '';
+      const typeText = typeLabel ? ` · ${typeLabel}` : '';
       panelSubtitle.textContent = districtCode
         ? `선택 선거구${typeText} · 총 ${candidates.length}명의 출마자`
-        : `${typeText ? typeText.slice(3) + ' · ' : ''}총 ${candidates.length}명의 출마자`;
+        : `${typeLabel ? typeLabel + ' · ' : ''}총 ${candidates.length}명의 출마자`;
 
       if (candidates.length === 0) {
         panelContent.innerHTML = `
@@ -783,25 +916,122 @@
         return;
       }
 
-      const html = `
-        <div class="candidates-list">
-          ${candidates.map(candidate => `
-            <div class="candidate-card">
-              <div class="candidate-name">${escapeHtml(candidate.name)}</div>
-              ${candidate.district_name ? `<div class="candidate-district">${escapeHtml(candidate.district_name)}</div>` : ''}
-              ${candidate.pledges && candidate.pledges.length > 0 ? `
-                <div class="candidate-pledges">
-                  ${candidate.pledges.slice(0, 3).map(pledge => `
-                    <div class="pledge-item">${escapeHtml(pledge.title || pledge)}</div>
-                  `).join('')}
-                </div>
-              ` : '<div class="candidate-pledges"><div class="pledge-item">공약 정보 없음</div></div>'}
-            </div>
-          `).join('')}
-        </div>
-      `;
+      const INITIAL_SHOW = 5;
+      const SHOW_MORE_THRESHOLD = 10;
+      const needShowMore = candidates.length > SHOW_MORE_THRESHOLD;
 
-      panelContent.innerHTML = html;
+      const cards = candidates.map((candidate, idx) => {
+        const pos = buildPositionTitle(candidate.election_type, regionCode, candidate.district_name);
+        const nameDisplay = pos ? `${pos} 후보 ${candidate.name}` : candidate.name;
+        const hiddenClass = needShowMore && idx >= INITIAL_SHOW ? ' hidden-card' : '';
+        const pledgesHtml = candidate.pledges && candidate.pledges.length > 0
+          ? candidate.pledges.map(pledge => {
+              const title = escapeHtml(pledge.title || pledge);
+              const content = (pledge.content || '').trim();
+              let html = `<div class="pledge-item" onclick="togglePledge(this)">${title}</div>`;
+              if (content) {
+                html += `<div class="pledge-content">${escapeHtml(content)}</div>`;
+                html += `<span class="read-more-link" onclick="toggleReadMore(this)" style="display:none;">더 읽기</span>`;
+              }
+              return html;
+            }).join('')
+          : '<div class="pledge-item" style="cursor:default;opacity:0.5">공약 정보 없음</div>';
+
+        return `
+          <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}">
+            <div class="candidate-header" onclick="toggleCandidate(this)">
+              <span class="candidate-name">${escapeHtml(nameDisplay)}</span>
+              <span class="candidate-arrow">▸</span>
+            </div>
+            <div class="candidate-pledges">${pledgesHtml}</div>
+          </div>`;
+      }).join('');
+
+      const showMoreBtn = needShowMore
+        ? `<button class="show-more-btn" onclick="showAllCandidates(this)">나머지 ${candidates.length - INITIAL_SHOW}명 더 보기</button>`
+        : '';
+
+      panelContent.innerHTML = `<div class="candidates-list">${cards}${showMoreBtn}</div>`;
+    }
+
+    function toggleCandidate(headerEl) {
+      const card = headerEl.closest('.candidate-card');
+      if (!card) return;
+      const opening = !card.classList.contains('open');
+      card.classList.toggle('open');
+      if (opening) {
+        card.querySelectorAll('.pledge-content').forEach(el => {
+          const link = el.nextElementSibling;
+          if (link && link.classList.contains('read-more-link')) {
+            const needsClamp = el.scrollHeight > el.clientHeight + 2;
+            link.style.display = needsClamp ? 'inline-block' : 'none';
+          }
+        });
+      }
+    }
+
+    function togglePledge(el) {
+      const contentEl = el.nextElementSibling;
+      if (!contentEl || !contentEl.classList.contains('pledge-content')) return;
+      const isOpen = contentEl.classList.contains('show');
+      contentEl.classList.toggle('show', !isOpen);
+      el.classList.toggle('expanded', !isOpen);
+      if (!isOpen) {
+        const link = contentEl.nextElementSibling;
+        if (link && link.classList.contains('read-more-link')) {
+          requestAnimationFrame(() => {
+            const needsClamp = contentEl.scrollHeight > contentEl.clientHeight + 2;
+            link.style.display = needsClamp ? 'inline-block' : 'none';
+            link.textContent = '더 읽기';
+            contentEl.classList.remove('full');
+          });
+        }
+      } else {
+        const link = contentEl.nextElementSibling;
+        if (link && link.classList.contains('read-more-link')) {
+          link.style.display = 'none';
+        }
+      }
+    }
+
+    function toggleReadMore(linkEl) {
+      const contentEl = linkEl.previousElementSibling;
+      if (!contentEl || !contentEl.classList.contains('pledge-content')) return;
+      const isFull = contentEl.classList.contains('full');
+      contentEl.classList.toggle('full', !isFull);
+      linkEl.textContent = isFull ? '더 읽기' : '접기';
+    }
+
+    function showAllCandidates(btn) {
+      const list = btn.closest('.candidates-list');
+      if (!list) return;
+      list.querySelectorAll('.candidate-card.hidden-card').forEach(card => {
+        card.classList.remove('hidden-card');
+      });
+      btn.remove();
+    }
+
+    function buildPositionTitle(electionType, regionCode, districtName) {
+      const rn = regionNames[regionCode] || '';
+      if (electionType === 'metro_mayor' && rn) {
+        if (rn.endsWith('시')) return rn + '장';
+        if (rn.endsWith('도')) return rn + '지사';
+        return rn + ' 단체장';
+      }
+      if (electionType === 'local_mayor' && districtName) {
+        const dn = districtName.trim();
+        if (dn.endsWith('구')) return dn + '청장';
+        if (dn.endsWith('시')) return dn + '장';
+        if (dn.endsWith('군')) return dn + '수';
+        return dn + ' 단체장';
+      }
+      if (electionType === 'regional_council') {
+        return districtName ? districtName + ' 광역의원' : (rn ? rn + ' 광역의원' : '광역의원');
+      }
+      if (electionType === 'local_council') {
+        return districtName ? districtName + ' 기초의원' : '기초의원';
+      }
+      return '';
     }
 
     // HTML 이스케이프
