@@ -1929,9 +1929,9 @@ def run_check(
             patched.append((score, fn, txt, meta))
         winners_enhanced = patched
 
-    # 4번은 유사 사례 비교: 입력 공약 핵심 키워드가 포함된 hit를 최우선 정렬
+    # ── 4번 유사 사례 비교: 공약 텍스트 중심 정렬 ──
+    # 입력 공약 핵심 키워드가 포함된 hit를 최우선으로 올린다.
     def _pledge_keyword_boost(items, pledge_text):
-        """입력 공약 핵심 키워드가 본문에 포함된 항목을 상위로 올린다."""
         kw_raw = _extract_query_keywords(pledge_text, max_terms=8)
         keywords = set(k for k in kw_raw.split() if len(k) >= 2)
         for a, b in _QUERY_SPELLING_VARIANTS:
@@ -1956,23 +1956,39 @@ def run_check(
     elif api_items:
         final_hits = _pledge_keyword_boost(api_items, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
 
+    # ── "있는데 없음" 방지: 유사 hit가 1개라도 있으면 빈 컨텍스트 금지 ──
+    has_any_hit = bool(winners_dedup_hits) or bool(api_items)
     if final_hits:
         winners2022_context = _build_structured_winners_context(
             final_hits,
             max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
             excerpt_len=400,
         )
+    elif has_any_hit:
+        # keyword boost 후 0건이지만 원본 후보가 있으면 상위 1~2건 강제 투입
+        fallback_pool = (winners_enhanced or []) + (api_items or [])
+        if fallback_pool:
+            final_hits = fallback_pool[:WINNERS2022_ROLE_SAFE_FALLBACK_ITEMS]
+            winners2022_context = _build_structured_winners_context(
+                final_hits,
+                max_chars=RUN_CHECK_WINNERS_MAX_CHARS,
+                excerpt_len=400,
+            )
+            logger.info("[WINNERS2022] fallback: keyword-boost 0건 → 강제 %d건 투입", len(final_hits))
+        else:
+            winners2022_context = WINNERS2022_CONTEXT_EMPTY
     else:
         winners2022_context = WINNERS2022_CONTEXT_EMPTY
 
     logger.info(
-        "[WINNERS2022] query_count=%s raw_hits=%s dedup_hits=%s enhanced_hits=%s api_items=%s final_selected=%s",
+        "[WINNERS2022] query_count=%s raw_hits=%s dedup=%s enhanced=%s api=%s boosted_final=%s ctx_len=%s",
         len(queries),
         len(winners_raw_hits),
         len(winners_dedup_hits),
         len(winners_enhanced),
         len(api_items),
         len(final_hits),
+        len(winners2022_context),
     )
     t_winners = time.perf_counter()
     logger.info("[run_check] winners_search ms=%.0f", (t_winners - t_policy) * 1000)
