@@ -24,8 +24,8 @@ from urllib.error import HTTPError
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 SG_ID = "20220601"  # 제8회 전국동시지방선거
-# sgTypecode: 4=광역의원(시도의원), 5=기초의원(기초의회의원)
-SG_TYPE_CODES = (4, 5)
+# sgTypecode: 4=기초자치단체장, 5=시도의원(광역의원), 6=구시군의원(기초의원)
+SG_TYPE_CODES = (4, 5, 6)
 API_URL = "https://apis.data.go.kr/9760000/CommonCodeService/getCommonSggCodeList"
 
 
@@ -185,7 +185,7 @@ def main() -> int:
         out_subs[k] = arr
 
     out = {
-        "note": "지방선거(제8회 전국동시지방선거) 광역의원·기초의원 세부선거구. 공공데이터 API getCommonSggCodeList(sgId=20220601, sgTypecode 4·5)로 생성.",
+        "note": "지방선거(제8회 전국동시지방선거) 기초자치단체장·시도의원·구시군의원 세부선거구. 공공데이터 API getCommonSggCodeList(sgId=20220601, sgTypecode 4·5·6)로 생성.",
         "subs": out_subs,
     }
     out_path = DATA_DIR / "district_sub_map.json"

@@ -511,6 +511,58 @@ def _data_gokr_gusigun(sd_name: Optional[str] = None, page_no: int = 1, num_of_r
     return items if isinstance(items, list) else [items]
 
 
+def _data_gokr_sgg_list(sg_typecode: int, page_no: int = 1, num_of_rows: int = 1000) -> list:
+    """공공데이터 getCommonSggCodeList. sgId=20220601, sgTypecode 4=광역의원 5=기초의원."""
+    if not DATA_GO_KR_API_KEY:
+        return []
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError
+    base = "https://apis.data.go.kr/9760000/CommonCodeService/getCommonSggCodeList"
+    params = {
+        "ServiceKey": DATA_GO_KR_API_KEY,
+        "sgId": "20220601",
+        "sgTypecode": sg_typecode,
+        "pageNo": page_no,
+        "numOfRows": num_of_rows,
+        "resultType": "json",
+    }
+    url = f"{base}?{urlencode(params)}"
+    req = Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", "Referer": "https://www.data.go.kr/"})
+    try:
+        with urlopen(req, timeout=15) as res:
+            data = json.loads(res.read().decode("utf-8"))
+    except (HTTPError, OSError, ValueError) as e:
+        logger.warning("공공데이터 getCommonSggCodeList 오류: %s", e)
+        return []
+    body = data.get("response", {}).get("body", {}) or data.get("body", {})
+    items = body.get("items") or body.get("item")
+    if items is None:
+        return []
+    if isinstance(items, dict):
+        items = items.get("item")
+    return items if isinstance(items, list) else [items]
+
+
+def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
+    """sggName에서 구시군명 제거 후 세부선거구명만 반환 (가선거구, 제1선거구 등)."""
+    sgg = (sgg_name or "").strip()
+    wiw = (wiw_name or "").strip()
+    if not sgg:
+        return "단독"
+    if not wiw or wiw == sgg:
+        return "단독"
+    wiw_compact = "".join(wiw.split())
+    sgg_compact = "".join(sgg.split())
+    if wiw_compact and sgg_compact.startswith(wiw_compact):
+        sub = sgg_compact[len(wiw_compact) :].strip()
+        return sub if sub else "단독"
+    if wiw in sgg:
+        sub = sgg.replace(wiw, "", 1).strip()
+        return sub if sub else "단독"
+    return sgg
+
+
 @app.get("/api/signup/regions")
 def api_signup_regions():
     """회원가입용 시/도 목록. 공공데이터 getCommonGusigunCodeList 응답에서 unique 시도명 추출 후 region_map으로 코드 매핑."""
@@ -637,16 +689,73 @@ def api_signup_districts(
         return out
 
 
+# 기초의원 세부선거구: 제N선거구 → 가나다라 (가선거구, 나선거구, ...) 변환용
+_SGG_NUMBER_TO_GANADARA = (
+    "가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하",
+    "거", "너", "더", "러", "머", "버", "서", "어", "저", "처", "커", "터", "퍼", "허",
+)
+
+
 @app.get("/api/signup/district-sub")
 def api_signup_district_sub(
     district_code: str = Query(..., description="시군구 코드 (예: 11:강북구)"),
+    election_position: str = Query(default="", description="local_council이면 기초의원 → 가나다라 표기"),
 ):
-    """시군구 선택 후 세부선거구(가나다) 목록. district_sub_map.json(공공 API getCommonSggCodeList로 생성) 기반. 없으면 단독 1개."""
+    """시군구 선택 후 세부선거구 목록. 기초의원이면 공공 API getCommonSggCodeList(sgTypecode=6)로 가·나·다 등 전부 조회, 없으면 JSON 폴백."""
     key = (district_code or "").strip()
     if not key:
         return [{"sub_code": "단독", "sub_name": "단독"}]
-    path = ROOT_DIR / "data" / "district_sub_map.json"
+    import re as _re
     default = [{"sub_code": "단독", "sub_name": "단독"}]
+    is_local_council = (election_position or "").strip().lower() in ("local_council", "기초의원", "기초 의원")
+
+    # 기초의원 + API 키 있으면 공공 API로 해당 구 세부선거구 전부 조회 (가~까 등)
+    if is_local_council and DATA_GO_KR_API_KEY and ":" in key:
+        parts = key.split(":", 1)
+        region_code = (parts[0] or "").strip()
+        wiw_norm = "".join((parts[1] or "").split()) or (parts[1] or "").strip()
+        sd_name = REGION_NAME_MAP.get(region_code, "")
+        if region_code and wiw_norm and sd_name:
+            seen = set()
+            page = 1
+            while True:
+                items = _data_gokr_sgg_list(6, page_no=page, num_of_rows=500)
+                if not items:
+                    break
+                for it in items:
+                    sd = (it.get("sdName") or it.get("SD_NAME") or "").strip()
+                    wiw = (it.get("wiwName") or it.get("WIW_NAME") or "").strip()
+                    wiw_c = "".join(wiw.split()) or wiw
+                    if sd != sd_name and "".join(sd.split()) != "".join(sd_name.split()):
+                        continue
+                    if wiw_c != wiw_norm and wiw != wiw_norm:
+                        continue
+                    sub = _extract_sub_from_sgg(
+                        it.get("sggName") or it.get("SGG_NAME") or "",
+                        wiw,
+                    )
+                    if sub and sub != "단독" and sub not in seen:
+                        seen.add(sub)
+                if len(items) < 500:
+                    break
+                page += 1
+            if seen:
+                sorted_subs = sorted(seen)
+                out = []
+                for sub in sorted_subs:
+                    if sub.startswith("제") and _re.match(r"제\d+선거구", sub):
+                        m = _re.match(r"제(\d+)선거구", sub)
+                        if m:
+                            idx = int(m.group(1))
+                            if 1 <= idx <= len(_SGG_NUMBER_TO_GANADARA):
+                                sub_name = _SGG_NUMBER_TO_GANADARA[idx - 1] + "선거구"
+                                out.append({"sub_code": sub_name, "sub_name": sub_name})
+                                continue
+                    out.append({"sub_code": sub, "sub_name": sub})
+                if out:
+                    return out
+
+    path = ROOT_DIR / "data" / "district_sub_map.json"
     if not path.exists():
         return default
     import json as _json
@@ -659,11 +768,20 @@ def api_signup_district_sub(
     names = subs.get(key)
     if not names or not isinstance(names, list):
         return default
-    # 선택지가 2개 이상이면 "단독"은 제외(실제 선거구만 노출)
-    filtered = [s for s in names if s and str(s).strip()]
-    if len(filtered) > 1:
-        filtered = [s for s in filtered if str(s).strip() != "단독"]
-    return [{"sub_code": str(s).strip(), "sub_name": str(s).strip()} for s in filtered if s]
+    is_regional_council = (election_position or "").strip().lower() in ("regional_council", "광역의원", "시도의원")
+    all_items = [str(s).strip() for s in names if s and str(s).strip()]
+    if is_local_council:
+        ganadara = [s for s in all_items if not s.startswith("제") and s != "단독" and s.endswith("선거구")]
+        if ganadara:
+            return [{"sub_code": s, "sub_name": s} for s in sorted(ganadara)]
+    elif is_regional_council:
+        jenu = [s for s in all_items if _re.match(r"제\d+선거구", s)]
+        if jenu:
+            return [{"sub_code": s, "sub_name": s} for s in sorted(jenu, key=lambda x: int(_re.search(r"\d+", x).group()) if _re.search(r"\d+", x) else 0)]
+    filtered = [s for s in all_items if s != "단독"]
+    if not filtered:
+        return default
+    return [{"sub_code": s, "sub_name": s} for s in filtered]
 
 
 @app.post("/api/auth/signup")
