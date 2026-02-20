@@ -315,14 +315,20 @@
     }
 
     .candidate-name{
+      flex: 1;
+      min-width: 0;
+    }
+    .candidate-name .cand-position{
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .candidate-name .cand-realname{
       font-size: 1.05rem;
       font-weight: 900;
       color: var(--text-strong);
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.3;
     }
 
     .candidate-arrow{
@@ -1017,7 +1023,6 @@
 
       const cards = candidates.map((candidate, idx) => {
         const pos = buildPositionTitle(candidate.election_type, regionCode, candidate.district_name);
-        const nameDisplay = pos ? `${pos} 후보 ${candidate.name}` : candidate.name;
         const hiddenClass = needShowMore && idx >= INITIAL_SHOW ? ' hidden-card' : '';
         const pledgesHtml = candidate.pledges && candidate.pledges.length > 0
           ? candidate.pledges.map(pledge => {
@@ -1040,7 +1045,10 @@
         return `
           <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}">
             <div class="candidate-header" onclick="toggleCandidate(this)">
-              <span class="candidate-name">${escapeHtml(nameDisplay)}</span>
+              <span class="candidate-name">
+                ${pos ? `<div class="cand-position">${escapeHtml(pos)} 후보</div>` : ''}
+                <div class="cand-realname">${escapeHtml(candidate.name)}</div>
+              </span>
               <span style="display:flex;align-items:center;gap:0.4rem;">
                 ${detailBtn}
                 <span class="candidate-arrow">▸</span>

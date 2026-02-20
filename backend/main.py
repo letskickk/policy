@@ -1709,7 +1709,18 @@ def admin_list_candidates(
         if sel_et:
             sql += " AND c.election_type = ?"
             params.append(sel_et)
-        sql += " ORDER BY c.region_code, datetime(c.created_at) DESC, c.id DESC"
+        sql += """
+            ORDER BY c.region_code,
+                CASE c.election_type
+                    WHEN 'metro_mayor' THEN 1
+                    WHEN 'local_mayor' THEN 2
+                    WHEN 'regional_council' THEN 3
+                    WHEN 'local_council' THEN 4
+                    ELSE 5
+                END,
+                COALESCE(c.district_name, '') ASC,
+                c.name ASC
+        """
         rows = conn.execute(sql, tuple(params)).fetchall()
     finally:
         conn.close()
@@ -2105,7 +2116,18 @@ def get_candidates(
         if selected_election_type:
             sql += " AND election_type = ?"
             params.append(selected_election_type)
-        sql += " ORDER BY datetime(created_at) DESC, id DESC"
+        sql += """
+            ORDER BY
+                CASE election_type
+                    WHEN 'metro_mayor' THEN 1
+                    WHEN 'local_mayor' THEN 2
+                    WHEN 'regional_council' THEN 3
+                    WHEN 'local_council' THEN 4
+                    ELSE 5
+                END,
+                COALESCE(district_name, '') ASC,
+                name ASC
+        """
         rows = conn.execute(sql, tuple(params)).fetchall()
     finally:
         conn.close()
