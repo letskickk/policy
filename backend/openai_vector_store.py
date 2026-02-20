@@ -391,6 +391,10 @@ def reconstruct_winner_identity(meta: Dict, evidence_text: str) -> Tuple[str, st
     """
     pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
     name = (meta.get("canonical_name") or meta.get("name") or "").strip()
+    if pos in {"-", "확인 필요", "확인불가"}:
+        pos = ""
+    if name in {"-", "확인 필요", "확인불가"}:
+        name = ""
     if pos and name:
         return (pos, name)
     ext_pos, ext_name = _extract_position_name_from_evidence(evidence_text or "")
@@ -403,6 +407,64 @@ def reconstruct_winner_identity(meta: Dict, evidence_text: str) -> Tuple[str, st
     if not pos:
         pos = "확인불가"
     return (pos, name)
+
+
+def _norm_title_key(val: str) -> str:
+    """공약 제목/문장 키 정규화 (공백/따옴표/기호 흔들림 제거)."""
+    s = (val or "").strip().lower()
+    if not s:
+        return ""
+    s = s.replace("“", "").replace("”", "").replace("\"", "").replace("'", "")
+    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"[^0-9a-z가-힣]", "", s)
+    return s
+
+
+def _pick_api_canonical_from_user_meta(
+    winner_rows: List[Dict[str, Any]],
+    user_meta: dict | None,
+) -> Dict[str, str]:
+    """
+    user_meta(선거유형/지역)로 API 당선인 canonical(이름/직책/지역) 1건 추정.
+    벡터 hit 메타가 비어 있을 때 최후 보정용.
+    """
+    if not winner_rows or not user_meta:
+        return {}
+    election = (user_meta.get("election_type") or "").strip().lower()
+    province = _normalize_region_for_api((user_meta.get("region_province") or "").strip())
+    city = (user_meta.get("region_city") or "").strip()
+    label_metro = ELECTION_TYPE_KEY_TO_LABEL.get("metro_mayor", "광역단체장")
+    label_local = ELECTION_TYPE_KEY_TO_LABEL.get("local_mayor", "기초단체장")
+    label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "교육감")
+    sg_candidates: List[str] = []
+    if "metro_mayor" in election or "시도지사" in election or "광역단체장" in election or (label_metro and label_metro in election):
+        sg_candidates = ["3"]
+    elif "local_mayor" in election or "기초단체장" in election or (label_local and label_local in election):
+        sg_candidates = ["4"]
+    elif "education" in election or "교육감" in election or (label_edu and label_edu in election):
+        sg_candidates = ["11"]
+    else:
+        sg_candidates = ["3", "4", "11"]
+
+    for sg in sg_candidates:
+        for row in winner_rows:
+            if str(row.get("_sgTypecode") or "") != sg:
+                continue
+            sd = _normalize_region_for_api((row.get("sdName") or "").strip())
+            sgg = (row.get("sggName") or "").strip()
+            if province and sd and sd != province:
+                continue
+            if city and sg in {"4"} and sgg and city not in sgg and sgg not in city:
+                continue
+            pos, reg = _winner_row_to_position_region(sg, row.get("sdName", ""), row.get("sggName", ""), row.get("wiwName", ""))
+            name = (row.get("name") or "").strip()
+            if pos and reg and name:
+                return {
+                    "canonical_name": name,
+                    "canonical_position": pos,
+                    "canonical_region": reg,
+                }
+    return {}
 
 
 def _normalize_region_name(region: str) -> str:
@@ -1788,6 +1850,34 @@ def run_check(
                 if 2 <= len(c) <= 4 and re.match(r"^[가-힣]{2,4}$", c):
                     meta["name"] = c
                     break
+        # 추가 폴백: 구조화 블록/요약라인 직접 파싱
+        if not meta["position"]:
+            m = re.search(r"직책\s*:\s*([^\n]+)", text)
+            if m:
+                cand = (m.group(1) or "").strip()
+                if cand and cand not in {"-", "확인 필요", "확인불가"}:
+                    meta["position"] = cand
+        if not meta["region"]:
+            m = re.search(r"지역\s*:\s*([^\n]+)", text)
+            if m:
+                cand = _normalize_region_name((m.group(1) or "").strip())
+                if cand and cand not in {"-", "확인 필요", "확인불가"}:
+                    meta["region"] = cand
+        if not meta["name"]:
+            m = re.search(r"당선인명\s*:\s*([^\n]+)", text)
+            if m:
+                cand = (m.group(1) or "").strip()
+                if re.match(r"^[가-힣]{2,4}$", cand):
+                    meta["name"] = cand
+        if (not meta["position"] or not meta["name"]) and "요약라인" in text:
+            m = re.search(r"요약라인\s*:\s*2022\s*/\s*([^/\n]+)\s*/\s*([^/\n]+)\s*/", text)
+            if m:
+                pos_cand = (m.group(1) or "").strip()
+                name_cand = (m.group(2) or "").strip()
+                if not meta["position"] and pos_cand and pos_cand not in {"-", "확인 필요", "확인불가"}:
+                    meta["position"] = pos_cand
+                if not meta["name"] and re.match(r"^[가-힣]{2,4}$", name_cand):
+                    meta["name"] = name_cand
         return meta
     
     def _enhance_winners2022_hits(
@@ -2066,6 +2156,8 @@ def run_check(
         )
         # canonical 보강: API 메타(이름/직책/지역)를 벡터 hit 메타에 덮어씀
         api_canonical_by_role_region: Dict[Tuple[str, str], Dict] = {}
+        api_canonical_by_title: Dict[str, Dict] = {}
+        inferred_user_canonical = _pick_api_canonical_from_user_meta(all_winner_rows, user_meta or {})
         for _s, _f, _t, meta in api_items:
             k = (
                 (meta.get("canonical_position") or meta.get("position") or "").strip(),
@@ -2073,11 +2165,28 @@ def run_check(
             )
             if k[0] and k[1] and k not in api_canonical_by_role_region:
                 api_canonical_by_role_region[k] = meta
+            # 제목 기반 보강: role/region가 비거나 추출 실패인 벡터 hit 보정
+            title_key = _norm_title_key(meta.get("pledge_title", ""))
+            if title_key and title_key not in api_canonical_by_title:
+                api_canonical_by_title[title_key] = meta
         patched: List[Tuple[float, str, str, Dict]] = []
         for score, fn, txt, meta in winners_enhanced:
             pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
             reg = (meta.get("canonical_region") or meta.get("region") or "").strip()
             can = api_canonical_by_role_region.get((pos, reg))
+            if not can:
+                hit_title_key = _norm_title_key(meta.get("pledge_title", "") or _extract_pledge_title(txt))
+                if hit_title_key:
+                    can = api_canonical_by_title.get(hit_title_key)
+                    if not can and len(hit_title_key) >= 6:
+                        for k_title, k_meta in api_canonical_by_title.items():
+                            if len(k_title) < 6:
+                                continue
+                            if hit_title_key in k_title or k_title in hit_title_key:
+                                can = k_meta
+                                break
+            if not can and inferred_user_canonical:
+                can = inferred_user_canonical
             if can:
                 if can.get("canonical_name") and not meta.get("canonical_name"):
                     meta["canonical_name"] = can.get("canonical_name")
