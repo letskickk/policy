@@ -26,9 +26,12 @@ else:
 
 if not KEY:
     KEY = __import__("os").environ.get("DATA_GO_KR_API_KEY", "").strip()
-if not KEY:
-    print("DATA_GO_KR_API_KEY가 없습니다. .env에 추가하거나 환경변수로 설정하세요.", file=sys.stderr)
-    sys.exit(1)
+
+
+def _require_key():
+    if not KEY:
+        print("DATA_GO_KR_API_KEY가 없습니다. .env에 추가하거나 환경변수로 설정하세요.", file=sys.stderr)
+        sys.exit(1)
 
 
 def call(url, params, desc=""):
@@ -56,35 +59,36 @@ def call(url, params, desc=""):
         print(f"[오류] {type(e).__name__}: {e}")
 
 
-# 당선인 API (공식 End Point: https)
-print("=" * 60)
-print("1. 당선인 정보 API (WinnerInfoInqireService2) — 제8회 지방선거 시도지사")
-call(
-    "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire",
-    {
-        "serviceKey": KEY,
-        "pageNo": "1",
-        "numOfRows": "5",
-        "sgId": "20220601",
-        "sgTypecode": "3",  # 시·도지사
-        "_type": "json",
-    },
-    desc="당선인 조회 sgId=20220601, sgTypecode=3",
-)
+if __name__ == "__main__":
+    _require_key()
 
-# 선거공약 API (당선인 huboid로 조회하려면 위 API에서 ID 확보 필요)
-print("\n" + "=" * 60)
-print("2. 선거공약 API (ElecPrmsInfoInqireService) — cnddtId 필요")
-call(
-    "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire",
-    {
-        "serviceKey": KEY,
-        "pageNo": "1",
-        "numOfRows": "3",
-        "sgId": "20220601",
-        "sgTypecode": "3",
-        "cnddtId": "1",
-        "_type": "json",
-    },
-    desc="공약 조회 (cnddtId=1은 예시, 실제로는 당선인 API huboid 사용)",
-)
+    print("=" * 60)
+    print("1. 당선인 정보 API (WinnerInfoInqireService2) — 제8회 지방선거 시도지사")
+    call(
+        "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire",
+        {
+            "serviceKey": KEY,
+            "pageNo": "1",
+            "numOfRows": "5",
+            "sgId": "20220601",
+            "sgTypecode": "3",
+            "_type": "json",
+        },
+        desc="당선인 조회 sgId=20220601, sgTypecode=3",
+    )
+
+    print("\n" + "=" * 60)
+    print("2. 선거공약 API (ElecPrmsInfoInqireService) — cnddtId 필요")
+    call(
+        "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire",
+        {
+            "serviceKey": KEY,
+            "pageNo": "1",
+            "numOfRows": "3",
+            "sgId": "20220601",
+            "sgTypecode": "3",
+            "cnddtId": "1",
+            "_type": "json",
+        },
+        desc="공약 조회 (cnddtId=1은 예시, 실제로는 당선인 API huboid 사용)",
+    )

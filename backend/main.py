@@ -618,7 +618,14 @@ def api_signup_districts(
         if str(rname).strip() not in region_aliases:
             continue
         names = list(district_names) if district_names else [rname]
-        return [{"district_code": f"{code}:{''.join(c for c in str(d).strip() if c not in ' \t')}", "district_name": str(d).strip(), "region_code": code} for d in names if str(d).strip()]
+        results = []
+        for d in names:
+            dname = str(d).strip()
+            if not dname:
+                continue
+            norm = "".join(c for c in dname if c not in " \t")
+            results.append({"district_code": f"{code}:{norm}", "district_name": dname, "region_code": code})
+        return results
     return []
 
 
