@@ -16,16 +16,18 @@
     .links form { display: inline; }
     .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
     #pendingCount { font-weight: 900; color: #fbbf24; }
+    #pledgePendingCount { font-weight: 900; color: #fde047; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>관리자</h1>
     <div class="card">
-      <p style="margin-bottom: 1rem;">승인 대기: <span id="pendingCount">0</span>명</p>
+      <p style="margin-bottom: 0.5rem;">사용자 승인 대기: <span id="pendingCount">0</span>명</p>
+      <p style="margin-bottom: 1rem;">공약 승인 대기: <span id="pledgePendingCount">0</span>건</p>
       <div class="links">
         <a href="/admin/users">사용자 관리 (승인/거절)</a><br><br>
-        <a href="/admin/candidates">출마자·공약 등록</a> (지도 페이지용)<br><br>
+        <a href="/admin/candidates">출마자·공약 관리 (등록/승인/거절)</a><br><br>
         <a href="/admin/usage">사용량 통계</a><br><br>
         <a href="/map">지역별 후보 지도</a><br><br>
         <a href="/my-pledges">내 공약 등록</a> · <a href="/dashboard">내 기록</a>
@@ -40,6 +42,14 @@
       try {
         const r = await fetch('/api/admin/users/pending', { credentials: 'include' });
         if (r.ok) { const d = await r.json(); document.getElementById('pendingCount').textContent = (d.users || []).length; }
+      } catch (e) {}
+      try {
+        const r2 = await fetch('/api/admin/candidates', { credentials: 'include' });
+        if (r2.ok) {
+          const list = await r2.json();
+          const pending = (Array.isArray(list) ? list : []).filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
+          document.getElementById('pledgePendingCount').textContent = pending;
+        }
       } catch (e) {}
     })();
   </script>

@@ -65,17 +65,18 @@
     .nav {
       margin-bottom: 1.5rem;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 0.6rem;
     }
-    .nav-left { display: flex; align-items: center; gap: 0.5rem; }
-    .nav-right { display: flex; align-items: center; gap: 1rem; }
-    .nav-login { color: var(--muted); font-size: 0.88rem; white-space: nowrap; }
-    @media (max-width: 640px) {
-      .nav { gap: 0.75rem; }
-      .nav-right { order: 3; width: 100%; justify-content: space-between; margin-top: 0.25rem; padding-top: 0.75rem; border-top: 1px solid rgba(148,163,184,0.15); }
+    .nav-login-row {
+      color: var(--muted); font-size: 0.88rem;
+    }
+    .nav-login-row .logout-btn {
+      background: none; border: none; color: #ffb37a; font-weight: 700;
+      cursor: pointer; padding: 0; font-size: inherit; margin-left: 0.5rem;
+    }
+    .nav-btns {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
     }
 
     .nav-link{
@@ -514,13 +515,11 @@
 
 <body>
   <nav class="nav">
-    <div class="nav-left">
+    <div id="loginRow" class="nav-login-row" style="display:none;"></div>
+    <div class="nav-btns">
       <a href="/" class="nav-link">← 메인</a>
       <a href="/dashboard" class="nav-link">내 기록</a>
       <a href="/my-pledges" class="nav-link">내 공약</a>
-    </div>
-    <div class="nav-right">
-      <span id="loginInfo" class="nav-login"></span>
     </div>
   </nav>
 
@@ -572,12 +571,13 @@
     (async function() {
       try {
         const r = await fetch('/api/auth/me', { credentials: 'include' });
-        const el = document.getElementById('loginInfo');
-        if (r.ok && el) {
+        if (r.ok) {
           const d = await r.json();
           if (d.email) {
             const e = String(d.email).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            el.innerHTML = e + ' 로그인 중 · <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" style="background:none;border:none;color:#ffb37a;font-weight:700;cursor:pointer;padding:0;font-size:inherit;">로그아웃</button></form>';
+            const row = document.getElementById('loginRow');
+            row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-btn">로그아웃</button></form>';
+            row.style.display = 'block';
           }
         }
       } catch (e) {}
