@@ -93,13 +93,36 @@
     .btn-approve:hover { background: rgba(34,197,94,0.3); }
     .btn-reject { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 700; }
     .btn-reject:hover { background: rgba(239,68,68,0.3); }
+    .approval-section { margin-bottom: 1.5rem; }
+    .approval-section h2 { font-size: 1.15rem; margin-bottom: 0.75rem; color: #f8fafc; }
+    .approval-section .count-badge { font-weight: 900; color: #fde047; font-size: 1rem; }
+    .approval-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .approval-tabs button {
+      padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid rgba(148,163,184,0.25);
+      background: rgba(0,0,0,0.2); color: #94a3b8; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+    }
+    .approval-tabs button.active { background: rgba(255,114,16,0.2); color: #ffb37a; border-color: rgba(255,114,16,0.4); }
+    .approval-empty { color: #64748b; font-size: 0.9rem; padding: 1rem 0; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="links"><a href="/admin">← 관리자</a> · <a href="/map" target="_blank">지도 보기</a></div>
-    <h1>출마자·공약 등록</h1>
-    <p class="muted">등록한 출마자는 지도 페이지(/map)에서 지역별로 노출됩니다.</p>
+    <h1>출마자·공약 관리</h1>
+
+    <div class="card approval-section" id="approval_section">
+      <h2>공약 승인 관리 <span class="count-badge" id="approval_count"></span></h2>
+      <div class="approval-tabs">
+        <button class="active" data-filter="PENDING">대기중</button>
+        <button data-filter="APPROVED">승인됨</button>
+        <button data-filter="REJECTED">거절됨</button>
+        <button data-filter="ALL">전체</button>
+      </div>
+      <div id="approval_list"></div>
+    </div>
+
+    <h2 style="font-size:1.15rem;margin-bottom:0.75rem;color:#cbd5e1;">신규 후보 등록</h2>
+    <p class="muted" style="margin-bottom:0.75rem;">등록한 출마자는 승인 후 지도 페이지(/map)에서 지역별로 노출됩니다.</p>
 
     <div class="card">
       <form id="form">
@@ -151,6 +174,110 @@
   </div>
 
   <script>
+    /* ===== 승인 관리 섹션 ===== */
+    const REGION_NAMES = {
+      '11':'서울','26':'부산','27':'대구','28':'인천','29':'광주','30':'대전','31':'울산',
+      '36':'세종','41':'경기','42':'강원','43':'충북','44':'충남','45':'전북','46':'전남',
+      '47':'경북','48':'경남','50':'제주'
+    };
+    const ET_LABELS = {
+      metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원',
+      local_council:'기초의원', party_official:'당직자'
+    };
+    let _allCandidates = [];
+    let _currentFilter = 'PENDING';
+
+    const approvalListEl = document.getElementById('approval_list');
+    const approvalCountEl = document.getElementById('approval_count');
+
+    document.querySelectorAll('.approval-tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.approval-tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _currentFilter = btn.dataset.filter;
+        renderApprovalList();
+      });
+    });
+
+    async function loadAllCandidates() {
+      try {
+        const r = await fetch('/api/admin/candidates', { credentials: 'include' });
+        if (!r.ok) return;
+        const data = await r.json();
+        _allCandidates = Array.isArray(data) ? data : [];
+        const pendingCount = _allCandidates.filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
+        approvalCountEl.textContent = pendingCount > 0 ? `(${pendingCount}건 대기)` : '';
+        renderApprovalList();
+      } catch (e) { console.error(e); }
+    }
+
+    function renderApprovalList() {
+      const filtered = _currentFilter === 'ALL'
+        ? _allCandidates
+        : _allCandidates.filter(c => (c.approval_status || 'PENDING') === _currentFilter);
+
+      if (filtered.length === 0) {
+        approvalListEl.innerHTML = '<div class="approval-empty">해당 상태의 후보가 없습니다.</div>';
+        return;
+      }
+
+      approvalListEl.innerHTML = filtered.map(c => {
+        const regBadge = c.user_id
+          ? `<span class="badge-user" title="${_esc(c.registered_by || '')}">사용자</span>`
+          : `<span class="badge-admin">관리자</span>`;
+        const st = (c.approval_status || 'PENDING').toUpperCase();
+        const statusLabel = st === 'APPROVED' ? '승인됨' : st === 'REJECTED' ? '거절됨' : '대기중';
+        const statusBadge = `<span class="badge-${st.toLowerCase()}">${statusLabel}</span>`;
+        const region = REGION_NAMES[c.region_code] || c.region_code || '';
+        const etype = ET_LABELS[c.election_type] || c.election_type || '';
+        const location = c.district_name ? `${region} ${c.district_name}` : region;
+        const approveBtn = st !== 'APPROVED' ? `<button class="btn-approve" onclick="doApprove(${c.candidate_id})">승인</button>` : '';
+        const rejectBtn = st !== 'REJECTED' ? `<button class="btn-reject" onclick="doReject(${c.candidate_id})">거절</button>` : '';
+        return `
+        <div class="list-item" data-cid="${c.candidate_id}">
+          <span>
+            <strong>${_escHtml(c.name)}</strong>
+            <span style="color:#94a3b8;font-size:0.85rem;margin-left:0.4rem;">${_escHtml(location)} · ${_escHtml(etype)}</span>
+            ${regBadge}${statusBadge}
+          </span>
+          <span>
+            ${approveBtn} ${rejectBtn}
+            <button class="btn-del" onclick="doDeleteApproval(${c.candidate_id}, '${_esc(c.name)}')">삭제</button>
+          </span>
+        </div>`;
+      }).join('');
+    }
+
+    function _esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function _escHtml(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+
+    async function doApprove(cid) {
+      try {
+        const r = await fetch('/api/admin/candidates/' + cid + '/approve', { method: 'POST', credentials: 'include' });
+        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
+        else alert('승인 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+    async function doReject(cid) {
+      if (!confirm('이 후보의 공약을 거절하시겠습니까?')) return;
+      try {
+        const r = await fetch('/api/admin/candidates/' + cid + '/reject', { method: 'POST', credentials: 'include' });
+        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
+        else alert('거절 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+    async function doDeleteApproval(cid, name) {
+      if (!confirm(`"${name}" 후보를 삭제하시겠습니까? 공약도 모두 삭제됩니다.`)) return;
+      try {
+        const r = await fetch('/api/admin/candidates/' + cid, { method: 'DELETE', credentials: 'include' });
+        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
+        else alert('삭제 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+
+    loadAllCandidates();
+
+    /* ===== 신규 등록 폼 ===== */
     const regionSelect = document.getElementById('region_code');
     const regionNameEl = document.getElementById('region_name');
     const electionTypeSelect = document.getElementById('election_type');
@@ -330,14 +457,14 @@
       if (!confirm(`"${name}" 후보를 삭제하시겠습니까? 공약도 모두 삭제됩니다.`)) return;
       try {
         const res = await fetch('/api/admin/candidates/' + cid, { method: 'DELETE', credentials: 'include' });
-        if (res.ok) loadCandidatesList();
+        if (res.ok) { loadCandidatesList(); loadAllCandidates(); }
         else alert('삭제 실패');
       } catch (e) { alert('서버 오류'); }
     }
     async function approveCandidate(cid) {
       try {
         const res = await fetch('/api/admin/candidates/' + cid + '/approve', { method: 'POST', credentials: 'include' });
-        if (res.ok) loadCandidatesList();
+        if (res.ok) { loadCandidatesList(); loadAllCandidates(); }
         else alert('승인 실패');
       } catch (e) { alert('서버 오류'); }
     }
@@ -345,7 +472,7 @@
       if (!confirm('이 후보의 공약을 거절하시겠습니까?')) return;
       try {
         const res = await fetch('/api/admin/candidates/' + cid + '/reject', { method: 'POST', credentials: 'include' });
-        if (res.ok) loadCandidatesList();
+        if (res.ok) { loadCandidatesList(); loadAllCandidates(); }
         else alert('거절 실패');
       } catch (e) { alert('서버 오류'); }
     }
@@ -427,6 +554,7 @@
         pledgesContainer.innerHTML = '';
         addPledgeRow('', '', 1);
         loadCandidatesList();
+        loadAllCandidates();
       } catch (err) {
         msgEl.textContent = '서버 연결 실패';
         msgEl.style.display = 'block';
