@@ -1929,12 +1929,32 @@ def run_check(
             patched.append((score, fn, txt, meta))
         winners_enhanced = patched
 
-    # 4번은 유사 사례 비교: 사용자 직책/지역 필터 없이 유사도 상위 항목 그대로 사용
+    # 4번은 유사 사례 비교: 입력 공약 핵심 키워드가 포함된 hit를 최우선 정렬
+    def _pledge_keyword_boost(items, pledge_text):
+        """입력 공약 핵심 키워드가 본문에 포함된 항목을 상위로 올린다."""
+        kw_raw = _extract_query_keywords(pledge_text, max_terms=8)
+        keywords = set(k for k in kw_raw.split() if len(k) >= 2)
+        for a, b in _QUERY_SPELLING_VARIANTS:
+            if a in pledge_text:
+                keywords.add(b)
+        if not keywords:
+            return items
+        boosted = []
+        rest = []
+        for row in items:
+            text = row[2] if len(row) > 2 else ""
+            cnt = sum(1 for k in keywords if k in text)
+            if cnt >= 1:
+                boosted.append((-cnt, row))
+            else:
+                rest.append(row)
+        boosted.sort(key=lambda x: x[0])
+        return [r for _, r in boosted] + rest
+
     if winners_enhanced:
-        final_hits = winners_enhanced[:RUN_CHECK_WINNERS_MAX_ITEMS]
+        final_hits = _pledge_keyword_boost(winners_enhanced, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
     elif api_items:
-        # 벡터 없으면 API 키워드 매칭 상위 항목 사용
-        final_hits = api_items[:RUN_CHECK_WINNERS_MAX_ITEMS]
+        final_hits = _pledge_keyword_boost(api_items, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
 
     if final_hits:
         winners2022_context = _build_structured_winners_context(
