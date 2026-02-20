@@ -1665,7 +1665,7 @@ def _normalize_election_type(value: Optional[str]) -> Optional[str]:
 
 class AdminCandidatePledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
-    content: Optional[str] = Field(default=None, max_length=5000, description="공약 세부내용")
+    content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위(작을수록 상위)")
 
 
@@ -2307,7 +2307,7 @@ def api_my_candidate_get(request: Request):
 
 class MyPledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
-    content: Optional[str] = Field(default=None, max_length=5000, description="공약 세부내용")
+    content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
 
 
