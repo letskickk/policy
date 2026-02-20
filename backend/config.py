@@ -109,6 +109,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
 FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER or "noreply@example.com")
+ADMIN_NOTIFY_EMAIL = os.getenv("ADMIN_NOTIFY_EMAIL", "letskick@naver.com").strip()
 
 # 이메일 인증 사용 시 SMTP 미설정이면 가입 시 메일이 안 나감 → 시작 시 한 번 경고
 if EMAIL_VERIFICATION_ENABLED and (not SMTP_HOST or not SMTP_USER):

@@ -148,8 +148,8 @@ def run_check_analysis(
     vs_id = vector_store_id or ""
     regional_id = regional_vector_store_id or ""
     winners2022_id = winners2022_vector_store_id or ""
-    # v3: 4번 섹션 user_meta 필터 완전 제거·전 선거구분 조회 (예전 "없음" 결과 무효화)
-    opts = f"check|{vs_id}|{regional_id}|{winners2022_id}|v3"
+    # v4: 승인 시스템 도입 후 출마자 컨텍스트 변경 → 캐시 무효화
+    opts = f"check|{vs_id}|{regional_id}|{winners2022_id}|v4"
     cache_key = _cache_key(normalized, opts, OPENAI_MODEL, vs_id)
 
     cached = _get_cached(user_id, cache_key)
