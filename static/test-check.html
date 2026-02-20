@@ -358,8 +358,7 @@ function render(baseText) {
     html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';
   }
 
-  html += `<div class="result-actions"><button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button><button type="button" class="btn-secondary" id="toggleRawBtn">원문 보기</button></div>`;
-  html += `<div id="rawResultBox" style="display:none;margin-top:0.7rem;" class="analysis-text">${escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>')}</div>`;
+  html += `<div class="result-actions"><button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button></div>`;
 
   resultArea.innerHTML = html;
 
@@ -368,15 +367,6 @@ function render(baseText) {
     copyBtn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(fullText || ''); copyBtn.textContent = '복사 완료'; setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200); }
       catch (e) { copyBtn.textContent = '복사 실패'; setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200); }
-    });
-  }
-  const toggleBtn = document.getElementById('toggleRawBtn');
-  const rawBox = document.getElementById('rawResultBox');
-  if (toggleBtn && rawBox) {
-    toggleBtn.addEventListener('click', () => {
-      const on = rawBox.style.display !== 'none';
-      rawBox.style.display = on ? 'none' : 'block';
-      toggleBtn.textContent = on ? '원문 보기' : '원문 숨기기';
     });
   }
 }
