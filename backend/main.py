@@ -1714,6 +1714,21 @@ def admin_list_candidates(
     finally:
         conn.close()
 
+    candidate_ids = [int(r["id"]) for r in rows]
+    pledges_map: dict[int, list[dict]] = {cid: [] for cid in candidate_ids}
+    if candidate_ids:
+        placeholders = ",".join("?" * len(candidate_ids))
+        conn2 = get_connection()
+        try:
+            p_rows = conn2.execute(
+                f"SELECT candidate_id, title, content FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
+                tuple(candidate_ids),
+            ).fetchall()
+            for p in p_rows:
+                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"]})
+        finally:
+            conn2.close()
+
     result = []
     for r in rows:
         cid = int(r["id"])
@@ -1730,6 +1745,7 @@ def admin_list_candidates(
             "user_id": r["user_id"],
             "registered_by": r["user_email"] or r["user_name"] if r["user_id"] else None,
             "approval_status": r["approval_status"] or "PENDING",
+            "pledges": pledges_map.get(cid, []),
         })
     return result
 
