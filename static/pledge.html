@@ -368,6 +368,13 @@
       font-size: 1rem;
       color: var(--text-strong);
     }
+
+    .section-cards{ margin-top: 0.9rem; display:flex; flex-direction:column; gap:0.7rem; }
+    .section-card{ border: 1px solid rgba(148,163,184,0.28); border-radius: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow: hidden; }
+    .section-card-head{ display:flex; align-items:center; justify-content:space-between; gap:0.6rem; padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background: rgba(2,6,23,0.25); }
+    .section-card-title{ font-weight:900; color:var(--text-strong); font-size:0.94rem; }
+    .section-card-body{ padding:0.7rem 0.8rem; line-height:1.7; color:var(--text-strong); }
+    .line-tag{ font-size:0.75rem; font-weight:800; color:#93c5fd; border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem; }
     /* 4번 섹션 유사 공약 카드 */
     .winners-card{
       margin: 0.65rem 0;
@@ -753,103 +760,77 @@
         }
       }
 
+      function splitSections(text) {
+        const lines = String(text || '').split(/\r?\n/);
+        const sections = [];
+        let current = null;
+        for (const raw of lines) {
+          const line = raw || '';
+          const m = line.match(/^\s*(\d+\.\s+.+)$/);
+          if (m) {
+            if (current) sections.push(current);
+            current = { title: m[1].trim(), body: [] };
+            continue;
+          }
+          if (!current) current = { title: '요약', body: [] };
+          current.body.push(line);
+        }
+        if (current) sections.push(current);
+        return sections.filter(sec => (sec.body.join('\n').trim() || sec.title));
+      }
+
       const normalizedBaseText = normalizeOutputText(baseText);
       const fullText = normalizedBaseText || '';
-
-      // 4번 섹션 유사 공약 카드 파싱
-      function parseWinnersCards(text) {
-        const cards = [];
-        // "2022 / 직책 / 이름 / "공약제목"" 패턴 매칭
-        const pattern = /[-\s]*2022\s*\/\s*([^\/]+)\/\s*([^\/]+)\/\s*"([^"]+)"/g;
-        let m;
-        while ((m = pattern.exec(text)) !== null) {
-          const position = (m[1] || '').trim();
-          const name = (m[2] || '').trim();
-          const title = (m[3] || '').trim();
-          // 이 매치 이후~다음 매치 또는 "보완 사항" 전까지가 본문
-          const afterIdx = m.index + m[0].length;
-          const nextMatch = text.indexOf('2022 /', afterIdx + 1);
-          const补完 = text.indexOf('보완 사항', afterIdx);
-          let endIdx = text.length;
-          if (nextMatch > 0 && nextMatch < endIdx) endIdx = nextMatch;
-          if (补完 > 0 && 补完 < endIdx) endIdx = 补完;
-          let body = text.substring(afterIdx, endIdx).trim();
-          // "- 유사 -", "- 참고 -", "- 동일 -" 라벨 추출
-          let label = '';
-          const labelMatch = body.match(/^[-\s]*(유사|동일|참고)\s*[-–]/);
-          if (labelMatch) {
-            label = labelMatch[1];
-            body = body.substring(labelMatch[0].length).trim();
-          }
-          cards.push({ position, name, title, label, body });
-        }
-        return cards;
-      }
-
-      // 4번 섹션 범위 추출
-      const sec4Start = fullText.search(/4\.\s*(제8회|이전)\s*(지방선거)?\s*(\(2022\))?\s*당선인/);
-      const sec5Start = fullText.search(/##?\s*5\.\s*총평|5\.\s*총평/);
-      let beforeSec4 = fullText;
-      let sec4Text = '';
-      let afterSec4 = '';
-
-      if (sec4Start >= 0) {
-        beforeSec4 = fullText.substring(0, sec4Start);
-        if (sec5Start > sec4Start) {
-          sec4Text = fullText.substring(sec4Start, sec5Start);
-          afterSec4 = fullText.substring(sec5Start);
-        } else {
-          sec4Text = fullText.substring(sec4Start);
-        }
-      }
-
-      const winnersCards = parseWinnersCards(sec4Text);
-
-      if (winnersCards.length > 0) {
-        // 4번 이전 텍스트
-        html += '<div class="analysis-text">' + escapeHtml(beforeSec4).replace(/\n/g, '<br>') + '</div>';
-
-        // 4번 섹션 제목
-        const sec4TitleMatch = sec4Text.match(/^[^\n]*/);
-        const sec4Title = sec4TitleMatch ? sec4TitleMatch[0] : '';
-        html += '<div class="analysis-text" style="margin-top:1rem;"><strong>' + escapeHtml(sec4Title) + '</strong></div>';
-
-        // 카드 렌더링
-        winnersCards.forEach(c => {
-          const labelClass = c.label === '동일' ? 'same' : (c.label === '유사' ? 'similar' : 'reference');
-          const labelHtml = c.label ? `<span class="winners-card-label ${labelClass}">${escapeHtml(c.label)}</span>` : '';
-          html += `
-            <div class="winners-card">
-              <div class="winners-card-header">
-                <span class="winners-card-badge">2022</span>
-                <span class="winners-card-title">"${escapeHtml(c.title)}"</span>
+      const sections = splitSections(fullText);
+      if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
+        html += '<div class="section-cards">' + sections.map((sec, idx) => {
+          const body = escapeHtml((sec.body || []).join('\n').trim()).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') || '-';
+          return `
+            <section class="section-card">
+              <div class="section-card-head">
+                <div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div>
+                <span class="line-tag">${idx + 1}</span>
               </div>
-              <div class="winners-card-meta">
-                <span>${escapeHtml(c.position)}</span>
-                <span>${escapeHtml(c.name) !== '확인불가' ? escapeHtml(c.name) : ''}</span>
-              </div>
-              <div class="winners-card-body">
-                ${labelHtml}${escapeHtml(c.body).replace(/\n/g, '<br>')}
-              </div>
-            </div>
+              <div class="section-card-body">${body}</div>
+            </section>
           `;
-        });
-
-        // 보완 사항
-        const 보완Match = sec4Text.match(/보완\s*사항\s*[:：]\s*([\s\S]*)/);
-        if (보완Match) {
-          html += '<div class="analysis-text" style="margin-top:0.3rem;"><strong>보완 사항</strong><br>' + escapeHtml(보완Match[1].trim()).replace(/\n/g, '<br>') + '</div>';
-        }
-
-        // 5번 이후
-        if (afterSec4) {
-          html += '<div class="analysis-text">' + escapeHtml(afterSec4).replace(/\n/g, '<br>') + '</div>';
-        }
+        }).join('') + '</div>';
       } else {
-        html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n/g, '<br>') + '</div>';
+        html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';
       }
+
+      html += `
+        <div class="result-actions">
+          <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
+          <button type="button" class="btn-secondary" id="toggleRawBtn">원문 보기</button>
+        </div>
+        <div id="rawResultBox" style="display:none;margin-top:0.7rem;" class="analysis-text">${escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>')}</div>
+      `;
 
       showResult(html);
+
+      const copyBtn = document.getElementById('copyResultBtn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(fullText || '');
+            copyBtn.textContent = '복사 완료';
+            setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200);
+          } catch (e) {
+            copyBtn.textContent = '복사 실패';
+            setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200);
+          }
+        });
+      }
+      const toggleBtn = document.getElementById('toggleRawBtn');
+      const rawBox = document.getElementById('rawResultBox');
+      if (toggleBtn && rawBox) {
+        toggleBtn.addEventListener('click', () => {
+          const on = rawBox.style.display !== 'none';
+          rawBox.style.display = on ? 'none' : 'block';
+          toggleBtn.textContent = on ? '원문 보기' : '원문 숨기기';
+        });
+      }
     }
 
     pledgeEl.addEventListener('keydown', function(e) {

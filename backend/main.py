@@ -369,6 +369,15 @@ def _login_redirect(path: str):
     return RedirectResponse(url=f"/login?next={quote(path)}", status_code=302)
 
 
+@app.api_route("/test-check", methods=["GET", "HEAD"])
+def test_check_page():
+    """UI 테스트 전용 페이지. GPT API 호출 없이 샘플 데이터로 렌더링."""
+    res = _serve_html("test-check.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="test-check.html not found")
+
+
 @app.api_route("/pledge", methods=["GET", "HEAD"])
 def pledge_page(request: Request):
     """공약 입력·점검 폼 페이지. (승인 사용자 전용)"""
@@ -626,7 +635,6 @@ def api_signup_districts(
             district_norm = "".join(c for c in name if c not in (" ", "\t"))
             out.append({"district_code": f"{code}:{district_norm}", "district_name": name, "region_code": code})
         return out
-    return []
 
 
 @app.get("/api/signup/district-sub")
