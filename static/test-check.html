@@ -84,6 +84,9 @@
     }
     .section-card-title{ font-weight:900; color:var(--text-strong); font-size:0.94rem; }
     .section-card-body{ padding:0.7rem 0.8rem; line-height:1.7; color:var(--text-strong); }
+    .section-line{ margin-top:0.35rem; }
+    .section-line:first-child{ margin-top:0; }
+    .section-line.item{ margin-top:0.5rem; }
     .line-tag{
       font-size:0.75rem; font-weight:800; color:#93c5fd;
       border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem;
@@ -326,7 +329,7 @@ function render(baseText) {
     const sections = []; let current = null;
     for (const raw of lines) {
       const line = raw || '';
-      const m = line.match(/^\s*(\d+\.\s+.+)$/);
+      const m = line.match(/^\s*(?:[#>*-]\s*)*(?:\*\*|__)?\s*(\d+[.)]\s*.+?)(?:\*\*|__)?\s*$/);
       if (m) { if (current) sections.push(current); current = { title: m[1].trim(), body: [] }; continue; }
       if (!current) current = { title: '요약', body: [] };
       current.body.push(line);
@@ -339,8 +342,17 @@ function render(baseText) {
   const sections = splitSections(fullText);
   if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
     html += '<div class="section-cards">' + sections.map((sec, idx) => {
-      const body = escapeHtml((sec.body || []).join('\n').trim()).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') || '-';
-      return `<section class="section-card"><div class="section-card-head"><div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div><span class="line-tag">${idx + 1}</span></div><div class="section-card-body">${body}</div></section>`;
+      const bodyLines = (sec.body || []).join('\n').split('\n');
+      let bodyHtml = '';
+      for (let i = 0; i < bodyLines.length; i++) {
+        const line = bodyLines[i];
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const isItem = /^[-·•]/.test(trimmed);
+        bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
+      }
+      bodyHtml = bodyHtml || '-';
+      return `<section class="section-card"><div class="section-card-head"><div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div><span class="line-tag">${idx + 1}</span></div><div class="section-card-body">${bodyHtml}</div></section>`;
     }).join('') + '</div>';
   } else {
     html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';

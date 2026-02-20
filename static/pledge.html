@@ -248,58 +248,44 @@
     }
     .result-content{
       width: 100%;
+      margin-top: 1rem;
       word-break: break-word;
       line-height: 1.7;
       font-size: 1rem;
       color: var(--text-strong);
     }
     .score-board{
+      display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;
+      padding:1rem 1.2rem; border-radius:14px;
+      background: linear-gradient(135deg, rgba(255,114,16,0.12), rgba(56,189,248,0.10));
+      border:1px solid rgba(255,114,16,0.25);
       margin-bottom: 0.85rem;
-      padding: 0.75rem 1rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(0,0,0,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      flex-wrap: wrap;
     }
     .score-board .score{
-      font-size: 1rem;
+      font-size: 1.6rem;
       font-weight: 900;
       color: var(--text-strong);
     }
     .badge{
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.3rem;
       border-radius: 999px;
-      padding: 0.35rem 0.7rem;
-      font-size: 0.85rem;
-      font-weight: 900;
-      border: 1px solid transparent;
-    }
-    .badge.green{ background: rgba(34,197,94,0.18); color: #bbf7d0; border-color: rgba(34,197,94,0.4); }
-    .badge.yellow{ background: rgba(250,204,21,0.16); color: #fef08a; border-color: rgba(250,204,21,0.38); }
-    .badge.red{ background: rgba(248,113,113,0.16); color: #fecaca; border-color: rgba(248,113,113,0.4); }
-    .result-actions{
-      margin: 1rem 0 0;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-      flex-wrap: wrap;
-    }
-    .btn-secondary{
-      padding: 0.65rem 0.95rem;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.08);
-      color: var(--text-strong);
-      font-size: 0.92rem;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.82rem;
       font-weight: 800;
-      cursor: pointer;
+      letter-spacing: 0.3px;
     }
+    .badge.green{ background: rgba(34,197,94,0.18); color: #86efac; border: 1px solid rgba(34,197,94,0.35); }
+    .badge.yellow{ background: rgba(250,204,21,0.18); color: #fef08a; border: 1px solid rgba(250,204,21,0.35); }
+    .badge.red{ background: rgba(248,113,113,0.18); color: #fca5a5; border: 1px solid rgba(248,113,113,0.35); }
+    .result-actions{ display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap; }
+    .btn-secondary{
+      padding:0.5rem 1rem; border-radius:10px; font-weight:700; font-size:0.85rem;
+      color:var(--text); background:rgba(255,255,255,0.08); border:1px solid var(--border);
+      cursor:pointer; transition:all 0.15s;
+    }
+    .btn-secondary:hover{ background:rgba(255,255,255,0.14); color:var(--text-strong); }
     .btn-secondary:disabled{
       opacity: 0.55;
       cursor: not-allowed;
@@ -331,17 +317,20 @@
       font-weight: 900;
     }
     .score-cards-row{
-      margin: 0.6rem 0 0.75rem;
       display: flex;
       flex-wrap: wrap;
-      gap: 0.4rem;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
     }
     .score-card{
-      display: inline-flex;
+      flex: 1 1 auto;
+      min-width: 110px;
+      padding: 0.55rem 0.7rem;
+      border-radius: 10px;
+      display: flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.35rem 0.5rem;
-      border-radius: 8px;
+      justify-content: space-between;
+      gap: 0.4rem;
       border: 1px solid rgba(148,163,184,0.25);
       background: rgba(255,255,255,0.05);
       font-size: 0.8rem;
@@ -360,19 +349,24 @@
     .score-card.mid{ border-color: rgba(250,204,21,0.45); }
     .score-card.low{ border-color: rgba(248,113,113,0.45); }
     .analysis-text{
-      margin-top: 0.5rem;
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.7;
-      font-size: 1rem;
-      color: var(--text-strong);
+      margin-top:0.5rem; white-space:pre-wrap; word-break:break-word;
+      line-height:1.7; font-size:1rem; color:var(--text-strong);
     }
 
-    .section-cards{ margin-top: 0.9rem; display:flex; flex-direction:column; gap:0.7rem; }
-    .section-card{ border: 1px solid rgba(148,163,184,0.28); border-radius: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow: hidden; }
-    .section-card-head{ display:flex; align-items:center; justify-content:space-between; gap:0.6rem; padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background: rgba(2,6,23,0.25); }
+    .section-cards{ margin-top:0.9rem; display:flex; flex-direction:column; gap:0.7rem; }
+    .section-card{
+      border:1px solid rgba(148,163,184,0.28); border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow:hidden;
+    }
+    .section-card-head{
+      display:flex; align-items:center; justify-content:space-between; gap:0.6rem;
+      padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background:rgba(2,6,23,0.25);
+    }
     .section-card-title{ font-weight:900; color:var(--text-strong); font-size:0.94rem; }
     .section-card-body{ padding:0.7rem 0.8rem; line-height:1.7; color:var(--text-strong); }
+    .section-line{ margin-top:0.35rem; }
+    .section-line:first-child{ margin-top:0; }
+    .section-line.item{ margin-top:0.5rem; }
     .line-tag{ font-size:0.75rem; font-weight:800; color:#93c5fd; border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem; }
     /* 4번 섹션 유사 공약 카드 */
     .winners-card{
@@ -765,7 +759,7 @@
         let current = null;
         for (const raw of lines) {
           const line = raw || '';
-          const m = line.match(/^\s*(\d+\.\s+.+)$/);
+          const m = line.match(/^\s*(?:[#>*-]\s*)*(?:\*\*|__)?\s*(\d+[.)]\s*.+?)(?:\*\*|__)?\s*$/);
           if (m) {
             if (current) sections.push(current);
             current = { title: m[1].trim(), body: [] };
@@ -783,14 +777,23 @@
       const sections = splitSections(fullText);
       if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
         html += '<div class="section-cards">' + sections.map((sec, idx) => {
-          const body = escapeHtml((sec.body || []).join('\n').trim()).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') || '-';
+          const bodyLines = (sec.body || []).join('\n').split('\n');
+          let bodyHtml = '';
+          for (let i = 0; i < bodyLines.length; i++) {
+            const line = bodyLines[i];
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const isItem = /^[-·•]/.test(trimmed);
+            bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
+          }
+          bodyHtml = bodyHtml || '-';
           return `
             <section class="section-card">
               <div class="section-card-head">
                 <div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div>
                 <span class="line-tag">${idx + 1}</span>
               </div>
-              <div class="section-card-body">${body}</div>
+              <div class="section-card-body">${bodyHtml}</div>
             </section>
           `;
         }).join('') + '</div>';
