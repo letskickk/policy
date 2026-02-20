@@ -585,6 +585,164 @@ def _parse_pledge_api_xml(raw: str) -> List[Dict[str, Any]]:
             out.append({"prmsTitle": t, "prmsCont": c, "prmsRealmName": rn})
     return out
 
+
+def _is_local_scope_election(election: str) -> bool:
+    return any(tok in election for tok in ("local_mayor", "regional_council", "local_council", "기초단체장", "기초의원", "광역의원"))
+
+
+def _election_type_matches_position(election: str, hit_position: str, city: str = "", hit_sgg: str = "") -> bool:
+    if not election or not hit_position:
+        return True
+    if "metro_mayor" in election or "광역단체장" in election or "시도지사" in election:
+        return ("지사" in hit_position) or ("시장" in hit_position)
+    if "local_mayor" in election or "기초단체장" in election:
+        return any(tok in hit_position for tok in ("시장", "구청장", "군수"))
+    if "education" in election or "교육감" in election:
+        return "교육감" in hit_position
+    if "regional_council" in election or "local_council" in election or "기초의원" in election or "광역의원" in election:
+        if "의원" not in hit_position:
+            return False
+        if not hit_sgg:
+            return False
+        if city and city not in hit_sgg and hit_sgg not in city:
+            return False
+    return True
+
+
+def _build_winners2022_queries_for_vector_simple(pledge_text: str, meta: dict | None = None) -> List[str]:
+    """Codex patch: 단순 쿼리 목록 (벡터 전용 폴백용)."""
+    out: List[str] = []
+    p = (pledge_text or "").strip()
+    if p:
+        normalized = re.sub(r"\s+", " ", p).strip()
+        if len(normalized) >= 15:
+            out.append(normalized[:2000])
+        lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
+        if lines and 10 <= len(lines[0]) <= 300:
+            out.append(lines[0])
+    meta = meta or {}
+    province = (meta.get("region_province") or "").strip()
+    election = (meta.get("election_type") or "").strip().lower()
+    role_hint = ""
+    if "education" in election or "교육감" in election:
+        role_hint = "교육감"
+    elif "local_mayor" in election or "기초단체장" in election:
+        role_hint = "기초단체장"
+    elif "metro_mayor" in election or "시도지사" in election or "광역단체장" in election:
+        role_hint = "광역단체장"
+    elif "regional_council" in election or "광역의원" in election:
+        role_hint = "광역의원"
+    elif "local_council" in election or "기초의원" in election:
+        role_hint = "기초의원"
+    if province or role_hint:
+        out.append(" ".join(x for x in [province, role_hint, "제8회 지방선거 당선인 공약"] if x).strip())
+    out.append("제8회 전국동시지방선거 당선인 공약")
+    seen_set: set = set()
+    unique_list: List[str] = []
+    for q in out:
+        key = re.sub(r"\s+", " ", (q or "").strip())[:500]
+        if key not in seen_set and len(key) >= 8:
+            seen_set.add(key)
+            unique_list.append((q or "").strip())
+    return unique_list or ["제8회 전국동시지방선거 당선인 공약"]
+
+
+def _choose_winners_items(
+    strict_items: List[Tuple[float, str, str, Dict]],
+    region_only_items: List[Tuple[float, str, str, Dict]],
+    no_filter_items: List[Tuple[float, str, str, Dict]],
+    user_meta: dict | None,
+) -> List[Tuple[float, str, str, Dict]]:
+    chosen_items = strict_items or region_only_items
+    if chosen_items:
+        return chosen_items
+    if not (user_meta or {}).get("election_type"):
+        return no_filter_items[: max(1, min(3, len(no_filter_items)))]
+    return []
+
+
+def _search_tokens(text: str) -> List[str]:
+    norm = re.sub(r"\s+", " ", (text or "").strip().lower())
+    if not norm:
+        return []
+    parts = re.split(r"[^0-9a-z가-힣]+", norm)
+    return [t for t in parts if len(t) >= 2]
+
+
+def _score_winner_relevance(pledge_text: str, candidate_text: str, pledge_title: str = "") -> float:
+    p = (pledge_text or "").strip().lower()
+    if not p:
+        return 0.0
+    c = " ".join([(pledge_title or "").strip().lower(), (candidate_text or "").strip().lower()]).strip()
+    if not c:
+        return 0.0
+    p_tokens = set(_search_tokens(p))
+    c_tokens = set(_search_tokens(c))
+    overlap = (len(p_tokens & c_tokens) / max(1, len(p_tokens))) if p_tokens else 0.0
+    phrase_bonus = 0.0
+    p_compact = re.sub(r"\s+", "", p)
+    c_compact = re.sub(r"\s+", "", c)
+    if p_compact and p_compact in c_compact:
+        phrase_bonus += 1.0
+    elif len(p_compact) >= 6:
+        for n in (10, 8, 6, 4):
+            if len(p_compact) >= n and p_compact[:n] in c_compact:
+                phrase_bonus = max(phrase_bonus, n / 10.0)
+                break
+    return overlap + phrase_bonus
+
+
+def _keyword_boost_winner_items(
+    pledge_text: str,
+    items: List[Tuple[float, str, str, Dict]],
+    min_score: float = 0.2,
+    limit: int = 2,
+) -> List[Tuple[float, str, str, Dict]]:
+    if not pledge_text or not items:
+        return []
+    scored: List[Tuple[float, str, str, Dict]] = []
+    for score, fn, text, meta in items:
+        rel = _score_winner_relevance(pledge_text, text, meta.get("pledge_title", ""))
+        if rel >= min_score:
+            scored.append((max(score, rel), fn, text, meta))
+    scored.sort(key=lambda row: row[0], reverse=True)
+    return scored[: max(1, limit)]
+
+
+def _is_winners_meta_match(meta: Dict, user_meta: dict, mode: str = "strict") -> bool:
+    """winners 메타 매칭 공통 로직."""
+    if not user_meta:
+        return True
+    province = (user_meta.get("region_province") or "").strip()
+    city = (user_meta.get("region_city") or "").strip()
+    election = (user_meta.get("election_type") or "").strip().lower()
+    hit_region = (meta.get("canonical_region") or meta.get("region") or "").strip()
+    hit_position = (meta.get("canonical_position") or meta.get("position") or "").strip()
+    hit_sgg = (meta.get("sggName") or "").strip()
+
+    def _norm(val: str) -> str:
+        if not val:
+            return ""
+        return re.sub(r"\s+", "", _normalize_region_for_api(val))
+
+    hit_region_norm = _norm(hit_region)
+    user_prov_norm = _norm(province) if province else ""
+    if user_prov_norm and hit_region_norm and hit_region_norm != user_prov_norm:
+        return False
+    if mode == "region_only":
+        return True
+    if city and _is_local_scope_election(election):
+        if hit_sgg:
+            if city not in hit_sgg and hit_sgg not in city:
+                return False
+        else:
+            if city not in hit_region and city not in hit_position:
+                return False
+    if election and hit_position:
+        return _election_type_matches_position(election, hit_position, city=city, hit_sgg=hit_sgg)
+    return True
+
+
 MANIFEST_PATH = ROOT_DIR / "data" / "vector_store_manifest.json"
 
 
@@ -822,9 +980,9 @@ def _normalize_user_meta_for_winners(user_meta: dict | None) -> dict:
     label_edu = ELECTION_TYPE_KEY_TO_LABEL.get("education", "")
     label_reg_council = ELECTION_TYPE_KEY_TO_LABEL.get("regional_council", "")
     label_local_council = ELECTION_TYPE_KEY_TO_LABEL.get("local_council", "")
-    if "metro_mayor" in election or (label_metro and label_metro in election) or "시도지사" in election:
+    if "metro_mayor" in election or (label_metro and label_metro in election) or "시도지사" in election or "광역단체장" in election:
         sg_typecodes.append("3")
-    if "local_mayor" in election or (label_local_mayor and label_local_mayor in election) or "구청장" in election or "시장" in election or "군수" in election:
+    if "local_mayor" in election or (label_local_mayor and label_local_mayor in election) or "기초단체장" in election or "구청장" in election or "시장" in election or "군수" in election:
         sg_typecodes.append("4")
     if "education" in election or (label_edu and label_edu in election):
         sg_typecodes.append("11")
@@ -1706,7 +1864,8 @@ def run_check(
         logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
         return enhanced
 
-    _is_meta_match = is_meta_match_for_winners
+    def _is_meta_match(meta: Dict, user_meta: dict, mode: str = "strict") -> bool:
+        return _is_winners_meta_match(meta, user_meta, mode=mode)
 
     def _filter_winners_by_user_meta(
         items: List[Tuple[float, str, str, Dict]],

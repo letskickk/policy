@@ -4,34 +4,25 @@
 .env에 DATA_GO_KR_API_KEY=인증키 설정 후 실행.
 당선인 API: https://apis.data.go.kr/9760000/WinnerInfoInqireService2
 """
-import urllib.request
-import urllib.parse
 import json
+import os
 import sys
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
-# 프로젝트 루트에서 .env 로드
+
 ROOT = Path(__file__).resolve().parent.parent
-if (ROOT / ".env").exists():
-    with open(ROOT / ".env", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("DATA_GO_KR_API_KEY=") and "=" in line:
-                KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
-                break
-        else:
-            KEY = ""
-else:
-    KEY = ""
-
-if not KEY:
-    KEY = __import__("os").environ.get("DATA_GO_KR_API_KEY", "").strip()
 
 
-def _require_key():
-    if not KEY:
-        print("DATA_GO_KR_API_KEY가 없습니다. .env에 추가하거나 환경변수로 설정하세요.", file=sys.stderr)
-        sys.exit(1)
+def _load_key() -> str:
+    if (ROOT / ".env").exists():
+        with open(ROOT / ".env", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("DATA_GO_KR_API_KEY=") and "=" in line:
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return os.environ.get("DATA_GO_KR_API_KEY", "").strip()
 
 
 def call(url, params, desc=""):
@@ -59,15 +50,18 @@ def call(url, params, desc=""):
         print(f"[오류] {type(e).__name__}: {e}")
 
 
-if __name__ == "__main__":
-    _require_key()
+def main() -> int:
+    key = _load_key()
+    if not key:
+        print("DATA_GO_KR_API_KEY가 없습니다. .env에 추가하거나 환경변수로 설정하세요.", file=sys.stderr)
+        return 1
 
     print("=" * 60)
     print("1. 당선인 정보 API (WinnerInfoInqireService2) — 제8회 지방선거 시도지사")
     call(
         "https://apis.data.go.kr/9760000/WinnerInfoInqireService2/getWinnerInfoInqire",
         {
-            "serviceKey": KEY,
+            "serviceKey": key,
             "pageNo": "1",
             "numOfRows": "5",
             "sgId": "20220601",
@@ -82,7 +76,7 @@ if __name__ == "__main__":
     call(
         "https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService/getCnddtElecPrmsInfoInqire",
         {
-            "serviceKey": KEY,
+            "serviceKey": key,
             "pageNo": "1",
             "numOfRows": "3",
             "sgId": "20220601",
@@ -92,3 +86,8 @@ if __name__ == "__main__":
         },
         desc="공약 조회 (cnddtId=1은 예시, 실제로는 당선인 API huboid 사용)",
     )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

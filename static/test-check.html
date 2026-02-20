@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UI 테스트 — 개혁신당 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root{
+      --bg1:#04162b; --bg2:#073053; --bg3:#0a3b69;
+      --text:#f1f5f9; --text-strong:#ffffff; --muted:#cbd5e1;
+      --brand:#ff7210;
+      --card: rgba(255,255,255,0.06); --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
+      --cta:#ffffff; --cta-text:#0f172a; --cta-hover:#f1f5f9;
+      --cta-ring: rgba(56, 189, 248, 0.35);
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --input-bg: rgba(0,0,0,0.22); --input-bg-focus: rgba(0,0,0,0.30);
+      --input-border: rgba(148,163,184,0.28);
+      --error-bg: rgba(255, 107, 107, 0.14); --error-border: rgba(255, 107, 107, 0.40); --error-text: #ffd1d1;
+    }
+    body{
+      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem 3rem;
+      min-height: 100vh; color: var(--text); line-height: 1.6; font-size: 16px;
+      background:
+        radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+        radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+        linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      background-attachment: fixed;
+    }
+    .test-banner{
+      padding: 0.6rem 1rem; margin-bottom: 1.2rem;
+      border-radius: 10px; background: rgba(250,204,21,0.15); border: 1px solid rgba(250,204,21,0.4);
+      color: #fef08a; font-weight: 800; font-size: 0.88rem; text-align: center;
+    }
+    h1{ font-size: 1.4rem; color: var(--text-strong); margin-bottom: 0.4rem; }
+    .subtitle{ color: var(--muted); font-size: 0.92rem; margin-bottom: 1.2rem; }
+    .card{
+      background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+      padding: 1.8rem 1.5rem; box-shadow: var(--shadow);
+    }
+    .result-content{ margin-top: 1rem; }
+    .score-board{
+      display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;
+      padding:1rem 1.2rem; border-radius:14px;
+      background: linear-gradient(135deg, rgba(255,114,16,0.12), rgba(56,189,248,0.10));
+      border:1px solid rgba(255,114,16,0.25);
+    }
+    .score-board .score{ font-size:1.6rem; font-weight:900; color:var(--text-strong); }
+    .badge{
+      display:inline-flex; align-items:center; gap:0.3rem; padding:0.3rem 0.8rem;
+      border-radius:999px; font-weight:800; font-size:0.82rem; letter-spacing:0.3px;
+    }
+    .badge.green{ background:rgba(34,197,94,0.18); color:#86efac; border:1px solid rgba(34,197,94,0.35); }
+    .badge.yellow{ background:rgba(250,204,21,0.18); color:#fef08a; border:1px solid rgba(250,204,21,0.35); }
+    .badge.red{ background:rgba(248,113,113,0.18); color:#fca5a5; border:1px solid rgba(248,113,113,0.35); }
+    .score-cards-row{
+      display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;
+    }
+    .score-card{
+      flex:1 1 auto; min-width:110px; padding:0.55rem 0.7rem; border-radius:10px;
+      display:flex; align-items:center; justify-content:space-between; gap:0.4rem;
+      border:1px solid rgba(148,163,184,0.25); background:rgba(255,255,255,0.05);
+      font-size:0.8rem; line-height:1.2;
+    }
+    .score-card-label{ color:var(--text); font-weight:700; white-space:nowrap; }
+    .score-card-value{ color:var(--text-strong); font-weight:900; }
+    .score-card.good{ border-color:rgba(34,197,94,0.45); }
+    .score-card.mid{ border-color:rgba(250,204,21,0.45); }
+    .score-card.low{ border-color:rgba(248,113,113,0.45); }
+    .analysis-text{
+      margin-top:0.5rem; white-space:pre-wrap; word-break:break-word;
+      line-height:1.7; font-size:1rem; color:var(--text-strong);
+    }
+    .section-cards{ margin-top:0.9rem; display:flex; flex-direction:column; gap:0.7rem; }
+    .section-card{
+      border:1px solid rgba(148,163,184,0.28); border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow:hidden;
+    }
+    .section-card-head{
+      display:flex; align-items:center; justify-content:space-between; gap:0.6rem;
+      padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background:rgba(2,6,23,0.25);
+    }
+    .section-card-title{ font-weight:900; color:var(--text-strong); font-size:0.94rem; }
+    .section-card-body{ padding:0.7rem 0.8rem; line-height:1.7; color:var(--text-strong); }
+    .line-tag{
+      font-size:0.75rem; font-weight:800; color:#93c5fd;
+      border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem;
+    }
+    .result-actions{ display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap; }
+    .btn-secondary{
+      padding:0.5rem 1rem; border-radius:10px; font-weight:700; font-size:0.85rem;
+      color:var(--text); background:rgba(255,255,255,0.08); border:1px solid var(--border);
+      cursor:pointer; transition:all 0.15s;
+    }
+    .btn-secondary:hover{ background:rgba(255,255,255,0.14); color:var(--text-strong); }
+    .btn-primary{
+      width:100%; padding:0.85rem; border:none; border-radius:14px;
+      background:var(--cta); color:var(--cta-text); font-size:1.05rem; font-weight:900;
+      cursor:pointer; margin-top:0.8rem; transition:all 0.15s;
+    }
+    .btn-primary:hover{ background:var(--cta-hover); }
+    .sample-selector{
+      display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;
+    }
+    .sample-selector button{
+      padding:0.45rem 0.9rem; border-radius:10px; font-weight:700; font-size:0.82rem;
+      color:var(--text); background:rgba(255,255,255,0.08); border:1px solid var(--border);
+      cursor:pointer; transition:all 0.15s;
+    }
+    .sample-selector button:hover,
+    .sample-selector button.active{ background:rgba(255,114,16,0.2); border-color:rgba(255,114,16,0.5); color:#ffb37a; }
+    textarea{
+      width:100%; min-height:120px; resize:vertical; padding:0.85rem 1rem;
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:14px;
+      color:var(--text-strong); font-size:1rem; font-family:inherit; line-height:1.6;
+    }
+    textarea:focus{ outline:none; border-color:rgba(56,189,248,0.5); background:var(--input-bg-focus); }
+  </style>
+</head>
+<body>
+
+<div class="test-banner">UI 테스트 페이지 — GPT API 호출 없이 샘플 데이터로 렌더링합니다</div>
+
+<h1>공약 점검 UI 테스트</h1>
+<p class="subtitle">아래 샘플을 선택하거나 직접 GPT 응답 텍스트를 붙여넣으세요.</p>
+
+<div class="sample-selector" id="sampleBtns"></div>
+
+<textarea id="mockInput" placeholder="GPT 분석 결과 텍스트를 여기에 붙여넣으세요..."></textarea>
+<button type="button" class="btn-primary" id="renderBtn">렌더링 미리보기</button>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div class="result-content" id="resultArea">
+    <div style="text-align:center;color:var(--muted);padding:2rem 0;font-weight:700;">
+      샘플을 선택하거나 텍스트를 붙여넣고 "렌더링 미리보기"를 누르세요.
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLES = {
+  "고득점 (82점)": `■ 점검 결과 종합 점수: 82.0점
+
+1. 정강정책 부합도 분석
+- 정강정책 부합도: 85점
+개혁신당의 복지 확대 기조와 높은 정합성을 보임. 안심소득 제도는 당 강령 중 "사회안전망 강화"와 직접 연결됨.
+
+2. 유사·중복 공약 분석
+- 서울시 기본소득 실험 (2024 정책발표)과 취지가 유사하나, 안심소득은 소득 보전 방식이라는 점에서 차별화됨.
+
+3. 타지역 유사 공약 비교
+- 경기도 기본소득: 월 25만원 지급 (2022~)
+- 부산 긴급복지: 긴급생활지원금 형태로 유사
+
+4. 제8회 지방선거(2022) 당선인 공약과의 비교
+- 2022 / 서울특별시장 / 오세훈 / "안심소득 시범사업 확대"
+  - 유사 - 소득 기준 중위 85% 이하 가구 대상. 현 공약은 대상을 확대한 점에서 발전적.
+
+5. 총평
+- 정강정책 부합도: 85
+- 정책 설계 완성도: 80
+- 실행 가능성: 78
+- 구체성: 82
+- 메시지 경쟁력: 85
+전반적으로 우수한 공약. 재원 조달 방안을 보완하면 더욱 설득력 있을 것.`,
+
+  "중간 (65점)": `■ 점검 결과 종합 점수: 65.0점
+
+1. 정강정책 부합도 분석
+- 정강정책 부합도: 68점
+당 정강정책의 방향성과 부분적으로 일치하나, 구체적인 연결 고리가 부족함.
+
+2. 유사·중복 공약 분석
+- 유사 공약: 없음
+
+3. 타지역 유사 공약 비교
+- 유사 공약: 없음
+
+4. 제8회 지방선거(2022) 당선인 공약과의 비교
+- 유사·참고 공약: 없음
+
+5. 총평
+- 정강정책 부합도: 68
+- 정책 설계 완성도: 62
+- 실행 가능성: 65
+- 구체성: 60
+- 메시지 경쟁력: 70
+공약의 방향은 좋으나 구체적인 실행 계획과 예산 근거가 필요함.`,
+
+  "저점 (42점)": `■ 점검 결과 종합 점수: 42.0점
+
+1. 정강정책 부합도 분석
+- 정강정책 부합도: 35점
+당의 정강정책과 직접적인 관련성을 찾기 어려움.
+
+2. 유사·중복 공약 분석
+- 유사 공약: 없음
+
+3. 타지역 유사 공약 비교
+- 유사 공약: 없음
+
+4. 제8회 지방선거(2022) 당선인 공약과의 비교
+- 유사·참고 공약: 없음
+
+5. 총평
+- 정강정책 부합도: 35
+- 정책 설계 완성도: 45
+- 실행 가능성: 40
+- 구체성: 50
+- 메시지 경쟁력: 38
+공약의 실현 가능성과 당 정책 부합도 모두 크게 부족. 전면 재검토 필요.`,
+
+  "4번 카드 다수": `■ 점검 결과 종합 점수: 75.0점
+
+1. 정강정책 부합도 분석
+- 정강정책 부합도: 78점
+산림·관광 인프라 확충은 개혁신당의 지역 균형발전 기조에 부합함.
+
+2. 유사·중복 공약 분석
+- 유사 공약: 없음
+
+3. 타지역 유사 공약 비교
+- 강원도 산림휴양벨리 조성 (2023 발표)과 유사한 취지
+
+4. 제8회 지방선거(2022) 당선인 공약과의 비교
+- 2022 / 남해군수 / 장충남 / "망운산 산림휴양밸리 조성"
+  - 유사 - 남해군 관광 인프라 확충의 핵심 사업으로 동일한 방향성.
+- 2022 / 경상남도지사 / 박완수 / "경남 관광벨트 조성"
+  - 참고 - 광역 단위 관광 정책으로 시너지 가능.
+- 2022 / 거제시장 / 박종우 / "거제 해양관광 클러스터"
+  - 참고 - 인근 지역 관광 사례로 벤치마킹 가능.
+
+5. 총평
+- 정강정책 부합도: 78
+- 정책 설계 완성도: 72
+- 실행 가능성: 75
+- 구체성: 70
+- 메시지 경쟁력: 80
+지역 특화 관광 인프라 공약으로 방향성 우수. 사업비 규모와 추진 일정 구체화가 필요.`,
+};
+
+const sampleBtns = document.getElementById('sampleBtns');
+const mockInput = document.getElementById('mockInput');
+const renderBtn = document.getElementById('renderBtn');
+const resultArea = document.getElementById('resultArea');
+
+Object.keys(SAMPLES).forEach(name => {
+  const btn = document.createElement('button');
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sample-selector button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    mockInput.value = SAMPLES[name];
+  });
+  sampleBtns.appendChild(btn);
+});
+
+function escapeHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toNumber(v) { return (typeof v === 'number' && !Number.isNaN(v)) ? v : null; }
+function normalizeOutputText(text) { return String(text || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); }
+function signalLabel(signal) {
+  if (signal === 'green') return '양호';
+  if (signal === 'yellow') return '보완 권고';
+  return '보완 필요';
+}
+
+function render(baseText) {
+  let totalScore = null, platformFitScore = null, designScore = null;
+  let feasibilityScore = null, specificityScore = null, messageScore = null;
+
+  if (baseText) {
+    const lines = String(baseText).split(/\r?\n/).map(s => s.trim());
+    const pickNum = (line) => { if (!line) return null; const m = line.match(/(\d+(?:\.\d+)?)/); return m ? toNumber(Number(m[1])) : null; };
+    const findByKeyword = (...keywords) => { const line = lines.find(l => keywords.every(k => l.includes(k))); return pickNum(line); };
+    totalScore = findByKeyword("결과", "종합", "점수") ?? findByKeyword("종합", "점수");
+    platformFitScore = findByKeyword("정강정책", "부합도");
+    designScore = findByKeyword("정책", "설계", "완성도");
+    feasibilityScore = findByKeyword("실행", "가능성");
+    specificityScore = findByKeyword("구체성");
+    messageScore = findByKeyword("메시지", "경쟁력");
+  }
+
+  function weightedTotalFromAxes() {
+    const axes = [
+      { v: platformFitScore, w: 0.30 }, { v: designScore, w: 0.25 },
+      { v: feasibilityScore, w: 0.20 }, { v: specificityScore, w: 0.15 }, { v: messageScore, w: 0.10 }
+    ].filter(x => x.v !== null);
+    if (!axes.length) return null;
+    const wSum = axes.reduce((a, b) => a + b.w, 0);
+    const vSum = axes.reduce((a, b) => a + (b.v * b.w), 0);
+    return Math.round((vSum / wSum) * 10) / 10;
+  }
+
+  if (totalScore === null) totalScore = weightedTotalFromAxes();
+
+  const signal = (totalScore !== null ? (totalScore >= 80 ? 'green' : (totalScore >= 60 ? 'yellow' : 'red')) : 'red');
+  const board = (totalScore !== null)
+    ? `<div class="score-board"><div class="score">총점: ${totalScore.toFixed(1)}점</div><span class="badge ${signal}">${signalLabel(signal)}</span></div>`
+    : '';
+
+  let html = board;
+  const hasScores = [platformFitScore, designScore, feasibilityScore, specificityScore, messageScore].some(v => v !== null);
+  if (hasScores) {
+    const scoreCards = [];
+    [
+      { label: '정강정책 부합도', value: platformFitScore },
+      { label: '정책 설계 완성도', value: designScore },
+      { label: '실행 가능성', value: feasibilityScore },
+      { label: '구체성', value: specificityScore },
+      { label: '메시지 경쟁력', value: messageScore }
+    ].forEach(item => {
+      if (item.value !== null) {
+        const cls = item.value >= 80 ? 'good' : (item.value >= 60 ? 'mid' : 'low');
+        scoreCards.push(`<div class="score-card ${cls}"><span class="score-card-label">${item.label}</span><span class="score-card-value">${item.value.toFixed(0)}</span></div>`);
+      }
+    });
+    if (scoreCards.length) html += `<div class="score-cards-row">${scoreCards.join('')}</div>`;
+  }
+
+  function splitSections(text) {
+    const lines = String(text || '').split(/\r?\n/);
+    const sections = []; let current = null;
+    for (const raw of lines) {
+      const line = raw || '';
+      const m = line.match(/^\s*(\d+\.\s+.+)$/);
+      if (m) { if (current) sections.push(current); current = { title: m[1].trim(), body: [] }; continue; }
+      if (!current) current = { title: '요약', body: [] };
+      current.body.push(line);
+    }
+    if (current) sections.push(current);
+    return sections.filter(sec => (sec.body.join('\n').trim() || sec.title));
+  }
+
+  const fullText = normalizeOutputText(baseText);
+  const sections = splitSections(fullText);
+  if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
+    html += '<div class="section-cards">' + sections.map((sec, idx) => {
+      const body = escapeHtml((sec.body || []).join('\n').trim()).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') || '-';
+      return `<section class="section-card"><div class="section-card-head"><div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div><span class="line-tag">${idx + 1}</span></div><div class="section-card-body">${body}</div></section>`;
+    }).join('') + '</div>';
+  } else {
+    html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';
+  }
+
+  html += `<div class="result-actions"><button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button><button type="button" class="btn-secondary" id="toggleRawBtn">원문 보기</button></div>`;
+  html += `<div id="rawResultBox" style="display:none;margin-top:0.7rem;" class="analysis-text">${escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>')}</div>`;
+
+  resultArea.innerHTML = html;
+
+  const copyBtn = document.getElementById('copyResultBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(fullText || ''); copyBtn.textContent = '복사 완료'; setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200); }
+      catch (e) { copyBtn.textContent = '복사 실패'; setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200); }
+    });
+  }
+  const toggleBtn = document.getElementById('toggleRawBtn');
+  const rawBox = document.getElementById('rawResultBox');
+  if (toggleBtn && rawBox) {
+    toggleBtn.addEventListener('click', () => {
+      const on = rawBox.style.display !== 'none';
+      rawBox.style.display = on ? 'none' : 'block';
+      toggleBtn.textContent = on ? '원문 보기' : '원문 숨기기';
+    });
+  }
+}
+
+renderBtn.addEventListener('click', () => {
+  const text = (mockInput.value || '').trim();
+  if (!text) { resultArea.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem 0;font-weight:700;">텍스트를 입력해주세요.</div>'; return; }
+  render(text);
+});
+
+mockInput.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); renderBtn.click(); }
+});
+</script>
+
+</body>
+</html>
