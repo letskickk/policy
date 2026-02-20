@@ -2385,9 +2385,10 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
     except HTTPException:
         conn.rollback()
         raise
-    except Exception:
+    except Exception as e:
         conn.rollback()
-        raise
+        logger.exception("내 공약 저장 실패: %s", e)
+        raise HTTPException(status_code=500, detail=f"저장 중 오류: {str(e)[:200]}")
     finally:
         conn.close()
 

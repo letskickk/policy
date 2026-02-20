@@ -265,7 +265,7 @@ def get_user(user_id: int) -> Optional[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role, election_position, region_code, region_name, district_code, district_name FROM users WHERE id = ?",
+            "SELECT id, email, name, status, role, election_position, region_code, region_name, district_code, district_name FROM users WHERE id = ?",
             (user_id,),
         )
         row = cur.fetchone()
