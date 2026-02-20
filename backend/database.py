@@ -156,6 +156,7 @@ def init_db() -> None:
             "ALTER TABLE candidates ADD COLUMN district_code TEXT",
             "ALTER TABLE candidates ADD COLUMN election_level TEXT NOT NULL DEFAULT 'regional'",
             "ALTER TABLE candidates ADD COLUMN user_id INTEGER REFERENCES users(id)",
+            "ALTER TABLE candidates ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'PENDING'",
             "ALTER TABLE candidate_pledges ADD COLUMN content TEXT",
         ]:
             try:
@@ -166,6 +167,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_district_code ON candidates(district_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_region_district ON candidates(region_code, district_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_user_id ON candidates(user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_approval ON candidates(approval_status)")
         conn.commit()
         logger.info("DB 초기화 완료: %s", DB_PATH)
     finally:

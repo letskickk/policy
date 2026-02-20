@@ -1636,8 +1636,8 @@ def _normalize_district_code(value: Optional[str]) -> Optional[str]:
     code = (value or "").strip()
     if not code:
         return None
-    if not re.fullmatch(r"[A-Za-z0-9_-]{2,64}", code):
-        raise HTTPException(status_code=400, detail="district_code 형식이 올바르지 않습니다. (영문/숫자/_/-, 2~64자)")
+    if not re.fullmatch(r"[A-Za-z0-9가-힣_:\-]{2,120}", code):
+        raise HTTPException(status_code=400, detail="district_code 형식이 올바르지 않습니다.")
     return code
 
 
@@ -1664,7 +1664,7 @@ def _normalize_election_type(value: Optional[str]) -> Optional[str]:
 
 
 class AdminCandidatePledgeInput(BaseModel):
-    title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
+    title: str = Field(..., min_length=1, max_length=100, description="공약 제목")
     content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위(작을수록 상위)")
 
@@ -1696,7 +1696,7 @@ def admin_list_candidates(
     try:
         sql = """
             SELECT c.id, c.name, c.district_name, c.district_code, c.region_code,
-                   c.election_type, c.election_level, c.user_id,
+                   c.election_type, c.election_level, c.user_id, c.approval_status,
                    u.email AS user_email, u.name AS user_name
             FROM candidates c
             LEFT JOIN users u ON c.user_id = u.id
@@ -1729,6 +1729,7 @@ def admin_list_candidates(
             "election_level": r["election_level"],
             "user_id": r["user_id"],
             "registered_by": r["user_email"] or r["user_name"] if r["user_id"] else None,
+            "approval_status": r["approval_status"] or "PENDING",
         })
     return result
 
@@ -1759,6 +1760,62 @@ def admin_delete_candidate(candidate_id: int, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/admin/candidates/{candidate_id}/approve", tags=["admin", "candidates"])
+def admin_approve_candidate(candidate_id: int, request: Request):
+    """관리자 전용 후보 승인."""
+    _ensure_db_ready()
+    _ = require_admin(request)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+        conn.execute(
+            "UPDATE candidates SET approval_status = 'APPROVED', updated_at = datetime('now') WHERE id = ?",
+            (candidate_id,),
+        )
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {"ok": True, "approval_status": "APPROVED"}
+
+
+@app.post("/api/admin/candidates/{candidate_id}/reject", tags=["admin", "candidates"])
+def admin_reject_candidate(candidate_id: int, request: Request):
+    """관리자 전용 후보 거절."""
+    _ensure_db_ready()
+    _ = require_admin(request)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+        conn.execute(
+            "UPDATE candidates SET approval_status = 'REJECTED', updated_at = datetime('now') WHERE id = ?",
+            (candidate_id,),
+        )
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {"ok": True, "approval_status": "REJECTED"}
+
+
 @app.post("/api/admin/candidates", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
 def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
     """관리자 전용 후보 등록 API. region_code 검증을 강제한다."""
@@ -1776,8 +1833,8 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
     try:
         cur = conn.execute(
             """
-            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, election_level, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, election_level, approval_status, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'PENDING', datetime('now'))
             """,
             (
                 body.name.strip(),
@@ -1826,7 +1883,7 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
     finally:
         conn.close()
 
-    return get_candidate_detail(candidate_id)
+    return _get_candidate_detail_any_status(candidate_id)
 
 
 @app.put("/api/admin/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
@@ -1851,7 +1908,7 @@ def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, re
         conn.execute(
             """
             UPDATE candidates
-            SET name = ?, district_name = ?, district_code = ?, region_code = ?, election_type = ?, election_level = ?, updated_at = datetime('now')
+            SET name = ?, district_name = ?, district_code = ?, region_code = ?, election_type = ?, election_level = ?, approval_status = 'PENDING', updated_at = datetime('now')
             WHERE id = ?
             """,
             (
@@ -1905,7 +1962,7 @@ def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, re
     finally:
         conn.close()
 
-    return get_candidate_detail(candidate_id)
+    return _get_candidate_detail_any_status(candidate_id)
 
 
 @app.get("/api/regions", response_model=list[RegionResponse], tags=["candidates"])
@@ -1920,6 +1977,7 @@ def get_regions():
             """
             SELECT region_code, COUNT(*) AS candidate_count
             FROM candidates
+            WHERE approval_status = 'APPROVED'
             GROUP BY region_code
             """
         ).fetchall()
@@ -1954,6 +2012,7 @@ def get_districts(
             SELECT district_name, district_code, election_type
             FROM candidates
             WHERE region_code = ?
+              AND approval_status = 'APPROVED'
               AND district_name IS NOT NULL
               AND TRIM(district_name) <> ''
         """
@@ -2024,6 +2083,7 @@ def get_candidates(
             SELECT id, name, district_name, district_code, region_code, election_type, election_level
             FROM candidates
             WHERE region_code = ?
+              AND approval_status = 'APPROVED'
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2065,10 +2125,40 @@ def get_candidate_detail(candidate_id: int):
     try:
         row = conn.execute(
             """
-            SELECT id, name, district_name, district_code, region_code, election_type, election_level
+            SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status
             FROM candidates
-            WHERE id = ?
+            WHERE id = ? AND approval_status = 'APPROVED'
             """,
+            (candidate_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
+
+    code = row["region_code"]
+    return CandidateDetailResponse(
+        candidate_id=int(row["id"]),
+        name=row["name"],
+        district_name=row["district_name"],
+        district_code=_derive_district_code(code, row["district_code"], row["district_name"]),
+        region_code=code,
+        region_name=_resolve_region_name(code),
+        election_type=row["election_type"],
+        election_level=row["election_level"],
+        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None),
+    )
+
+
+def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailResponse:
+    """승인 상태 무관하게 후보 상세를 반환 (관리자·내부용)."""
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id, name, district_name, district_code, region_code, election_type, election_level FROM candidates WHERE id = ?",
             (candidate_id,),
         ).fetchone()
     finally:
@@ -2257,7 +2347,7 @@ def api_my_candidate_get(request: Request):
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT id, name, district_name, district_code, region_code, election_type, election_level FROM candidates WHERE user_id = ? LIMIT 1",
+            "SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status FROM candidates WHERE user_id = ? LIMIT 1",
             (uid,),
         ).fetchone()
 
@@ -2293,6 +2383,7 @@ def api_my_candidate_get(request: Request):
                 "region_name": region_name,
                 "election_type": row["election_type"],
                 "election_level": row["election_level"],
+                "approval_status": row["approval_status"] or "PENDING",
             },
             "pledges": [
                 {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"]}
@@ -2314,7 +2405,7 @@ def api_my_candidate_get(request: Request):
 
 
 class MyPledgeInput(BaseModel):
-    title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
+    title: str = Field(..., min_length=1, max_length=100, description="공약 제목")
     content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
 
@@ -2387,7 +2478,7 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
         else:
             candidate_id = int(row["id"])
             conn.execute(
-                "UPDATE candidates SET name = ?, updated_at = datetime('now') WHERE id = ?",
+                "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
                 (candidate_name, candidate_id),
             )
 

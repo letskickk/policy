@@ -59,6 +59,7 @@ def load_candidates_pledges_context(max_chars: int = 40000) -> str:
                 cp.priority
             FROM candidates c
             LEFT JOIN candidate_pledges cp ON cp.candidate_id = c.id
+            WHERE c.approval_status = 'APPROVED'
             ORDER BY c.region_code, c.election_type, c.name, cp.priority ASC, cp.id ASC
         """).fetchall()
     except Exception as e:

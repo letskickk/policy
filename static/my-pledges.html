@@ -92,6 +92,22 @@
     }
     .badge-new { background: rgba(34,197,94,0.2); color: #86efac; }
     .badge-edit { background: rgba(56,189,248,0.2); color: #7dd3fc; }
+    .badge-pending { background: rgba(250,204,21,0.2); color: #fde047; }
+    .badge-approved { background: rgba(34,197,94,0.2); color: #86efac; }
+    .badge-rejected { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .approval-info {
+      margin-top: 0.6rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .approval-info.pending { background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.2); color: #fde047; }
+    .approval-info.approved { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
+    .approval-info.rejected { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+    .char-count { text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
+    .char-count.warn { color: #fde047; }
+    .char-count.over { color: #fca5a5; }
     .loading { text-align: center; padding: 2rem; color: #64748b; }
     @media (max-width: 560px) {
       body { padding: 1rem; }
@@ -109,7 +125,7 @@
       <a href="/map">지도</a>
     </div>
     <h1>내 공약 등록</h1>
-    <p class="subtitle">회원가입 시 선택한 지역·선거 유형에 맞는 공약을 등록하세요. 등록된 공약은 지도 페이지에 노출됩니다.</p>
+    <p class="subtitle">회원가입 시 선택한 지역·선거 유형에 맞는 공약을 등록하세요. 관리자 승인 후 지도 페이지에 공개됩니다.</p>
 
     <div id="loading" class="loading">불러오는 중...</div>
 
@@ -124,6 +140,7 @@
       <div class="card">
         <div class="info-grid" id="user-info"></div>
         <span id="status-badge"></span>
+        <div id="approval-info"></div>
       </div>
 
       <div class="card">
@@ -174,16 +191,26 @@
       const div = document.createElement('div');
       div.className = 'pledge-block';
       div.id = id;
+      const titleLen = (title || '').length;
+      const contentLen = (content || '').length;
       div.innerHTML = `
         <div class="pledge-header">
           <span class="pledge-num">${pledgeIndex}</span>
-          <input type="text" name="pledge_title" placeholder="공약 제목" value="${esc(title)}" maxlength="300" required />
+          <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
           <input type="number" name="pledge_priority" placeholder="순서" value="${esc(priority || pledgeIndex)}" min="1" max="9999" style="width:60px;" />
           <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
         </div>
-        <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4">${esc(content)}</textarea>
+        <div class="char-count title-count">${titleLen}/100</div>
+        <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000">${esc(content)}</textarea>
+        <div class="char-count content-count">${contentLen}/50,000</div>
       `;
       pledgesContainer.appendChild(div);
+      const titleInput = div.querySelector('input[name="pledge_title"]');
+      const titleCounter = div.querySelector('.title-count');
+      const contentInput = div.querySelector('textarea[name="pledge_content"]');
+      const contentCounter = div.querySelector('.content-count');
+      titleInput.addEventListener('input', () => updateCounter(titleInput, titleCounter, 100));
+      contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
       div.querySelector('[data-remove]').addEventListener('click', () => {
         div.remove();
         renumberPledges();
@@ -196,6 +223,13 @@
         const num = block.querySelector('.pledge-num');
         if (num) num.textContent = i + 1;
       });
+    }
+
+    function updateCounter(input, counter, max) {
+      const len = input.value.length;
+      const formatted = max >= 10000 ? max.toLocaleString() : max;
+      counter.textContent = `${len.toLocaleString()}/${formatted}`;
+      counter.className = 'char-count' + (len >= max ? ' over' : len >= max * 0.9 ? ' warn' : '');
     }
 
     document.getElementById('add_pledge').addEventListener('click', () => addPledgeRow());
@@ -241,11 +275,25 @@
         }
         userInfoEl.innerHTML = infoHtml;
 
+        const approvalInfoEl = document.getElementById('approval-info');
         if (data.candidate) {
           hasExistingCandidate = true;
           statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드 - 기존 공약이 있습니다</span>';
           submitBtn.textContent = '공약 수정 저장';
           deleteAllBtn.style.display = 'inline-block';
+
+          const status = (data.candidate.approval_status || 'PENDING').toUpperCase();
+          if (status === 'APPROVED') {
+            statusBadgeEl.innerHTML += ' <span class="badge badge-approved">승인됨</span>';
+            approvalInfoEl.innerHTML = '<div class="approval-info approved">공약이 승인되어 지도에 공개 중입니다. 수정 시 재승인이 필요합니다.</div>';
+          } else if (status === 'REJECTED') {
+            statusBadgeEl.innerHTML += ' <span class="badge badge-rejected">거절됨</span>';
+            approvalInfoEl.innerHTML = '<div class="approval-info rejected">공약이 거절되었습니다. 수정 후 다시 저장하면 재심사 요청됩니다.</div>';
+          } else {
+            statusBadgeEl.innerHTML += ' <span class="badge badge-pending">승인 대기</span>';
+            approvalInfoEl.innerHTML = '<div class="approval-info pending">관리자 승인 대기 중입니다. 승인 후 지도에 공개됩니다.</div>';
+          }
+
           const pledges = data.pledges || [];
           if (pledges.length === 0) {
             addPledgeRow();
@@ -254,6 +302,7 @@
           }
         } else {
           statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
+          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
           submitBtn.textContent = '공약 등록';
           addPledgeRow();
         }
@@ -310,9 +359,11 @@
           submitBtn.disabled = false;
           return;
         }
-        showMsg(`공약 ${data.pledge_count || pledges.length}개가 저장되었습니다. 지도에서 확인하세요!`, true);
+        showMsg(`공약 ${data.pledge_count || pledges.length}개가 저장되었습니다. 관리자 승인 후 지도에 공개됩니다.`, true);
         hasExistingCandidate = true;
-        statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드 - 기존 공약이 있습니다</span>';
+        statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드</span> <span class="badge badge-pending">승인 대기</span>';
+        const aInfoEl = document.getElementById('approval-info');
+        if (aInfoEl) aInfoEl.innerHTML = '<div class="approval-info pending">관리자 승인 대기 중입니다. 승인 후 지도에 공개됩니다.</div>';
         submitBtn.textContent = '공약 수정 저장';
         deleteAllBtn.style.display = 'inline-block';
       } catch (err) {
