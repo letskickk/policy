@@ -539,9 +539,9 @@
     <section class="card">
       <label for="pledge" class="form-label">공약 내용 입력</label>
       <p class="form-hint">
-        정책의 배경, 목표, 구체적인 실행 방안 등을 포함하여 <strong>최대한 상세하게 작성</strong>해 주시면 분석의 정확도가 높아집니다.
+        아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
-      <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요.&#13;&#10;(예시: 저출산 해결을 위해 00 제도를 도입하고자 합니다. 현재 문제점은 무엇이며, 이를 통해 어떤 효과를 기대하는지...)"></textarea>
+      <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
     </section>
 
@@ -804,9 +804,7 @@
       html += `
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
-          <button type="button" class="btn-secondary" id="toggleRawBtn">원문 보기</button>
         </div>
-        <div id="rawResultBox" style="display:none;margin-top:0.7rem;" class="analysis-text">${escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>')}</div>
       `;
 
       showResult(html);
@@ -822,15 +820,6 @@
             copyBtn.textContent = '복사 실패';
             setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200);
           }
-        });
-      }
-      const toggleBtn = document.getElementById('toggleRawBtn');
-      const rawBox = document.getElementById('rawResultBox');
-      if (toggleBtn && rawBox) {
-        toggleBtn.addEventListener('click', () => {
-          const on = rawBox.style.display !== 'none';
-          rawBox.style.display = on ? 'none' : 'block';
-          toggleBtn.textContent = on ? '원문 보기' : '원문 숨기기';
         });
       }
     }
