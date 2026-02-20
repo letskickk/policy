@@ -103,6 +103,28 @@
     }
     .approval-tabs button.active { background: rgba(255,114,16,0.2); color: #ffb37a; border-color: rgba(255,114,16,0.4); }
     .approval-empty { color: #64748b; font-size: 0.9rem; padding: 1rem 0; }
+    .approval-item { background: rgba(0,0,0,0.2); border-radius: 10px; margin-bottom: 0.5rem; overflow: hidden; }
+    .approval-item-header {
+      padding: 0.75rem; display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 0.5rem; cursor: pointer;
+    }
+    .approval-item-header:hover { background: rgba(255,255,255,0.03); }
+    .approval-item-header .toggle-icon { color: #64748b; font-size: 0.8rem; margin-right: 0.4rem; transition: transform 0.2s; }
+    .approval-item-header.open .toggle-icon { transform: rotate(90deg); }
+    .approval-pledges {
+      display: none; padding: 0 0.75rem 0.75rem; border-top: 1px solid rgba(148,163,184,0.1);
+    }
+    .approval-pledges.show { display: block; }
+    .pledge-detail {
+      background: rgba(0,0,0,0.15); border-radius: 8px; padding: 0.6rem 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .pledge-detail .pledge-title-row { font-weight: 700; color: #f8fafc; font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .pledge-detail .pledge-content-text {
+      color: #cbd5e1; font-size: 0.85rem; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto;
+    }
+    .pledge-detail .no-content { color: #64748b; font-style: italic; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -231,21 +253,44 @@
         const region = REGION_NAMES[c.region_code] || c.region_code || '';
         const etype = ET_LABELS[c.election_type] || c.election_type || '';
         const location = c.district_name ? `${region} ${c.district_name}` : region;
-        const approveBtn = st !== 'APPROVED' ? `<button class="btn-approve" onclick="doApprove(${c.candidate_id})">승인</button>` : '';
-        const rejectBtn = st !== 'REJECTED' ? `<button class="btn-reject" onclick="doReject(${c.candidate_id})">거절</button>` : '';
+        const approveBtn = st !== 'APPROVED' ? `<button class="btn-approve" onclick="event.stopPropagation();doApprove(${c.candidate_id})">승인</button>` : '';
+        const rejectBtn = st !== 'REJECTED' ? `<button class="btn-reject" onclick="event.stopPropagation();doReject(${c.candidate_id})">거절</button>` : '';
+        const delBtn = `<button class="btn-del" onclick="event.stopPropagation();doDeleteApproval(${c.candidate_id}, '${_esc(c.name)}')">삭제</button>`;
+
+        const pledges = c.pledges || [];
+        const pledgeCount = pledges.length;
+        const pledgesHtml = pledgeCount === 0
+          ? '<div style="color:#64748b;font-size:0.85rem;padding:0.5rem 0;">등록된 공약이 없습니다.</div>'
+          : pledges.map((p, i) => `
+            <div class="pledge-detail">
+              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}</div>
+              ${p.content ? `<div class="pledge-content-text">${_escHtml(p.content)}</div>` : '<div class="no-content">세부내용 없음</div>'}
+            </div>`).join('');
+
         return `
-        <div class="list-item" data-cid="${c.candidate_id}">
-          <span>
-            <strong>${_escHtml(c.name)}</strong>
-            <span style="color:#94a3b8;font-size:0.85rem;margin-left:0.4rem;">${_escHtml(location)} · ${_escHtml(etype)}</span>
-            ${regBadge}${statusBadge}
-          </span>
-          <span>
-            ${approveBtn} ${rejectBtn}
-            <button class="btn-del" onclick="doDeleteApproval(${c.candidate_id}, '${_esc(c.name)}')">삭제</button>
-          </span>
+        <div class="approval-item" data-cid="${c.candidate_id}">
+          <div class="approval-item-header" onclick="togglePledges(this)">
+            <span>
+              <span class="toggle-icon">▶</span>
+              <strong>${_escHtml(c.name)}</strong>
+              <span style="color:#94a3b8;font-size:0.85rem;margin-left:0.4rem;">${_escHtml(location)} · ${_escHtml(etype)} · 공약 ${pledgeCount}개</span>
+              ${regBadge}${statusBadge}
+            </span>
+            <span>
+              ${approveBtn} ${rejectBtn} ${delBtn}
+            </span>
+          </div>
+          <div class="approval-pledges">
+            ${pledgesHtml}
+          </div>
         </div>`;
       }).join('');
+    }
+
+    function togglePledges(headerEl) {
+      headerEl.classList.toggle('open');
+      const pledgesEl = headerEl.nextElementSibling;
+      pledgesEl.classList.toggle('show');
     }
 
     function _esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

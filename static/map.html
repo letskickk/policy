@@ -303,6 +303,12 @@
       user-select: none;
       gap: 0.5rem;
     }
+    .btn-detail{
+      flex-shrink:0; padding:0.25rem 0.5rem; border-radius:6px; font-size:0.75rem; font-weight:700;
+      background:rgba(56,189,248,0.12); color:#7dd3fc; border:1px solid rgba(56,189,248,0.25);
+      cursor:pointer; transition:all 0.15s; white-space:nowrap;
+    }
+    .btn-detail:hover{ background:rgba(56,189,248,0.25); }
 
     .candidate-header:hover{
       background: rgba(255,255,255,0.03);
@@ -450,6 +456,78 @@
       h1{ font-size: 1.75rem; }
       .map-container, .panel{ padding: 1rem; border-radius: 16px; }
     }
+
+    /* 공약 상세 모달 */
+    .pledge-modal-overlay{
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);
+      justify-content:center; align-items:center; padding:1.5rem;
+    }
+    .pledge-modal-overlay.open{ display:flex; }
+    .pledge-modal{
+      background: linear-gradient(160deg, #0a2540 0%, #0e3a63 100%);
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 18px;
+      width: 100%; max-width: 700px;
+      max-height: calc(100vh - 3rem);
+      display: flex; flex-direction: column;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    }
+    .pledge-modal-header{
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(148,163,184,0.15);
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+      flex-shrink: 0;
+    }
+    .pledge-modal-header h3{
+      font-size: 1.15rem; font-weight: 900; color: #f8fafc; margin: 0; line-height: 1.4;
+    }
+    .pledge-modal-header .modal-sub{
+      font-size: 0.85rem; color: #94a3b8; font-weight: 400; margin-top: 0.15rem;
+    }
+    .pledge-modal-close{
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(148,163,184,0.2);
+      color: #94a3b8; width: 36px; height: 36px; border-radius: 10px;
+      cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s;
+    }
+    .pledge-modal-close:hover{ background: rgba(255,255,255,0.15); color: #fff; }
+    .pledge-modal-body{
+      padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;
+    }
+    .modal-pledge-item{
+      background: rgba(0,0,0,0.18); border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 0.75rem;
+    }
+    .modal-pledge-item:last-child{ margin-bottom: 0; }
+    .modal-pledge-num{
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,114,16,0.2); color: #ffb37a;
+      font-weight: 900; font-size: 0.8rem; margin-right: 0.5rem; flex-shrink: 0;
+    }
+    .modal-pledge-title{
+      font-weight: 800; font-size: 1rem; color: #f8fafc; line-height: 1.5;
+    }
+    .modal-pledge-content{
+      margin-top: 0.6rem; padding-top: 0.6rem;
+      border-top: 1px solid rgba(148,163,184,0.1);
+      font-size: 0.9rem; color: #cbd5e1; line-height: 1.75;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .modal-pledge-empty{
+      color: #64748b; font-style: italic; font-size: 0.9rem; margin-top: 0.4rem;
+    }
+    .modal-pledge-count{
+      font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;
+    }
+    @media (max-width: 640px){
+      .pledge-modal-overlay{ padding: 0.5rem; }
+      .pledge-modal{ border-radius: 14px; max-height: calc(100vh - 1rem); }
+      .pledge-modal-header{ padding: 1rem 1.1rem; }
+      .pledge-modal-header h3{ font-size: 1.05rem; }
+      .pledge-modal-body{ padding: 1rem 1.1rem; }
+    }
   </style>
 </head>
 <body>
@@ -509,6 +587,19 @@
     </div>
   </div>
 
+  <div class="pledge-modal-overlay" id="pledgeModalOverlay" onclick="closePledgeModal(event)">
+    <div class="pledge-modal" onclick="event.stopPropagation()">
+      <div class="pledge-modal-header">
+        <div>
+          <h3 id="pledgeModalTitle"></h3>
+          <div class="modal-sub" id="pledgeModalSub"></div>
+        </div>
+        <button class="pledge-modal-close" onclick="closePledgeModal()" title="닫기">✕</button>
+      </div>
+      <div class="pledge-modal-body" id="pledgeModalBody"></div>
+    </div>
+  </div>
+
   <script>
     const panelTitle = document.getElementById('panel-title');
     const panelSubtitle = document.getElementById('panel-subtitle');
@@ -521,6 +612,8 @@
     const CANDIDATES_TIMEOUT_MS = 60000;
     const DISTRICTS_TIMEOUT_MS = 30000;
     let mapPaths = [];
+    let _renderedCandidates = [];
+    let _renderedRegionCode = '';
 
     const electionTypeLabels = {
       'metro_mayor': '광역단체장',
@@ -898,6 +991,8 @@
 
     // 후보자 목록 렌더링
     function renderCandidates(candidates, regionCode, districtCode = null, electionType = null) {
+      _renderedCandidates = candidates;
+      _renderedRegionCode = regionCode;
       const regionName = regionNames[regionCode] || '알 수 없음';
       panelTitle.textContent = regionName;
       const typeLabel = electionType ? (electionTypeLabels[electionType] || electionType) : '';
@@ -937,11 +1032,19 @@
             }).join('')
           : '<div class="pledge-item" style="cursor:default;opacity:0.5">공약 정보 없음</div>';
 
+        const hasPledges = candidate.pledges && candidate.pledges.length > 0;
+        const detailBtn = hasPledges
+          ? `<button class="btn-detail" onclick="event.stopPropagation();openPledgeModal(${idx})" title="공약 전문 보기">상세</button>`
+          : '';
+
         return `
           <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}">
             <div class="candidate-header" onclick="toggleCandidate(this)">
               <span class="candidate-name">${escapeHtml(nameDisplay)}</span>
-              <span class="candidate-arrow">▸</span>
+              <span style="display:flex;align-items:center;gap:0.4rem;">
+                ${detailBtn}
+                <span class="candidate-arrow">▸</span>
+              </span>
             </div>
             <div class="candidate-pledges">${pledgesHtml}</div>
           </div>`;
@@ -1134,6 +1237,82 @@
         showEmptyState();
       }
     });
+
+    /* ===== 공약 상세 모달 ===== */
+    const pledgeModalOverlay = document.getElementById('pledgeModalOverlay');
+    const pledgeModalTitle = document.getElementById('pledgeModalTitle');
+    const pledgeModalSub = document.getElementById('pledgeModalSub');
+    const pledgeModalBody = document.getElementById('pledgeModalBody');
+
+    async function openPledgeModal(candidateIdx) {
+      const c = _renderedCandidates[candidateIdx];
+      if (!c) return;
+
+      const regionName = regionNames[_renderedRegionCode] || '';
+      const pos = buildPositionTitle(c.election_type, _renderedRegionCode, c.district_name);
+      pledgeModalTitle.textContent = pos ? `${pos} 후보 ${c.name}` : c.name;
+
+      const etype = electionTypeLabels[c.election_type] || c.election_type || '';
+      const location = c.district_name ? `${regionName} ${c.district_name}` : regionName;
+      pledgeModalSub.textContent = `${location} · ${etype}`;
+
+      pledgeModalOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      let pledges = c.pledges || [];
+
+      if (c.candidate_id) {
+        pledgeModalBody.innerHTML = '<div style="color:#94a3b8;padding:1rem 0;text-align:center;">공약을 불러오는 중...</div>';
+        try {
+          const res = await fetch(`/api/candidates/${c.candidate_id}`);
+          if (res.ok) {
+            const detail = await res.json();
+            pledges = detail.pledges || pledges;
+          }
+        } catch (e) { /* 실패 시 기존 데이터 사용 */ }
+      }
+
+      renderModalPledges(pledges);
+    }
+
+    function renderModalPledges(pledges) {
+      if (pledges.length === 0) {
+        pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">등록된 공약이 없습니다.</div>';
+        return;
+      }
+      pledgeModalBody.innerHTML =
+        `<div class="modal-pledge-count">공약 ${pledges.length}개</div>` +
+        pledges.map((p, i) => {
+          const title = escapeHtml(p.title || p);
+          const content = (p.content || '').trim();
+          return `
+            <div class="modal-pledge-item">
+              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}</div>
+              ${content
+                ? `<div class="modal-pledge-content">${escapeHtml(content)}</div>`
+                : '<div class="modal-pledge-empty">세부내용 없음</div>'}
+            </div>`;
+        }).join('');
+    }
+
+    function closePledgeModal(event) {
+      if (event && event.target && event.target !== pledgeModalOverlay) return;
+      pledgeModalOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && pledgeModalOverlay.classList.contains('open')) {
+        closePledgeModal();
+      }
+    });
   </script>
+
+  <footer style="max-width:1400px;margin:2rem auto 0;padding:1.5rem;text-align:center;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(148,163,184,0.12);">
+    <p>
+      <strong>개혁신당 정책국</strong><br>
+      문의: <a href="mailto:letskick@reformparty.kr" style="color:#ffb37a;text-decoration:none;">letskick@reformparty.kr</a>
+    </p>
+  </footer>
 </body>
 </html>
