@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>출마자·공약 등록 - 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%);
+      min-height: 100vh; color: #e2e8f0; padding: 2rem;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      border-radius: 18px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .links { margin-bottom: 1rem; }
+    .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .links a:hover { text-decoration: underline; }
+    label { display: block; font-weight: 700; margin-bottom: 0.35rem; font-size: 0.9rem; }
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28);
+      background: rgba(0,0,0,0.22);
+      color: #fff;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    select { cursor: pointer; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
+    textarea {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28);
+      background: rgba(0,0,0,0.22);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      min-height: 80px;
+    }
+    .pledge-block { background: rgba(0,0,0,0.15); border: 1px solid rgba(148,163,184,0.15); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; position: relative; }
+    .pledge-block .pledge-header { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .pledge-block .pledge-header input[type="text"] { flex: 1; margin-bottom: 0; }
+    .pledge-block .pledge-header input[type="number"] { width: 60px; margin-bottom: 0; }
+    .pledge-block textarea { margin-bottom: 0; }
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .btn-add { background: #22c55e; color: #fff; margin-bottom: 1rem; }
+    .btn-submit { background: #ff7210; color: #fff; width: 100%; padding: 0.75rem; }
+    .btn-remove { background: transparent; color: #94a3b8; padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+    .btn-remove:hover { color: #ef4444; }
+    #msg { margin-top: 1rem; padding: 0.75rem; border-radius: 10px; display: none; }
+    .muted { color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }
+    .list-section { margin-top: 2rem; }
+    .list-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #cbd5e1; }
+    .list-item {
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      margin-bottom: 0.5rem;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+    }
+    .list-item a { color: #7dd3fc; text-decoration: none; font-weight: 600; }
+    .list-item a:hover { text-decoration: underline; }
+    .list-item .badge-user { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(56,189,248,0.15); color: #7dd3fc; margin-left: 0.5rem; }
+    .list-item .badge-admin { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(255,114,16,0.15); color: #ffb37a; margin-left: 0.5rem; }
+    .btn-del { background: transparent; color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+    .btn-del:hover { color: #ef4444; border-color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="links"><a href="/admin">← 관리자</a> · <a href="/map" target="_blank">지도 보기</a></div>
+    <h1>출마자·공약 등록</h1>
+    <p class="muted">등록한 출마자는 지도 페이지(/map)에서 지역별로 노출됩니다.</p>
+
+    <div class="card">
+      <form id="form">
+        <label>시/도</label>
+        <select id="region_code" required>
+          <option value="">선택하세요</option>
+        </select>
+        <input type="hidden" id="region_name" name="region_name" />
+
+        <label>선거 유형</label>
+        <select id="election_type" name="election_type">
+          <option value="local_council">기초의원</option>
+          <option value="regional_council">광역의원</option>
+          <option value="local_mayor">기초단체장</option>
+          <option value="metro_mayor">광역단체장</option>
+        </select>
+
+        <div id="district_block">
+          <label>시군구</label>
+          <select id="district_code">
+            <option value="">선택하세요</option>
+          </select>
+          <div id="district_sub_wrap" style="display:none;">
+            <label>세부선거구</label>
+            <select id="district_sub">
+              <option value="">선택하세요</option>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="district_code_full" name="district_code" />
+        <input type="hidden" id="district_name" name="district_name" />
+
+        <label>후보명</label>
+        <input type="text" id="name" name="name" required maxlength="80" placeholder="홍길동" />
+
+        <label>공약 (제목 + 세부내용)</label>
+        <div id="pledges_container"></div>
+        <button type="button" class="btn-add" id="add_pledge">+ 공약 추가</button>
+
+        <button type="submit" class="btn-submit">등록</button>
+      </form>
+      <div id="msg"></div>
+    </div>
+
+    <div class="list-section" id="list_section" style="display:none;">
+      <h2>해당 지역 등록 후보</h2>
+      <div id="candidates_list"></div>
+    </div>
+  </div>
+
+  <script>
+    const regionSelect = document.getElementById('region_code');
+    const regionNameEl = document.getElementById('region_name');
+    const electionTypeSelect = document.getElementById('election_type');
+    const districtBlock = document.getElementById('district_block');
+    const districtSelect = document.getElementById('district_code');
+    const districtSubWrap = document.getElementById('district_sub_wrap');
+    const districtSubSelect = document.getElementById('district_sub');
+    const districtCodeFull = document.getElementById('district_code_full');
+    const districtNameEl = document.getElementById('district_name');
+    const form = document.getElementById('form');
+    const msgEl = document.getElementById('msg');
+    const pledgesContainer = document.getElementById('pledges_container');
+    const listSection = document.getElementById('list_section');
+    const candidatesList = document.getElementById('candidates_list');
+
+    let pledgeIndex = 0;
+    function addPledgeRow(title = '', content = '', priority = '') {
+      const id = 'p' + (pledgeIndex++);
+      const div = document.createElement('div');
+      div.className = 'pledge-block';
+      div.id = id;
+      div.innerHTML = `
+        <div class="pledge-header">
+          <input type="text" name="pledge_title" placeholder="공약 제목 (예: AI 기반 통학버스 안전 혁신)" value="${escapeAttr(title)}" maxlength="300" required />
+          <input type="number" name="pledge_priority" placeholder="순서" value="${escapeAttr(priority)}" min="1" max="9999" />
+          <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
+        </div>
+        <textarea name="pledge_content" placeholder="공약 세부내용을 입력하세요&#10;(배경, 실행방안, 기대효과 등)" rows="4">${escapeAttr(content)}</textarea>
+      `;
+      pledgesContainer.appendChild(div);
+      div.querySelector('[data-remove]').addEventListener('click', () => div.remove());
+    }
+    function escapeAttr(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    document.getElementById('add_pledge').addEventListener('click', () => addPledgeRow('', '', pledgeIndex + 1));
+    addPledgeRow('', '', 1);
+
+    function setDistrictHidden() {
+      const dc = (districtSelect.value || '').trim();
+      const sub = (districtSubSelect.value || '').trim();
+      const dname = districtSelect.selectedIndex >= 0 ? (districtSelect.options[districtSelect.selectedIndex].text || '').trim() : '';
+      if (!dc) {
+        districtCodeFull.value = '';
+        districtNameEl.value = '';
+        return;
+      }
+      const isSingle = !sub || sub === '단독';
+      districtCodeFull.value = isSingle ? dc : dc + ':' + sub;
+      districtNameEl.value = isSingle ? dname : (dname + ' ' + sub).trim();
+    }
+
+    async function loadRegions() {
+      try {
+        const r = await fetch('/api/signup/regions');
+        const data = await r.json();
+        if (!Array.isArray(data)) return;
+        regionSelect.innerHTML = '<option value="">선택하세요</option>' +
+          data.map(x => `<option value="${(x.region_code||'')}">${escapeAttr(x.region_name||'')}</option>`).join('');
+      } catch (e) { console.error(e); }
+    }
+    loadRegions();
+
+    regionSelect.addEventListener('change', () => {
+      const opt = regionSelect.options[regionSelect.selectedIndex];
+      regionNameEl.value = opt ? (opt.textContent || '').trim() : '';
+      districtSelect.innerHTML = '<option value="">선택하세요</option>';
+      districtSubSelect.innerHTML = '<option value="">선택하세요</option>';
+      districtSubWrap.style.display = 'none';
+      setDistrictHidden();
+      if (regionSelect.value && electionTypeSelect.value !== 'metro_mayor') loadDistricts();
+      loadCandidatesList();
+    });
+
+    electionTypeSelect.addEventListener('change', () => {
+      if (electionTypeSelect.value === 'metro_mayor') {
+        districtBlock.style.display = 'none';
+        districtCodeFull.value = '';
+        districtNameEl.value = '';
+      } else {
+        districtBlock.style.display = 'block';
+        if (regionSelect.value) loadDistricts();
+      }
+      loadCandidatesList();
+    });
+
+    async function loadDistricts() {
+      const regionCode = regionSelect.value;
+      if (!regionCode) return;
+      const pos = electionTypeSelect.value || '';
+      try {
+        const r = await fetch('/api/signup/districts?region_code=' + encodeURIComponent(regionCode) + '&election_position=' + encodeURIComponent(pos));
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : (data.items || []);
+        districtSelect.innerHTML = '<option value="">선택하세요</option>' +
+          list.map(x => `<option value="${escapeAttr(x.district_code||'')}">${escapeAttr(x.district_name||'')}</option>`).join('');
+        districtSubSelect.innerHTML = '<option value="">선택하세요</option>';
+        districtSubWrap.style.display = 'none';
+        setDistrictHidden();
+      } catch (e) { console.error(e); }
+    }
+
+    districtSelect.addEventListener('change', () => {
+      const dc = (districtSelect.value || '').trim();
+      districtSubSelect.innerHTML = '<option value="">선택하세요</option>';
+      districtSubWrap.style.display = 'none';
+      setDistrictHidden();
+      if (!dc) return;
+      const pos = (electionTypeSelect.value || '').trim();
+      fetch('/api/signup/district-sub?district_code=' + encodeURIComponent(dc) + '&election_position=' + encodeURIComponent(pos))
+        .then(r => r.json())
+        .then(list => {
+          const arr = Array.isArray(list) ? list : [];
+          const filtered = arr.length > 1 ? arr.filter(x => (x.sub_code||'').trim() !== '단독' && (x.sub_name||'').trim() !== '단독') : arr;
+          districtSubSelect.innerHTML = '<option value="">선택하세요</option>' +
+            filtered.map(x => `<option value="${escapeAttr(x.sub_code||'')}">${escapeAttr(x.sub_name||'')}</option>`).join('');
+          if (filtered.length > 1) districtSubWrap.style.display = 'block';
+          else if (filtered.length === 1) districtSubSelect.selectedIndex = 1;
+          setDistrictHidden();
+        })
+        .catch(e => { console.error(e); setDistrictHidden(); });
+    });
+
+    districtSubSelect.addEventListener('change', setDistrictHidden);
+
+    async function loadCandidatesList() {
+      const regionCode = regionSelect.value;
+      if (!regionCode) { listSection.style.display = 'none'; return; }
+      try {
+        const r = await fetch('/api/admin/candidates?region_code=' + encodeURIComponent(regionCode) + '&election_type=' + encodeURIComponent(electionTypeSelect.value || ''), { credentials: 'include' });
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : (data.candidates || []);
+        if (list.length === 0) {
+          listSection.style.display = 'none';
+          return;
+        }
+        listSection.style.display = 'block';
+        candidatesList.innerHTML = list.map(c => {
+          const badge = c.user_id
+            ? `<span class="badge-user" title="${escapeAttr(c.registered_by || '')}">사용자 등록</span>`
+            : `<span class="badge-admin">관리자 등록</span>`;
+          return `
+          <div class="list-item" data-cid="${c.candidate_id}">
+            <span><strong>${escapeHtml(c.name)}</strong>${c.district_name ? ' · ' + escapeHtml(c.district_name) : ''}${badge}</span>
+            <span>
+              <a href="/map?region_code=${encodeURIComponent(regionCode)}&district_code=${encodeURIComponent(c.district_code||'')}&election_type=${encodeURIComponent(c.election_type||'')}" target="_blank">지도</a>
+              <button class="btn-del" onclick="deleteCandidate(${c.candidate_id}, '${escapeAttr(c.name)}')">삭제</button>
+            </span>
+          </div>`;
+        }).join('');
+      } catch (e) { listSection.style.display = 'none'; }
+    }
+    async function deleteCandidate(cid, name) {
+      if (!confirm(`"${name}" 후보를 삭제하시겠습니까? 공약도 모두 삭제됩니다.`)) return;
+      try {
+        const res = await fetch('/api/admin/candidates/' + cid, { method: 'DELETE', credentials: 'include' });
+        if (res.ok) loadCandidatesList();
+        else alert('삭제 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s ?? '';
+      return d.innerHTML;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msgEl.style.display = 'none';
+      const regionCode = (regionSelect.value || '').trim();
+      const regionName = (regionNameEl.value || '').trim();
+      if (!regionCode || !regionName) {
+        msgEl.textContent = '시/도를 선택하세요.';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,0.2)';
+        msgEl.style.color = '#fca5a5';
+        return;
+      }
+      const name = (document.getElementById('name').value || '').trim();
+      if (!name) {
+        msgEl.textContent = '후보명을 입력하세요.';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,0.2)';
+        msgEl.style.color = '#fca5a5';
+        return;
+      }
+      const electionType = (electionTypeSelect.value || 'local_council').trim();
+      const districtCode = (districtCodeFull.value || '').trim();
+      const districtName = (districtNameEl.value || '').trim();
+      if (electionType !== 'metro_mayor' && !districtCode) {
+        msgEl.textContent = '선거구를 선택하세요.';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,0.2)';
+        msgEl.style.color = '#fca5a5';
+        return;
+      }
+      const pledgeBlocks = pledgesContainer.querySelectorAll('.pledge-block');
+      const pledges = [];
+      pledgeBlocks.forEach((block, idx) => {
+        const title = (block.querySelector('input[name="pledge_title"]').value || '').trim();
+        if (!title) return;
+        const content = (block.querySelector('textarea[name="pledge_content"]').value || '').trim();
+        const priority = parseInt(block.querySelector('input[name="pledge_priority"]').value, 10) || (idx + 1);
+        pledges.push({ title, content: content || null, priority });
+      });
+      const body = {
+        name,
+        region_code: regionCode,
+        region_name: regionName,
+        district_code: districtCode || null,
+        district_name: districtName || null,
+        election_type: electionType,
+        election_level: 'regional',
+        pledges,
+      };
+      try {
+        const res = await fetch('/api/admin/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          msgEl.textContent = data.detail || data.message || '등록 실패';
+          msgEl.style.display = 'block';
+          msgEl.style.background = 'rgba(239,68,68,0.2)';
+          msgEl.style.color = '#fca5a5';
+          return;
+        }
+        msgEl.textContent = '등록되었습니다. 지도에서 확인하세요.';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(34,197,94,0.2)';
+        msgEl.style.color = '#86efac';
+        document.getElementById('name').value = '';
+        pledgesContainer.innerHTML = '';
+        addPledgeRow('', '', 1);
+        loadCandidatesList();
+      } catch (err) {
+        msgEl.textContent = '서버 연결 실패';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,0.2)';
+        msgEl.style.color = '#fca5a5';
+      }
+    });
+  </script>
+</body>
+</html>

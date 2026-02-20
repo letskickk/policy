@@ -458,6 +458,16 @@ def admin_users_page(request: Request):
     raise HTTPException(status_code=404, detail="admin/users.html not found")
 
 
+@app.api_route("/admin/candidates", methods=["GET", "HEAD"])
+def admin_candidates_page(request: Request):
+    """관리자 전용: 출마자·공약 등록 페이지."""
+    _ = require_admin(request)
+    res = _serve_html("admin/candidates.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="admin/candidates.html not found")
+
+
 @app.api_route("/admin/usage", methods=["GET", "HEAD"])
 def admin_usage_page(request: Request):
     user = get_current_user(request)
@@ -565,57 +575,17 @@ def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
 
 @app.get("/api/signup/regions")
 def api_signup_regions():
-    """회원가입용 시/도 목록. 공공데이터 getCommonGusigunCodeList 응답에서 unique 시도명 추출 후 region_map으로 코드 매핑."""
+    """회원가입·어드민용 시/도 목록. region_map.json 전체를 반환하여 전 시도가 항상 노출되도록 함."""
     import json as _json
-    if not DATA_GO_KR_API_KEY:
-        path = ROOT_DIR / "data" / "region_map.json"
-        if path.exists():
-            data = _json.loads(path.read_text(encoding="utf-8"))
-            regions = data.get("regions", [])
-            if regions:
-                return [{"region_code": r.get("region_code", ""), "region_name": r.get("region_name", "")} for r in regions]
-        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
-    seen = set()
-    all_sd = []
-    page = 1
-    while True:
-        items = _data_gokr_gusigun(sd_name=None, page_no=page, num_of_rows=500)
-        if not items:
-            break
-        for it in items:
-            sd = (it.get("sdName") or it.get("SD_NAME") or "").strip()
-            if sd and sd not in seen:
-                seen.add(sd)
-                all_sd.append(sd)
-        if len(items) < 500:
-            break
-        page += 1
-    if not all_sd:
-        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
-    sd_to_code = {}
     path = ROOT_DIR / "data" / "region_map.json"
     if path.exists():
-        rm = _json.loads(path.read_text(encoding="utf-8"))
-        for r in rm.get("regions", []):
-            c = str(r.get("region_code", "")).strip()
-            n = str(r.get("region_name", "")).strip()
-            if c and n:
-                sd_to_code[n] = c
-                for a in r.get("aliases", []) or []:
-                    sd_to_code[str(a).strip()] = c
-    for code, name in REGION_NAME_MAP.items():
-        if name not in sd_to_code:
-            sd_to_code[name] = code
-    result = []
-    for sd in all_sd:
-        code = sd_to_code.get(sd)
-        if code:
-            result.append({"region_code": code, "region_name": sd})
-    if not result:
-        return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
-    order = {c: i for i, (c, _) in enumerate(REGION_NAME_MAP.items())}
-    result.sort(key=lambda x: order.get(x["region_code"], 999))
-    return result
+        data = _json.loads(path.read_text(encoding="utf-8"))
+        regions = data.get("regions", [])
+        if regions:
+            out = [{"region_code": str(r.get("region_code", "")).strip(), "region_name": str(r.get("region_name", "")).strip()} for r in regions if r.get("region_code")]
+            if out:
+                return out
+    return [{"region_code": k, "region_name": v} for k, v in REGION_NAME_MAP.items()]
 
 
 @app.get("/api/signup/districts")
@@ -845,9 +815,11 @@ def api_resend_verification(body: ResendVerificationBody):
 
 
 @app.api_route("/verify-email", methods=["GET", "HEAD"])
-def verify_email_page(token: str = Query(default="", alias="token")):
+def verify_email_page(request: Request, token: str = Query(default="", alias="token")):
     """이메일 인증 링크 처리. token 검증 후 로그인 페이지로 리다이렉트."""
     from urllib.parse import quote
+    if request.method == "HEAD":
+        return RedirectResponse(url="/login", status_code=302)
     ok, msg = verify_email_token(token)
     if ok:
         return RedirectResponse(url="/login?verified=1", status_code=302)
@@ -896,6 +868,60 @@ def api_admin_approve(body: ApproveBody, request: Request):
     if not ok:
         raise HTTPException(status_code=400, detail="처리 실패")
     return {"message": "처리 완료"}
+
+
+class UpdateUserProfileBody(BaseModel):
+    user_id: int = Field(..., description="사용자 ID")
+    election_position: str = Field(default="", description="출마 유형")
+    region_code: str = Field(default="", description="행정구역 코드")
+    region_name: str = Field(default="", description="행정구역명")
+    district_code: str = Field(default="", description="선거구 코드")
+    district_name: str = Field(default="", description="선거구명")
+
+
+@app.post("/api/admin/users/update-profile")
+def api_admin_update_user_profile(body: UpdateUserProfileBody, request: Request):
+    """관리자가 회원의 출마지역/선거유형을 변경."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM users WHERE id = ?", (body.user_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        conn.execute(
+            """
+            UPDATE users
+            SET election_position = ?,
+                region_code = ?,
+                region_name = ?,
+                district_code = ?,
+                district_name = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                (body.election_position or "").strip(),
+                (body.region_code or "").strip(),
+                (body.region_name or "").strip(),
+                (body.district_code or "").strip(),
+                (body.district_name or "").strip(),
+                body.user_id,
+            ),
+        )
+        conn.commit()
+        return {"ok": True, "message": "수정 완료"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="수정 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
 
 
 class DeleteUserBody(BaseModel):
@@ -1512,7 +1538,7 @@ class RegionResponse(BaseModel):
 
 class CandidatePledgeResponse(BaseModel):
     title: str = Field(..., description="공약 제목")
-    category: Optional[str] = Field(default=None, description="공약 카테고리")
+    content: Optional[str] = Field(default=None, description="공약 세부내용")
 
 
 class CandidateListItemResponse(BaseModel):
@@ -1572,7 +1598,7 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
     conn = get_connection()
     try:
         sql = """
-            SELECT title, category
+            SELECT title, content
             FROM candidate_pledges
             WHERE candidate_id = ?
             ORDER BY priority ASC, datetime(created_at) DESC, id DESC
@@ -1582,7 +1608,7 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
             sql += " LIMIT ?"
             params = (candidate_id, limit)
         rows = conn.execute(sql, params).fetchall()
-        return [CandidatePledgeResponse(title=r["title"], category=r["category"]) for r in rows]
+        return [CandidatePledgeResponse(title=r["title"], content=r["content"]) for r in rows]
     finally:
         conn.close()
 
@@ -1639,7 +1665,7 @@ def _normalize_election_type(value: Optional[str]) -> Optional[str]:
 
 class AdminCandidatePledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
-    category: Optional[str] = Field(default=None, max_length=100, description="공약 카테고리")
+    content: Optional[str] = Field(default=None, max_length=5000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위(작을수록 상위)")
 
 
@@ -1651,6 +1677,86 @@ class AdminCandidateUpsertBody(BaseModel):
     election_type: str = Field(default="local", min_length=1, max_length=40, description="선거 구분")
     election_level: str = Field(default="regional", min_length=1, max_length=40, description="선거 레벨")
     pledges: list[AdminCandidatePledgeInput] = Field(default_factory=list, description="후보 공약 목록")
+
+
+@app.get("/api/admin/candidates", tags=["admin", "candidates"])
+def admin_list_candidates(
+    request: Request,
+    region_code: Optional[str] = Query(default=None, description="행정구역 코드"),
+    election_type: Optional[str] = Query(default=None, description="선거 타입"),
+):
+    """관리자 전용 후보 목록 (user_id/등록자 정보 포함)."""
+    _ensure_db_ready()
+    _ = require_admin(request)
+    code = (region_code or "").strip()
+    sel_et = _normalize_election_type(election_type)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT c.id, c.name, c.district_name, c.district_code, c.region_code,
+                   c.election_type, c.election_level, c.user_id,
+                   u.email AS user_email, u.name AS user_name
+            FROM candidates c
+            LEFT JOIN users u ON c.user_id = u.id
+            WHERE 1=1
+        """
+        params: list[object] = []
+        if code:
+            sql += " AND c.region_code = ?"
+            params.append(code)
+        if sel_et:
+            sql += " AND c.election_type = ?"
+            params.append(sel_et)
+        sql += " ORDER BY c.region_code, datetime(c.created_at) DESC, c.id DESC"
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    finally:
+        conn.close()
+
+    result = []
+    for r in rows:
+        cid = int(r["id"])
+        rc = r["region_code"] or ""
+        result.append({
+            "candidate_id": cid,
+            "name": r["name"],
+            "district_name": r["district_name"],
+            "district_code": _derive_district_code(rc, r["district_code"], r["district_name"]),
+            "region_code": rc,
+            "region_name": REGION_NAME_MAP.get(rc, rc),
+            "election_type": r["election_type"],
+            "election_level": r["election_level"],
+            "user_id": r["user_id"],
+            "registered_by": r["user_email"] or r["user_name"] if r["user_id"] else None,
+        })
+    return result
+
+
+@app.delete("/api/admin/candidates/{candidate_id}", tags=["admin", "candidates"])
+def admin_delete_candidate(candidate_id: int, request: Request):
+    """관리자 전용 후보 삭제."""
+    _ensure_db_ready()
+    _ = require_admin(request)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        existing = conn.execute("SELECT id FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+        conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
+        conn.execute("DELETE FROM candidates WHERE id = ?", (candidate_id,))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {"ok": True}
 
 
 @app.post("/api/admin/candidates", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
@@ -1699,13 +1805,13 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
         for idx, pledge in enumerate(body.pledges):
             conn.execute(
                 """
-                INSERT INTO candidate_pledges (candidate_id, title, category, priority)
+                INSERT INTO candidate_pledges (candidate_id, title, content, priority)
                 VALUES (?, ?, ?, ?)
                 """,
                 (
                     candidate_id,
                     pledge.title.strip(),
-                    (pledge.category or "").strip() or None,
+                    (pledge.content or "").strip() or None,
                     pledge.priority if pledge.priority else (idx + 1),
                 ),
             )
@@ -1771,13 +1877,13 @@ def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, re
         for idx, pledge in enumerate(body.pledges):
             conn.execute(
                 """
-                INSERT INTO candidate_pledges (candidate_id, title, category, priority)
+                INSERT INTO candidate_pledges (candidate_id, title, content, priority)
                 VALUES (?, ?, ?, ?)
                 """,
                 (
                     candidate_id,
                     pledge.title.strip(),
-                    (pledge.category or "").strip() or None,
+                    (pledge.content or "").strip() or None,
                     pledge.priority if pledge.priority else (idx + 1),
                 ),
             )
@@ -2085,3 +2191,233 @@ def api_history_clear(request: Request):
 
     deleted = clear_history(user["id"])
     return {"ok": True, "deleted": deleted}
+
+
+# ── 사용자 본인 공약 등록/관리 ──────────────────────────────
+
+ELECTION_POSITION_TO_TYPE = {
+    "metro_mayor": "metro_mayor",
+    "regional_council": "regional_council",
+    "local_mayor": "local_mayor",
+    "local_council": "local_council",
+    "party_official": "party_official",
+}
+
+ELECTION_POSITION_TO_LEVEL = {
+    "metro_mayor": "metro",
+    "regional_council": "metro",
+    "local_mayor": "local",
+    "local_council": "local",
+    "party_official": "none",
+}
+
+
+@app.api_route("/my-pledges", methods=["GET", "HEAD"])
+def my_pledges_page(request: Request):
+    """사용자 본인 공약 등록/관리 페이지."""
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if (
+        user["status"] != STATUS_APPROVED
+        and user["email"] not in ADMIN_EMAILS
+        and user["role"] != ROLE_ADMIN
+    ):
+        return RedirectResponse(url="/pending", status_code=302)
+    res = _serve_html("my-pledges.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="my-pledges.html not found")
+
+
+@app.get("/api/my/candidate", tags=["my-candidate"])
+def api_my_candidate_get(request: Request):
+    """로그인 사용자의 후보 프로필 + 공약 목록 반환. 미등록이면 user 정보만 반환."""
+    _ensure_db_ready()
+    user = require_approved(request)
+    uid = user["id"]
+
+    election_position = user.get("election_position") or ""
+    region_code = user.get("region_code") or ""
+    region_name = user.get("region_name") or REGION_NAME_MAP.get(region_code, "")
+    district_code = user.get("district_code") or ""
+    district_name = user.get("district_name") or ""
+    election_type = ELECTION_POSITION_TO_TYPE.get(election_position, election_position)
+    election_level = ELECTION_POSITION_TO_LEVEL.get(election_position, "regional")
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id, name, district_name, district_code, region_code, election_type, election_level FROM candidates WHERE user_id = ? LIMIT 1",
+            (uid,),
+        ).fetchone()
+
+        if row is None:
+            return {
+                "candidate": None,
+                "pledges": [],
+                "user_info": {
+                    "name": user.get("name") or user.get("email", ""),
+                    "election_position": election_position,
+                    "election_type": election_type,
+                    "election_level": election_level,
+                    "region_code": region_code,
+                    "region_name": region_name,
+                    "district_code": district_code,
+                    "district_name": district_name,
+                },
+            }
+
+        candidate_id = int(row["id"])
+        pledges = conn.execute(
+            "SELECT id, title, content, priority FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
+            (candidate_id,),
+        ).fetchall()
+
+        return {
+            "candidate": {
+                "candidate_id": candidate_id,
+                "name": row["name"],
+                "district_name": row["district_name"],
+                "district_code": row["district_code"],
+                "region_code": row["region_code"],
+                "region_name": region_name,
+                "election_type": row["election_type"],
+                "election_level": row["election_level"],
+            },
+            "pledges": [
+                {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"]}
+                for p in pledges
+            ],
+            "user_info": {
+                "name": user.get("name") or user.get("email", ""),
+                "election_position": election_position,
+                "election_type": election_type,
+                "election_level": election_level,
+                "region_code": region_code,
+                "region_name": region_name,
+                "district_code": district_code,
+                "district_name": district_name,
+            },
+        }
+    finally:
+        conn.close()
+
+
+class MyPledgeInput(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300, description="공약 제목")
+    content: Optional[str] = Field(default=None, max_length=5000, description="공약 세부내용")
+    priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
+
+
+class MyPledgesBody(BaseModel):
+    pledges: list[MyPledgeInput] = Field(..., min_length=1, max_length=30, description="공약 목록 (1~30개)")
+
+
+@app.post("/api/my/candidate", tags=["my-candidate"])
+def api_my_candidate_save(body: MyPledgesBody, request: Request):
+    """
+    사용자 본인의 후보 등록 + 공약 저장.
+    candidates 행이 없으면 INSERT, 있으면 공약만 교체(UPSERT).
+    region_code/election_type 등은 회원가입 시 입력한 정보에서 자동 결정된다.
+    """
+    _ensure_db_ready()
+    user = require_approved(request)
+    uid = user["id"]
+
+    election_position = (user.get("election_position") or "").strip()
+    if not election_position:
+        raise HTTPException(status_code=400, detail="회원가입 시 출마 유형을 선택하지 않아 공약을 등록할 수 없습니다.")
+    region_code = (user.get("region_code") or "").strip()
+    if not region_code:
+        raise HTTPException(status_code=400, detail="회원가입 시 지역을 선택하지 않아 공약을 등록할 수 없습니다.")
+
+    election_type = ELECTION_POSITION_TO_TYPE.get(election_position, election_position)
+    election_level = ELECTION_POSITION_TO_LEVEL.get(election_position, "regional")
+    region_name = user.get("region_name") or REGION_NAME_MAP.get(region_code, "")
+    district_code_raw = (user.get("district_code") or "").strip()
+    district_name = (user.get("district_name") or "").strip()
+    resolved_district_code = district_code_raw or _derive_district_code(region_code, None, district_name)
+    candidate_name = (user.get("name") or user.get("email", "")).strip()
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM candidates WHERE user_id = ? LIMIT 1", (uid,)).fetchone()
+
+        if row is None:
+            cur = conn.execute(
+                """
+                INSERT INTO candidates (name, district_name, district_code, region_code, election_type, election_level, user_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (candidate_name, district_name or None, resolved_district_code, region_code, election_type, election_level, uid),
+            )
+            candidate_id = int(cur.lastrowid)
+            if resolved_district_code and district_name:
+                conn.execute(
+                    """
+                    INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
+                    VALUES (?, ?, ?, ?, '[]', datetime('now'))
+                    ON CONFLICT(district_code) DO UPDATE SET
+                        district_name = excluded.district_name,
+                        region_code = excluded.region_code,
+                        election_type = excluded.election_type,
+                        updated_at = datetime('now')
+                    """,
+                    (resolved_district_code, district_name, region_code, election_type),
+                )
+        else:
+            candidate_id = int(row["id"])
+            conn.execute(
+                "UPDATE candidates SET name = ?, updated_at = datetime('now') WHERE id = ?",
+                (candidate_name, candidate_id),
+            )
+
+        conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
+        for idx, p in enumerate(body.pledges):
+            conn.execute(
+                "INSERT INTO candidate_pledges (candidate_id, title, content, priority) VALUES (?, ?, ?, ?)",
+                (candidate_id, p.title.strip(), (p.content or "").strip() or None, p.priority if p.priority else (idx + 1)),
+            )
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {"ok": True, "candidate_id": candidate_id, "pledge_count": len(body.pledges)}
+
+
+@app.delete("/api/my/candidate", tags=["my-candidate"])
+def api_my_candidate_delete(request: Request):
+    """사용자 본인의 후보 프로필 + 공약 전체 삭제."""
+    _ensure_db_ready()
+    user = require_approved(request)
+    uid = user["id"]
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM candidates WHERE user_id = ? LIMIT 1", (uid,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="등록된 후보 정보가 없습니다.")
+        candidate_id = int(row["id"])
+        conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
+        conn.execute("DELETE FROM candidates WHERE id = ?", (candidate_id,))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {"ok": True}

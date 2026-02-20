@@ -298,6 +298,14 @@ def run_verify_analysis(
 
     start = time.perf_counter()
     use_vs = bool(vector_store_id)
+
+    # DB 등록 출마자 공약 컨텍스트 로드
+    try:
+        from backend.candidate_context import load_candidates_pledges_context
+        candidates_ctx = load_candidates_pledges_context()
+    except Exception:
+        candidates_ctx = ""
+
     try:
         if use_vs:
             from backend.config import FILE_SEARCH_MAX_RESULTS_QUICK
@@ -305,11 +313,13 @@ def run_verify_analysis(
             max_results = FILE_SEARCH_MAX_RESULTS_QUICK if (options.get("phase") or "").strip().lower() == "quick" else None
             if options.get("judge"):
                 result = run_verify_judge(
-                    vector_store_id, normalized, regional_vector_store_id or "", max_results
+                    vector_store_id, normalized, regional_vector_store_id or "", max_results,
+                    candidates_context=candidates_ctx,
                 )
             else:
                 result = run_verify(
-                    vector_store_id, normalized, regional_vector_store_id or "", max_results
+                    vector_store_id, normalized, regional_vector_store_id or "", max_results,
+                    candidates_context=candidates_ctx,
                 )
         else:
             from backend.report import generate_report
