@@ -68,6 +68,9 @@
     .btn-remove:hover { color: #ef4444; }
     #msg { margin-top: 1rem; padding: 0.75rem; border-radius: 10px; display: none; }
     .muted { color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }
+    .char-count { text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; margin-bottom: 0.5rem; }
+    .char-count.warn { color: #fde047; }
+    .char-count.over { color: #fca5a5; }
     .list-section { margin-top: 2rem; }
     .list-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #cbd5e1; }
     .list-item {
@@ -83,6 +86,13 @@
     .list-item .badge-admin { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(255,114,16,0.15); color: #ffb37a; margin-left: 0.5rem; }
     .btn-del { background: transparent; color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
     .btn-del:hover { color: #ef4444; border-color: #ef4444; }
+    .badge-pending { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(250,204,21,0.18); color: #fde047; margin-left: 0.4rem; }
+    .badge-approved { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(34,197,94,0.18); color: #86efac; margin-left: 0.4rem; }
+    .badge-rejected { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(239,68,68,0.18); color: #fca5a5; margin-left: 0.4rem; }
+    .btn-approve { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 700; }
+    .btn-approve:hover { background: rgba(34,197,94,0.3); }
+    .btn-reject { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 700; }
+    .btn-reject:hover { background: rgba(239,68,68,0.3); }
   </style>
 </head>
 <body>
@@ -159,19 +169,35 @@
     let pledgeIndex = 0;
     function addPledgeRow(title = '', content = '', priority = '') {
       const id = 'p' + (pledgeIndex++);
+      const titleLen = (title || '').length;
+      const contentLen = (content || '').length;
       const div = document.createElement('div');
       div.className = 'pledge-block';
       div.id = id;
       div.innerHTML = `
         <div class="pledge-header">
-          <input type="text" name="pledge_title" placeholder="공약 제목 (예: AI 기반 통학버스 안전 혁신)" value="${escapeAttr(title)}" maxlength="300" required />
+          <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자, 예: AI 기반 통학버스 안전 혁신)" value="${escapeAttr(title)}" maxlength="100" required />
           <input type="number" name="pledge_priority" placeholder="순서" value="${escapeAttr(priority)}" min="1" max="9999" />
           <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
         </div>
-        <textarea name="pledge_content" placeholder="공약 세부내용을 입력하세요&#10;(배경, 실행방안, 기대효과 등)" rows="4">${escapeAttr(content)}</textarea>
+        <div class="char-count title-count">${titleLen}/100</div>
+        <textarea name="pledge_content" placeholder="공약 세부내용을 입력하세요&#10;(배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000">${escapeAttr(content)}</textarea>
+        <div class="char-count content-count">${contentLen.toLocaleString()}/50,000</div>
       `;
       pledgesContainer.appendChild(div);
+      const titleInput = div.querySelector('input[name="pledge_title"]');
+      const titleCounter = div.querySelector('.title-count');
+      const contentInput = div.querySelector('textarea[name="pledge_content"]');
+      const contentCounter = div.querySelector('.content-count');
+      titleInput.addEventListener('input', () => updateCounter(titleInput, titleCounter, 100));
+      contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
       div.querySelector('[data-remove]').addEventListener('click', () => div.remove());
+    }
+    function updateCounter(input, counter, max) {
+      const len = input.value.length;
+      const formatted = max >= 10000 ? max.toLocaleString() : max;
+      counter.textContent = `${len.toLocaleString()}/${formatted}`;
+      counter.className = 'char-count' + (len >= max ? ' over' : len >= max * 0.9 ? ' warn' : '');
     }
     function escapeAttr(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -280,13 +306,19 @@
         }
         listSection.style.display = 'block';
         candidatesList.innerHTML = list.map(c => {
-          const badge = c.user_id
+          const regBadge = c.user_id
             ? `<span class="badge-user" title="${escapeAttr(c.registered_by || '')}">사용자 등록</span>`
             : `<span class="badge-admin">관리자 등록</span>`;
+          const st = (c.approval_status || 'PENDING').toUpperCase();
+          const statusLabel = st === 'APPROVED' ? '승인됨' : st === 'REJECTED' ? '거절됨' : '대기중';
+          const statusBadge = `<span class="badge-${st.toLowerCase()}">${statusLabel}</span>`;
+          const approveBtn = st !== 'APPROVED' ? `<button class="btn-approve" onclick="approveCandidate(${c.candidate_id})">승인</button>` : '';
+          const rejectBtn = st !== 'REJECTED' ? `<button class="btn-reject" onclick="rejectCandidate(${c.candidate_id})">거절</button>` : '';
           return `
           <div class="list-item" data-cid="${c.candidate_id}">
-            <span><strong>${escapeHtml(c.name)}</strong>${c.district_name ? ' · ' + escapeHtml(c.district_name) : ''}${badge}</span>
+            <span><strong>${escapeHtml(c.name)}</strong>${c.district_name ? ' · ' + escapeHtml(c.district_name) : ''}${regBadge}${statusBadge}</span>
             <span>
+              ${approveBtn} ${rejectBtn}
               <a href="/map?region_code=${encodeURIComponent(regionCode)}&district_code=${encodeURIComponent(c.district_code||'')}&election_type=${encodeURIComponent(c.election_type||'')}" target="_blank">지도</a>
               <button class="btn-del" onclick="deleteCandidate(${c.candidate_id}, '${escapeAttr(c.name)}')">삭제</button>
             </span>
@@ -300,6 +332,21 @@
         const res = await fetch('/api/admin/candidates/' + cid, { method: 'DELETE', credentials: 'include' });
         if (res.ok) loadCandidatesList();
         else alert('삭제 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+    async function approveCandidate(cid) {
+      try {
+        const res = await fetch('/api/admin/candidates/' + cid + '/approve', { method: 'POST', credentials: 'include' });
+        if (res.ok) loadCandidatesList();
+        else alert('승인 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+    async function rejectCandidate(cid) {
+      if (!confirm('이 후보의 공약을 거절하시겠습니까?')) return;
+      try {
+        const res = await fetch('/api/admin/candidates/' + cid + '/reject', { method: 'POST', credentials: 'include' });
+        if (res.ok) loadCandidatesList();
+        else alert('거절 실패');
       } catch (e) { alert('서버 오류'); }
     }
     function escapeHtml(s) {
@@ -372,7 +419,7 @@
           msgEl.style.color = '#fca5a5';
           return;
         }
-        msgEl.textContent = '등록되었습니다. 지도에서 확인하세요.';
+        msgEl.textContent = '등록되었습니다 (승인 대기 상태). 승인 후 지도에 공개됩니다.';
         msgEl.style.display = 'block';
         msgEl.style.background = 'rgba(34,197,94,0.2)';
         msgEl.style.color = '#86efac';
