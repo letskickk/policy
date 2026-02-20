@@ -1790,6 +1790,10 @@ def admin_create_candidate(body: AdminCandidateUpsertBody, request: Request):
         )
         if resolved_district_code and district_name_clean:
             conn.execute(
+                "INSERT INTO region_codes (region_code, region_name, aliases_json, updated_at) VALUES (?, ?, '[]', datetime('now')) ON CONFLICT(region_code) DO NOTHING",
+                (code, REGION_NAME_MAP.get(code, code)),
+            )
+            conn.execute(
                 """
                 INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
                 VALUES (?, ?, ?, ?, '[]', datetime('now'))
@@ -1861,6 +1865,10 @@ def admin_update_candidate(candidate_id: int, body: AdminCandidateUpsertBody, re
             ),
         )
         if resolved_district_code and district_name_clean:
+            conn.execute(
+                "INSERT INTO region_codes (region_code, region_name, aliases_json, updated_at) VALUES (?, ?, '[]', datetime('now')) ON CONFLICT(region_code) DO NOTHING",
+                (code, REGION_NAME_MAP.get(code, code)),
+            )
             conn.execute(
                 """
                 INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
@@ -2356,6 +2364,14 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
             )
             candidate_id = int(cur.lastrowid)
             if resolved_district_code and district_name:
+                conn.execute(
+                    """
+                    INSERT INTO region_codes (region_code, region_name, aliases_json, updated_at)
+                    VALUES (?, ?, '[]', datetime('now'))
+                    ON CONFLICT(region_code) DO NOTHING
+                    """,
+                    (region_code, region_name or REGION_NAME_MAP.get(region_code, region_code)),
+                )
                 conn.execute(
                     """
                     INSERT INTO district_codes (district_code, district_name, region_code, election_type, aliases_json, updated_at)
