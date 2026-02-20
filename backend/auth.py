@@ -104,6 +104,16 @@ def signup(
             (email, _hash_password(password), status, role, email_verified, verification_token, verification_expires_at, name, phone, ep or None, rc or None, rn or None, dc or None, dn or None),
         )
         conn.commit()
+        # 관리자에게 가입 알림 메일 (비동기적으로, 실패해도 가입에 영향 없음)
+        try:
+            from backend.email_sender import send_signup_notification
+            send_signup_notification(
+                user_email=email, name=name, phone=phone,
+                election_position=ep, region_name=rn, district_name=dn,
+            )
+        except Exception:
+            logger.warning("가입 알림 메일 발송 실패 (가입 자체는 정상 처리)")
+
         if EMAIL_VERIFICATION_ENABLED and verification_token:
             from backend.email_sender import send_verification_email
             if send_verification_email(email, verification_token):
