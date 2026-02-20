@@ -361,64 +361,18 @@
       color: var(--text);
       position: relative;
       line-height: 1.6;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s;
+      cursor: default;
       border-radius: 6px;
       padding: 0.3rem 0.4rem 0.3rem 1.1rem;
     }
 
-    .pledge-item:hover{
-      background: rgba(255,255,255,0.04);
-    }
-
     .pledge-item::before{
-      content: "▸";
+      content: "•";
       position: absolute;
-      left: 0.1rem;
+      left: 0.3rem;
       color: var(--brand);
       font-weight: 900;
       transition: transform 0.2s;
-    }
-
-    .pledge-item.expanded::before{
-      transform: rotate(90deg);
-    }
-
-    .pledge-content{
-      display: none;
-      font-size: 0.86rem;
-      color: var(--muted);
-      line-height: 1.7;
-      padding: 0.4rem 0.4rem 0.25rem 1.1rem;
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow: hidden;
-    }
-
-    .pledge-content.show{
-      display: -webkit-box;
-      -webkit-line-clamp: 4;
-      -webkit-box-orient: vertical;
-    }
-
-    .pledge-content.show.full{
-      display: block;
-      -webkit-line-clamp: unset;
-    }
-
-    .read-more-link{
-      display: inline-block;
-      font-size: 0.8rem;
-      color: var(--brand);
-      cursor: pointer;
-      padding: 0.15rem 0.4rem 0.35rem 1.1rem;
-      user-select: none;
-      font-weight: 700;
-    }
-
-    .read-more-link:hover{
-      text-decoration: underline;
     }
 
     .show-more-btn{
@@ -1027,13 +981,7 @@
         const pledgesHtml = candidate.pledges && candidate.pledges.length > 0
           ? candidate.pledges.map(pledge => {
               const title = escapeHtml(pledge.title || pledge);
-              const content = (pledge.content || '').trim();
-              let html = `<div class="pledge-item" onclick="togglePledge(this)">${title}</div>`;
-              if (content) {
-                html += `<div class="pledge-content">${escapeHtml(content)}</div>`;
-                html += `<span class="read-more-link" onclick="toggleReadMore(this)" style="display:none;">더 읽기</span>`;
-              }
-              return html;
+              return `<div class="pledge-item">${title}</div>`;
             }).join('')
           : '<div class="pledge-item" style="cursor:default;opacity:0.5">공약 정보 없음</div>';
 
@@ -1068,49 +1016,7 @@
     function toggleCandidate(headerEl) {
       const card = headerEl.closest('.candidate-card');
       if (!card) return;
-      const opening = !card.classList.contains('open');
       card.classList.toggle('open');
-      if (opening) {
-        card.querySelectorAll('.pledge-content').forEach(el => {
-          const link = el.nextElementSibling;
-          if (link && link.classList.contains('read-more-link')) {
-            const needsClamp = el.scrollHeight > el.clientHeight + 2;
-            link.style.display = needsClamp ? 'inline-block' : 'none';
-          }
-        });
-      }
-    }
-
-    function togglePledge(el) {
-      const contentEl = el.nextElementSibling;
-      if (!contentEl || !contentEl.classList.contains('pledge-content')) return;
-      const isOpen = contentEl.classList.contains('show');
-      contentEl.classList.toggle('show', !isOpen);
-      el.classList.toggle('expanded', !isOpen);
-      if (!isOpen) {
-        const link = contentEl.nextElementSibling;
-        if (link && link.classList.contains('read-more-link')) {
-          requestAnimationFrame(() => {
-            const needsClamp = contentEl.scrollHeight > contentEl.clientHeight + 2;
-            link.style.display = needsClamp ? 'inline-block' : 'none';
-            link.textContent = '더 읽기';
-            contentEl.classList.remove('full');
-          });
-        }
-      } else {
-        const link = contentEl.nextElementSibling;
-        if (link && link.classList.contains('read-more-link')) {
-          link.style.display = 'none';
-        }
-      }
-    }
-
-    function toggleReadMore(linkEl) {
-      const contentEl = linkEl.previousElementSibling;
-      if (!contentEl || !contentEl.classList.contains('pledge-content')) return;
-      const isFull = contentEl.classList.contains('full');
-      contentEl.classList.toggle('full', !isFull);
-      linkEl.textContent = isFull ? '더 읽기' : '접기';
     }
 
     function showAllCandidates(btn) {
