@@ -719,7 +719,7 @@
         totalScore = toNumber(data && data.total_score) ?? toNumber(data && data.fit_score);
       }
 
-      const signal = (data && data.signal_light || (totalScore !== null ? (totalScore >= 80 ? 'green' : (totalScore >= 60 ? 'yellow' : 'red')) : 'red')).toLowerCase();
+      const signal = (totalScore !== null ? (totalScore >= 80 ? 'green' : (totalScore >= 60 ? 'yellow' : 'red')) : (data && data.signal_light || 'red')).toLowerCase();
       const board = (totalScore !== null)
         ? `<div class="score-board"><div class="score">총점: ${totalScore.toFixed(1)}점</div><span class="badge ${signal}">${signalLabel(signal)}</span></div>`
         : '';
