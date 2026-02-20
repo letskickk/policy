@@ -267,7 +267,8 @@
       if (subWrap) subWrap.style.display = 'none';
       dcHidden.value = ''; dnEl.value = '';
       if (!dc) return;
-      fetch('/api/signup/district-sub?district_code=' + encodeURIComponent(dc))
+      const pos = (epEl.value || '').trim();
+      fetch('/api/signup/district-sub?district_code=' + encodeURIComponent(dc) + '&election_position=' + encodeURIComponent(pos))
         .then(r => r.json())
         .then(list => {
           let arr = Array.isArray(list) ? list : [];
