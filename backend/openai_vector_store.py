@@ -1504,17 +1504,17 @@ file_search 도구: 정강·공약·지역별 공약 검색.
 
 
 # run_check 검색/컨텍스트 상한 (대규모 문서·타임아웃 방지)
-RUN_CHECK_K_POLICY = 22
-RUN_CHECK_K_PLATFORM = 14
+RUN_CHECK_K_POLICY = 16
+RUN_CHECK_K_PLATFORM = 10
 RUN_CHECK_K_REGIONAL = 12
-RUN_CHECK_K_WINNERS = 12
-RUN_CHECK_WINNERS_QUERIES_MAX = 6
-RUN_CHECK_WINNERS_RAW_CAP = 20
-RUN_CHECK_MAX_ENHANCE = 10
-RUN_CHECK_PLATFORM_MAX_CHARS = 7_000
-RUN_CHECK_PLEDGES_MAX_CHARS = 10_000
+RUN_CHECK_K_WINNERS = 8
+RUN_CHECK_WINNERS_QUERIES_MAX = 4
+RUN_CHECK_WINNERS_RAW_CAP = 12
+RUN_CHECK_MAX_ENHANCE = 5
+RUN_CHECK_PLATFORM_MAX_CHARS = 5_000
+RUN_CHECK_PLEDGES_MAX_CHARS = 7_000
 RUN_CHECK_REGIONAL_MAX_CHARS = 5_000
-RUN_CHECK_WINNERS_MAX_CHARS = 8_000
+RUN_CHECK_WINNERS_MAX_CHARS = 5_000
 RUN_CHECK_WINNERS_MAX_ITEMS = 8
 RUN_CHECK_MAX_WORKERS = 4
 
@@ -1885,75 +1885,105 @@ def run_check(
         client: OpenAI,
         vs_id: str,
         hits: List[Tuple[float, str, str]],
-        max_enhance: int = 10,
+        max_enhance: int = 5,
     ) -> List[Tuple[float, str, str, Dict]]:
         """
-        winners2022 hits에 메타 정보 보강.
-        Returns: [(score, filename, raw_text, meta), ...]
-        동일 chunk 재파싱 금지: meta_cache(hash key)로 _extract_winners2022_metadata 결과 캐시.
-        공공 API 이름 보강은 상위 후보(idx<3)만 최대 3회.
+        winners2022 hits에 메타 정보 보강 (2-pass 병렬).
+        Pass 1: 메타 추출 (CPU, 빠름)
+        Pass 2: 부족한 메타 → 공공 API / 벡터 재검색을 병렬 실행
         """
-        enhanced: List[Tuple[float, str, str, Dict]] = []
-        meta_cache: Dict[str, Dict] = {}  # chunk_key (hash) -> meta, 같은 chunk 재파싱 금지
-        api_cache: Dict[str, str] = {}
-        api_call_count = 0
-        max_api_calls = 3  # 상위 후보에만 제한
+        meta_cache: Dict[str, Dict] = {}
+        items: List[Tuple[float, str, str, Dict]] = []
 
-        for idx, (score, filename, text) in enumerate(hits[:max_enhance]):
-            chunk_key = hashlib.sha256((str(filename) + "\n" + (text or "")[:500]).encode("utf-8", errors="ignore")).hexdigest()
+        # --- Pass 1: 메타 추출 (순차, CPU only) ---
+        for score, filename, text in hits[:max_enhance]:
+            chunk_key = hashlib.sha256(
+                (str(filename) + "\n" + (text or "")[:500]).encode("utf-8", errors="ignore")
+            ).hexdigest()
             if chunk_key in meta_cache:
                 meta = dict(meta_cache[chunk_key])
             else:
                 meta = _extract_winners2022_metadata(text, filename)
-                meta_cache[chunk_key] = dict(meta)  # hash key 캐시로 동일 chunk 재파싱 금지
+                meta_cache[chunk_key] = dict(meta)
+            items.append((score, filename, text, meta))
 
-            needs_enhancement = not (meta["name"] and meta["position"] and meta["region"])
+        # max_enhance 이후 항목은 메타 추출만, 보강 없이 추가
+        for score, filename, text in hits[max_enhance:]:
+            chunk_key = hashlib.sha256(
+                (str(filename) + "\n" + (text or "")[:500]).encode("utf-8", errors="ignore")
+            ).hexdigest()
+            if chunk_key in meta_cache:
+                meta = dict(meta_cache[chunk_key])
+            else:
+                meta = _extract_winners2022_metadata(text, filename)
+                meta_cache[chunk_key] = dict(meta)
+            items.append((score, filename, text, meta))
 
-            if needs_enhancement:
-                # 공공 API 이름 보강: 상위 3개 후보에만, 최대 3회
-                if idx < 3 and meta.get("position") and meta.get("region") and not meta.get("name"):
-                    cache_key = f"{meta['position']}|{meta['region']}"
-                    if cache_key in api_cache:
-                        meta["name"] = api_cache[cache_key] or None
-                    elif api_call_count < max_api_calls:
-                        api_name = _get_winner_name_from_api(meta["position"], meta["region"])
-                        api_call_count += 1
-                        if api_name:
-                            meta["name"] = api_name
-                            api_cache[cache_key] = api_name
-                            logger.debug(f"[API] 이름 조회: {meta['position']} {meta['region']} → {api_name}")
-                        else:
-                            api_cache[cache_key] = ""
+        # --- Pass 2: API + 벡터 재검색 병렬 실행 ---
+        max_api_calls = 2
+        api_cache: Dict[str, str] = {}
+        api_tasks: List[Tuple[int, str]] = []  # (item_idx, cache_key)
+        search_tasks: List[Tuple[int, str]] = []  # (item_idx, query)
 
-                if not meta["name"] or not meta["position"] or not meta["region"]:
-                    source_path = _extract_source_path(text)
-                    if source_path or filename:
-                        refine_queries = []
-                        if meta.get("region") and not meta.get("name"):
-                            refine_queries.append(f"{meta['region']} 당선인 이름")
-                        elif meta.get("position") and not meta.get("name"):
-                            refine_queries.append(f"{meta['position']} 당선인 이름")
-                        elif not meta.get("region") and not meta.get("position"):
-                            refine_queries.append("제8회 전국동시지방선거 당선인 직책 지역 이름")
-                        for rq in refine_queries[:1]:
-                            enhance_hits = _search(client, vs_id, rq, k=4, rewrite=False)
-                            for _, _, enhance_text in enhance_hits:
-                                enhance_meta = _extract_winners2022_metadata(enhance_text, filename)
-                                if enhance_meta["name"] and not meta["name"]:
-                                    meta["name"] = enhance_meta["name"]
-                                if enhance_meta["position"] and not meta["position"]:
-                                    meta["position"] = enhance_meta["position"]
-                                if enhance_meta["region"] and not meta["region"]:
-                                    meta["region"] = enhance_meta["region"]
-                                if meta["name"] and meta["position"] and meta["region"]:
-                                    break
-                            if meta["name"] and meta["position"] and meta["region"]:
-                                break
+        for idx in range(min(max_enhance, len(items))):
+            _, filename, text, meta = items[idx]
+            if meta["name"] and meta["position"] and meta["region"]:
+                continue
 
-            enhanced.append((score, filename, text, meta))
+            if idx < 2 and meta.get("position") and meta.get("region") and not meta.get("name"):
+                cache_key = f"{meta['position']}|{meta['region']}"
+                if len(api_tasks) < max_api_calls:
+                    api_tasks.append((idx, cache_key))
+                    continue
 
-        logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(enhanced)}개 hit")
-        return enhanced
+            if not meta["name"] or not meta["position"] or not meta["region"]:
+                if meta.get("region") and not meta.get("name"):
+                    search_tasks.append((idx, f"{meta['region']} 당선인 이름"))
+                elif meta.get("position") and not meta.get("name"):
+                    search_tasks.append((idx, f"{meta['position']} 당선인 이름"))
+                elif not meta.get("region") and not meta.get("position"):
+                    search_tasks.append((idx, "제8회 전국동시지방선거 당선인 직책 지역 이름"))
+
+        if api_tasks or search_tasks:
+            with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as ex:
+                api_futures = {}
+                for item_idx, cache_key in api_tasks:
+                    pos, reg = cache_key.split("|", 1)
+                    fut = ex.submit(_get_winner_name_from_api, pos, reg)
+                    api_futures[fut] = (item_idx, cache_key)
+
+                search_futures = {}
+                for item_idx, query in search_tasks:
+                    fut = ex.submit(_search, client, vs_id, query, k=4, rewrite=False)
+                    search_futures[fut] = item_idx
+
+                for fut in as_completed(api_futures):
+                    item_idx, cache_key = api_futures[fut]
+                    api_name = fut.result()
+                    if api_name:
+                        items[item_idx][3]["name"] = api_name
+                        api_cache[cache_key] = api_name
+                    else:
+                        api_cache[cache_key] = ""
+
+                for fut in as_completed(search_futures):
+                    item_idx = search_futures[fut]
+                    enhance_hits = fut.result()
+                    meta = items[item_idx][3]
+                    _, fn, _, _ = items[item_idx]
+                    for _, _, enhance_text in enhance_hits:
+                        enhance_meta = _extract_winners2022_metadata(enhance_text, fn)
+                        if enhance_meta["name"] and not meta["name"]:
+                            meta["name"] = enhance_meta["name"]
+                        if enhance_meta["position"] and not meta["position"]:
+                            meta["position"] = enhance_meta["position"]
+                        if enhance_meta["region"] and not meta["region"]:
+                            meta["region"] = enhance_meta["region"]
+                        if meta["name"] and meta["position"] and meta["region"]:
+                            break
+
+        logger.debug(f"[WINNERS2022] 메타 보강 완료: {len(items)}개 hit")
+        return items
 
     def _is_meta_match(meta: Dict, user_meta: dict, mode: str = "strict") -> bool:
         return _is_winners_meta_match(meta, user_meta, mode=mode)
@@ -2288,6 +2318,7 @@ def run_check(
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
+        max_tokens=4096,
         timeout=180,
     )
     text = resp.choices[0].message.content or ""
