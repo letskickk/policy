@@ -238,6 +238,17 @@ def check_pledge_alignment(
         )
         result = response.choices[0].message.content or ""
 
+    # 모델이 verify 형식 JSON을 반환한 경우 저장/표시하지 않고 안내 문구로 대체
+    # 접두사([결과], ```json 등)가 있어도 내용에 fit_score·rubric 등이 있으면 JSON으로 간주
+    s = (result or "").strip()
+    head = s[:4000]  # 앞부분만 검사
+    if ("fit_score" in head and "rubric" in head) or ('"breakdown"' in head and "fit_score" in head):
+        logger.warning("[check] GPT가 JSON 형식을 반환함. 텍스트 결과로 대체합니다.")
+        result = (
+            "점검 결과가 요청한 텍스트 형식으로 생성되지 않았습니다. "
+            "잠시 후 다시 시도해 주세요."
+        )
+
     logger.info(f"GPT 응답 길이: {len(result)}자")
     result = apply_check_postprocessing(result, pledge_key)
     _set_cached_result(pledge_key, result)

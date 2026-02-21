@@ -13,6 +13,7 @@
       color: #e2e8f0;
       padding: 2rem;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
@@ -48,6 +49,9 @@
       cursor: pointer;
     }
     select option { background: #0f172a; color: #fff; }
+    .footer { margin-top: auto; padding-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #94a3b8; line-height: 1.8; }
+    .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .footer a:hover { text-decoration: underline; }
     input {
       width: 100%;
       padding: 0.75rem;
@@ -186,6 +190,10 @@
       이미 계정이 있으신가요? <a href="/login">로그인</a>
     </div>
   </div>
+  <p class="footer">
+    <strong>개혁신당 정책국</strong><br>
+    문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+  </p>
   <script>
     document.querySelectorAll('.pw-wrap').forEach(wrap => {
       const input = wrap.querySelector('input');

@@ -6,7 +6,7 @@
   <title>로그인 - 정책 멘토링</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; display: flex; align-items: center; justify-content: center; }
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 2rem; max-width: 420px; width: 100%; }
     h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
     label { display: block; font-weight: 700; margin-bottom: 0.5rem; }
@@ -28,6 +28,9 @@
     .resend-wrap button { padding: 0.5rem 1rem; background: rgba(255,179,122,0.2); color: #ffb37a; border: 1px solid rgba(255,179,122,0.4); border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
     .resend-wrap button:hover { background: rgba(255,179,122,0.3); }
     .resend-wrap button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .footer { margin-top: auto; padding-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #94a3b8; line-height: 1.8; }
+    .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -54,6 +57,10 @@
       계정이 없으신가요? <br><a href="/signup">회원가입</a> | <a href="/">메인으로</a>
     </div>
   </div>
+  <p class="footer">
+    <strong>개혁신당 정책국</strong><br>
+    문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+  </p>
   <script>
     (function(){
       const params = new URLSearchParams(location.search);
