@@ -1539,6 +1539,231 @@ RUN_CHECK_WINNERS_MAX_ITEMS = 8
 RUN_CHECK_MAX_WORKERS = 4
 
 
+# ── 모듈 레벨 헬퍼 (run_check 클로저에서도 참조) ──
+
+def _extract_pledge_title_from_text(text: str) -> str | None:
+    """공약 제목 추출 (공약 1, 공약 2 등 다음 텍스트 또는 따옴표 안 텍스트)."""
+    if not text:
+        return None
+    match = re.search(r'공약\s*\d+\s*[:\s]*([^\n]{10,80}?)(?:\n|목표|이행방법|$)', text, re.MULTILINE)
+    if match:
+        title = match.group(1).strip()
+        title = re.sub(r'^["\'「」『』]|["\'「」『』]$', '', title).strip()
+        if len(title) >= 5:
+            return title
+    for quote in ['"', "'", '「', '」', '『', '』']:
+        match = re.search(rf'{quote}([^{quote}]{{10,80}}?){quote}', text)
+        if match:
+            title = match.group(1).strip()
+            if len(title) >= 5:
+                return title
+    lines = text.split('\n')
+    for line in lines[:5]:
+        line = line.strip()
+        if 10 <= len(line) <= 50 and not line.startswith('[') and not line.startswith('출처'):
+            return line
+    return None
+
+
+def _extract_winners2022_metadata_from_text(text: str, filename: str = "") -> dict:
+    """winners2022 청크에서 이름/직책/지역/제목 추출."""
+    meta: dict = {"name": None, "position": None, "region": None, "pledge_title": None}
+    if not text:
+        return meta
+    meta["pledge_title"] = _extract_pledge_title_from_text(text)
+    m_pos = re.search(r"직책 후보군\s*:\s*([^\n]+)", text)
+    m_reg = re.search(r"지역 후보군\s*:\s*([^\n]+)", text)
+    m_name = re.search(r"이름 후보\s*:\s*([^\n]+)", text)
+    if m_pos and m_pos.group(1).strip() != "확인 필요":
+        cands = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
+        meta["position"] = cands[0] if cands else None
+    if m_reg and m_reg.group(1).strip() != "확인 필요":
+        cands = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
+        meta["region"] = _normalize_region_name(cands[0]) if cands else None
+    if m_name and m_name.group(1).strip() != "확인 필요":
+        for c in [x.strip() for x in m_name.group(1).split(",") if x.strip()]:
+            cand = _clean_winner_name(c)
+            if cand:
+                meta["name"] = cand
+                break
+    if not meta["position"]:
+        m = re.search(r"직책\s*:\s*([^\n]+)", text)
+        if m:
+            cand = (m.group(1) or "").strip()
+            if cand and cand not in {"-", "확인 필요", "확인불가"}:
+                meta["position"] = cand
+    if not meta["region"]:
+        m = re.search(r"지역\s*:\s*([^\n]+)", text)
+        if m:
+            cand = _normalize_region_name((m.group(1) or "").strip())
+            if cand and cand not in {"-", "확인 필요", "확인불가"}:
+                meta["region"] = cand
+    if not meta["name"]:
+        m = re.search(r"당선인명\s*:\s*([^\n]+)", text)
+        if m:
+            cand = _clean_winner_name((m.group(1) or "").strip())
+            if cand:
+                meta["name"] = cand
+    if (not meta["position"] or not meta["name"]) and "요약라인" in text:
+        m = re.search(r"요약라인\s*:\s*2022\s*/\s*([^/\n]+)\s*/\s*([^/\n]+)\s*/", text)
+        if m:
+            pos_cand = (m.group(1) or "").strip()
+            name_cand = (m.group(2) or "").strip()
+            if not meta["position"] and pos_cand and pos_cand not in {"-", "확인 필요", "확인불가"}:
+                meta["position"] = pos_cand
+            if not meta["name"]:
+                cand = _clean_winner_name(name_cand)
+                if cand:
+                    meta["name"] = cand
+    return meta
+
+
+def _search_winners2022_vs(
+    winners2022_vector_store_id: str,
+    pledge: str,
+    user_meta: dict | None = None,
+    max_items: int = 8,
+) -> List[Tuple[float, str, str, Dict]]:
+    """winners2022 벡터 스토어에서 유사 공약 검색 후 메타 추출."""
+    if not winners2022_vector_store_id or not OPENAI_API_KEY:
+        return []
+    try:
+        from openai import OpenAI as _OAI
+        client = _OAI(api_key=OPENAI_API_KEY)
+        queries = _build_winners2022_queries_for_vector(pledge, user_meta, max_queries=4)
+        all_hits: List[Tuple[float, str, str]] = []
+        seen_keys: set = set()
+        for q in queries[:4]:
+            try:
+                try:
+                    page = client.vector_stores.search(
+                        vector_store_id=winners2022_vector_store_id,
+                        query=q,
+                        max_num_results=10,
+                        rewrite_query=True,
+                    )
+                except TypeError:
+                    page = client.vector_stores.search(
+                        winners2022_vector_store_id,
+                        query=q,
+                        max_num_results=10,
+                        rewrite_query=True,
+                    )
+                data = getattr(page, "data", None) if not isinstance(page, dict) else page.get("data")
+                for item in (data or []):
+                    score = float(getattr(item, "score", 0) or 0)
+                    filename = str(getattr(item, "filename", "") or "")
+                    content = getattr(item, "content", None) if not isinstance(item, dict) else item.get("content")
+                    text = ""
+                    if content:
+                        items_c = content if isinstance(content, list) else [content]
+                        for c in items_c:
+                            c_type = getattr(c, "type", None) if not isinstance(c, dict) else c.get("type")
+                            if c_type == "text":
+                                txt = getattr(c, "text", None) if not isinstance(c, dict) else c.get("text")
+                                if txt:
+                                    text += str(txt)
+                    if not text.strip():
+                        continue
+                    key = hashlib.sha256((filename + "\n" + text[:300]).encode("utf-8", errors="ignore")).hexdigest()
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    all_hits.append((score, filename, text))
+            except Exception as e:
+                logger.warning("[winners2022_vs] 검색 오류 q=%r: %s", q[:60], e)
+        if not all_hits:
+            return []
+        all_hits = rerank_winners_hits_by_similarity(all_hits, pledge)
+        result: List[Tuple[float, str, str, Dict]] = []
+        for score, filename, text in all_hits[:max_items]:
+            meta = _extract_winners2022_metadata_from_text(text, filename)
+            result.append((score, filename, text, meta))
+        return result
+    except Exception as e:
+        logger.warning("[winners2022_vs] VS 검색 실패: %s", e)
+        return []
+
+
+def search_winners2022_from_db(
+    pledge: str,
+    user_meta: dict | None = None,
+    top_k: int = 8,
+) -> List[Tuple[float, str, str, Dict]]:
+    """SQLite DB에서 2022 당선인 공약 검색.
+
+    반환: [(score, "DB", text, meta), ...]
+    meta에는 name/position/region/pledge_title이 항상 채워짐 (확인불가 없음).
+    DB가 비어있거나 테이블이 없으면 빈 리스트 반환.
+    """
+    try:
+        import sqlite3 as _sqlite3
+        from backend.database import DB_PATH
+        conn = _sqlite3.connect(str(DB_PATH))
+        conn.row_factory = _sqlite3.Row
+        try:
+            # 테이블 존재 + 데이터 확인
+            count = conn.execute(
+                "SELECT COUNT(*) FROM winners2022"
+            ).fetchone()[0]
+            if count == 0:
+                return []
+
+            # user_meta 기반 필터 구성
+            norm = _normalize_user_meta_for_winners(user_meta)
+            typecodes = norm.get("sgTypecodes") or ["3", "4", "11"]
+            sd_name = norm.get("sdName") or ""
+
+            placeholders = ",".join("?" * len(typecodes))
+            params: list = list(typecodes)
+            where_clauses = [f"w.sg_typecode IN ({placeholders})"]
+            if sd_name:
+                where_clauses.append("w.sd_name LIKE ?")
+                params.append(sd_name[:2] + "%")  # "경기도" → "경기%"
+
+            sql = f"""
+                SELECT w.huboid, w.name, w.position, w.region,
+                       wp.id, wp.title, wp.content, wp.realm
+                FROM winners2022 w
+                JOIN winner_pledges2022 wp ON w.huboid = wp.huboid
+                WHERE {' AND '.join(where_clauses)}
+            """
+            db_rows = conn.execute(sql, params).fetchall()
+            if not db_rows:
+                return []
+
+            # _rank_api_items_by_pledge_keywords 형식으로 변환
+            api_items: List[Tuple[float, str, str, Dict]] = []
+            for row in db_rows:
+                huboid, name, position, region, pid, title, content, realm = (
+                    row[0], row[1], row[2], row[3],
+                    row[4], row[5], row[6], row[7],
+                )
+                text = (content or title or "").strip()
+                if not text:
+                    continue
+                meta = {
+                    "name": name or "",
+                    "position": position or "",
+                    "region": region or "",
+                    "pledge_title": title or "",
+                    "canonical_name": name or "",
+                    "canonical_position": position or "",
+                    "canonical_region": region or "",
+                }
+                api_items.append((1.0, "DB", text, meta))
+
+            # 키워드 매칭으로 정렬
+            ranked = _rank_api_items_by_pledge_keywords(api_items, pledge)
+            return ranked[:top_k]
+
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("[search_winners2022_from_db] DB 조회 실패: %s", e)
+        return []
+
+
 def build_winners2022_context(
     pledge: str,
     winners2022_vector_store_id: str = "",
@@ -1551,6 +1776,74 @@ def build_winners2022_context(
     pledge = (pledge or "").strip()
     if not pledge:
         return ""
+
+    # ── 1순위: SQLite DB 검색 (이름/직책/지역 100% 정확) ──────────────────
+    db_hits = search_winners2022_from_db(pledge, user_meta, top_k=RUN_CHECK_WINNERS_MAX_ITEMS)
+    if db_hits:
+        blocks: List[str] = []
+        total = 0
+        for score, filename, text, meta in db_hits:
+            name = (meta.get("name") or meta.get("canonical_name") or "").strip()
+            position = (meta.get("position") or meta.get("canonical_position") or "-").strip()
+            region = (meta.get("region") or meta.get("canonical_region") or "-").strip()
+            title = (meta.get("pledge_title") or "-").strip()
+            excerpt = (text or "").strip()[:400]
+            summary_line = f'2022 / {position} / {name} / "{title}"'
+            block = (
+                f"요약라인: {summary_line}\n"
+                f"당선인명: {name}\n"
+                f"직책: {position}\n"
+                f"지역: {region}\n"
+                f"공약제목: {title}\n"
+                f"출처: DB(공공데이터포털 당선인공약 API)\n"
+                f"근거발췌: {excerpt}"
+            )
+            if total + len(block) > RUN_CHECK_WINNERS_MAX_CHARS:
+                break
+            blocks.append(block)
+            total += len(block) + 2
+        if blocks:
+            ctx = "\n\n---\n\n".join(blocks)
+            logger.info("[build_winners2022_context] DB기반 %d건 (%d자)", len(blocks), len(ctx))
+            return ctx
+
+    # ── 2순위: VS 검색 (DB 비었을 때 폴백) ────────────────────────────────
+    if winners2022_vector_store_id:
+        vs_hits = _search_winners2022_vs(
+            winners2022_vector_store_id, pledge, user_meta, max_items=RUN_CHECK_WINNERS_MAX_ITEMS
+        )
+        if vs_hits:
+            blocks: List[str] = []
+            total = 0
+            for score, filename, text, meta in vs_hits:
+                name = _clean_winner_name(
+                    meta.get("name") or meta.get("canonical_name") or ""
+                ) or "미상(아래 근거발췌에서 확인)"
+                position = (meta.get("position") or meta.get("canonical_position") or "확인불가").strip()
+                region = (meta.get("region") or meta.get("canonical_region") or "-").strip()
+                title = (meta.get("pledge_title") or "-").strip()
+                excerpt = (text or "").strip()[:400]
+                summary_line = f'2022 / {position} / {name} / "{title}"'
+                block = (
+                    f"요약라인: {summary_line}\n"
+                    f"당선인명: {name}\n"
+                    f"직책: {position}\n"
+                    f"지역: {region}\n"
+                    f"공약제목: {title}\n"
+                    f"score: {score:.3f}\n"
+                    f"출처: {filename}\n"
+                    f"근거발췌: {excerpt}"
+                )
+                if total + len(block) > RUN_CHECK_WINNERS_MAX_CHARS:
+                    break
+                blocks.append(block)
+                total += len(block) + 2
+            if blocks:
+                ctx = "\n\n---\n\n".join(blocks)
+                logger.info("[build_winners2022_context] VS기반 %d건 (%d자)", len(blocks), len(ctx))
+                return ctx
+
+    # VS 없거나 결과 없으면 공공 API 경로
     if not (DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY):
         return ""
 
@@ -1914,95 +2207,12 @@ def run_check(
             logger.debug(f"[API] 당선인 정보 조회 실패: {e}")
             return None
 
+    # 모듈 레벨 함수를 로컬 별칭으로 참조 (하위 함수에서도 사용)
     def _extract_pledge_title(text: str) -> str | None:
-        """
-        공약 제목 추출 (공약 1, 공약 2 등 다음 텍스트 또는 따옴표 안 텍스트).
-        """
-        if not text:
-            return None
-        
-        # 패턴 1: "공약 1", "공약 2" 등 다음 텍스트
-        match = re.search(r'공약\s*\d+\s*[:\s]*([^\n]{10,80}?)(?:\n|목표|이행방법|$)', text, re.MULTILINE)
-        if match:
-            title = match.group(1).strip()
-            # 따옴표 제거
-            title = re.sub(r'^["\'「」『』]|["\'「」『』]$', '', title).strip()
-            if len(title) >= 5:
-                return title
-        
-        # 패턴 2: 따옴표 안 텍스트
-        for quote in ['"', "'", '「', '」', '『', '』']:
-            match = re.search(rf'{quote}([^{quote}]{{10,80}}?){quote}', text)
-            if match:
-                title = match.group(1).strip()
-                if len(title) >= 5:
-                    return title
-        
-        # 패턴 3: 첫 번째 문장 (50자 이내)
-        lines = text.split('\n')
-        for line in lines[:5]:
-            line = line.strip()
-            if 10 <= len(line) <= 50 and not line.startswith('[') and not line.startswith('출처'):
-                return line
-        
-        return None
+        return _extract_pledge_title_from_text(text)
 
     def _extract_winners2022_metadata(text: str, filename: str = "") -> dict:
-        """
-        winners2022 청크에서 제목/근거 추출 보조. (API 사용 시 이름/직책/지역은 API 값으로 overwrite)
-        Returns: {'name', 'position', 'region', 'pledge_title'} — pledge_title 우선, 나머지는 폴백용.
-        """
-        meta = {"name": None, "position": None, "region": None, "pledge_title": None}
-        if not text:
-            return meta
-        meta["pledge_title"] = _extract_pledge_title(text)
-        # 폴백: [문서 메타] 헤더만 간단 파싱 (정규식 의존 최소화)
-        m_pos = re.search(r"직책 후보군\s*:\s*([^\n]+)", text)
-        m_reg = re.search(r"지역 후보군\s*:\s*([^\n]+)", text)
-        m_name = re.search(r"이름 후보\s*:\s*([^\n]+)", text)
-        if m_pos and m_pos.group(1).strip() != "확인 필요":
-            cands = [c.strip() for c in m_pos.group(1).split(",") if c.strip()]
-            meta["position"] = cands[0] if cands else None
-        if m_reg and m_reg.group(1).strip() != "확인 필요":
-            cands = [c.strip() for c in m_reg.group(1).split(",") if c.strip()]
-            meta["region"] = _normalize_region_name(cands[0]) if cands else None
-        if m_name and m_name.group(1).strip() != "확인 필요":
-            for c in [x.strip() for x in m_name.group(1).split(",") if x.strip()]:
-                cand = _clean_winner_name(c)
-                if cand:
-                    meta["name"] = cand
-                    break
-        # 추가 폴백: 구조화 블록/요약라인 직접 파싱
-        if not meta["position"]:
-            m = re.search(r"직책\s*:\s*([^\n]+)", text)
-            if m:
-                cand = (m.group(1) or "").strip()
-                if cand and cand not in {"-", "확인 필요", "확인불가"}:
-                    meta["position"] = cand
-        if not meta["region"]:
-            m = re.search(r"지역\s*:\s*([^\n]+)", text)
-            if m:
-                cand = _normalize_region_name((m.group(1) or "").strip())
-                if cand and cand not in {"-", "확인 필요", "확인불가"}:
-                    meta["region"] = cand
-        if not meta["name"]:
-            m = re.search(r"당선인명\s*:\s*([^\n]+)", text)
-            if m:
-                cand = _clean_winner_name((m.group(1) or "").strip())
-                if cand:
-                    meta["name"] = cand
-        if (not meta["position"] or not meta["name"]) and "요약라인" in text:
-            m = re.search(r"요약라인\s*:\s*2022\s*/\s*([^/\n]+)\s*/\s*([^/\n]+)\s*/", text)
-            if m:
-                pos_cand = (m.group(1) or "").strip()
-                name_cand = (m.group(2) or "").strip()
-                if not meta["position"] and pos_cand and pos_cand not in {"-", "확인 필요", "확인불가"}:
-                    meta["position"] = pos_cand
-                if not meta["name"]:
-                    cand = _clean_winner_name(name_cand)
-                    if cand:
-                        meta["name"] = cand
-        return meta
+        return _extract_winners2022_metadata_from_text(text, filename)
     
     def _enhance_winners2022_hits(
         client: OpenAI,

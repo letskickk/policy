@@ -141,6 +141,30 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_district_codes_region ON district_codes(region_code);
         CREATE INDEX IF NOT EXISTS idx_district_codes_region_election ON district_codes(region_code, election_type);
+
+        CREATE TABLE IF NOT EXISTS winners2022 (
+            huboid TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            sg_typecode TEXT,
+            sd_name TEXT,
+            sgg_name TEXT,
+            wiw_name TEXT,
+            position TEXT,
+            region TEXT,
+            fetched_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_winners2022_typecode ON winners2022(sg_typecode);
+        CREATE INDEX IF NOT EXISTS idx_winners2022_sd_name ON winners2022(sd_name);
+
+        CREATE TABLE IF NOT EXISTS winner_pledges2022 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            huboid TEXT NOT NULL REFERENCES winners2022(huboid),
+            title TEXT,
+            content TEXT,
+            realm TEXT,
+            fetched_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_winner_pledges2022_huboid ON winner_pledges2022(huboid);
         """)
         for stmt in [
             "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
