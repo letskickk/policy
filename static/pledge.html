@@ -1227,28 +1227,21 @@
         }
       }
 
-      const checkPromise = fetch('/check', {
+      let baseText = '';
+      let verifyData = null;
+      let checkDone = false;
+      let checkErrorHandled = false;
+      let checkErrorMsg = '';
+
+      const checkChain = fetch('/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pledge: text }),
         credentials: 'include'
-      });
-      const verifyPromise = fetch('/api/pledge/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, phase: 'quick' }),
-        credentials: 'include'
-      });
-
-      let baseText = '';
-      let verifyData = null;
-      let checkDone = false;
-
-      // /check 도착 시 최소 50%로 올리고, 시뮬레이션은 계속 진행
-      checkPromise.then(async res => {
+      }).then(async res => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          if (handleAuthError(res, data)) return;
+          if (handleAuthError(res, data)) { checkErrorHandled = true; return; }
           throw new Error(data.detail || res.statusText || '서버 요청 실패');
         }
         const bar = document.getElementById('loadingProgressBar');
@@ -1259,15 +1252,15 @@
         console.log('[perf] /check done in', Math.round(performance.now() - t0), 'ms');
       }).catch(e => {
         console.error('[check]', e);
-        if (!checkDone) {
-          if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
-          handleFetchError((e && e.message) || '');
-          resetBtn();
-        }
+        checkErrorMsg = (e && e.message) || '';
       });
 
-      // verify 도착 시 최소 50% 또는 100%, 시뮬레이션은 계속 진행
-      verifyPromise.then(async res => {
+      const verifyChain = fetch('/api/pledge/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, phase: 'quick' }),
+        credentials: 'include'
+      }).then(async res => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (handleAuthError(res, data)) return;
@@ -1284,18 +1277,26 @@
         console.warn('[verify] error:', e);
       });
 
-      // 둘 다 끝나면 완료된 경우에만 100%로 맞추고 결과 표시
-      Promise.allSettled([checkPromise, verifyPromise]).then(() => {
+      Promise.allSettled([checkChain, verifyChain]).then(() => {
         if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
         if (checkDone) {
           updateProgress(100);
           renderCombinedResult(baseText, verifyData || {});
           resetBtn();
           console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
-        } else {
+        } else if (!checkErrorHandled) {
+          handleFetchError(checkErrorMsg || '서버 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
           resetBtn();
         }
       });
+
+      const safetyTimeout = setTimeout(() => {
+        if (!checkDone && btnEl.disabled) {
+          if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
+          handleFetchError('분석 응답이 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해 주세요.');
+          resetBtn();
+        }
+      }, 180000);
     });
 
   </script>
