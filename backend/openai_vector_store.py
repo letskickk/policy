@@ -2318,7 +2318,7 @@ def run_check(
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        max_tokens=4096,
+        max_completion_tokens=4096,
         timeout=180,
     )
     text = resp.choices[0].message.content or ""
