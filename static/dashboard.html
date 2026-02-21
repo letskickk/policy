@@ -59,14 +59,27 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 1.5rem;
-      margin-bottom: 1rem;
+      padding: 1.75rem;
+      margin-bottom: 1.75rem;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: var(--text-strong); }
-    .stat { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    h1 {
+      font-size: 2rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.03em;
+    }
+    .page-desc {
+      font-size: 1.05rem;
+      color: var(--text);
+      font-weight: 600;
+      line-height: 1.7;
+      margin-bottom: 1.5rem;
+    }
+    .stat { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0; }
     .stat-item { background: rgba(0,0,0,0.2); padding: 0.75rem 1rem; border-radius: 12px; min-width: 140px; }
     .stat-item .v { font-size: 1.5rem; font-weight: 900; color: #fff; }
-    .stat-item .l { font-size: 0.85rem; color: var(--muted); }
+    .stat-item .l { font-size: 0.9rem; color: var(--muted); }
     .nav-link {
       display: inline-flex; align-items: center; justify-content: center;
       min-height: 36px; padding: 0 0.9rem;
@@ -85,10 +98,6 @@
     }
     .nav-links .logout-link:hover { color: var(--text-strong); }
     .nav-login-txt { color: var(--muted); font-size: 0.88rem; margin-right: 0.5rem; align-self: center; }
-    .links { margin-top: 1rem; }
-    .links a { color: #ffb37a; text-decoration: none; font-weight: 700; margin-right: 1rem; }
-    .links form { display: inline; }
-    .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
     .footer { margin-top: 2rem; padding-top: 1rem; text-align: center; font-size: 0.9rem; color: var(--muted); line-height: 1.8; border-top: 1px solid var(--border); }
     .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
     .footer a:hover { text-decoration: underline; }
@@ -192,23 +201,16 @@
       </div>
     </div>
     <h1>내 기록</h1>
+    <p class="page-desc">공약 분석 결과가 저장됩니다. 열기로 상세 확인·복사·저장·인쇄 가능.</p>
     <div class="card">
       <div class="stat" id="stats">
         <div class="stat-item"><span class="l">오늘 사용</span><div class="v" id="daily">-</div><span class="l">/ <span id="dailyLimit">-</span> 회</span></div>
         <div class="stat-item"><span class="l">이번 달 사용</span><div class="v" id="monthly">-</div><span class="l">/ <span id="monthlyLimit">-</span> 회</span></div>
       </div>
-      <div class="links">
-        <a href="/pledge">공약 분석하기</a>
-        <a href="/map">지역 공약</a>
-        <a href="/">메인</a>
-        <form action="/api/auth/logout" method="POST" style="display:inline">
-          <button type="submit">로그아웃</button>
-        </form>
-      </div>
     </div>
 
     <div class="card">
-      <h2 style="font-size:1.15rem;margin:0 0 0.8rem 0;color:#f8fafc;">최근 분석 결과</h2>
+      <h2 style="font-size:1.08rem;font-weight:900;margin:0 0 0.8rem 0;color:var(--text-strong);">최근 분석 결과</h2>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:-0.35rem 0 0.8rem 0;">
         <button id="historyRefresh" type="button" style="background:rgba(0,0,0,0.18);border:1px solid rgba(148,163,184,0.22);color:#ffb37a;border-radius:12px;padding:0.55rem 0.75rem;cursor:pointer;font-weight:900;">새로고침</button>
         <button id="historyClear" type="button" style="background:rgba(0,0,0,0.18);border:1px solid rgba(148,163,184,0.22);color:#fca5a5;border-radius:12px;padding:0.55rem 0.75rem;cursor:pointer;font-weight:900;">전체 삭제</button>
@@ -300,7 +302,7 @@
               const rawTxt = item.result_text || '';
               lastHistoryModalFullText = '[입력]\n' + (item.input_text || '') + '\n\n[결과]\n' + rawTxt;
               const resultHtml = CRR ? CRR.buildResultHtml(rawTxt) : ('<div class="analysis-text">' + esc(rawTxt).replace(/\n/g, '<br>') + '</div>');
-              const inputBlock = '<div class="input-label">입력 공약</div><div class="input-block">' + esc(item.input_text || '') + '</div>';
+              const inputBlock = '<div class="input-label">AI 분석에 넣었던 공약</div><div class="input-block">' + esc(item.input_text || '') + '</div>';
               const resultBlock = '<div class="result-label">분석 결과</div><div class="result-content">' + resultHtml + '</div>';
               document.getElementById('historyModalTitle').textContent = '분석 결과 #' + item.id;
               document.getElementById('historyModalBody').innerHTML = inputBlock + resultBlock;
