@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>운영 상태 - 관리자</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #f8fafc; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 0.5rem; }
+    .label { color: #94a3b8; font-weight: 700; min-width: 120px; }
+    .value { word-break: break-all; }
+    .links a { color: #ffb37a; text-decoration: none; font-weight: 700; margin-right: 1rem; }
+    .links a:hover { text-decoration: underline; }
+    .err { color: #fca5a5; }
+    pre { background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: 10px; font-size: 0.85rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>운영 상태</h1>
+    <div class="links" style="margin-bottom:1rem;">
+      <a href="/admin">관리자</a>
+      <a href="/admin/usage">사용량</a>
+    </div>
+    <div id="content" class="card">
+      <p class="err" id="err" style="display:none;"></p>
+      <div id="body"></div>
+    </div>
+  </div>
+  <script>
+    (async () => {
+      const errEl = document.getElementById('err');
+      const bodyEl = document.getElementById('body');
+      try {
+        const r = await fetch('/api/admin/ops/status', { credentials: 'include' });
+        if (r.status === 401) {
+          errEl.textContent = '로그인이 필요합니다.';
+          errEl.style.display = 'block';
+          bodyEl.innerHTML = '<a href="/login?next=' + encodeURIComponent(location.pathname) + '">로그인</a>';
+          return;
+        }
+        if (r.status === 403) {
+          errEl.textContent = '관리자만 접근할 수 있습니다.';
+          errEl.style.display = 'block';
+          return;
+        }
+        if (!r.ok) {
+          errEl.textContent = '상태를 불러오지 못했습니다. (' + r.status + ')';
+          errEl.style.display = 'block';
+          return;
+        }
+        const d = await r.json();
+
+        let html = '';
+
+        html += '<h2>벡터스토어</h2>';
+        html += '<div class="row"><span class="label">모드</span><span class="value">' + (d.use_openai_vector_store ? 'OpenAI Vector Store' : 'FAISS 인덱스') + '</span></div>';
+        const vs = d.vector_stores || {};
+        html += '<div class="row"><span class="label">policy</span><span class="value">' + (vs.policy || '(없음)') + '</span></div>';
+        html += '<div class="row"><span class="label">regional</span><span class="value">' + (vs.regional || '(없음)') + '</span></div>';
+        html += '<div class="row"><span class="label">winners2022</span><span class="value">' + (vs.winners2022 || '(없음)') + '</span></div>';
+
+        if (d.fs) {
+          html += '<h2 style="margin-top:1rem;">PDF 디렉터리</h2>';
+          html += '<div class="row"><span class="label">경로</span><span class="value">' + (d.fs.pdf_dir || '-') + '</span></div>';
+          html += '<div class="row"><span class="label">존재</span><span class="value">' + (d.fs.pdf_dir_exists ? '예' : '아니오') + '</span></div>';
+          const folders = d.fs.folders || {};
+          for (const [name, info] of Object.entries(folders)) {
+            html += '<div class="row"><span class="label">' + name + '</span><span class="value">문서 ' + (info.doc_count || 0) + '개' + (info.sample_names && info.sample_names.length ? ' (샘플: ' + info.sample_names.slice(0, 3).join(', ') + ')' : '') + '</span></div>';
+          }
+        }
+        if (d.fs_error) {
+          html += '<p class="err" style="margin-top:0.5rem;">FS 조회 오류: ' + d.fs_error + '</p>';
+        }
+
+        bodyEl.innerHTML = html;
+      } catch (e) {
+        errEl.textContent = '오류: ' + (e && e.message ? e.message : String(e));
+        errEl.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

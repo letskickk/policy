@@ -355,6 +355,20 @@ def og_image_png():
     raise HTTPException(status_code=404, detail="og.png not found")
 
 
+@app.get("/static/{path:path}")
+def serve_static(path: str):
+    """정적 파일 (JS, CSS 등) 제공."""
+    safe = Path(path)
+    if safe.is_absolute() or ".." in safe.parts:
+        raise HTTPException(status_code=404, detail="Not found")
+    file_path = (STATIC_DIR / path).resolve()
+    if not file_path.is_file() or not str(file_path).startswith(str(STATIC_DIR.resolve())):
+        raise HTTPException(status_code=404, detail="Not found")
+    suffix = file_path.suffix.lower()
+    media = "application/javascript; charset=utf-8" if suffix == ".js" else "text/css; charset=utf-8" if suffix == ".css" else None
+    return FileResponse(file_path, media_type=media)
+
+
 @app.api_route("/", methods=["GET", "HEAD"])
 def index():
     """메인 페이지: 서비스 소개 및 공약 점검 진입."""
@@ -479,6 +493,16 @@ def admin_usage_page(request: Request):
     if res:
         return res
     raise HTTPException(status_code=404, detail="admin/usage.html not found")
+
+
+@app.api_route("/admin/ops", methods=["GET", "HEAD"])
+def admin_ops_page(request: Request):
+    """관리자 전용: 운영 상태 (벡터스토어·PDF 디렉터리) 페이지."""
+    _ = require_admin(request)
+    res = _serve_html("admin/ops.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="admin/ops.html not found")
 
 
 class SignupBody(BaseModel):
@@ -838,7 +862,16 @@ def api_me(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="로그인 필요")
-    return {"id": user["id"], "email": user["email"], "status": user["status"], "role": user["role"]}
+    full = get_user(user["id"])
+    out = {"id": user["id"], "email": user["email"], "status": user["status"], "role": user["role"]}
+    out["is_admin"] = user["role"] == ROLE_ADMIN or user["email"] in ADMIN_EMAILS
+    if full:
+        out["election_position"] = full.get("election_position") or ""
+        out["region_code"] = full.get("region_code") or ""
+        out["region_name"] = full.get("region_name") or ""
+        out["district_code"] = full.get("district_code") or ""
+        out["district_name"] = full.get("district_name") or ""
+    return out
 
 
 @app.get("/api/admin/users/pending")
@@ -1024,6 +1057,33 @@ def api_admin_usage_stats(request: Request):
         }
     finally:
         conn.close()
+
+
+@app.get("/api/admin/ops/status")
+def api_admin_ops_status(request: Request):
+    """관리자 전용: 벡터스토어 ID·PDF 디렉터리 요약 등 운영 상태 (읽기 전용)."""
+    require_admin(request)
+    _ensure_startup()
+    global _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
+    try:
+        from backend.rag_registry import get_vector_store_ids
+        policy_id, regional_id, winners2022_id = get_vector_store_ids()
+    except Exception as e:
+        logger.warning("rag_registry get_vector_store_ids failed: %s", e)
+        policy_id = regional_id = winners2022_id = ""
+    out = {
+        "vector_stores": {
+            "policy": _vector_store_id or policy_id or "",
+            "regional": _regional_vector_store_id or regional_id or "",
+            "winners2022": _winners2022_vector_store_id or winners2022_id or "",
+        },
+        "use_openai_vector_store": USE_OPENAI_VECTOR_STORE,
+    }
+    try:
+        out["fs"] = _get_fs_debug()
+    except Exception as e:
+        out["fs_error"] = str(e)
+    return out
 
 
 @app.get("/map")
@@ -2221,6 +2281,110 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
         election_level=row["election_level"],
         pledges=_fetch_candidate_pledges(int(row["id"]), limit=None),
     )
+
+
+PLEDGE_TEMPLATES_PATH = ROOT_DIR / "data" / "pledge_templates.json"
+
+
+@app.get("/api/pledge/templates")
+def api_pledge_templates(
+    request: Request,
+    election_position: str = Query(default="", description="(관리자 전용) 선거유형 오버라이드"),
+    region_name: str = Query(default="", description="(관리자 전용) 출마지역(광역) 오버라이드"),
+    district_name: str = Query(default="", description="(관리자 전용) 지역구/선거구 오버라이드"),
+):
+    """
+    로그인 사용자의 선거유형·지역에 맞는 공약 초안 템플릿을 반환한다.
+    회원가입 시 저장된 election_position, region_name, district_name을 자동 반영.
+    관리자는 쿼리 파라미터로 선거유형·지역을 지정해 테스트할 수 있다.
+    """
+    user = require_user(request)
+    full = get_user(user["id"])
+    is_admin = user["role"] == ROLE_ADMIN or user["email"] in ADMIN_EMAILS
+
+    ep = (full.get("election_position") or "").strip().lower() if full else ""
+    region_name_val = (full.get("region_name") or "").strip() if full else ""
+    district_name_val = (full.get("district_name") or "").strip() if full else ""
+
+    if is_admin:
+        if (election_position or "").strip():
+            ep = election_position.strip().lower()
+        if (region_name or "").strip():
+            region_name_val = region_name.strip()
+        if (district_name or "").strip():
+            district_name_val = district_name.strip()
+
+    if not PLEDGE_TEMPLATES_PATH.exists():
+        out = {"label": "", "sections": [], "election_position": ep, "region_name": region_name_val, "district_name": district_name_val}
+        if is_admin:
+            out["template_options"] = []
+        return out
+
+    try:
+        raw = PLEDGE_TEMPLATES_PATH.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except Exception as e:
+        logger.warning("pledge_templates.json load failed: %s", e)
+        out = {"label": "", "sections": [], "election_position": ep, "region_name": region_name_val, "district_name": district_name_val}
+        if is_admin:
+            out["template_options"] = []
+        return out
+
+    if is_admin:
+        template_options = [{"key": k, "label": (v.get("label") or k)} for k, v in data.items() if isinstance(v, dict) and v.get("label") and not v.get("not_available")]
+    else:
+        template_options = []
+
+    def substitute(s: str) -> str:
+        return (s or "").replace("{{region_name}}", region_name_val).replace("{{district_name}}", district_name_val)
+
+    template = data.get(ep) if ep else None
+    if not template:
+        out = {"label": "", "election_position": ep, "region_name": region_name_val, "district_name": district_name_val}
+        if template_options:
+            out["template_options"] = template_options
+        return out
+
+    if template.get("not_available"):
+        out = {
+            "label": substitute(template.get("label", "")),
+            "not_available": True,
+            "message": substitute(template.get("message", "해당 선거유형은 공약 초안 도우미 대상이 아닙니다.")),
+            "election_position": ep,
+            "region_name": region_name_val,
+            "district_name": district_name_val,
+        }
+        if template_options:
+            out["template_options"] = template_options
+        return out
+
+    label = substitute(template.get("label", ""))
+    structure_raw = template.get("structure") or {}
+    structure = {
+        "background": substitute(structure_raw.get("background", "")),
+        "action": substitute(structure_raw.get("action", "")),
+        "effect": substitute(structure_raw.get("effect", "")),
+    }
+    checklist = [substitute(x) for x in (template.get("checklist") or [])]
+    do_dont = [substitute(x) for x in (template.get("do_dont") or [])]
+    standard_intro = (data.get("standard_intro") or "").strip()
+    out = {
+        "label": label,
+        "standard_intro": standard_intro,
+        "guide_title": substitute(template.get("guide_title", "공약 한 편 잘 쓰기")),
+        "guide_intro": substitute(template.get("guide_intro", "")),
+        "structure": structure,
+        "checklist": checklist,
+        "do_dont": do_dont,
+        "example": substitute(template.get("example", "")),
+        "notice_one_line": substitute(template.get("notice_one_line", "")),
+        "election_position": ep,
+        "region_name": region_name_val,
+        "district_name": district_name_val,
+    }
+    if template_options:
+        out["template_options"] = template_options
+    return out
 
 
 class PledgeVerifyRequest(BaseModel):
