@@ -2454,13 +2454,18 @@ def run_check(
     ]
 
     # 4) winners2022 — 입력 공약과 유사한 2022 당선인 사례 검색
-    # 핵심: 4번 섹션은 유사 사례 비교용. 사용자 직책/지역으로 필터하지 않음.
+    # 핵심: 4번 섹션은 유사 사례 비교용. DB 우선 → VS → 공공 API 순.
     winners2022_context = ""
     request_dedup: set = set()
     api_items: List[Tuple[float, str, str, Dict]] = []
 
-    # API: 전 선거구분(3=광역단체장, 4=기초단체장, 11=교육감) 모두 조회 → 키워드 매칭 상위 선택
-    if DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY:
+    # ── 1순위: SQLite DB (이름/직책 100% 정확, API 실시간 호출 불필요) ──
+    _db_hits = search_winners2022_from_db(pledge, user_meta, top_k=RUN_CHECK_WINNERS_RAW_CAP)
+    if _db_hits:
+        api_items = _db_hits
+        logger.info("[run_check/WINNERS2022] DB기반 %d건 사용", len(api_items))
+    elif DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY:
+        # ── 2순위: 공공 API 실시간 호출 (DB 비었을 때 폴백) ──
         all_winner_rows: List[Dict[str, Any]] = []
         for st in ["3", "4", "11"]:
             rows = _fetch_winners_api(
@@ -2501,8 +2506,8 @@ def run_check(
 
     queries = _build_winners2022_queries_for_vector(
         pledge, user_meta or {}, max_queries=RUN_CHECK_WINNERS_QUERIES_MAX
-    ) if winners2022_vector_store_id and pledge else []
-    if winners2022_vector_store_id and queries:
+    ) if winners2022_vector_store_id and pledge and not _db_hits else []
+    if winners2022_vector_store_id and queries and not _db_hits:
         all_hits: List[Tuple[float, str, str]] = []
         with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as executor:
             futures = [
@@ -2581,7 +2586,10 @@ def run_check(
         boosted.sort(key=lambda x: x[0])
         return [r for _, r in boosted] + rest
 
-    if winners_enhanced:
+    if _db_hits:
+        # DB 결과 직접 사용 (VS 건너뜀, 이름/직책 100% 정확)
+        final_hits = _pledge_keyword_boost(api_items, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
+    elif winners_enhanced:
         final_hits = _pledge_keyword_boost(winners_enhanced, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
     elif api_items:
         final_hits = _pledge_keyword_boost(api_items, pledge)[:RUN_CHECK_WINNERS_MAX_ITEMS]
