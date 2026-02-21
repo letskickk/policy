@@ -514,6 +514,31 @@
       color: var(--text-strong);
       font-weight: 800;
     }
+    .loading-progress-wrap{
+      width: 100%;
+      max-width: 280px;
+      margin-top: 0.25rem;
+    }
+    .loading-progress-track{
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .loading-progress-bar{
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ff7210, #ffb37a);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+    .loading-progress-pct{
+      display: block;
+      margin-top: 0.4rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
     .spinner{
       width: 32px; height: 32px;
       border: 3px solid rgba(255,255,255,0.12);
@@ -706,17 +731,39 @@
       resultEl.className = 'result-content';
     }
 
+    let loadingProgressTimer = null;
+    function updateProgress(pct) {
+      const bar = document.getElementById('loadingProgressBar');
+      const pctEl = document.getElementById('loadingProgressPct');
+      if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+      if (pctEl) pctEl.textContent = Math.min(100, Math.max(0, Math.round(pct))) + '%';
+    }
     function showLoading() {
       resultEl.innerHTML = `
         <div class="loading-state">
           <div class="spinner"></div>
           <span>AI가 정책 데이터를 분석하고 있습니다...</span>
+          <div class="loading-progress-wrap">
+            <div class="loading-progress-track">
+              <div id="loadingProgressBar" class="loading-progress-bar"></div>
+            </div>
+            <span id="loadingProgressPct" class="loading-progress-pct">0%</span>
+          </div>
           <small style="display:block;margin-top:0.5rem;color:var(--muted);font-weight:600;">최대 1~2분 걸릴 수 있습니다. 잠시만 기다려 주세요.</small>
         </div>
       `;
       resultEl.className = 'result-content';
       btnEl.disabled = true;
       btnEl.textContent = '분석 진행 중...';
+      updateProgress(0);
+      if (loadingProgressTimer) clearInterval(loadingProgressTimer);
+      loadingProgressTimer = setInterval(() => {
+        const bar = document.getElementById('loadingProgressBar');
+        if (!bar) { clearInterval(loadingProgressTimer); return; }
+        const w = parseFloat(bar.style.width || '0');
+        if (w >= 90) return;
+        updateProgress(w + 2);
+      }, 1500);
     }
 
     function resetBtn() {
@@ -1193,26 +1240,29 @@
       let verifyData = null;
       let checkDone = false;
 
-      // /check 먼저 도착하면 즉시 렌더
+      // /check 도착 시 최소 50%로 올리고, 시뮬레이션은 계속 진행
       checkPromise.then(async res => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (handleAuthError(res, data)) return;
           throw new Error(data.detail || res.statusText || '서버 요청 실패');
         }
+        const bar = document.getElementById('loadingProgressBar');
+        const cur = bar ? parseFloat(bar.style.width || '0') : 0;
+        updateProgress(Math.max(cur, 50));
         baseText = (data && typeof data.result === 'string') ? data.result : '';
         checkDone = true;
         console.log('[perf] /check done in', Math.round(performance.now() - t0), 'ms');
-        renderCombinedResult(baseText, verifyData || {});
       }).catch(e => {
         console.error('[check]', e);
         if (!checkDone) {
+          if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
           handleFetchError((e && e.message) || '');
           resetBtn();
         }
       });
 
-      // verify 도착하면 보강 렌더
+      // verify 도착 시 최소 50% 또는 100%, 시뮬레이션은 계속 진행
       verifyPromise.then(async res => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -1222,18 +1272,25 @@
         }
         if (!data || typeof data !== 'object') return;
         verifyData = data;
+        const bar = document.getElementById('loadingProgressBar');
+        const cur = bar ? parseFloat(bar.style.width || '0') : 0;
+        updateProgress(Math.max(cur, checkDone ? 100 : 50));
         console.log('[perf] /verify done in', Math.round(performance.now() - t0), 'ms');
-        if (checkDone) {
-          renderCombinedResult(baseText, verifyData);
-        }
       }).catch(e => {
         console.warn('[verify] error:', e);
       });
 
-      // 둘 다 끝나면 버튼 복원
+      // 둘 다 끝나면 100%로 맞추고 바로 결과 표시
       Promise.allSettled([checkPromise, verifyPromise]).then(() => {
-        resetBtn();
-        console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
+        if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
+        updateProgress(100);
+        if (checkDone) {
+          renderCombinedResult(baseText, verifyData || {});
+          resetBtn();
+          console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
+        } else {
+          resetBtn();
+        }
       });
     });
 
