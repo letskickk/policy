@@ -366,8 +366,13 @@ def _extract_position_name_from_evidence(text: str) -> Tuple[str, str]:
     if not t:
         return ("", "")
     patterns = [
-        r"((?:[가-힣]{2,}(?:특별시|광역시|도))?\s*[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원))\s*[:\-]?\s*([가-힣]{2,4})",
-        r"([가-힣]{2,4})\s*\(\s*((?:[가-힣]{2,}(?:특별시|광역시|도))?\s*[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원))\s*\)",
+        r"((?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|"
+        r"경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|"
+        r"[가-힣]{2,}(?:특별시|광역시|특별자치시|도)\s*(?:시장|지사)|[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원)))\s*[:\-]?\s*([가-힣]{2,4})",
+        r"([가-힣]{2,4})\s*\(\s*((?:서울특별시장|부산광역시장|대구광역시장|인천광역시장|광주광역시장|대전광역시장|울산광역시장|세종특별자치시장|"
+        r"경기도지사|강원도지사|충청북도지사|충청남도지사|전라북도지사|전라남도지사|경상북도지사|경상남도지사|제주특별자치도지사|"
+        r"[가-힣]{2,}(?:특별시|광역시|특별자치시|도)\s*(?:시장|지사)|[가-힣]{1,20}(?:교육감|시장|군수|구청장|지사|의원)))\s*\)",
+        r"((?:[가-힣]{2,}(?:특별시|광역시|특별자치시|도))\s*(?:시장|지사|교육감))\s*[:\-]?\s*([가-힣]{2,4})",
     ]
     for pat in patterns:
         m = re.search(pat, t)
@@ -380,6 +385,20 @@ def _extract_position_name_from_evidence(text: str) -> Tuple[str, str]:
             if re.search(r"(교육감|시장|군수|구청장|지사|의원)$", g2):
                 return (g2, g1)
     return ("", "")
+
+
+def _clean_winner_name(raw: str) -> str:
+    """당선인명 후보를 정규화해 2~4자 한글 이름만 반환."""
+    cand = (raw or "").strip()
+    if not cand:
+        return ""
+    cand = re.sub(r"\(.*?\)", "", cand).strip()
+    cand = re.sub(r"\b(?:후보|당선인|님)\b", "", cand).strip()
+    cand = re.sub(r"^[^가-힣]+|[^가-힣]+$", "", cand)
+    if re.match(r"^[가-힣]{2,4}$", cand):
+        return cand
+    m = re.search(r"([가-힣]{2,4})", cand)
+    return m.group(1) if m else ""
 
 
 def reconstruct_winner_identity(meta: Dict, evidence_text: str) -> Tuple[str, str]:
@@ -395,13 +414,14 @@ def reconstruct_winner_identity(meta: Dict, evidence_text: str) -> Tuple[str, st
         pos = ""
     if name in {"-", "확인 필요", "확인불가"}:
         name = ""
+    name = _clean_winner_name(name)
     if pos and name:
         return (pos, name)
     ext_pos, ext_name = _extract_position_name_from_evidence(evidence_text or "")
     if not pos and ext_pos:
         pos = ext_pos
     if not name and ext_name:
-        name = ext_name
+        name = _clean_winner_name(ext_name)
     if not name:
         name = "확인불가"
     if not pos:
@@ -1948,8 +1968,9 @@ def run_check(
             meta["region"] = _normalize_region_name(cands[0]) if cands else None
         if m_name and m_name.group(1).strip() != "확인 필요":
             for c in [x.strip() for x in m_name.group(1).split(",") if x.strip()]:
-                if 2 <= len(c) <= 4 and re.match(r"^[가-힣]{2,4}$", c):
-                    meta["name"] = c
+                cand = _clean_winner_name(c)
+                if cand:
+                    meta["name"] = cand
                     break
         # 추가 폴백: 구조화 블록/요약라인 직접 파싱
         if not meta["position"]:
@@ -1967,8 +1988,8 @@ def run_check(
         if not meta["name"]:
             m = re.search(r"당선인명\s*:\s*([^\n]+)", text)
             if m:
-                cand = (m.group(1) or "").strip()
-                if re.match(r"^[가-힣]{2,4}$", cand):
+                cand = _clean_winner_name((m.group(1) or "").strip())
+                if cand:
                     meta["name"] = cand
         if (not meta["position"] or not meta["name"]) and "요약라인" in text:
             m = re.search(r"요약라인\s*:\s*2022\s*/\s*([^/\n]+)\s*/\s*([^/\n]+)\s*/", text)
@@ -1977,8 +1998,10 @@ def run_check(
                 name_cand = (m.group(2) or "").strip()
                 if not meta["position"] and pos_cand and pos_cand not in {"-", "확인 필요", "확인불가"}:
                     meta["position"] = pos_cand
-                if not meta["name"] and re.match(r"^[가-힣]{2,4}$", name_cand):
-                    meta["name"] = name_cand
+                if not meta["name"]:
+                    cand = _clean_winner_name(name_cand)
+                    if cand:
+                        meta["name"] = cand
         return meta
     
     def _enhance_winners2022_hits(
