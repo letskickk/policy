@@ -359,6 +359,16 @@
       border:1px solid rgba(148,163,184,0.28); border-radius:12px;
       background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow:hidden;
     }
+    .section-details summary.section-card-head{
+      list-style:none; cursor:pointer; user-select:none;
+    }
+    .section-details summary.section-card-head::-webkit-details-marker{ display:none; }
+    .section-details summary.section-card-head::before{
+      content: ''; display:inline-block; width:0.5rem; height:0.5rem; margin-right:0.4rem;
+      border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+      transform:rotate(45deg); transition:transform 0.2s;
+    }
+    .section-details[open] summary.section-card-head::before{ transform:rotate(-135deg); }
     .section-card-head{
       display:flex; align-items:center; justify-content:space-between; gap:0.6rem;
       padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background:rgba(2,6,23,0.25);
@@ -368,6 +378,38 @@
     .section-line{ margin-top:0.35rem; }
     .section-line:first-child{ margin-top:0; }
     .section-line.item{ margin-top:0.5rem; }
+
+    .draft-modal{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .draft-modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,0.6); }
+    .draft-modal-box{ position:relative; max-width:840px; width:100%; max-height:85vh; overflow:auto; background:var(--bg2); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow2); }
+    .draft-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:1rem 1.2rem; border-bottom:1px solid var(--border); }
+    .draft-modal-title{ margin:0; font-size:1.15rem; color:var(--text-strong); }
+    .draft-modal-close{ background:none; border:none; color:var(--muted); font-size:1.5rem; cursor:pointer; padding:0 0.25rem; line-height:1; }
+    .draft-modal-close:hover{ color:var(--text-strong); }
+    .draft-modal-admin-row{ display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; padding:0.75rem 1.2rem; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.15); font-size:0.9rem; }
+    .draft-modal-admin-row label{ display:inline-flex; align-items:center; gap:0.35rem; }
+    .draft-modal-admin-row select{ padding:0.25rem 0.5rem; border-radius:6px; border:1px solid var(--border); }
+    .draft-modal-admin-row input[type="text"]{ padding:0.25rem 0.5rem; width:140px; border-radius:6px; border:1px solid var(--border); }
+    .draft-admin-label{ color:var(--muted); margin-right:0.25rem; }
+    .draft-modal-body{ padding:1rem 1.2rem; color:var(--text); font-size:0.95rem; line-height:1.6; }
+    .draft-modal-body .draft-section{ margin-bottom:1rem; }
+    .draft-modal-body .draft-section-title{ font-weight:900; color:var(--text-strong); margin-bottom:0.35rem; }
+    .draft-modal-body .draft-section-hint{ color:var(--muted); font-size:0.9rem; margin-bottom:0.25rem; }
+    .draft-modal-body .draft-section-sample{ white-space:pre-wrap; background:rgba(0,0,0,0.2); padding:0.75rem; border-radius:10px; font-size:0.88rem; }
+    .draft-modal-body .draft-guide-example-input{ width:100%; min-height:180px; padding:0.75rem; border-radius:10px; font-size:0.9rem; line-height:1.6; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:var(--text); resize:vertical; box-sizing:border-box; }
+    .draft-modal-body .draft-guide-meta{ margin-bottom:0.75rem; }
+    .draft-modal-body .draft-guide-title{ margin:0 0 0.5rem; font-size:1.05rem; color:var(--text-strong); }
+    .draft-modal-body .draft-guide-intro{ color:var(--text); margin-bottom:1rem; line-height:1.6; }
+    .draft-modal-body .draft-guide-structure{ margin-bottom:1rem; }
+    .draft-modal-body .draft-guide-structure p{ margin:0.35rem 0; font-size:0.9rem; }
+    .draft-modal-body .draft-guide-checklist{ margin-bottom:1rem; }
+    .draft-modal-body .draft-guide-checklist ul{ margin:0.25rem 0 0 1.2rem; padding:0; }
+    .draft-modal-body .draft-guide-do-dont{ margin-bottom:1rem; }
+    .draft-modal-body .draft-guide-do-dont ul{ margin:0.25rem 0 0 1.2rem; padding:0; }
+    .draft-modal-body .draft-guide-notice{ margin-bottom:1rem; padding:0.5rem 0.75rem; background:rgba(255,179,122,0.12); border-radius:8px; font-size:0.9rem; color:var(--text-strong); }
+    .draft-modal-body .draft-guide-notice-label{ font-weight:700; color:var(--muted); margin-right:0.35rem; }
+    .draft-modal-body .draft-not-available{ color:var(--muted); padding:1rem 0; }
+    .draft-modal-footer{ display:flex; gap:0.5rem; flex-wrap:wrap; padding:1rem 1.2rem; border-top:1px solid var(--border); }
     .line-tag{ font-size:0.75rem; font-weight:800; color:#93c5fd; border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem; }
     /* 4번 섹션 유사 공약 카드 */
     .winners-card{
@@ -541,9 +583,34 @@
       <p class="form-hint">
         아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+        <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
+      </div>
       <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
     </section>
+
+    <div id="draftHelperModal" class="draft-modal" style="display:none;" aria-hidden="true">
+      <div class="draft-modal-backdrop"></div>
+      <div class="draft-modal-box">
+        <div class="draft-modal-head">
+          <h3 class="draft-modal-title">공약 초안 도우미</h3>
+          <button type="button" class="draft-modal-close" id="draftHelperClose" aria-label="닫기">&times;</button>
+        </div>
+        <div id="draftHelperAdminRow" class="draft-modal-admin-row" style="display:none;">
+          <span class="draft-admin-label">테스트용 (관리자):</span>
+          <label>선거유형 <select id="draftHelperElection"></select></label>
+          <label>출마지역(광역) <input type="text" id="draftHelperRegion" placeholder="예: 서울특별시" /></label>
+          <label>지역구/선거구 <input type="text" id="draftHelperDistrict" placeholder="예: 강남구 제1선거구" /></label>
+          <button type="button" id="draftHelperAdminApply" class="btn-secondary">적용</button>
+        </div>
+        <div id="draftHelperContent" class="draft-modal-body"></div>
+        <div class="draft-modal-footer">
+          <button type="button" class="btn-secondary" id="draftHelperFill">입력창에 채우기</button>
+          <button type="button" class="btn-secondary" id="draftHelperClose2">닫기</button>
+        </div>
+      </div>
+    </div>
 
     <section class="card">
       <h2 class="form-label">분석 결과</h2>
@@ -568,11 +635,13 @@
   </footer>
 
   <script>
+    let meData = { is_admin: false };
     (async function() {
       try {
         const r = await fetch('/api/auth/me', { credentials: 'include' });
         if (r.ok) {
           const d = await r.json();
+          meData = d;
           if (d.email) {
             const e = String(d.email).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const row = document.getElementById('loginRow');
@@ -585,6 +654,7 @@
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
+    let lastResultFullText = '';
 
     const emptyMessage = '<div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>공약 내용을 입력하고<br>\'AI 분석 시작하기\' 버튼을 눌러주세요.';
 
@@ -777,6 +847,7 @@
       const fullText = normalizedBaseText || '';
       const sections = splitSections(fullText);
       if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
+        const defaultOpen = (idx) => [0, 1, 4, 5].includes(idx);
         html += '<div class="section-cards">' + sections.map((sec, idx) => {
           const bodyLines = (sec.body || []).join('\n').split('\n');
           let bodyHtml = '';
@@ -788,14 +859,15 @@
             bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
           }
           bodyHtml = bodyHtml || '-';
+          const openAttr = defaultOpen(idx) ? ' open' : '';
           return `
-            <section class="section-card">
-              <div class="section-card-head">
+            <details class="section-card section-details"${openAttr}>
+              <summary class="section-card-head">
                 <div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div>
                 <span class="line-tag">${idx + 1}</span>
-              </div>
+              </summary>
               <div class="section-card-body">${bodyHtml}</div>
-            </section>
+            </details>
           `;
         }).join('') + '</div>';
       } else {
@@ -805,16 +877,19 @@
       html += `
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
+          <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
+          <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
 
       showResult(html);
+      lastResultFullText = fullText || '';
 
       const copyBtn = document.getElementById('copyResultBtn');
       if (copyBtn) {
         copyBtn.addEventListener('click', async () => {
           try {
-            await navigator.clipboard.writeText(fullText || '');
+            await navigator.clipboard.writeText(lastResultFullText || '');
             copyBtn.textContent = '복사 완료';
             setTimeout(() => { copyBtn.textContent = '결과 복사'; }, 1200);
           } catch (e) {
@@ -823,7 +898,203 @@
           }
         });
       }
+      const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+      if (downloadTxtBtn) {
+        downloadTxtBtn.addEventListener('click', () => {
+          const text = lastResultFullText || '';
+          if (!text) return;
+          const now = new Date();
+          const y = now.getFullYear();
+          const m = String(now.getMonth() + 1).padStart(2, '0');
+          const d = String(now.getDate()).padStart(2, '0');
+          const h = String(now.getHours()).padStart(2, '0');
+          const min = String(now.getMinutes()).padStart(2, '0');
+          const name = `analysis_${y}${m}${d}_${h}${min}.txt`;
+          const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = name;
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      }
+      const printResultBtn = document.getElementById('printResultBtn');
+      if (printResultBtn) {
+        printResultBtn.addEventListener('click', () => {
+          const text = lastResultFullText || '';
+          if (!text) return;
+          const w = window.open('', '_blank');
+          if (!w) {
+            alert('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요.');
+            return;
+          }
+          const escaped = escapeHtml(text).replace(/\n/g, '<br>');
+          w.document.write(`
+            <!DOCTYPE html><html><head><meta charset="utf-8"><title>분석 결과 인쇄</title>
+            <style>
+              body { font-family: "Malgun Gothic", sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; line-height: 1.7; color: #1e293b; }
+              @media print { body { padding: 16px; } }
+            </style></head><body><div class="content">${escaped}</div></body></html>
+          `);
+          w.document.close();
+          w.focus();
+          setTimeout(() => { w.print(); }, 250);
+        });
+      }
     }
+
+    let lastDraftText = '';
+
+    function buildTemplatesUrl(opts) {
+      if (!opts || !meData.is_admin) return '/api/pledge/templates';
+      const p = new URLSearchParams();
+      if (opts.election_position) p.set('election_position', opts.election_position);
+      if (opts.region_name) p.set('region_name', opts.region_name);
+      if (opts.district_name) p.set('district_name', opts.district_name);
+      const q = p.toString();
+      return '/api/pledge/templates' + (q ? '?' + q : '');
+    }
+
+    function renderDraftContent(data, content) {
+      const fillBtn = document.getElementById('draftHelperFill');
+      if (data.not_available) {
+        content.innerHTML = '<p class="draft-not-available">' + escapeHtml(data.message || '교육감은 정당 소속이 아니어서 본 도우미 대상이 아닙니다.') + '</p>';
+        lastDraftText = '';
+        fillBtn.disabled = true;
+        return;
+      }
+      fillBtn.disabled = false;
+      let html = '';
+      if (data.label) {
+        html += '<p class="draft-guide-meta"><strong>' + escapeHtml(data.label) + '</strong>';
+        if (data.region_name || data.district_name) html += ' · ' + escapeHtml([data.region_name, data.district_name].filter(Boolean).join(' '));
+        html += '</p>';
+      }
+      if (data.standard_intro) html += '<p class="draft-guide-intro">' + escapeHtml(data.standard_intro) + '</p>';
+      if (data.structure && (data.structure.background || data.structure.action || data.structure.effect)) {
+        function nl2br(s) { return (s || '').split('\n').map(function(t) { return escapeHtml(t); }).join('<br>'); }
+        html += '<div class="draft-guide-structure"><div class="draft-section-title">1. 공약의 구조</div>';
+        if (data.structure.background) html += '<p><strong>배경 (현황 및 문제점)</strong><br>' + nl2br(data.structure.background) + '</p>';
+        if (data.structure.action) html += '<p><strong>실행방안 (해결책 및 추진 계획)</strong><br>' + nl2br(data.structure.action) + '</p>';
+        if (data.structure.effect) html += '<p><strong>기대효과 (개선 목표)</strong><br>' + nl2br(data.structure.effect) + '</p>';
+        html += '</div>';
+      }
+      if (data.checklist && data.checklist.length) {
+        html += '<div class="draft-guide-checklist"><div class="draft-section-title">2. 핵심 체크리스트</div><ul>';
+        data.checklist.forEach(function(item) { html += '<li>[ ] ' + escapeHtml(item) + '</li>'; });
+        html += '</ul></div>';
+      }
+      if (data.do_dont && data.do_dont.length) {
+        html += '<div class="draft-guide-do-dont"><div class="draft-section-title">3. DO / DON\'T</div><ul>';
+        data.do_dont.forEach(function(item) { html += '<li>' + escapeHtml(item) + '</li>'; });
+        html += '</ul></div>';
+      }
+      if (data.example) {
+        html += '<div class="draft-section-title">예시 (한 편)</div><textarea id="draftHelperExample" class="draft-guide-example-input" rows="12" placeholder="예시를 수정한 뒤 입력창에 채우기를 누르세요">' + escapeHtml(data.example) + '</textarea>';
+      }
+      content.innerHTML = html;
+      lastDraftText = data.example || '';
+    }
+
+    document.getElementById('draftHelperBtn').addEventListener('click', async function() {
+      const modal = document.getElementById('draftHelperModal');
+      const content = document.getElementById('draftHelperContent');
+      const adminRow = document.getElementById('draftHelperAdminRow');
+      const selEl = document.getElementById('draftHelperElection');
+      const regionEl = document.getElementById('draftHelperRegion');
+      const districtEl = document.getElementById('draftHelperDistrict');
+      adminRow.style.display = 'none';
+      try {
+        const url = buildTemplatesUrl(null);
+        const r = await fetch(url, { credentials: 'include' });
+        if (!r.ok) {
+          if (r.status === 401) {
+            content.innerHTML = '<p style="color:var(--muted);">로그인 후 이용 가능합니다. <a href="/login?next=' + encodeURIComponent(location.pathname) + '" style="color:#ffb37a;">로그인</a></p>';
+          } else {
+            content.innerHTML = '<p style="color:var(--muted);">템플릿을 불러올 수 없습니다.</p>';
+          }
+          lastDraftText = '';
+          modal.style.display = 'flex';
+          modal.setAttribute('aria-hidden', 'false');
+          return;
+        }
+        const data = await r.json();
+        if (meData.is_admin && (data.template_options || []).length > 0) {
+          adminRow.style.display = 'flex';
+          selEl.innerHTML = '';
+          data.template_options.forEach(function(o) {
+            const opt = document.createElement('option');
+            opt.value = o.key;
+            opt.textContent = o.label || o.key;
+            if (o.key === (data.election_position || '').toLowerCase()) opt.selected = true;
+            selEl.appendChild(opt);
+          });
+          regionEl.value = data.region_name || '';
+          districtEl.value = data.district_name || '';
+        }
+        if (data.not_available || data.guide_title || data.example) {
+          renderDraftContent(data, content);
+        } else {
+          content.innerHTML = '<p style="color:var(--muted);">등록된 선거유형·지역이 없거나 해당 템플릿이 없습니다. 회원정보를 확인해 주세요.</p>';
+          lastDraftText = '';
+          document.getElementById('draftHelperFill').disabled = false;
+        }
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+      } catch (e) {
+        content.innerHTML = '<p style="color:var(--muted);">템플릿을 불러올 수 없습니다.</p>';
+        lastDraftText = '';
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+      }
+    });
+
+    document.getElementById('draftHelperAdminApply').addEventListener('click', async function() {
+      if (!meData.is_admin) return;
+      const content = document.getElementById('draftHelperContent');
+      const selEl = document.getElementById('draftHelperElection');
+      const regionEl = document.getElementById('draftHelperRegion');
+      const districtEl = document.getElementById('draftHelperDistrict');
+      const opts = {
+        election_position: (selEl.value || '').trim(),
+        region_name: (regionEl.value || '').trim(),
+        district_name: (districtEl.value || '').trim()
+      };
+      try {
+        const r = await fetch(buildTemplatesUrl(opts), { credentials: 'include' });
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data.not_available || data.guide_title || data.example) {
+          renderDraftContent(data, content);
+        } else {
+          content.innerHTML = '<p style="color:var(--muted);">선택한 조건에 해당하는 템플릿이 없습니다.</p>';
+          lastDraftText = '';
+          document.getElementById('draftHelperFill').disabled = false;
+        }
+      } catch (e) {}
+    });
+
+    function closeDraftModal() {
+      const modal = document.getElementById('draftHelperModal');
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.getElementById('draftHelperClose').addEventListener('click', closeDraftModal);
+    document.getElementById('draftHelperClose2').addEventListener('click', closeDraftModal);
+    document.querySelector('.draft-modal-backdrop').addEventListener('click', closeDraftModal);
+
+    document.getElementById('draftHelperFill').addEventListener('click', function() {
+      var ex = document.getElementById('draftHelperExample');
+      if (ex && ex.value) {
+        pledgeEl.value = ex.value;
+        closeDraftModal();
+      } else if (lastDraftText) {
+        pledgeEl.value = lastDraftText;
+        closeDraftModal();
+      }
+    });
 
     pledgeEl.addEventListener('keydown', function(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

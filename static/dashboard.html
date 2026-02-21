@@ -72,6 +72,7 @@
       <div id="history" style="display:flex;flex-direction:column;gap:0.65rem;"></div>
     </div>
   </div>
+  <script src="/static/js/check-result-render.js"></script>
   <script>
     (async () => {
       try {
@@ -131,16 +132,47 @@
               const ir = await fetch('/api/history/' + encodeURIComponent(it.id), { credentials: 'include' });
               if (!ir.ok) return;
               const item = await ir.json();
-              let txt = item.result_text;
-              if (item.result_format === 'json') {
-                try { txt = JSON.stringify(JSON.parse(item.result_text), null, 2); } catch {}
-              }
-              const content = `[#${item.id}] ${kindLabel} · ${fmt(item.created_at)}\n\n[입력]\n${item.input_text}\n\n[결과]\n${txt}`;
               const w = window.open('', '_blank');
               if (!w) { alert('팝업이 차단되었습니다. 브라우저 설정을 확인하세요.'); return; }
               w.document.title = '분석 결과 #' + item.id;
-              w.document.body.style.margin = '0';
-              w.document.body.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-word;padding:16px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">${esc(content)}</pre>`;
+
+              if (it.kind === 'check' && item.result_format === 'text' && window.CheckResultRender) {
+                const resultHtml = window.CheckResultRender.buildResultHtml(item.result_text || '');
+                const printCss = `
+                  * { box-sizing: border-box; }
+                  body { font-family: "Malgun Gothic", sans-serif; background: #04162b; color: #f1f5f9; padding: 1.5rem; max-width: 880px; margin: 0 auto; line-height: 1.7; }
+                  .score-board { display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; padding:1rem 1.2rem; border-radius:14px; background: linear-gradient(135deg, rgba(255,114,16,0.12), rgba(56,189,248,0.10)); border:1px solid rgba(255,114,16,0.25); margin-bottom: 0.85rem; }
+                  .score-board .score { font-size: 1.6rem; font-weight: 900; }
+                  .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.82rem; font-weight: 800; }
+                  .badge.green { background: rgba(34,197,94,0.18); color: #86efac; }
+                  .badge.yellow { background: rgba(250,204,21,0.18); color: #fef08a; }
+                  .badge.red { background: rgba(248,113,113,0.18); color: #fca5a5; }
+                  .score-cards-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+                  .score-card { flex: 1 1 auto; min-width: 110px; padding: 0.55rem 0.7rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(148,163,184,0.25); background: rgba(255,255,255,0.05); font-size: 0.8rem; }
+                  .score-card.good { border-color: rgba(34,197,94,0.45); }
+                  .score-card.mid { border-color: rgba(250,204,21,0.45); }
+                  .score-card.low { border-color: rgba(248,113,113,0.45); }
+                  .section-cards { margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem; }
+                  .section-card { border: 1px solid rgba(148,163,184,0.28); border-radius: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow: hidden; }
+                  .section-card-head { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.8rem; border-bottom: 1px solid rgba(148,163,184,0.22); background: rgba(2,6,23,0.25); }
+                  .section-card-title { font-weight: 900; font-size: 0.94rem; }
+                  .section-card-body { padding: 0.7rem 0.8rem; line-height: 1.7; }
+                  .section-line { margin-top: 0.35rem; }
+                  .section-line.item { margin-top: 0.5rem; }
+                  .line-tag { font-size: 0.75rem; font-weight: 800; color: #93c5fd; border: 1px solid rgba(147,197,253,0.4); border-radius: 999px; padding: 0.15rem 0.5rem; }
+                  .analysis-text { margin-top: 0.5rem; white-space: pre-wrap; word-break: break-word; }
+                `;
+                w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + printCss + '</style></head><body><div class="result-content">' + resultHtml + '</div><p style="margin-top:1.5rem;color:#94a3b8;font-size:0.9rem;">입력 공약</p><pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,0.2);padding:1rem;border-radius:10px;font-size:0.9rem;">' + esc(item.input_text || '') + '</pre></body></html>');
+              } else {
+                let txt = item.result_text;
+                if (item.result_format === 'json') {
+                  try { txt = JSON.stringify(JSON.parse(item.result_text), null, 2); } catch {}
+                }
+                const content = `[#${item.id}] ${kindLabel} · ${fmt(item.created_at)}\n\n[입력]\n${item.input_text}\n\n[결과]\n${txt}`;
+                w.document.body.style.margin = '0';
+                w.document.body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;padding:16px;font-family:ui-monospace, monospace;">' + esc(content) + '</pre>';
+              }
+              w.document.close();
             });
 
             row.querySelector('button[data-del]').addEventListener('click', async () => {
