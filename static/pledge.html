@@ -359,16 +359,6 @@
       border:1px solid rgba(148,163,184,0.28); border-radius:12px;
       background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); overflow:hidden;
     }
-    .section-details summary.section-card-head{
-      list-style:none; cursor:pointer; user-select:none;
-    }
-    .section-details summary.section-card-head::-webkit-details-marker{ display:none; }
-    .section-details summary.section-card-head::before{
-      content: ''; display:inline-block; width:0.5rem; height:0.5rem; margin-right:0.4rem;
-      border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
-      transform:rotate(45deg); transition:transform 0.2s;
-    }
-    .section-details[open] summary.section-card-head::before{ transform:rotate(-135deg); }
     .section-card-head{
       display:flex; align-items:center; justify-content:space-between; gap:0.6rem;
       padding:0.55rem 0.8rem; border-bottom:1px solid rgba(148,163,184,0.22); background:rgba(2,6,23,0.25);
@@ -847,7 +837,6 @@
       const fullText = normalizedBaseText || '';
       const sections = splitSections(fullText);
       if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
-        const defaultOpen = (idx) => [0, 1, 4, 5].includes(idx);
         html += '<div class="section-cards">' + sections.map((sec, idx) => {
           const bodyLines = (sec.body || []).join('\n').split('\n');
           let bodyHtml = '';
@@ -859,15 +848,14 @@
             bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
           }
           bodyHtml = bodyHtml || '-';
-          const openAttr = defaultOpen(idx) ? ' open' : '';
           return `
-            <details class="section-card section-details"${openAttr}>
-              <summary class="section-card-head">
+            <div class="section-card">
+              <div class="section-card-head">
                 <div class="section-card-title">${escapeHtml(sec.title || '섹션')}</div>
                 <span class="line-tag">${idx + 1}</span>
-              </summary>
+              </div>
               <div class="section-card-body">${bodyHtml}</div>
-            </details>
+            </div>
           `;
         }).join('') + '</div>';
       } else {
@@ -991,7 +979,7 @@
         html += '</ul></div>';
       }
       if (data.example) {
-        html += '<div class="draft-section-title">예시 (한 편)</div><textarea id="draftHelperExample" class="draft-guide-example-input" rows="12" placeholder="예시를 수정한 뒤 입력창에 채우기를 누르세요">' + escapeHtml(data.example) + '</textarea>';
+        html += '<div class="draft-section-title">예시</div><textarea id="draftHelperExample" class="draft-guide-example-input" rows="12" placeholder="예시를 수정한 뒤 입력창에 채우기를 누르세요">' + escapeHtml(data.example) + '</textarea>';
       }
       content.innerHTML = html;
       lastDraftText = data.example || '';
