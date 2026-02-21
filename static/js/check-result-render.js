@@ -71,7 +71,17 @@
     return Math.round((vSum / wSum) * 10) / 10;
   }
 
+  function isVerifyStyleJson(text) {
+    const s = String(text || '');
+    const head = s.trim().slice(0, 5000);
+    if (!head.length) return false;
+    return (head.indexOf('fit_score') !== -1 && head.indexOf('rubric') !== -1) || (head.indexOf('"breakdown"') !== -1 && head.indexOf('fit_score') !== -1);
+  }
+
   function buildResultHtml(fullText) {
+    if (isVerifyStyleJson(fullText)) {
+      return '<div class="analysis-text" style="color:var(--muted, #94a3b8);">이 결과는 이전 형식의 데이터입니다. 점검을 다시 실행해 주세요.</div>';
+    }
     const normalized = normalizeOutputText(fullText || '');
     const text = normalized || '';
     const scores = parseScoresFromText(text);
@@ -130,6 +140,7 @@
     normalizeOutputText: normalizeOutputText,
     splitSections: splitSections,
     parseScoresFromText: parseScoresFromText,
+    isVerifyStyleJson: isVerifyStyleJson,
     buildResultHtml: buildResultHtml
   };
 })(typeof window !== 'undefined' ? window : this);

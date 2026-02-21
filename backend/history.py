@@ -99,7 +99,7 @@ def list_history(user_id: int, limit: int = 20) -> list[dict]:
                    substr(result_text, 1, 220) AS result_preview,
                    result_format
             FROM analysis_history
-            WHERE user_id = ?
+            WHERE user_id = ? AND kind != 'verify'
             ORDER BY created_at DESC, id DESC
             LIMIT ?
             """,

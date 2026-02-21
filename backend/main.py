@@ -2461,20 +2461,7 @@ def verify_pledge(body: PledgeVerifyRequest, request: Request):
     )
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=result.get("detail", result) if isinstance(result, dict) else result)
-    try:
-        from backend.history import add_history
-
-        add_history(
-            user_id=user["id"],
-            kind="verify",
-            input_text=body.text or "",
-            result=result,
-            status_code=status_code,
-            from_cache=from_cache,
-            options=options,
-        )
-    except Exception:
-        pass
+    # 기록에는 당 부합 점검(텍스트)만 저장. verify(JSON)는 저장하지 않음.
     logger.info("[verify] completed in %.1fs", time.perf_counter() - t0)
     return result
 

@@ -1,11 +1,14 @@
 """
 쿼터(daily/monthly) 및 레이트리밋(IP, user) 검사.
+관리자(ADMIN role 또는 ADMIN_EMAILS)는 일일/월간 쿼터 적용 안 함.
 """
 import time
 from collections import OrderedDict, defaultdict
 from threading import Lock
 
+from backend.auth import ROLE_ADMIN, get_user
 from backend.config import (
+    ADMIN_EMAILS,
     QUOTA_DAILY,
     QUOTA_MONTHLY,
     RATE_LIMIT_IP_PER_MIN,
@@ -29,7 +32,15 @@ def check_quota(user_id: int) -> tuple[bool, str]:
     """
     user_id의 일일/월간 쿼터 초과 여부 확인.
     usage_logs에서 status_code 2xx인 것만 카운트.
+    관리자(role=ADMIN 또는 ADMIN_EMAILS)는 쿼터 미적용.
     """
+    user = get_user(user_id)
+    if user and (
+        user.get("role") == ROLE_ADMIN
+        or (user.get("email") or "").strip().lower() in ADMIN_EMAILS
+    ):
+        return True, ""
+
     conn = get_connection()
     try:
         today = time.strftime("%Y-%m-%d")

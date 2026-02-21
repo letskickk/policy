@@ -67,48 +67,59 @@
 
     .wrap{ max-width: 720px; margin: 0 auto; }
 
-    .top{
-      display:flex;
-      align-items:flex-start;
-      gap: 1rem;
-      margin-bottom: 1.75rem;
-    }
-
-    .logo{
-      display:flex;
-      align-items:center;
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 0.75rem;
-      margin: 0;
-      line-height: 1;
+      margin-bottom: 1.25rem;
     }
-    .logo img{
-      height: 30px;
-      width: auto;
-      display: inline-block;
+    .top-bar .top-bar-left {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    }
+    .top-bar .brand { display: inline-flex; align-items: center; gap: 0.75rem; }
+    .top-bar .brand-logo {
+      display: inline-flex; align-items: center; gap: 0.75rem;
+      text-decoration: none; color: inherit; line-height: 1; margin: 0;
+    }
+    .top-bar .brand-logo:hover { color: inherit; opacity: 0.95; }
+    .top-bar .brand-logo img {
+      height: 30px; width: auto; display: inline-block;
       filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
     }
-    .logo .title{
-      font-size: 1.05rem;
-      font-weight: 900;
-      letter-spacing: -0.02em;
-      color: var(--text-strong);
+    .top-bar .brand-title {
+      font-size: 1.05rem; font-weight: 900; letter-spacing: -0.02em; color: var(--text-strong);
     }
-    .logo .tag{
-      display:block;
-      margin-top: 0.35rem;
-      font-size: 0.84rem;
-      color: #ffb37a;
-      letter-spacing: -0.01em;
-      font-weight: 800;
-      opacity: 0.95;
+    .top-bar .brand-tag {
+      display: block; margin-top: 0.35rem; font-size: 0.84rem;
+      color: #ffb37a; letter-spacing: -0.01em; font-weight: 800; opacity: 0.95;
     }
-
-    /* [추가] 상단 우측 컨트롤 영역 */
-    .top-right{
-      display:flex;
-      align-items:center;
-      gap: 0.55rem;
-      margin-top: 0.1rem;
+    .top-bar .nav-wrap {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .top-bar .nav-login-row {
+      color: var(--muted); font-size: 0.88rem; margin-right: 0.5rem;
+    }
+    .top-bar .nav-login-row .logout-link {
+      background: none; border: none; padding: 0; cursor: pointer;
+      color: var(--muted); font-size: 0.875rem; text-decoration: none;
+      margin-left: 0.5rem; font-family: inherit;
+    }
+    .top-bar .nav-login-row .logout-link:hover { color: var(--text-strong); }
+    .top-bar .nav-login-row .auth-links-inline { color: var(--muted); font-size: 0.875rem; }
+    .top-bar .nav-login-row .auth-links-inline a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .top-bar .nav-btns { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .top-bar .nav-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 36px; padding: 0 0.9rem;
+      color: var(--text); text-decoration: none; font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .top-bar .nav-link:hover {
+      background: rgba(255,255,255,0.10); color: var(--text-strong); border-color: rgba(148,163,184,0.28);
     }
 
 
@@ -312,9 +323,9 @@
 
     @media (max-width: 640px){
       .wrap{ padding: 0 0.75rem; }
-      .top{ margin-bottom: 1.25rem; flex-direction: column; align-items: flex-start; }
-      .logo .title{ font-size: 0.95rem; }
-      .logo .tag{ font-size: 0.78rem; }
+      .top-bar{ margin-bottom: 1rem; flex-direction: column; align-items: flex-start; }
+      .top-bar .brand-tag{ display: none; }
+      .top-bar .nav-link{ min-height: 32px; padding: 0 0.75rem; font-size: 0.85rem; }
       h1{ font-size: 1.75rem; line-height: 1.3; }
       .hero{ padding: 1.25rem; border-radius: 16px; }
       .hero-desc{ font-size: 0.95rem; }
@@ -329,14 +340,22 @@
 
 <body>
   <div class="wrap">
-    <div class="top">
-      <p class="logo">
-        <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고" />
-        <span>
-          <span class="title">개혁신당 정책 멘토링</span>
-          <span class="tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
-        </span>
-      </p>
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div class="brand">
+          <a href="/" class="brand-logo">
+            <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고" />
+            <span class="brand-inner">
+              <span class="brand-title">개혁신당 정책 멘토링</span>
+              <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+            </span>
+          </a>
+        </div>
+        <div id="authRow" class="nav-login-row"></div>
+      </div>
+      <div class="nav-wrap">
+        <a href="/dashboard" class="nav-link">내 기록</a>
+      </div>
     </div>
 
     <div class="hero">
@@ -381,10 +400,6 @@
           <div class="sample-item"><strong>4. 제8회 지방선거(2022) 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
         </div>
       </div>
-      <p id="authLinks" class="auth-links">
-        회원가입 후 관리자 승인이 필요합니다.<br>
-        <a href="/signup" class="auth-link">회원가입</a> | <a href="/login" class="auth-link">로그인</a>
-      </p>
     </div>
 
     <section class="features">
@@ -428,17 +443,21 @@
     (async function() {
       try {
         const r = await fetch('/api/auth/me', { credentials: 'include' });
-        const el = document.getElementById('authLinks');
+        const authRow = document.getElementById('authRow');
         const pledgeBtn = document.getElementById('btnPledge');
-        if (!el) return;
+        if (!authRow) return;
+        const safe = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         if (r.ok) {
           const d = await r.json();
           const email = (d.email || '').trim();
-          const safe = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-          el.innerHTML = (email ? '<span class="auth-login-line"><span style="color:var(--muted);">' + safe(email) + ' 로그인 중</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="auth-logout-btn">로그아웃</button></form></span><span class="auth-nav-line"><a href="/my-pledges" class="auth-pill">내 공약</a> <a href="/dashboard" class="auth-pill">내 기록</a></span>' : '') + '';
+          authRow.style.display = email ? '' : 'none';
+          authRow.innerHTML = email
+            ? '<span>' + safe(email) + ' 로그인 중</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>'
+            : '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
         } else {
-          el.innerHTML = '회원가입 후 관리자 승인이 필요합니다.<br><a href="/signup" class="auth-link">회원가입</a> | <a href="/login" class="auth-link">로그인</a>';
+          authRow.style.display = '';
+          authRow.innerHTML = '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
         }
       } catch (e) {}

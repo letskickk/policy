@@ -630,7 +630,8 @@
       <div id="loginRow" class="nav-login-row" style="display:none;"></div>
       <div class="nav-btns">
         <a href="/dashboard" class="nav-link">내 기록</a>
-        <a href="/my-pledges" class="nav-link">내 공약</a>
+        <a href="/pledge" class="nav-link" data-nav-page="pledge" style="display:none;">공약 분석</a>
+        <a href="/map" class="nav-link">지역 공약</a>
       </div>
     </div>
   </div>
@@ -819,6 +820,9 @@
     }
 
     function renderCombinedResult(baseText, data) {
+      if (window.CheckResultRender && window.CheckResultRender.isVerifyStyleJson && window.CheckResultRender.isVerifyStyleJson(baseText)) {
+        baseText = '이 결과는 표시할 수 없는 형식입니다. 점검을 다시 실행해 주세요.';
+      }
       // 총평 섹션에서 점수 파싱
       let totalScore = null;
       let platformFitScore = null;
