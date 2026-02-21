@@ -23,14 +23,14 @@ def test_db(tmp_path, monkeypatch):
     try:
         conn.execute(
             """
-            INSERT INTO candidates (name, district_name, region_code, election_type, created_at)
-            VALUES ('홍길동', '강남구', '11', 'local', '2026-01-10 12:00:00')
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, approval_status, created_at)
+            VALUES ('홍길동', '강남구', '11:강남구', '11', 'local', 'APPROVED', '2026-01-10 12:00:00')
             """
         )
         conn.execute(
             """
-            INSERT INTO candidates (name, district_name, region_code, election_type, created_at)
-            VALUES ('김철수', '종로구', '11', 'local', '2026-01-12 12:00:00')
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, approval_status, created_at)
+            VALUES ('김철수', '종로구', '11:종로구', '11', 'local', 'APPROVED', '2026-01-12 12:00:00')
             """
         )
         conn.execute(
@@ -97,8 +97,8 @@ def test_get_candidates_filters_by_election_type(test_db):
     try:
         conn.execute(
             """
-            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, created_at)
-            VALUES ('이단체장', '강남구', '11:강남구', '11', 'mayor', '2026-01-15 12:00:00')
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, approval_status, created_at)
+            VALUES ('이단체장', '강남구', '11:강남구', '11', 'mayor', 'APPROVED', '2026-01-15 12:00:00')
             """
         )
         conn.commit()
@@ -117,8 +117,8 @@ def test_get_districts_filters_by_election_type(test_db):
     try:
         conn.execute(
             """
-            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, created_at)
-            VALUES ('오광역', '강남구', '11:강남구', '11', 'mayor', '2026-01-16 12:00:00')
+            INSERT INTO candidates (name, district_name, district_code, region_code, election_type, approval_status, created_at)
+            VALUES ('오광역', '강남구', '11:강남구', '11', 'mayor', 'APPROVED', '2026-01-16 12:00:00')
             """
         )
         conn.commit()

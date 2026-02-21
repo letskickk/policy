@@ -1633,7 +1633,9 @@ def _resolve_region_name(code: str) -> str:
 
 
 def _normalize_district_code(value: Optional[str]) -> Optional[str]:
-    code = (value or "").strip()
+    if value is None or not isinstance(value, str):
+        return None
+    code = value.strip()
     if not code:
         return None
     if not re.fullmatch(r"[A-Za-z0-9가-힣_:\-]{2,120}", code):
@@ -1655,7 +1657,9 @@ def _derive_district_code(region_code: str, district_code: Optional[str], distri
 
 
 def _normalize_election_type(value: Optional[str]) -> Optional[str]:
-    text = (value or "").strip()
+    if value is None or not isinstance(value, str):
+        return None
+    text = value.strip()
     if not text:
         return None
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", text):
