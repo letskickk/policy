@@ -254,6 +254,15 @@ def _ensure_startup():
                 _indexes["pledge"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
             if "regional" not in _indexes:
                 _indexes["regional"] = VectorIndex(dimension=EMBEDDING_DIMENSION, use_cosine=True)
+            # FAISS 모드에서도 winners2022 벡터 스토어 ID 로드 (공약 유사도 검색용)
+            from backend.config import OPENAI_WINNERS2022_VECTOR_STORE_ID
+            from backend.rag_registry import get_vector_store_ids
+            _w2022_env = OPENAI_WINNERS2022_VECTOR_STORE_ID.strip()
+            if not _w2022_env:
+                _, _, _w2022_env = get_vector_store_ids()
+            if _w2022_env:
+                _winners2022_vector_store_id = _w2022_env
+                print(f"[winners2022] 벡터 스토어 로드: {_w2022_env}", flush=True)
         
         _startup_done = True
         print("=" * 60, flush=True)
@@ -1533,7 +1542,7 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
         global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
         vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
         regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
-        winners2022_vs_id = _winners2022_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+        winners2022_vs_id = _winners2022_vector_store_id  # VS 모드·FAISS 모드 공통 사용
         result, status_code, from_cache = run_check_analysis(
             user["id"],
             body.pledge or "",
