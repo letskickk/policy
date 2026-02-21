@@ -63,60 +63,89 @@
 
     /* --- [네비게이션] --- */
     .nav {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
     .nav-login-row {
-      color: var(--muted); font-size: 0.88rem;
+      color: var(--muted); font-size: 0.88rem; margin-right: 0.5rem;
     }
-    .nav-login-row .logout-btn {
-      background: none; border: none; color: #ffb37a; font-weight: 700;
-      cursor: pointer; padding: 0; font-size: inherit; margin-left: 0.5rem;
+    .nav-login-row .logout-link {
+      background: none; border: none; padding: 0; cursor: pointer;
+      color: var(--muted); font-size: 0.875rem; text-decoration: none;
+      margin-left: 0.5rem; font-family: inherit;
     }
+    .nav-login-row .logout-link:hover { color: var(--text-strong); }
     .nav-btns {
       display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
     }
-
-    .nav-link{
-      display:inline-flex;
-      align-items:center;
-      color: var(--text);
-      text-decoration:none;
-      font-size: 0.92rem;
-      font-weight: 800;
-      padding: 0.6rem 1rem;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.05);
+    .nav-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 36px; padding: 0 0.9rem;
+      color: var(--text); text-decoration: none;
+      font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
       border: 1px solid var(--border);
-      transition: all 0.2s ease;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
-    .nav-link:hover{
+    .nav-link:hover {
       background: rgba(255,255,255,0.10);
       color: var(--text-strong);
       border-color: rgba(148,163,184,0.28);
     }
-    .nav-link:focus-visible{
+    .nav-link:focus-visible {
       outline: none;
-      box-shadow: 0 0 0 4px var(--cta-ring);
+      box-shadow: 0 0 0 3px var(--cta-ring);
     }
-    /* --- [브랜드] --- */
-    .brand-container { margin-bottom: 1.5rem; }
-    .brand-logo{
-      display:inline-flex;
-      align-items:center;
+    /* --- [상단: 로고 + 네비] --- */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 0.75rem;
-      font-weight: 900;
-      font-size: 1.1rem;
-      color: var(--text-strong);
-      letter-spacing: -0.01em;
+      margin-bottom: 1rem;
     }
-    .brand-logo img{
-      height: 26px;
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+      line-height: 1;
+      margin: 0;
+    }
+    .brand-logo:hover { color: inherit; opacity: 0.95; }
+    .brand-logo img {
+      height: 30px;
       width: auto;
+      display: inline-block;
       filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
     }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--text-strong);
+    }
+    .brand-tag {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.84rem;
+      color: #ffb37a;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+      opacity: 0.95;
+    }
+    .top-bar .nav-wrap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
     /* --- [헤더] --- */
     header { margin-bottom: 2.2rem; }
@@ -546,24 +575,27 @@
 </head>
 
 <body>
-  <nav class="nav">
-    <div id="loginRow" class="nav-login-row" style="display:none;"></div>
-    <div class="nav-btns">
-      <a href="/" class="nav-link">← 메인</a>
-      <a href="/dashboard" class="nav-link">내 기록</a>
-      <a href="/my-pledges" class="nav-link">내 공약</a>
+  <div class="top-bar">
+    <div class="brand">
+      <a href="/" class="brand-logo">
+        <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+        <span class="brand-inner">
+          <span class="brand-title">개혁신당 정책 멘토링</span>
+          <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+        </span>
+      </a>
     </div>
-  </nav>
-
-  <div class="brand-container">
-    <div class="brand-logo">
-      <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
-      공약 멘토링
+    <div class="nav-wrap">
+      <div id="loginRow" class="nav-login-row" style="display:none;"></div>
+      <div class="nav-btns">
+        <a href="/dashboard" class="nav-link">내 기록</a>
+        <a href="/my-pledges" class="nav-link">내 공약</a>
+      </div>
     </div>
   </div>
 
   <header>
-    <h1>개혁신당 정책 멘토링</h1>
+    <h1>공약 분석</h1>
     <p class="subtitle">작성하신 공약을 입력하면 당의 정강정책 및 기존 공약과의 정합성을 AI가 분석해 드립니다.</p>
   </header>
 
@@ -635,7 +667,7 @@
           if (d.email) {
             const e = String(d.email).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const row = document.getElementById('loginRow');
-            row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-btn">로그아웃</button></form>';
+            row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
             row.style.display = 'block';
           }
         }
