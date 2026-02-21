@@ -39,7 +39,12 @@
     .links form { display: inline; }
     .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
     @media (max-width: 560px) {
-      .nav { flex-direction: column; align-items: flex-start; }
+      body { padding: 1rem; }
+      .wrap { padding: 0 0.5rem; }
+      .nav { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .nav-links { flex-wrap: wrap; }
+      .nav-link, .nav .logout-btn { min-height: 32px; padding: 0 0.75rem; font-size: 0.85rem; }
+      .card { padding: 1rem; }
     }
   </style>
 </head>

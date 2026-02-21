@@ -125,6 +125,10 @@
     .auth-links{ margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
     .auth-link{ color:#ffb37a; font-weight:700; text-decoration:none; }
     .auth-pill{ color:#ffb37a; font-weight:700; padding:0.4rem 0.8rem; border-radius:999px; background:rgba(255,255,255,0.08); border:1px solid rgba(148,163,184,0.25); text-decoration:none; display:inline-block; }
+    .auth-login-line{ display:block; margin-bottom:0.5rem; }
+    .auth-nav-line{ display:block; }
+    .auth-logout-btn{ background:none; border:none; padding:0; cursor:pointer; font-family:inherit; font-size:inherit; font-weight:700; color:var(--text); text-decoration:underline; margin-left:0.35rem; }
+    .auth-logout-btn:hover{ color:var(--text-strong); }
 
     .hero{
       background: var(--card);
@@ -307,10 +311,18 @@
     }
 
     @media (max-width: 640px){
-      h1{ font-size: 1.75rem; }
+      .wrap{ padding: 0 0.75rem; }
+      .top{ margin-bottom: 1.25rem; flex-direction: column; align-items: flex-start; }
+      .logo .title{ font-size: 0.95rem; }
+      .logo .tag{ font-size: 0.78rem; }
+      h1{ font-size: 1.75rem; line-height: 1.3; }
       .hero{ padding: 1.25rem; border-radius: 16px; }
-      .flow{ grid-template-columns: 1fr; }
-      .top{ flex-direction: column; align-items: flex-start; }
+      .hero-desc{ font-size: 0.95rem; }
+      .flow{ grid-template-columns: 1fr; gap: 0.75rem; }
+      .feature-grid li{ padding: 1rem; }
+      .feature-grid .txt{ font-size: 0.9rem; }
+      .cta-group{ gap: 0.6rem; }
+      .cta{ padding: 0.85rem 1rem; font-size: 0.95rem; }
     }
   </style>
 </head>
@@ -423,7 +435,7 @@
           const d = await r.json();
           const email = (d.email || '').trim();
           const safe = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-          el.innerHTML = (email ? '<span style="color:var(--muted);">' + safe(email) + ' 로그인 중</span> · ' : '') + '<a href="/my-pledges" class="auth-pill">내 공약</a> · <a href="/dashboard" class="auth-pill">내 기록</a> · <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" style="background:none;border:none;color:#ffb37a;font-weight:700;cursor:pointer;padding:0;font-size:inherit;">로그아웃</button></form>';
+          el.innerHTML = (email ? '<span class="auth-login-line"><span style="color:var(--muted);">' + safe(email) + ' 로그인 중</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="auth-logout-btn">로그아웃</button></form></span><span class="auth-nav-line"><a href="/my-pledges" class="auth-pill">내 공약</a> <a href="/dashboard" class="auth-pill">내 기록</a></span>' : '') + '';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
         } else {
           el.innerHTML = '회원가입 후 관리자 승인이 필요합니다.<br><a href="/signup" class="auth-link">회원가입</a> | <a href="/login" class="auth-link">로그인</a>';
