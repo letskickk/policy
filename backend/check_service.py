@@ -89,6 +89,29 @@ def _load_candidates_context() -> str:
         return ""
 
 
+def _build_winners2022_context_for_non_vs(
+    pledge: str,
+    winners2022_vector_store_id: str | None,
+    user_meta: dict | None,
+) -> str:
+    """FAISS/PDF 경로에서도 winners2022 컨텍스트를 생성한다.
+
+    winners2022 벡터 스토어 ID가 있으면 OpenAI 벡터 검색 + 공공 API를 사용하고,
+    벡터 스토어가 없으면 공공 API만 사용한다.
+    """
+    try:
+        from backend.openai_vector_store import build_winners2022_context
+        ctx = build_winners2022_context(
+            pledge, winners2022_vector_store_id or "", user_meta or {},
+        )
+        if ctx:
+            logger.info("winners2022 컨텍스트 생성 완료: %d자", len(ctx))
+        return ctx
+    except Exception as e:
+        logger.warning("winners2022 컨텍스트 생성 실패: %s", e)
+        return ""
+
+
 def check_pledge_alignment(
     pledge: str,
     vector_store_id: str | None = None,
@@ -161,9 +184,13 @@ def check_pledge_alignment(
         if not platform_context.strip() and not pledges_context.strip():
             return "오류: 검색 결과가 없습니다. 인덱스를 확인하세요."
 
+        winners2022_ctx = _build_winners2022_context_for_non_vs(
+            pledge_key, winners2022_vector_store_id, user_meta,
+        )
+
         system = load_system_prompt()
         user = build_user_message(
-            platform_context, pledges_context, pledge_key, "",
+            platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
             user_meta=user_meta,
         )
@@ -190,9 +217,13 @@ def check_pledge_alignment(
         if not pledges_context.strip():
             logger.warning("공약 컨텍스트가 비어있습니다. GPT가 공약 비교를 제대로 할 수 없습니다.")
 
+        winners2022_ctx = _build_winners2022_context_for_non_vs(
+            pledge_key, winners2022_vector_store_id, user_meta,
+        )
+
         system = load_system_prompt()
         user = build_user_message(
-            platform_context, pledges_context, pledge_key, "",
+            platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
             user_meta=user_meta,
         )

@@ -1470,18 +1470,18 @@ def _load_check_instructions(has_regional: bool, has_winners2022: bool = False) 
     if has_winners2022:
         tool_desc = """
 file_search 도구가 2개 제공됨:
-1) 첫 번째 도구: 정강·공약·지역별 공약 (1~3번 섹션용)
-2) 두 번째 도구: 2022 당선인 공약 전용 (4번 섹션용). 반드시 이 도구를 호출하여 4번 섹션을 작성하라.
-4번 섹션은 두 번째 도구 검색 결과를 사용. 두 번째 도구를 호출하지 않으면 4번에 "없음"을 적지 말고, 먼저 호출한 뒤 결과에 따라 작성하라.
+1) 첫 번째 도구: 정강·공약·지역별 공약 (1~2번 섹션용)
+2) 두 번째 도구: 2022 당선인 공약 전용 (3번 섹션용). 반드시 이 도구를 호출하여 3번 섹션을 작성하라.
+3번 섹션은 두 번째 도구 검색 결과를 사용. 두 번째 도구를 호출하지 않으면 3번에 "없음"을 적지 말고, 먼저 호출한 뒤 결과에 따라 작성하라.
 """
     else:
         tool_desc = """
 file_search 도구: 정강·공약·지역별 공약 검색.
 """
-    if not has_regional:
-        tool_desc += "\n지역별 공약 store가 없음. '3. 타지역 공약과 유사성'에서는 반드시 '유사 공약: 없음', '유사성 분석: 없음'만 표기."
     if not has_winners2022:
-        tool_desc += "\n2022 당선인 공약 store가 없음. '4. 제8회 지방선거(2022) 당선인 공약과의 비교'에서는 반드시 '유사·참고 공약: 없음', '발전 방향: 없음'만 표기."
+        tool_desc += "\n2022 당선인 공약 store가 없음. '3. 제8회 지방선거(2022) 당선인 공약과의 비교'에서는 반드시 '유사 공약: 없음'만 표기."
+    if not has_regional:
+        tool_desc += "\n지역별 공약 store가 없음. 해당 섹션에서는 반드시 '유사 공약: 없음'만 표기."
 
     winners2022_ctx = "[file_search로 2022 당선인 공약 검색 (해당 store 있으면)]" if has_winners2022 else "(2022 당선인 공약 문서 없음)"
 
@@ -1517,6 +1517,106 @@ RUN_CHECK_REGIONAL_MAX_CHARS = 5_000
 RUN_CHECK_WINNERS_MAX_CHARS = 5_000
 RUN_CHECK_WINNERS_MAX_ITEMS = 8
 RUN_CHECK_MAX_WORKERS = 4
+
+
+def build_winners2022_context(
+    pledge: str,
+    winners2022_vector_store_id: str = "",
+    user_meta: dict | None = None,
+) -> str:
+    """FAISS/PDF 경로에서 호출 가능한 winners2022 컨텍스트 빌더.
+
+    공공 API(당선인 목록 + 공약)를 사용하여 구조화된 컨텍스트를 반환한다.
+    """
+    pledge = (pledge or "").strip()
+    if not pledge:
+        return ""
+    if not (DATA_GO_KR_WINNER_API_KEY or DATA_GO_KR_PLEDGE_API_KEY):
+        return ""
+
+    request_dedup: set = set()
+    api_items: List[Tuple[float, str, str, Dict]] = []
+
+    for st in ["3", "4", "11"]:
+        rows = _fetch_winners_api(
+            SG_ID_2022, st, "", "", DATA_GO_KR_WINNER_API_KEY, request_dedup
+        )
+        for r in rows:
+            r["_sgTypecode"] = st
+        for w in rows:
+            pos_label, region_label = _winner_row_to_position_region(
+                w["_sgTypecode"], w["sdName"], w["sggName"], w["wiwName"]
+            )
+            pledges_api = _fetch_winner_pledges_api(
+                SG_ID_2022, w["_sgTypecode"], w["huboid"],
+                DATA_GO_KR_PLEDGE_API_KEY, request_dedup,
+            )
+            for pl in pledges_api[:5]:
+                title = (pl.get("prmsTitle") or "").strip() or (pl.get("prmsCont") or "")[:80]
+                text = (pl.get("prmsCont") or "").strip() or title
+                api_items.append((1.0, "API", text, {
+                    "canonical_name": (w.get("name") or "").strip(),
+                    "canonical_position": pos_label,
+                    "canonical_region": region_label,
+                    "name": (w.get("name") or "").strip(),
+                    "position": pos_label,
+                    "region": region_label,
+                    "pledge_title": title,
+                }))
+
+    if not api_items:
+        return ""
+
+    api_items = _rank_api_items_by_pledge_keywords(api_items, pledge)
+    api_items = api_items[:RUN_CHECK_WINNERS_RAW_CAP]
+
+    kw_raw = _extract_query_keywords(pledge, max_terms=8)
+    keywords = set(k for k in kw_raw.split() if len(k) >= 2)
+    for a, b in _QUERY_SPELLING_VARIANTS:
+        if a in pledge:
+            keywords.add(b)
+
+    if keywords:
+        boosted, rest = [], []
+        for row in api_items:
+            cnt = sum(1 for k in keywords if k in row[2])
+            if cnt >= 1:
+                boosted.append((-cnt, row))
+            else:
+                rest.append(row)
+        boosted.sort(key=lambda x: x[0])
+        api_items = [r for _, r in boosted] + rest
+
+    top_items = api_items[:RUN_CHECK_WINNERS_MAX_ITEMS]
+    if not top_items:
+        return ""
+
+    blocks: List[str] = []
+    total = 0
+    for _score, _fn, text, meta in top_items:
+        name = (meta.get("canonical_name") or meta.get("name") or "확인불가").strip()
+        position = (meta.get("canonical_position") or meta.get("position") or "확인불가").strip()
+        region = (meta.get("canonical_region") or meta.get("region") or "-").strip()
+        title = (meta.get("pledge_title") or "-").strip()
+        excerpt = (text or "").strip()[:400]
+        summary_line = f'2022 / {position} / {name} / "{title}"'
+        block = (
+            f"요약라인: {summary_line}\n"
+            f"당선인명: {name}\n"
+            f"직책: {position}\n"
+            f"지역: {region}\n"
+            f"공약제목: {title}\n"
+            f"출처: 공공데이터포털 당선인공약 API\n"
+            f"근거발췌: {excerpt}"
+        )
+        if total + len(block) > RUN_CHECK_WINNERS_MAX_CHARS:
+            break
+        blocks.append(block)
+        total += len(block) + 2
+
+    ctx = "\n\n---\n\n".join(blocks)
+    logger.info("[build_winners2022_context] API기반 %d건 컨텍스트 생성 (%d자)", len(blocks), len(ctx))
+    return ctx
 
 
 def run_check(
