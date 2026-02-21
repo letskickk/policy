@@ -2288,7 +2288,6 @@ def run_check(
         # canonical 보강: API 메타(이름/직책/지역)를 벡터 hit 메타에 덮어씀
         api_canonical_by_role_region: Dict[Tuple[str, str], Dict] = {}
         api_canonical_by_title: Dict[str, Dict] = {}
-        inferred_user_canonical = _pick_api_canonical_from_user_meta(all_winner_rows, user_meta or {})
         for _s, _f, _t, meta in api_items:
             k = (
                 (meta.get("canonical_position") or meta.get("position") or "").strip(),
@@ -2296,10 +2295,11 @@ def run_check(
             )
             if k[0] and k[1] and k not in api_canonical_by_role_region:
                 api_canonical_by_role_region[k] = meta
-            # 제목 기반 보강: role/region가 비거나 추출 실패인 벡터 hit 보정
             title_key = _norm_title_key(meta.get("pledge_title", ""))
             if title_key and title_key not in api_canonical_by_title:
                 api_canonical_by_title[title_key] = meta
+        # 벡터 hit에는 (직책·지역) 또는 제목으로 API 매칭된 경우에만 canonical 보강.
+        # 사용자 지역으로 추론한 1명(inferred_user_canonical)으로 덮어쓰지 않음 → 옥천/성북 공약에 서울 시장 이름 붙는 버그 방지
         patched: List[Tuple[float, str, str, Dict]] = []
         for score, fn, txt, meta in winners_enhanced:
             pos = (meta.get("canonical_position") or meta.get("position") or "").strip()
@@ -2316,8 +2316,6 @@ def run_check(
                             if hit_title_key in k_title or k_title in hit_title_key:
                                 can = k_meta
                                 break
-            if not can and inferred_user_canonical:
-                can = inferred_user_canonical
             if can:
                 if can.get("canonical_name") and not meta.get("canonical_name"):
                     meta["canonical_name"] = can.get("canonical_name")
