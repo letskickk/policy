@@ -14,36 +14,46 @@
     .stat-item { background: rgba(0,0,0,0.2); padding: 0.75rem 1rem; border-radius: 12px; min-width: 140px; }
     .stat-item .v { font-size: 1.5rem; font-weight: 900; color: #fff; }
     .stat-item .l { font-size: 0.85rem; color: #94a3b8; }
-    .nav-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
-    .nav-top a { color: #ffb37a; text-decoration: none; font-weight: 700; }
-    .nav-top .sep { color: #64748b; margin: 0 0.35rem; }
-    .nav-top form { display: inline; }
-    .nav-top button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; padding: 0; }
+    .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+    .nav-links { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .nav-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 36px; padding: 0 0.9rem;
+      color: #e2e8f0; text-decoration: none;
+      font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.10); color: #f8fafc; border-color: rgba(148,163,184,0.28); }
+    .nav .logout-btn {
+      min-height: 36px; padding: 0 0.9rem; font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px; border: 1px solid rgba(148,163,184,0.18);
+      background: rgba(255,255,255,0.06); color: #e2e8f0;
+      cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .nav .logout-btn:hover { background: rgba(255,255,255,0.10); color: #f8fafc; border-color: rgba(148,163,184,0.28); }
     .links { margin-top: 1rem; }
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; margin-right: 1rem; }
     .links form { display: inline; }
     .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
     @media (max-width: 560px) {
-      .nav-top { flex-direction: column; align-items: flex-start; }
-      .nav-top > div { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
-      .nav-top .sep { margin: 0 0.2rem; }
+      .nav { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="nav-top">
+    <div class="nav">
       <h1 style="margin:0;">내 기록</h1>
-      <div>
-        <span id="loginInfo" style="color:#94a3b8;font-size:0.9rem;margin-right:0.75rem;"></span>
-        <a href="/pledge">공약 분석</a>
-        <span class="sep">|</span>
-        <a href="/my-pledges">내 공약</a>
-        <span class="sep">|</span>
-        <a href="/">메인</a>
-        <span class="sep">|</span>
+      <div class="nav-links">
+        <span id="loginInfo" style="color:#94a3b8;font-size:0.85rem;margin-right:0.25rem;align-self:center;"></span>
+        <a href="/pledge" class="nav-link">공약 분석</a>
+        <a href="/my-pledges" class="nav-link">내 공약</a>
+        <a href="/" class="nav-link">메인</a>
         <form action="/api/auth/logout" method="POST" style="display:inline">
-          <button type="submit">로그아웃</button>
+          <button type="submit" class="logout-btn">로그아웃</button>
         </form>
       </div>
     </div>

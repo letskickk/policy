@@ -2086,6 +2086,27 @@ def get_regions():
     ]
 
 
+@app.get("/api/stats/election-types", tags=["candidates"])
+def get_election_type_counts():
+    """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용)."""
+    _ensure_db_ready()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT election_type, COUNT(*) AS n
+            FROM candidates
+            WHERE approval_status = 'APPROVED'
+            GROUP BY election_type
+            """
+        ).fetchall()
+        return {r["election_type"]: int(r["n"]) for r in rows}
+    finally:
+        conn.close()
+
+
 @app.get("/api/districts", response_model=list[DistrictResponse], tags=["candidates"])
 def get_districts(
     region_code: Optional[str] = Query(default=None, description="행정구역 코드"),

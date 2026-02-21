@@ -59,28 +59,102 @@
       }
     }
 
-    /* 네비게이션 */
-    .nav{
-      margin-bottom: 1.5rem;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
+    /* 상단: 로고 + 네비 */
+    .top-bar{
+      max-width: 1400px;
+      margin: 0 auto 1rem;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .top-bar .brand{
+      display: inline-flex;
+      align-items: center;
       gap: 0.75rem;
       flex-wrap: wrap;
     }
+    .top-bar .brand-logo{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+      line-height: 1;
+      margin: 0;
+    }
+    .top-bar .brand-logo:hover{ color: inherit; opacity: 0.95; }
+    .top-bar .brand-logo img{
+      height: 30px;
+      width: auto;
+      display: inline-block;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
+    }
+    .top-bar .brand-title{
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--text-strong);
+    }
+    .top-bar .brand-tag{
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.84rem;
+      color: #ffb37a;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+      opacity: 0.95;
+    }
+    .top-bar .top-bar-left{
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .top-bar .map-heading{
+      margin: 0;
+    }
+    .top-bar .map-heading h1{
+      font-size: 1.35rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin: 0 0 0.2rem 0;
+      letter-spacing: -0.03em;
+    }
+    .top-bar .map-heading .subtitle{
+      font-size: 0.9rem;
+      color: var(--text);
+      opacity: 0.9;
+      margin: 0;
+    }
+    .top-bar .nav{
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
 
     .nav-link{
-      display:inline-flex;
-      align-items:center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 0.9rem;
       color: var(--text);
-      text-decoration:none;
-      font-size: 0.92rem;
-      font-weight: 800;
-      padding: 0.6rem 1rem;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.05);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 700;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
       border: 1px solid var(--border);
-      transition: all 0.2s ease;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     .nav-link:hover{
       background: rgba(255,255,255,0.10);
@@ -89,13 +163,9 @@
     }
     .nav-link:focus-visible{
       outline: none;
-      box-shadow: 0 0 0 4px var(--cta-ring);
+      box-shadow: 0 0 0 3px var(--cta-ring);
     }
 
-    /* 헤더 */
-    header{
-      margin-bottom: 1.5rem;
-    }
     h1{
       font-size: 2rem;
       font-weight: 950;
@@ -165,15 +235,21 @@
       pointer-events: none;
     }
 
-    /* 우측 패널 */
+    /* 우측 패널 (지도 높이에 맞춤) */
     .panel{
+      display: flex;
+      flex-direction: column;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 1.5rem;
       box-shadow: var(--shadow);
       backdrop-filter: blur(10px);
-      max-height: calc(100vh - 120px);
+      min-height: 0;
+    }
+    #panel-content{
+      flex: 1;
+      min-height: 0;
       overflow-y: auto;
     }
 
@@ -218,6 +294,28 @@
       outline: none;
       font-size: 0.95rem;
       cursor: pointer;
+    }
+
+    .panel-cta-row{
+      margin-top: 1rem;
+    }
+    .panel-cta-btn{
+      display: block;
+      text-align: center;
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font-weight: 800;
+      font-size: 0.95rem;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .panel-cta-btn:hover{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+      border-color: rgba(148,163,184,0.28);
     }
 
     .filter-select option{
@@ -402,13 +500,20 @@
 
     .empty-state{
       text-align: center;
-      padding: 3rem 1rem;
+      padding: 2.5rem 1.5rem;
       color: var(--muted);
     }
 
     .empty-state-icon{
-      font-size: 3rem;
-      margin-bottom: 1rem;
+      width: 4rem;
+      height: 4rem;
+      margin: 0 auto 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.25rem;
+      line-height: 1;
+      flex-shrink: 0;
     }
 
     @media (max-width: 640px){
@@ -491,22 +596,32 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <div>
-      <nav class="nav">
-        <a href="/" class="nav-link">← 메인으로</a>
-        <a href="/pledge" class="nav-link">공약 분석하기</a>
-      </nav>
-
-      <header>
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="brand">
+        <a href="/" class="brand-logo">
+          <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+          <span class="brand-inner">
+            <span class="brand-title">개혁신당 정책 멘토링</span>
+            <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+          </span>
+        </a>
+      </div>
+      <div class="map-heading">
         <h1>지역별 출마자 공약</h1>
         <p class="subtitle">지도를 클릭하여 해당 지역의 출마자 공약을 확인하세요</p>
-      </header>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/pledge" class="nav-link">공약 분석</a>
+      <a href="/my-pledges" class="nav-link">내 공약 올리기</a>
+    </nav>
+  </div>
 
-      <div class="map-container">
-        <div class="map-wrapper">
-          <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
-        </div>
+  <div class="container">
+    <div class="map-container">
+      <div class="map-wrapper">
+        <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
       </div>
     </div>
 
@@ -535,6 +650,9 @@
           <select id="districtSelect" class="filter-select" disabled aria-label="선거구 선택">
             <option value="">지역을 먼저 선택하세요</option>
           </select>
+        </div>
+        <div class="panel-cta-row">
+          <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
         </div>
       </div>
 
@@ -582,6 +700,14 @@
       'local_council': '기초의원',
       'party_official': '당직자',
     };
+
+    const electionTypeOptions = [
+      { value: '', label: '전체' },
+      { value: 'metro_mayor', label: '광역단체장 (시도지사)' },
+      { value: 'local_mayor', label: '기초단체장 (구청장·시장·군수)' },
+      { value: 'regional_council', label: '광역의원 (시도의원)' },
+      { value: 'local_council', label: '기초의원 (구의원·시의원·군의원)' },
+    ];
 
     const regionNames = {
       '11': '서울특별시',
@@ -1090,10 +1216,39 @@
       }
     }
 
+    // 선거 타입별 후보 수 로드 후 셀렉트 옵션에 카운팅 표시
+    async function loadElectionTypeCounts() {
+      const preserved = electionTypeSelect.value || '';
+      try {
+        const counts = await fetchJsonWithTimeout('/api/stats/election-types');
+        electionTypeSelect.innerHTML = '';
+        electionTypeOptions.forEach((opt) => {
+          const option = document.createElement('option');
+          option.value = opt.value;
+          const n = opt.value ? (counts[opt.value] ?? 0) : '';
+          option.textContent = n !== '' ? `${opt.label} (${n})` : opt.label;
+          electionTypeSelect.appendChild(option);
+        });
+        if (preserved && electionTypeSelect.querySelector(`option[value="${preserved}"]`)) {
+          electionTypeSelect.value = preserved;
+        }
+      } catch (e) {
+        console.error('선거 타입 카운트 로드 실패:', e);
+        electionTypeSelect.innerHTML = '';
+        electionTypeOptions.forEach((opt) => {
+          const option = document.createElement('option');
+          option.value = opt.value;
+          option.textContent = opt.label;
+          electionTypeSelect.appendChild(option);
+        });
+        if (preserved) electionTypeSelect.value = preserved;
+      }
+    }
+
     // 초기화
     async function initializePage() {
       await renderRealKoreaMap();
-      await loadRegionData();
+      await Promise.all([loadRegionData(), loadElectionTypeCounts()]);
 
       const urlRegionCode = getRegionFromURL();
       const urlDistrictCode = getDistrictFromURL();
