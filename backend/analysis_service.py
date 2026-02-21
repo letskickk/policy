@@ -27,6 +27,18 @@ def _cache_key(normalized_input: str, options: str, model: str, vs_id: str) -> s
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _normalize_cache_options(options: dict) -> str:
+    """캐시 적중률을 높이기 위해 분석 결과에 영향을 주는 필드만 정규화."""
+    canonical = {
+        "phase": (options.get("phase") or "full").strip().lower(),
+        "judge": bool(options.get("judge")),
+        "top_k_platform": int(options.get("top_k_platform", 6)),
+        "top_k_pledge": int(options.get("top_k_pledge", 6)),
+        "top_k_regional": int(options.get("top_k_regional", 8)),
+    }
+    return json.dumps(canonical, sort_keys=True)
+
+
 def _get_cached(user_id: int, cache_key: str) -> Optional[str]:
     conn = get_connection()
     try:
@@ -96,6 +108,8 @@ def _enrich_verify_result(result: Any) -> Any:
     - total_score: 0~100
     - signal_light: green|yellow|red
     - pdf_eligible: bool (80점 이상)
+    - summary.scores: { alignment, conflict_risk, differentiation }
+    - evidence_links: 프론트 친화 근거 매핑 배열
     """
     if not isinstance(result, dict):
         return result
@@ -117,7 +131,56 @@ def _enrich_verify_result(result: Any) -> Any:
     summary["total_score"] = score
     summary["signal_light"] = signal
     summary["pdf_eligible"] = eligible
+    summary["label"] = (
+        "강한 부합" if score >= 80 else
+        "부합" if score >= 60 else
+        "부분부합" if score >= 40 else
+        "미부합"
+    )
+
+    # 3축 점수: 기존 rubric 항목에서 파생
+    summary["scores"] = _build_axis_scores(result)
+
+    # improvements 통일: 문자열/객체 혼합 → 객체 배열
+    raw_imps = result.get("improvements", [])
+    if isinstance(raw_imps, list):
+        result["improvements"] = [
+            imp if isinstance(imp, dict) else {"title": str(imp), "detail": ""}
+            for imp in raw_imps
+        ]
+
     return result
+
+
+def _avg_score_0_5(items: list) -> float:
+    if not isinstance(items, list) or not items:
+        return 0.0
+    scores = [
+        float(it.get("score_0_5", 0))
+        for it in items
+        if isinstance(it, dict) and isinstance(it.get("score_0_5"), (int, float))
+    ]
+    return (sum(scores) / len(scores)) if scores else 0.0
+
+
+def _build_axis_scores(result: dict) -> dict:
+    """platform/pledges/conflicts rubric → 3축 0~100 점수."""
+    platform = result.get("platform", [])
+    pledges = result.get("pledges", [])
+    conflicts = result.get("conflicts", [])
+
+    alignment = round(_avg_score_0_5(platform) * 20, 1)
+    differentiation = round(_avg_score_0_5(pledges) * 20, 1)
+    conflict_raw = _avg_score_0_5(conflicts)
+    conflict_risk = round(conflict_raw * 20, 1)
+
+    return {
+        "alignment": min(alignment, 100.0),
+        "conflict_risk": min(conflict_risk, 100.0),
+        "differentiation": min(differentiation, 100.0),
+    }
+
+
 
 
 def run_check_analysis(
@@ -221,6 +284,7 @@ def run_check_analysis(
         return result, 503, False
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
+    logger.info("[check] user=%s elapsed=%dms chars=%d", user_id, elapsed_ms, len(result))
     token_in = len(normalized) // 2
     token_out = len(result) // 2
     cost = _estimate_cost(token_in, token_out, OPENAI_MODEL)
@@ -269,9 +333,21 @@ def run_verify_analysis(
     if not normalized:
         return {"detail": "공약 텍스트가 비어 있습니다."}, 400, False
 
+    is_quick = (options.get("phase") or "").strip().lower() == "quick"
+    if is_quick:
+        options.setdefault("top_k_platform", 6)
+        options.setdefault("top_k_pledge", 6)
+        options.setdefault("top_k_regional", 8)
+        if options["top_k_platform"] >= 6:
+            options["top_k_platform"] = 4
+        if options["top_k_pledge"] >= 6:
+            options["top_k_pledge"] = 4
+        if options["top_k_regional"] >= 8:
+            options["top_k_regional"] = 5
+
     vs_id = vector_store_id or ""
-    opts = json.dumps(options, sort_keys=True)
-    cache_key = _cache_key(normalized, opts, CHAT_MODEL, vs_id)
+    cache_opts = _normalize_cache_options(options)
+    cache_key = _cache_key(normalized, cache_opts, CHAT_MODEL, vs_id)
 
     cached = _get_cached(user_id, cache_key)
     if cached:
@@ -352,6 +428,12 @@ def run_verify_analysis(
         raise
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
+    phase_tag = "quick" if is_quick else "full"
+    logger.info(
+        "[verify][%s] user=%s elapsed=%dms top_k=(%s,%s,%s)",
+        phase_tag, user_id, elapsed_ms,
+        options.get("top_k_platform"), options.get("top_k_pledge"), options.get("top_k_regional"),
+    )
     result = _enrich_verify_result(result)
     out_str = json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
     token_in = len(normalized) // 2
