@@ -1709,25 +1709,14 @@ def search_winners2022_from_db(
             if count == 0:
                 return []
 
-            # user_meta 기반 필터 구성
-            norm = _normalize_user_meta_for_winners(user_meta)
-            typecodes = norm.get("sgTypecodes") or ["3", "4", "11"]
-            sd_name = norm.get("sdName") or ""
-
-            placeholders = ",".join("?" * len(typecodes))
-            params: list = list(typecodes)
-            where_clauses = [f"w.sg_typecode IN ({placeholders})"]
-            if sd_name:
-                where_clauses.append("w.sd_name LIKE ?")
-                params.append(sd_name[:2] + "%")  # "경기도" → "경기%"
-
-            sql = f"""
+            # 벤치마킹 목적: 지역 필터 없이 전국 전체 검색 후 키워드 랭킹으로 관련성 판단
+            sql = """
                 SELECT w.huboid, w.name, w.position, w.region,
                        wp.id, wp.title, wp.content, wp.realm
                 FROM winners2022 w
                 JOIN winner_pledges2022 wp ON w.huboid = wp.huboid
-                WHERE {' AND '.join(where_clauses)}
             """
+            params: list = []
             db_rows = conn.execute(sql, params).fetchall()
             if not db_rows:
                 return []
