@@ -1278,17 +1278,17 @@
         verifyData = data;
         const bar = document.getElementById('loadingProgressBar');
         const cur = bar ? parseFloat(bar.style.width || '0') : 0;
-        updateProgress(Math.max(cur, checkDone ? 100 : 50));
+        updateProgress(Math.max(cur, 50));
         console.log('[perf] /verify done in', Math.round(performance.now() - t0), 'ms');
       }).catch(e => {
         console.warn('[verify] error:', e);
       });
 
-      // 둘 다 끝나면 100%로 맞추고 바로 결과 표시
+      // 둘 다 끝나면 완료된 경우에만 100%로 맞추고 결과 표시
       Promise.allSettled([checkPromise, verifyPromise]).then(() => {
         if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
-        updateProgress(100);
         if (checkDone) {
+          updateProgress(100);
           renderCombinedResult(baseText, verifyData || {});
           resetBtn();
           console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
