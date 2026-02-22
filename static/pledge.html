@@ -693,10 +693,7 @@
     <section class="card">
       <h2 class="form-label">분석 결과</h2>
       <div class="result-container">
-        <div id="result" class="result-content empty">
-          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>
-공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
-        </div>
+        <div id="result" class="result-content"></div>
       </div>
       <div class="disclaimer-box">
         본 분석 결과는 <strong><bold>AI를 활용하여 작성된 참고 자료</strong></bold>입니다.<br>
@@ -734,7 +731,7 @@
     const btnEl = document.getElementById('btn');
     let lastResultFullText = '';
 
-    const emptyMessage = '<div style="font-size: 2rem; margin-bottom: 0.5rem;">🧐</div>공약 내용을 입력하고<br>\'AI 분석 시작하기\' 버튼을 눌러주세요.';
+    // 초기 스켈레톤은 SECTION_TITLES 정의 후 showSkeleton()으로 렌더링됨
 
     function showResult(text) {
       resultEl.innerHTML = text;
@@ -747,31 +744,75 @@
     }
 
     function showLoading() {
-      resultEl.innerHTML = `
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <span>AI가 정책 데이터를 분석하고 있습니다...</span>
-          <small style="display:block;margin-top:0.5rem;color:var(--muted);font-weight:600;">컨텍스트 구성 중... 잠시만 기다려 주세요.</small>
-        </div>
-      `;
-      resultEl.className = 'result-content';
+      // 스켈레톤 유지 — 버튼 상태만 변경
       btnEl.disabled = true;
       btnEl.textContent = '분석 진행 중...';
     }
 
     // ── 스트리밍 섹션 카드 렌더링 ──
+    const SECTION_TITLES = [
+      '개혁신당 정강정책과의 부합성',
+      '개혁신당 중앙당 공약과의 유사성',
+      '제8회 지방선거(2022) 당선인 공약과의 비교',
+      '우리 당 출마자 공약 비교',
+      '총평 (종합점수, 5개 축 점수)',
+      '수정·보완 제안'
+    ];
+
     let _streamBuf = '';
     let _streamBodyEl = null;
     let _streamSectionIdx = 0;
     let _streamActiveBadge = null;  // 현재 스트리밍 중인 섹션의 뱃지 참조
+
+    function showSkeleton() {
+      let cardsHtml = '';
+      SECTION_TITLES.forEach(function(title, i) {
+        const idx = i + 1;
+        cardsHtml +=
+          '<div class="section-card">' +
+            '<div class="section-card-head">' +
+              '<div class="section-card-title">' + idx + '. ' + escapeHtml(title) + '</div>' +
+              '<span class="line-tag" id="sBdg' + idx + '">' + idx + '</span>' +
+            '</div>' +
+            '<div class="section-card-body" id="sBdy' + idx + '">' +
+              '<div class="section-line" style="color:var(--muted);font-style:italic;">분석 시작 후 결과가 여기에 표시됩니다</div>' +
+            '</div>' +
+          '</div>';
+      });
+      resultEl.innerHTML =
+        '<div class="score-board" id="scorePlaceholder" style="opacity:0.45;">' +
+          '<div class="score" style="font-size:1.3rem;">총점: ———</div>' +
+          '<span style="color:var(--muted);font-size:0.9rem;">분석 후 총점이 여기에 표시됩니다</span>' +
+        '</div>' +
+        '<div class="section-cards" id="streamCards">' + cardsHtml + '</div>';
+      resultEl.className = 'result-content';
+    }
 
     function initStreamingCards() {
       _streamBuf = '';
       _streamBodyEl = null;
       _streamSectionIdx = 0;
       _streamActiveBadge = null;
-      resultEl.innerHTML = '<div class="section-cards" id="streamCards"></div>';
-      resultEl.className = 'result-content';
+
+      // 스켈레톤이 없으면(재분석 등) 새로 렌더링
+      if (!document.getElementById('scorePlaceholder')) showSkeleton();
+
+      // 스코어보드 → 스피너 + 플레이스홀더 텍스트
+      const scorePh = document.getElementById('scorePlaceholder');
+      if (scorePh) {
+        scorePh.style.opacity = '1';
+        scorePh.innerHTML =
+          '<div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0;"></div>' +
+          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">분석 완료 후 총점이 여기에 표시됩니다</span>';
+      }
+
+      // 각 섹션 카드 body 비우기 + badge를 streaming 상태로
+      for (let i = 1; i <= SECTION_TITLES.length; i++) {
+        const bodyEl = document.getElementById('sBdy' + i);
+        const badgeEl = document.getElementById('sBdg' + i);
+        if (bodyEl) bodyEl.innerHTML = '';
+        if (badgeEl) badgeEl.classList.add('streaming');
+      }
     }
 
     function _stopActiveBadge() {
@@ -789,25 +830,13 @@
       // 섹션 헤더 감지: "1. 제목", "2) 제목" 등
       const sectionMatch = trimmed.match(/^(\d+[.)]\s+.+)/);
       if (sectionMatch) {
-        const title = sectionMatch[1].trim();
         // 이전 섹션 뱃지 스피너 종료
         _stopActiveBadge();
         _streamSectionIdx++;
-        const cardsEl = document.getElementById('streamCards');
-        if (!cardsEl) return;
-        const card = document.createElement('div');
-        card.className = 'section-card';
-        const bodyId = 'sBdy' + _streamSectionIdx;
-        const badgeId = 'sBdg' + _streamSectionIdx;
-        card.innerHTML =
-          '<div class="section-card-head">' +
-            '<div class="section-card-title">' + escapeHtml(title) + '</div>' +
-            '<span class="line-tag streaming" id="' + badgeId + '">' + _streamSectionIdx + '</span>' +
-          '</div>' +
-          '<div class="section-card-body" id="' + bodyId + '"></div>';
-        cardsEl.appendChild(card);
-        _streamBodyEl = document.getElementById(bodyId);
-        _streamActiveBadge = document.getElementById(badgeId);
+        // 기존 스켈레톤 카드 타겟팅 (새 카드 생성하지 않음)
+        _streamBodyEl = document.getElementById('sBdy' + _streamSectionIdx);
+        _streamActiveBadge = document.getElementById('sBdg' + _streamSectionIdx);
+        if (_streamActiveBadge) _streamActiveBadge.classList.add('streaming');
         return;
       }
 
@@ -865,6 +894,9 @@
         .replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;');
     }
+
+    // 페이지 로드 시 스켈레톤 렌더링
+    showSkeleton();
 
     function toNumber(v) {
       return (typeof v === 'number' && !Number.isNaN(v)) ? v : null;
@@ -1279,6 +1311,7 @@
       }
 
       showLoading();
+      initStreamingCards();  // 버튼 클릭 즉시 스코어 플레이스홀더 표시 (fetch 전)
       const t0 = performance.now();
 
       function handleAuthError(res, data) {
@@ -1366,7 +1399,6 @@
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
-        let firstChunk = true;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1383,10 +1415,6 @@
             try { msg = JSON.parse(jsonStr); } catch { continue; }
 
             if (msg.type === 'chunk') {
-              if (firstChunk) {
-                firstChunk = false;
-                initStreamingCards();
-              }
               appendStreamChunk(msg.text);
             } else if (msg.type === 'cached') {
               // 캐시 히트: final에서 바로 처리
