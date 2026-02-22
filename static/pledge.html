@@ -430,6 +430,20 @@
     .draft-modal-body .draft-not-available{ color:var(--muted); padding:1rem 0; }
     .draft-modal-footer{ display:flex; gap:0.5rem; flex-wrap:wrap; padding:1rem 1.2rem; border-top:1px solid var(--border); }
     .line-tag{ font-size:0.75rem; font-weight:800; color:#93c5fd; border:1px solid rgba(147,197,253,0.4); border-radius:999px; padding:0.15rem 0.5rem; }
+    .line-tag.streaming{
+      color: transparent;
+      border-width: 2px;
+      border-color: rgba(147,197,253,0.18);
+      border-top-color: #93c5fd;
+      animation: spin 0.75s linear infinite;
+      width: 22px; height: 22px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      vertical-align: middle;
+    }
     /* 4번 섹션 유사 공약 카드 */
     .winners-card{
       margin: 0.65rem 0;
@@ -749,13 +763,22 @@
     let _streamBuf = '';
     let _streamBodyEl = null;
     let _streamSectionIdx = 0;
+    let _streamActiveBadge = null;  // 현재 스트리밍 중인 섹션의 뱃지 참조
 
     function initStreamingCards() {
       _streamBuf = '';
       _streamBodyEl = null;
       _streamSectionIdx = 0;
+      _streamActiveBadge = null;
       resultEl.innerHTML = '<div class="section-cards" id="streamCards"></div>';
       resultEl.className = 'result-content';
+    }
+
+    function _stopActiveBadge() {
+      if (_streamActiveBadge) {
+        _streamActiveBadge.classList.remove('streaming');
+        _streamActiveBadge = null;
+      }
     }
 
     function _flushStreamLine(raw) {
@@ -767,20 +790,24 @@
       const sectionMatch = trimmed.match(/^(\d+[.)]\s+.+)/);
       if (sectionMatch) {
         const title = sectionMatch[1].trim();
+        // 이전 섹션 뱃지 스피너 종료
+        _stopActiveBadge();
         _streamSectionIdx++;
         const cardsEl = document.getElementById('streamCards');
         if (!cardsEl) return;
         const card = document.createElement('div');
         card.className = 'section-card';
         const bodyId = 'sBdy' + _streamSectionIdx;
+        const badgeId = 'sBdg' + _streamSectionIdx;
         card.innerHTML =
           '<div class="section-card-head">' +
             '<div class="section-card-title">' + escapeHtml(title) + '</div>' +
-            '<span class="line-tag">' + _streamSectionIdx + '</span>' +
+            '<span class="line-tag streaming" id="' + badgeId + '">' + _streamSectionIdx + '</span>' +
           '</div>' +
           '<div class="section-card-body" id="' + bodyId + '"></div>';
         cardsEl.appendChild(card);
         _streamBodyEl = document.getElementById(bodyId);
+        _streamActiveBadge = document.getElementById(badgeId);
         return;
       }
 
@@ -1284,6 +1311,15 @@
       let verifyData = null;
       let streamDone = false;
       let streamErrorHandled = false;
+      let finalRendered = false;
+
+      function doFinalRender() {
+        if (finalRendered) return;
+        finalRendered = true;
+        renderCombinedResult(baseText, verifyData || {});
+        resetBtn();
+        console.log('[perf] final render in', Math.round(performance.now() - t0), 'ms');
+      }
 
       // /api/pledge/verify 병렬 호출 (변경 없음)
       const verifyChain = fetch('/api/pledge/verify', {
@@ -1355,11 +1391,13 @@
             } else if (msg.type === 'cached') {
               // 캐시 히트: final에서 바로 처리
             } else if (msg.type === 'final') {
+              _stopActiveBadge();  // 마지막 섹션 스피너 종료
               baseText = msg.text || '';
               streamDone = true;
               console.log('[perf] /check/stream final in', Math.round(performance.now() - t0), 'ms');
+              doFinalRender();  // [FINAL] 수신 즉시 최종 렌더링 (스트림 닫힘 대기 안 함)
             } else if (msg.type === 'done') {
-              // 정상 종료
+              doFinalRender();  // [DONE]에서도 렌더링 보장 (캐시 히트 등)
             } else if (msg.type === 'error') {
               handleFetchError(msg.detail || '분석 중 오류가 발생했습니다.');
               streamErrorHandled = true;
@@ -1371,14 +1409,14 @@
 
       Promise.allSettled([checkChain, verifyChain]).then(() => {
         if (streamDone) {
-          renderCombinedResult(baseText, verifyData || {});
-          resetBtn();
-          console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
+          doFinalRender();  // 아직 렌더링 안 됐으면 여기서 처리 (중복 호출은 무시됨)
         } else if (!streamErrorHandled) {
-          handleFetchError('서버 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
-          resetBtn();
+          if (!finalRendered) {
+            handleFetchError('서버 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
+            resetBtn();
+          }
         } else {
-          resetBtn();
+          if (!finalRendered) resetBtn();
         }
       });
 
