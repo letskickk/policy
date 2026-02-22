@@ -766,8 +766,8 @@
       mFill.style.width = monthlyPct + '%';
       dFill.className   = 'quota-fill' + (q.daily_remaining   <= 3  ? ' warn' : '');
       mFill.className   = 'quota-fill' + (q.monthly_remaining <= 10 ? ' warn' : '');
-      document.getElementById('quotaDailyText').textContent   = q.daily_remaining   + '/' + q.daily_limit   + '회 남음';
-      document.getElementById('quotaMonthlyText').textContent = q.monthly_remaining + '/' + q.monthly_limit + '회 남음';
+      document.getElementById('quotaDailyText').textContent   = q.daily_used   + '/' + q.daily_limit   + '회';
+      document.getElementById('quotaMonthlyText').textContent = q.monthly_used + '/' + q.monthly_limit + '회';
       bar.style.display = 'block';
     }
 
