@@ -770,7 +770,12 @@
       _streamBodyEl = null;
       _streamSectionIdx = 0;
       _streamActiveBadge = null;
-      resultEl.innerHTML = '<div class="section-cards" id="streamCards"></div>';
+      resultEl.innerHTML =
+        '<div class="score-board" id="scorePlaceholder">' +
+          '<div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0;"></div>' +
+          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">총점 분석 중&hellip; (분석이 끝나면 여기에 표시됩니다)</span>' +
+        '</div>' +
+        '<div class="section-cards" id="streamCards"></div>';
       resultEl.className = 'result-content';
     }
 
