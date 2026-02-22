@@ -299,6 +299,45 @@
     .panel-cta-row{
       margin-top: 1rem;
     }
+    .panel-cta-row-buttons{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .panel-cta-row-buttons .panel-cta-btn{
+      flex: 1;
+      min-width: 120px;
+    }
+    .candidate-search-wrap{
+      margin-bottom: 0.75rem;
+    }
+    .candidate-search-wrap label{
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    .candidate-search-wrap input{
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.35);
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .candidate-search-wrap input::placeholder{ color: var(--muted); opacity: 0.8; }
+    .candidate-search-wrap input:focus{
+      box-shadow: 0 0 0 3px var(--cta-ring);
+      border-color: rgba(255,255,255,0.32);
+    }
+    .copy-toast{
+      font-size: 0.8rem;
+      color: var(--brand);
+      margin-left: 0.5rem;
+    }
     .panel-cta-btn{
       display: block;
       text-align: center;
@@ -596,6 +635,15 @@
     .modal-pledge-count{
       font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;
     }
+    .pledge-modal-footer{
+      padding: 1rem 1.5rem;
+      border-top: 1px solid rgba(148,163,184,0.15);
+      flex-shrink: 0;
+    }
+    .pledge-modal-footer .panel-cta-btn{
+      display: block;
+      text-align: center;
+    }
     @media (max-width: 640px){
       .pledge-modal-overlay{ padding: 0.75rem 0.5rem; align-items: flex-start; }
       .pledge-modal{ border-radius: 14px; max-height: calc(100vh - 1.5rem); }
@@ -603,6 +651,22 @@
       .pledge-modal-header h3{ font-size: 1.05rem; }
       .pledge-modal-body{ padding: 1rem 1.1rem 1.5rem; }
     }
+
+    .footer{
+      max-width: 1400px;
+      margin: 2rem auto 0;
+      padding: 1.5rem;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.85rem;
+      border-top: 1px solid rgba(148,163,184,0.12);
+    }
+    .footer a{
+      color: #ffb37a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .footer a:hover{ text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -661,7 +725,8 @@
             <option value="">지역을 먼저 선택하세요</option>
           </select>
         </div>
-        <div class="panel-cta-row">
+        <div class="panel-cta-row panel-cta-row-buttons">
+          <button type="button" id="copyLinkBtn" class="panel-cta-btn" style="display:none;" title="현재 화면 링크 복사">링크 복사</button>
           <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
         </div>
       </div>
@@ -682,9 +747,12 @@
           <h3 id="pledgeModalTitle"></h3>
           <div class="modal-sub" id="pledgeModalSub"></div>
         </div>
-        <button class="pledge-modal-close" onclick="closePledgeModal()" title="닫기">✕</button>
+        <button class="pledge-modal-close" id="pledgeModalCloseBtn" onclick="closePledgeModal()" title="닫기">✕</button>
       </div>
       <div class="pledge-modal-body" id="pledgeModalBody"></div>
+      <div class="pledge-modal-footer">
+        <a href="/pledge" class="panel-cta-btn" id="pledgeModalCheckLink">이 공약으로 점검하기</a>
+      </div>
     </div>
   </div>
 
@@ -696,6 +764,7 @@
     const regionSelect = document.getElementById('regionSelect');
     const electionTypeSelect = document.getElementById('electionTypeSelect');
     const districtSelect = document.getElementById('districtSelect');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
     const REQUEST_TIMEOUT_MS = 15000;
     const CANDIDATES_TIMEOUT_MS = 60000;
     const DISTRICTS_TIMEOUT_MS = 30000;
@@ -905,11 +974,13 @@
         selectedDistrictCode = null;
         updateURL(null, null, null);
         if (regionSelect) regionSelect.value = "";
+        if (copyLinkBtn) copyLinkBtn.style.display = 'none';
         showEmptyState();
         return;
       }
 
       selectedRegionCode = regionCode;
+      if (copyLinkBtn) copyLinkBtn.style.display = 'inline-block';
       selectedDistrictCode = null;
       if (regionSelect && regionCode) {
         regionSelect.value = regionCode;
@@ -941,6 +1012,7 @@
       panelSubtitle.textContent = '지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요';
       districtSelect.disabled = true;
       districtSelect.innerHTML = '<option value="">지역을 먼저 선택하세요</option>';
+      if (copyLinkBtn) copyLinkBtn.style.display = 'none';
       panelContent.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
@@ -1049,11 +1121,19 @@
       `;
     }
 
-    // 에러 상태 표시
-    function showError(message) {
+    // 에러 상태 표시 (retryCallback 있으면 다시 시도 버튼 표시)
+    function showError(message, retryCallback) {
+      const retryHtml = typeof retryCallback === 'function'
+        ? '<div class="panel-cta-row" style="margin-top:1rem;"><button type="button" class="panel-cta-btn" id="errorRetryBtn">다시 시도</button></div>'
+        : '';
       panelContent.innerHTML = `
         <div class="error-message">${message}</div>
+        ${retryHtml}
       `;
+      const btn = panelContent.querySelector('#errorRetryBtn');
+      if (btn && typeof retryCallback === 'function') {
+        btn.onclick = function() { this.disabled = true; retryCallback(); };
+      }
     }
 
     // 후보자 목록 로드
@@ -1081,7 +1161,10 @@
         const msg = error && error.name === 'AbortError'
           ? '서버 초기화가 지연되고 있습니다. 잠시 후 다시 시도해주세요.'
           : (error.message || '서버 연결 실패');
-        showError(`출마자 정보를 불러오는 중 오류가 발생했습니다.<br>(${msg})`);
+        const region = regionCode;
+        const district = districtCode;
+        const etype = electionTypeSelect.value || null;
+        showError(`출마자 정보를 불러오는 중 오류가 발생했습니다.<br>(${msg})`, () => loadCandidates(region, district, etype));
       }
     }
 
@@ -1111,6 +1194,12 @@
       const SHOW_MORE_THRESHOLD = 10;
       const needShowMore = candidates.length > SHOW_MORE_THRESHOLD;
 
+      const searchHtml = `
+        <div class="candidate-search-wrap" id="candidateSearchWrap">
+          <label for="candidateSearchInput">이름 검색</label>
+          <input type="text" id="candidateSearchInput" class="filter-select" placeholder="후보 이름으로 필터" aria-label="후보 이름 검색">
+        </div>`;
+
       const cards = candidates.map((candidate, idx) => {
         const pos = buildPositionTitle(candidate.election_type, regionCode, candidate.district_name);
         const hiddenClass = needShowMore && idx >= INITIAL_SHOW ? ' hidden-card' : '';
@@ -1125,15 +1214,17 @@
         const detailBtn = hasPledges
           ? `<button class="btn-detail" onclick="event.stopPropagation();openPledgeModal(${idx})" title="공약 전문 보기">상세</button>`
           : '';
+        const checkLink = `<a href="/pledge" class="btn-detail" style="margin-left:0.25rem;" title="이 공약으로 점검하기">점검</a>`;
 
         return `
-          <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}">
+          <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}" data-candidate-name="${escapeHtml(candidate.name)}">
             <div class="candidate-header" onclick="toggleCandidate(this)">
               <span class="candidate-name">
                 ${pos ? `<div class="cand-position">${escapeHtml(pos)} 후보</div>` : ''}
                 <div class="cand-realname">${escapeHtml(candidate.name)}</div>
               </span>
               <span style="display:flex;align-items:center;gap:0.4rem;">
+                ${checkLink}
                 ${detailBtn}
                 <span class="candidate-arrow">▸</span>
               </span>
@@ -1146,7 +1237,20 @@
         ? `<button class="show-more-btn" onclick="showAllCandidates(this)">나머지 ${candidates.length - INITIAL_SHOW}명 더 보기</button>`
         : '';
 
-      panelContent.innerHTML = `<div class="candidates-list">${cards}${showMoreBtn}</div>`;
+      panelContent.innerHTML = `${searchHtml}<div class="candidates-list">${cards}${showMoreBtn}</div>`;
+
+      const searchInput = document.getElementById('candidateSearchInput');
+      if (searchInput) {
+        searchInput.addEventListener('input', function() {
+          const q = (this.value || '').trim().toLowerCase();
+          const list = panelContent.querySelector('.candidates-list');
+          if (!list) return;
+          list.querySelectorAll('.candidate-card').forEach(function(card) {
+            const name = (card.getAttribute('data-candidate-name') || '').toLowerCase();
+            card.classList.toggle('hidden-card', q !== '' && name.indexOf(q) === -1);
+          });
+        });
+      }
     }
 
     function toggleCandidate(headerEl) {
@@ -1212,7 +1316,7 @@
           option.textContent = `${regionNames[code]} (${count})`;
           regionSelect.appendChild(option);
         });
-        // 배지 업데이트는 필요시 구현
+        updateMapPathTitles();
       } catch (error) {
         console.error('지역 데이터 로드 실패:', error);
         const ordered = Object.keys(regionNames);
@@ -1223,7 +1327,17 @@
           option.textContent = regionNames[code];
           regionSelect.appendChild(option);
         });
+        updateMapPathTitles();
       }
+    }
+
+    function updateMapPathTitles() {
+      mapPaths.forEach((path) => {
+        const code = path.getAttribute('data-region-code');
+        const name = regionNames[code] || code;
+        const count = regionData[code]?.candidate_count ?? 0;
+        path.setAttribute('title', `${name} (${count}명)`);
+      });
     }
 
     // 선거 타입별 후보 수 로드 후 셀렉트 옵션에 카운팅 표시
@@ -1268,6 +1382,25 @@
       }
     }
     initializePage();
+
+    if (copyLinkBtn) {
+      copyLinkBtn.addEventListener('click', function() {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(function() {
+          const span = document.createElement('span');
+          span.className = 'copy-toast';
+          span.textContent = '복사됨';
+          copyLinkBtn.appendChild(span);
+          setTimeout(function() { span.remove(); }, 2000);
+        }).catch(function() {
+          const span = document.createElement('span');
+          span.className = 'copy-toast';
+          span.textContent = '복사 실패';
+          copyLinkBtn.appendChild(span);
+          setTimeout(function() { span.remove(); }, 2000);
+        });
+      });
+    }
 
     districtSelect.addEventListener('change', function() {
       if (!selectedRegionCode) return;
@@ -1338,6 +1471,26 @@
       pledgeModalOverlay.classList.add('open');
       document.body.style.overflow = 'hidden';
 
+      const closeBtn = document.getElementById('pledgeModalCloseBtn');
+      if (closeBtn) { closeBtn.focus(); }
+
+      const trapHandler = function(e) {
+        if (e.key !== 'Tab' || !pledgeModalOverlay.classList.contains('open')) return;
+        const modal = pledgeModalOverlay.querySelector('.pledge-modal');
+        const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        const list = Array.from(focusables).filter(function(el) { return el.tabIndex >= 0 && !el.disabled; });
+        if (list.length === 0) return;
+        const first = list[0];
+        const last = list[list.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      };
+      pledgeModalOverlay._trapHandler = trapHandler;
+      document.addEventListener('keydown', trapHandler);
+
       let pledges = c.pledges || [];
 
       if (c.candidate_id) {
@@ -1378,6 +1531,10 @@
       if (event && event.target && event.target !== pledgeModalOverlay) return;
       pledgeModalOverlay.classList.remove('open');
       document.body.style.overflow = '';
+      if (pledgeModalOverlay._trapHandler) {
+        document.removeEventListener('keydown', pledgeModalOverlay._trapHandler);
+        pledgeModalOverlay._trapHandler = null;
+      }
     }
 
     document.addEventListener('keydown', (e) => {
@@ -1387,10 +1544,10 @@
     });
   </script>
 
-  <footer style="max-width:1400px;margin:2rem auto 0;padding:1.5rem;text-align:center;color:#64748b;font-size:0.85rem;border-top:1px solid rgba(148,163,184,0.12);">
+  <footer class="footer">
     <p>
       <strong>개혁신당 정책국</strong><br>
-      문의: <a href="mailto:letskick@reformparty.kr" style="color:#ffb37a;text-decoration:none;">letskick@reformparty.kr</a>
+      문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
     </p>
   </footer>
 </body>
