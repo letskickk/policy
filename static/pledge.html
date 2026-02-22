@@ -561,6 +561,10 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     .error-message{
       padding: 1rem 1.25rem;
@@ -693,7 +697,10 @@
     <section class="card">
       <h2 class="form-label">분석 결과</h2>
       <div class="result-container">
-        <div id="result" class="result-content"></div>
+        <div id="result" class="result-content empty">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>
+          공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
+        </div>
       </div>
       <div class="disclaimer-box">
         본 분석 결과는 <strong><bold>AI를 활용하여 작성된 참고 자료</strong></bold>입니다.<br>
@@ -731,7 +738,7 @@
     const btnEl = document.getElementById('btn');
     let lastResultFullText = '';
 
-    // 초기 스켈레톤은 SECTION_TITLES 정의 후 showSkeleton()으로 렌더링됨
+    const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고<br>\'AI 분석 시작하기\' 버튼을 눌러주세요.';
 
     function showResult(text) {
       resultEl.innerHTML = text;
@@ -764,29 +771,6 @@
     let _streamSectionIdx = 0;
     let _streamActiveBadge = null;  // 현재 스트리밍 중인 섹션의 뱃지 참조
 
-    function showSkeleton() {
-      let cardsHtml = '';
-      SECTION_TITLES.forEach(function(title, i) {
-        const idx = i + 1;
-        cardsHtml +=
-          '<div class="section-card">' +
-            '<div class="section-card-head">' +
-              '<div class="section-card-title">' + idx + '. ' + escapeHtml(title) + '</div>' +
-              '<span class="line-tag" id="sBdg' + idx + '">' + idx + '</span>' +
-            '</div>' +
-            '<div class="section-card-body" id="sBdy' + idx + '">' +
-              '<div class="section-line" style="color:var(--muted);font-style:italic;">분석 시작 후 결과가 여기에 표시됩니다</div>' +
-            '</div>' +
-          '</div>';
-      });
-      resultEl.innerHTML =
-        '<div class="score-board" id="scorePlaceholder" style="opacity:0.45;">' +
-          '<div class="score" style="font-size:1.3rem;">총점: ———</div>' +
-          '<span style="color:var(--muted);font-size:0.9rem;">분석 후 총점이 여기에 표시됩니다</span>' +
-        '</div>' +
-        '<div class="section-cards" id="streamCards">' + cardsHtml + '</div>';
-      resultEl.className = 'result-content';
-    }
 
     function initStreamingCards() {
       _streamBuf = '';
@@ -794,25 +778,27 @@
       _streamSectionIdx = 0;
       _streamActiveBadge = null;
 
-      // 스켈레톤이 없으면(재분석 등) 새로 렌더링
-      if (!document.getElementById('scorePlaceholder')) showSkeleton();
+      // 섹션 카드를 처음부터 로딩 상태로 생성
+      let cardsHtml = '';
+      SECTION_TITLES.forEach(function(title, i) {
+        const idx = i + 1;
+        cardsHtml +=
+          '<div class="section-card" style="animation:fadeInUp 0.3s ease both;animation-delay:' + (i * 0.06) + 's">' +
+            '<div class="section-card-head">' +
+              '<div class="section-card-title">' + idx + '. ' + escapeHtml(title) + '</div>' +
+              '<span class="line-tag streaming" id="sBdg' + idx + '">' + idx + '</span>' +
+            '</div>' +
+            '<div class="section-card-body" id="sBdy' + idx + '"></div>' +
+          '</div>';
+      });
 
-      // 스코어보드 → 스피너 + 플레이스홀더 텍스트
-      const scorePh = document.getElementById('scorePlaceholder');
-      if (scorePh) {
-        scorePh.style.opacity = '1';
-        scorePh.innerHTML =
+      resultEl.innerHTML =
+        '<div class="score-board" id="scorePlaceholder">' +
           '<div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0;"></div>' +
-          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">분석 완료 후 총점이 여기에 표시됩니다</span>';
-      }
-
-      // 각 섹션 카드 body 비우기 + badge를 streaming 상태로
-      for (let i = 1; i <= SECTION_TITLES.length; i++) {
-        const bodyEl = document.getElementById('sBdy' + i);
-        const badgeEl = document.getElementById('sBdg' + i);
-        if (bodyEl) bodyEl.innerHTML = '';
-        if (badgeEl) badgeEl.classList.add('streaming');
-      }
+          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">분석 완료 후 총점이 여기에 표시됩니다</span>' +
+        '</div>' +
+        '<div class="section-cards" id="streamCards">' + cardsHtml + '</div>';
+      resultEl.className = 'result-content';
     }
 
     function _stopActiveBadge() {
@@ -894,9 +880,6 @@
         .replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;');
     }
-
-    // 페이지 로드 시 스켈레톤 렌더링
-    showSkeleton();
 
     function toNumber(v) {
       return (typeof v === 'number' && !Number.isNaN(v)) ? v : null;
