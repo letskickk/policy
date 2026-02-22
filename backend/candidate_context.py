@@ -39,11 +39,40 @@ ELECTION_TYPE_LABELS = {
 }
 
 
+_JUNK_MIN_UNIQUE_RATIO = 0.15   # 고유 문자 비율 15% 미만이면 반복 텍스트로 간주
+_JUNK_MIN_CONTENT_LEN = 15      # 제목+내용 합산 최소 의미있는 길이
+_JUNK_REPEAT_UNIT_MAX = 10      # 이 길이 이하 단위가 전체의 70% 이상 차지하면 반복
+
+
+def _is_junk_text(text: str) -> bool:
+    """반복 문자열·너무 짧은·의미 없는 텍스트 여부 판별."""
+    t = (text or "").strip()
+    if not t or len(t) < _JUNK_MIN_CONTENT_LEN:
+        return True
+    # 고유 문자 비율 검사
+    if len(set(t)) / len(t) < _JUNK_MIN_UNIQUE_RATIO:
+        return True
+    # 짧은 단위 반복 검사: 앞 2~10자 패턴이 전체에서 반복되는지
+    for unit_len in range(2, min(_JUNK_REPEAT_UNIT_MAX + 1, len(t) // 2 + 1)):
+        unit = t[:unit_len]
+        repeat_count = t.count(unit)
+        if repeat_count * unit_len >= len(t) * 0.70:
+            return True
+    return False
+
+
+def _is_junk_pledge(title: str, content: str) -> bool:
+    """공약 제목+내용이 쓰레기 데이터인지 판별."""
+    combined = f"{title} {content}".strip()
+    return _is_junk_text(combined)
+
+
 def load_candidates_pledges_context(max_chars: int = 40000) -> str:
     """
     DB의 전체 candidates + candidate_pledges를 GPT 컨텍스트용 텍스트로 변환.
     max_chars 초과 시 공약 content(세부내용)부터 잘라내고 제목은 유지한다.
     후보 0명이면 빈 문자열 반환.
+    반복 문자열·너무 짧은 공약은 품질 필터로 제외한다.
     """
     conn = get_connection()
     try:
@@ -72,6 +101,7 @@ def load_candidates_pledges_context(max_chars: int = 40000) -> str:
         return ""
 
     candidates: dict[int, dict] = {}
+    skipped_pledges = 0
     for r in rows:
         cid = r["candidate_id"]
         if cid not in candidates:
@@ -88,10 +118,19 @@ def load_candidates_pledges_context(max_chars: int = 40000) -> str:
                 "pledges": [],
             }
         if r["pledge_title"]:
-            candidates[cid]["pledges"].append({
-                "title": (r["pledge_title"] or "").strip(),
-                "content": (r["pledge_content"] or "").strip(),
-            })
+            title = (r["pledge_title"] or "").strip()
+            content = (r["pledge_content"] or "").strip()
+            if _is_junk_pledge(title, content):
+                skipped_pledges += 1
+                logger.debug("품질 필터 제외: 후보=%s 제목=%r", r["name"], title[:40])
+                continue
+            candidates[cid]["pledges"].append({"title": title, "content": content})
+
+    if skipped_pledges:
+        logger.info("출마자 공약 품질 필터: %d건 제외", skipped_pledges)
+
+    # 공약이 하나도 없는 후보는 컨텍스트에서 제외
+    candidates = {cid: info for cid, info in candidates.items() if info["pledges"]}
 
     if not candidates:
         return ""
