@@ -27,7 +27,7 @@
 | `backend/quota_rate.py` | 일일30회·월300회 쿼터 |
 | `static/js/check-result-render.js` | 점검 결과 프론트 렌더링 |
 | `static/pledge.html` | 공약 입력/점검 페이지 |
-| `static/map.html` | 지역별 출마자 지도 페이지 (지도 클릭·지역/선거타입/선거구 필터, 후보 목록·공약 상세·점검 링크) |
+| `static/map.html` | 지역별 출마자 지도 페이지 (지도 클릭·지역/선거타입/선거구 필터, 후보 목록·공약 상세) |
 
 ---
 

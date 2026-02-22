@@ -196,6 +196,25 @@
       margin: 0 auto;
     }
 
+    .map-legend{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .map-legend span{ display: flex; align-items: center; gap: 0.35rem; }
+    .map-legend .legend-swatch{
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
     .korea-map{
       width: 100%;
       height: auto;
@@ -203,23 +222,21 @@
     }
 
     .korea-map path{
-      fill: rgba(255,255,255,0.1);
-      stroke: rgba(255,255,255,0.3);
       stroke-width: 1;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
     }
-
+    /* fill은 JS에서 출마자 수에 따라 설정, hover/selected 시 덮어씀 */
     .korea-map path:hover{
-      fill: rgba(255,114,16,0.2);
-      stroke: var(--brand);
-      stroke-width: 2;
+      fill: rgba(255,114,16,0.25) !important;
+      stroke: var(--brand) !important;
+      stroke-width: 2 !important;
     }
 
     .korea-map path.selected{
-      fill: var(--selected);
-      stroke: var(--selected-border);
-      stroke-width: 2;
+      fill: var(--selected) !important;
+      stroke: var(--selected-border) !important;
+      stroke-width: 2 !important;
     }
 
     .korea-map path:focus{
@@ -299,15 +316,6 @@
     .panel-cta-row{
       margin-top: 1rem;
     }
-    .panel-cta-row-buttons{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .panel-cta-row-buttons .panel-cta-btn{
-      flex: 1;
-      min-width: 120px;
-    }
     .candidate-search-wrap{
       margin-bottom: 0.75rem;
     }
@@ -332,11 +340,6 @@
     .candidate-search-wrap input:focus{
       box-shadow: 0 0 0 3px var(--cta-ring);
       border-color: rgba(255,255,255,0.32);
-    }
-    .copy-toast{
-      font-size: 0.8rem;
-      color: var(--brand);
-      margin-left: 0.5rem;
     }
     .panel-cta-btn{
       display: block;
@@ -635,15 +638,6 @@
     .modal-pledge-count{
       font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;
     }
-    .pledge-modal-footer{
-      padding: 1rem 1.5rem;
-      border-top: 1px solid rgba(148,163,184,0.15);
-      flex-shrink: 0;
-    }
-    .pledge-modal-footer .panel-cta-btn{
-      display: block;
-      text-align: center;
-    }
     @media (max-width: 640px){
       .pledge-modal-overlay{ padding: 0.75rem 0.5rem; align-items: flex-start; }
       .pledge-modal{ border-radius: 14px; max-height: calc(100vh - 1.5rem); }
@@ -697,6 +691,11 @@
       <div class="map-wrapper">
         <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
       </div>
+      <div class="map-legend" id="mapLegend" aria-label="출마자 수에 따른 색상 범례">
+        <span><span class="legend-swatch" style="background:rgba(255,255,255,0.06);"></span> 0명</span>
+        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.2);"></span> 소수</span>
+        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.45);"></span> 많음</span>
+      </div>
     </div>
 
     <div class="panel">
@@ -725,8 +724,7 @@
             <option value="">지역을 먼저 선택하세요</option>
           </select>
         </div>
-        <div class="panel-cta-row panel-cta-row-buttons">
-          <button type="button" id="copyLinkBtn" class="panel-cta-btn" style="display:none;" title="현재 화면 링크 복사">링크 복사</button>
+        <div class="panel-cta-row">
           <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
         </div>
       </div>
@@ -750,9 +748,6 @@
         <button class="pledge-modal-close" id="pledgeModalCloseBtn" onclick="closePledgeModal()" title="닫기">✕</button>
       </div>
       <div class="pledge-modal-body" id="pledgeModalBody"></div>
-      <div class="pledge-modal-footer">
-        <a href="/pledge" class="panel-cta-btn" id="pledgeModalCheckLink">이 공약으로 점검하기</a>
-      </div>
     </div>
   </div>
 
@@ -764,7 +759,6 @@
     const regionSelect = document.getElementById('regionSelect');
     const electionTypeSelect = document.getElementById('electionTypeSelect');
     const districtSelect = document.getElementById('districtSelect');
-    const copyLinkBtn = document.getElementById('copyLinkBtn');
     const REQUEST_TIMEOUT_MS = 15000;
     const CANDIDATES_TIMEOUT_MS = 60000;
     const DISTRICTS_TIMEOUT_MS = 30000;
@@ -974,13 +968,11 @@
         selectedDistrictCode = null;
         updateURL(null, null, null);
         if (regionSelect) regionSelect.value = "";
-        if (copyLinkBtn) copyLinkBtn.style.display = 'none';
         showEmptyState();
         return;
       }
 
       selectedRegionCode = regionCode;
-      if (copyLinkBtn) copyLinkBtn.style.display = 'inline-block';
       selectedDistrictCode = null;
       if (regionSelect && regionCode) {
         regionSelect.value = regionCode;
@@ -1012,7 +1004,6 @@
       panelSubtitle.textContent = '지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요';
       districtSelect.disabled = true;
       districtSelect.innerHTML = '<option value="">지역을 먼저 선택하세요</option>';
-      if (copyLinkBtn) copyLinkBtn.style.display = 'none';
       panelContent.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
@@ -1214,7 +1205,6 @@
         const detailBtn = hasPledges
           ? `<button class="btn-detail" onclick="event.stopPropagation();openPledgeModal(${idx})" title="공약 전문 보기">상세</button>`
           : '';
-        const checkLink = `<a href="/pledge" class="btn-detail" style="margin-left:0.25rem;" title="이 공약으로 점검하기">점검</a>`;
 
         return `
           <div class="candidate-card${hiddenClass}" data-candidate-id="${candidate.candidate_id || ''}" data-candidate-name="${escapeHtml(candidate.name)}">
@@ -1224,7 +1214,6 @@
                 <div class="cand-realname">${escapeHtml(candidate.name)}</div>
               </span>
               <span style="display:flex;align-items:center;gap:0.4rem;">
-                ${checkLink}
                 ${detailBtn}
                 <span class="candidate-arrow">▸</span>
               </span>
@@ -1317,6 +1306,7 @@
           regionSelect.appendChild(option);
         });
         updateMapPathTitles();
+        updateMapPathStyles();
       } catch (error) {
         console.error('지역 데이터 로드 실패:', error);
         const ordered = Object.keys(regionNames);
@@ -1328,6 +1318,7 @@
           regionSelect.appendChild(option);
         });
         updateMapPathTitles();
+        updateMapPathStyles();
       }
     }
 
@@ -1337,6 +1328,26 @@
         const name = regionNames[code] || code;
         const count = regionData[code]?.candidate_count ?? 0;
         path.setAttribute('title', `${name} (${count}명)`);
+      });
+    }
+
+    /** 출마자 수에 따라 지역 색 농도 적용: 0명=연한 회색, 많을수록 진한 오렌지 */
+    function updateMapPathStyles() {
+      const counts = mapPaths.map((p) => regionData[p.getAttribute('data-region-code')]?.candidate_count ?? 0);
+      const maxCount = Math.max(1, ...counts);
+      mapPaths.forEach((path) => {
+        const code = path.getAttribute('data-region-code');
+        const count = regionData[code]?.candidate_count ?? 0;
+        if (count === 0) {
+          path.style.fill = 'rgba(255,255,255,0.06)';
+          path.style.stroke = 'rgba(255,255,255,0.18)';
+        } else {
+          let intensity = maxCount <= 1 ? 1 : (count - 1) / (maxCount - 1);
+          intensity = Math.min(1, Math.max(0, intensity));
+          const alpha = 0.12 + intensity * 0.32;
+          path.style.fill = 'rgba(255,114,16,' + alpha + ')';
+          path.style.stroke = 'rgba(255,114,16,' + (0.25 + intensity * 0.4) + ')';
+        }
       });
     }
 
@@ -1382,25 +1393,6 @@
       }
     }
     initializePage();
-
-    if (copyLinkBtn) {
-      copyLinkBtn.addEventListener('click', function() {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url).then(function() {
-          const span = document.createElement('span');
-          span.className = 'copy-toast';
-          span.textContent = '복사됨';
-          copyLinkBtn.appendChild(span);
-          setTimeout(function() { span.remove(); }, 2000);
-        }).catch(function() {
-          const span = document.createElement('span');
-          span.className = 'copy-toast';
-          span.textContent = '복사 실패';
-          copyLinkBtn.appendChild(span);
-          setTimeout(function() { span.remove(); }, 2000);
-        });
-      });
-    }
 
     districtSelect.addEventListener('change', function() {
       if (!selectedRegionCode) return;
