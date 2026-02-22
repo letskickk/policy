@@ -692,9 +692,7 @@
         <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
       </div>
       <div class="map-legend" id="mapLegend" aria-label="출마자 수에 따른 색상 범례">
-        <span><span class="legend-swatch" style="background:rgba(255,255,255,0.06);"></span> 0명</span>
-        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.2);"></span> 소수</span>
-        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.45);"></span> 많음</span>
+        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.45);"></span> 출마자 많음</span>
       </div>
     </div>
 
@@ -1187,8 +1185,8 @@
 
       const searchHtml = `
         <div class="candidate-search-wrap" id="candidateSearchWrap">
-          <label for="candidateSearchInput">이름 검색</label>
-          <input type="text" id="candidateSearchInput" class="filter-select" placeholder="후보 이름으로 필터" aria-label="후보 이름 검색">
+          <label for="candidateSearchInput">이름으로 검색</label>
+          <input type="text" id="candidateSearchInput" class="filter-select" placeholder="이름으로 검색" aria-label="이름으로 검색">
         </div>`;
 
       const cards = candidates.map((candidate, idx) => {
