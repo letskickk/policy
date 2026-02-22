@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.config import (
@@ -1576,6 +1576,122 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
     except Exception as e:
         logger.exception("check_pledge 오류 (after %.1fs)", time.perf_counter() - t0)
         raise HTTPException(status_code=500, detail=str(e)[:500])
+
+
+@app.post("/check/stream")
+def check_pledge_stream(body: PledgeCheckRequest, request: Request):
+    """공약 당 부합 점검 - SSE 스트리밍 버전. GPT 토큰을 실시간으로 클라이언트에 전달."""
+    import json as _json
+    import time as _time
+
+    _ensure_startup()
+
+    user = require_approved(request)
+    ip = _client_ip(request)
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+    ok, msg = check_rate_limit_user(user["id"])
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
+    from backend.quota_rate import check_quota
+    ok, msg = check_quota(user["id"])
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
+    pledge_text = (body.pledge or "").strip()
+    if not pledge_text:
+        raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
+
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
+    vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    winners2022_vs_id = _winners2022_vector_store_id
+
+    t0 = _time.perf_counter()
+
+    def generate():
+        from backend.check_service import check_pledge_alignment_stream
+        from backend.usage_logger import log_usage, _estimate_cost
+
+        accumulated: list[str] = []
+        final_text = ""
+        from_cache = False
+        had_error = False
+
+        try:
+            gen = check_pledge_alignment_stream(
+                pledge_text,
+                vs_id,
+                regional_vs_id,
+                winners2022_vs_id,
+                _indexes if not USE_OPENAI_VECTOR_STORE else None,
+                user["id"],
+            )
+            for item in gen:
+                if item == "[CACHED]":
+                    from_cache = True
+                    yield f"data: {_json.dumps({'type': 'cached'}, ensure_ascii=False)}\n\n"
+                elif item.startswith("[FINAL]"):
+                    final_text = item[len("[FINAL]"):]
+                    yield f"data: {_json.dumps({'type': 'final', 'text': final_text}, ensure_ascii=False)}\n\n"
+                elif item.startswith("[ERROR]"):
+                    had_error = True
+                    yield f"data: {_json.dumps({'type': 'error', 'detail': item[7:]}, ensure_ascii=False)}\n\n"
+                else:
+                    accumulated.append(item)
+                    yield f"data: {_json.dumps({'type': 'chunk', 'text': item}, ensure_ascii=False)}\n\n"
+
+            yield f"data: {_json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            had_error = True
+            logger.exception("[check/stream] 오류")
+            yield f"data: {_json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
+
+        # 사용량 로깅
+        elapsed_ms = int((_time.perf_counter() - t0) * 1000)
+        status = 500 if had_error else 200
+        out_chars = len(final_text) if final_text else len("".join(accumulated))
+        token_in = len(pledge_text) // 2
+        token_out = out_chars // 2
+        cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
+        log_usage(
+            user_id=user["id"],
+            ip=ip,
+            endpoint="/check/stream",
+            action="cache_hit" if from_cache else "analysis_run",
+            input_chars=len(pledge_text),
+            output_chars=out_chars,
+            model=OPENAI_MODEL,
+            token_in=0 if from_cache else token_in,
+            token_out=0 if from_cache else token_out,
+            cost_estimate=0.0 if from_cache else cost,
+            status_code=status,
+            latency_ms=elapsed_ms,
+        )
+        # history 저장
+        if not had_error and final_text:
+            try:
+                from backend.history import add_history
+                add_history(
+                    user_id=user["id"],
+                    kind="check",
+                    input_text=pledge_text,
+                    result=final_text,
+                    status_code=200,
+                    from_cache=from_cache,
+                    options={"source": "check/stream"},
+                )
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 REGION_NAME_MAP = {

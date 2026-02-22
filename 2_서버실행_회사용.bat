@@ -11,11 +11,9 @@ if not exist .venv\Scripts\python.exe (
 )
 
 echo [회사용] 서버 시작 중...
-echo.
 echo   페이지 주소: http://127.0.0.1:8001
 echo   (브라우저에서 이 주소로 접속하세요)
-echo.
-echo 종료하려면 이 창을 닫거나 Ctrl+C 하세요.
+echo   종료: 창 닫기 또는 Ctrl+C
 echo ========================================
 echo.
 

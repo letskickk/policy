@@ -732,39 +732,92 @@
       resultEl.className = 'result-content';
     }
 
-    let loadingProgressTimer = null;
-    function updateProgress(pct) {
-      const bar = document.getElementById('loadingProgressBar');
-      const pctEl = document.getElementById('loadingProgressPct');
-      if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
-      if (pctEl) pctEl.textContent = Math.min(100, Math.max(0, Math.round(pct))) + '%';
-    }
     function showLoading() {
       resultEl.innerHTML = `
         <div class="loading-state">
           <div class="spinner"></div>
           <span>AI가 정책 데이터를 분석하고 있습니다...</span>
-          <div class="loading-progress-wrap">
-            <div class="loading-progress-track">
-              <div id="loadingProgressBar" class="loading-progress-bar"></div>
-            </div>
-            <span id="loadingProgressPct" class="loading-progress-pct">0%</span>
-          </div>
-          <small style="display:block;margin-top:0.5rem;color:var(--muted);font-weight:600;">최대 1~2분 걸릴 수 있습니다. 잠시만 기다려 주세요.</small>
+          <small style="display:block;margin-top:0.5rem;color:var(--muted);font-weight:600;">컨텍스트 구성 중... 잠시만 기다려 주세요.</small>
         </div>
       `;
       resultEl.className = 'result-content';
       btnEl.disabled = true;
       btnEl.textContent = '분석 진행 중...';
-      updateProgress(0);
-      if (loadingProgressTimer) clearInterval(loadingProgressTimer);
-      loadingProgressTimer = setInterval(() => {
-        const bar = document.getElementById('loadingProgressBar');
-        if (!bar) { clearInterval(loadingProgressTimer); return; }
-        const w = parseFloat(bar.style.width || '0');
-        if (w >= 90) return;
-        updateProgress(w + 2);
-      }, 1500);
+    }
+
+    // ── 스트리밍 섹션 카드 렌더링 ──
+    let _streamBuf = '';
+    let _streamBodyEl = null;
+    let _streamSectionIdx = 0;
+
+    function initStreamingCards() {
+      _streamBuf = '';
+      _streamBodyEl = null;
+      _streamSectionIdx = 0;
+      resultEl.innerHTML = '<div class="section-cards" id="streamCards"></div>';
+      resultEl.className = 'result-content';
+    }
+
+    function _flushStreamLine(raw) {
+      const line = raw.trimEnd();
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // 섹션 헤더 감지: "1. 제목", "2) 제목" 등
+      const sectionMatch = trimmed.match(/^(\d+[.)]\s+.+)/);
+      if (sectionMatch) {
+        const title = sectionMatch[1].trim();
+        _streamSectionIdx++;
+        const cardsEl = document.getElementById('streamCards');
+        if (!cardsEl) return;
+        const card = document.createElement('div');
+        card.className = 'section-card';
+        const bodyId = 'sBdy' + _streamSectionIdx;
+        card.innerHTML =
+          '<div class="section-card-head">' +
+            '<div class="section-card-title">' + escapeHtml(title) + '</div>' +
+            '<span class="line-tag">' + _streamSectionIdx + '</span>' +
+          '</div>' +
+          '<div class="section-card-body" id="' + bodyId + '"></div>';
+        cardsEl.appendChild(card);
+        _streamBodyEl = document.getElementById(bodyId);
+        return;
+      }
+
+      // 섹션 내용
+      if (!_streamBodyEl) {
+        // 섹션 헤더 이전 텍스트는 간단히 표시
+        let preEl = document.getElementById('streamPre');
+        if (!preEl) {
+          const cardsEl = document.getElementById('streamCards');
+          if (!cardsEl) return;
+          preEl = document.createElement('div');
+          preEl.id = 'streamPre';
+          preEl.className = 'analysis-text';
+          preEl.style.marginBottom = '0.7rem';
+          cardsEl.insertBefore(preEl, cardsEl.firstChild);
+        }
+        const span = document.createElement('span');
+        span.textContent = line + '\n';
+        preEl.appendChild(span);
+        return;
+      }
+
+      const isItem = /^[-·•]/.test(trimmed);
+      const div = document.createElement('div');
+      div.className = 'section-line' + (isItem ? ' item' : '');
+      div.textContent = line;
+      _streamBodyEl.appendChild(div);
+    }
+
+    function appendStreamChunk(chunk) {
+      // 섹션 카드가 아직 없으면 초기화
+      if (!document.getElementById('streamCards')) initStreamingCards();
+
+      _streamBuf += chunk;
+      const lines = _streamBuf.split('\n');
+      _streamBuf = lines.pop(); // 마지막 미완성 줄 보류
+      for (const line of lines) _flushStreamLine(line);
     }
 
     function resetBtn() {
@@ -1229,32 +1282,10 @@
 
       let baseText = '';
       let verifyData = null;
-      let checkDone = false;
-      let checkErrorHandled = false;
-      let checkErrorMsg = '';
+      let streamDone = false;
+      let streamErrorHandled = false;
 
-      const checkChain = fetch('/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pledge: text }),
-        credentials: 'include'
-      }).then(async res => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (handleAuthError(res, data)) { checkErrorHandled = true; return; }
-          throw new Error(data.detail || res.statusText || '서버 요청 실패');
-        }
-        const bar = document.getElementById('loadingProgressBar');
-        const cur = bar ? parseFloat(bar.style.width || '0') : 0;
-        updateProgress(Math.max(cur, 50));
-        baseText = (data && typeof data.result === 'string') ? data.result : '';
-        checkDone = true;
-        console.log('[perf] /check done in', Math.round(performance.now() - t0), 'ms');
-      }).catch(e => {
-        console.error('[check]', e);
-        checkErrorMsg = (e && e.message) || '';
-      });
-
+      // /api/pledge/verify 병렬 호출 (변경 없음)
       const verifyChain = fetch('/api/pledge/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1269,30 +1300,90 @@
         }
         if (!data || typeof data !== 'object') return;
         verifyData = data;
-        const bar = document.getElementById('loadingProgressBar');
-        const cur = bar ? parseFloat(bar.style.width || '0') : 0;
-        updateProgress(Math.max(cur, 50));
         console.log('[perf] /verify done in', Math.round(performance.now() - t0), 'ms');
       }).catch(e => {
         console.warn('[verify] error:', e);
       });
 
+      // /check/stream SSE 스트리밍
+      const checkChain = (async () => {
+        let res;
+        try {
+          res = await fetch('/check/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pledge: text }),
+            credentials: 'include'
+          });
+        } catch (e) {
+          handleFetchError((e && e.message) || '서버 연결 실패');
+          return;
+        }
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (handleAuthError(res, data)) { streamErrorHandled = true; return; }
+          handleFetchError(data.detail || res.statusText || '서버 요청 실패');
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        let firstChunk = true;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const parts = buf.split('\n\n');
+          buf = parts.pop(); // 마지막 불완전한 부분 보류
+
+          for (const part of parts) {
+            const line = part.trim();
+            if (!line.startsWith('data:')) continue;
+            const jsonStr = line.slice(5).trim();
+            let msg;
+            try { msg = JSON.parse(jsonStr); } catch { continue; }
+
+            if (msg.type === 'chunk') {
+              if (firstChunk) {
+                firstChunk = false;
+                initStreamingCards();
+              }
+              appendStreamChunk(msg.text);
+            } else if (msg.type === 'cached') {
+              // 캐시 히트: final에서 바로 처리
+            } else if (msg.type === 'final') {
+              baseText = msg.text || '';
+              streamDone = true;
+              console.log('[perf] /check/stream final in', Math.round(performance.now() - t0), 'ms');
+            } else if (msg.type === 'done') {
+              // 정상 종료
+            } else if (msg.type === 'error') {
+              handleFetchError(msg.detail || '분석 중 오류가 발생했습니다.');
+              streamErrorHandled = true;
+              return;
+            }
+          }
+        }
+      })();
+
       Promise.allSettled([checkChain, verifyChain]).then(() => {
-        if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
-        if (checkDone) {
-          updateProgress(100);
+        if (streamDone) {
           renderCombinedResult(baseText, verifyData || {});
           resetBtn();
           console.log('[perf] total render in', Math.round(performance.now() - t0), 'ms');
-        } else if (!checkErrorHandled) {
-          handleFetchError(checkErrorMsg || '서버 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
+        } else if (!streamErrorHandled) {
+          handleFetchError('서버 응답을 처리하지 못했습니다. 다시 시도해 주세요.');
+          resetBtn();
+        } else {
           resetBtn();
         }
       });
 
       const safetyTimeout = setTimeout(() => {
-        if (!checkDone && btnEl.disabled) {
-          if (loadingProgressTimer) { clearInterval(loadingProgressTimer); loadingProgressTimer = null; }
+        if (!streamDone && btnEl.disabled) {
           handleFetchError('분석 응답이 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해 주세요.');
           resetBtn();
         }
