@@ -196,25 +196,6 @@
       margin: 0 auto;
     }
 
-    .map-legend{
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem 1rem;
-      flex-wrap: wrap;
-      margin-top: 0.75rem;
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-weight: 700;
-    }
-    .map-legend span{ display: flex; align-items: center; gap: 0.35rem; }
-    .map-legend .legend-swatch{
-      width: 14px;
-      height: 14px;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
     .korea-map{
       width: 100%;
       height: auto;
@@ -690,9 +671,6 @@
     <div class="map-container">
       <div class="map-wrapper">
         <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
-      </div>
-      <div class="map-legend" id="mapLegend" aria-label="출마자 수에 따른 색상 범례">
-        <span><span class="legend-swatch" style="background:rgba(255,114,16,0.45);"></span> 출마자 많음</span>
       </div>
     </div>
 
