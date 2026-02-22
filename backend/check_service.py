@@ -6,7 +6,7 @@
 import logging
 import re
 from collections import OrderedDict
-from typing import Any
+from typing import Any, Iterator
 
 from openai import OpenAI
 
@@ -253,3 +253,158 @@ def check_pledge_alignment(
     result = apply_check_postprocessing(result, pledge_key)
     _set_cached_result(pledge_key, result)
     return result
+
+
+def check_pledge_alignment_stream(
+    pledge: str,
+    vector_store_id: str | None = None,
+    regional_vector_store_id: str | None = None,
+    winners2022_vector_store_id: str | None = None,
+    indexes: dict[str, Any] | None = None,
+    user_id: int | None = None,
+) -> Iterator[str]:
+    """
+    GPT 응답을 청크 단위로 yield하는 스트리밍 버전.
+    캐시 히트 시 저장된 텍스트를 즉시 반환.
+    최종적으로 "[FINAL]<후처리된 전체 텍스트>" yield 후 종료.
+    """
+    if not OPENAI_API_KEY:
+        yield "[ERROR]OPENAI_API_KEY가 설정되지 않았습니다."
+        return
+
+    pledge_key = (pledge or "").strip()
+
+    cached = _get_cached_result(pledge_key)
+    if cached is not None:
+        logger.info("[stream] 캐시 히트")
+        yield "[CACHED]"
+        yield "[FINAL]" + cached
+        return
+
+    user_meta = None
+    if user_id is not None:
+        from backend.auth import get_user
+        user = get_user(user_id)
+        user_meta = build_pledge_meta_from_user(user)
+
+    candidates_context = _load_candidates_context()
+
+    use_vector_store = bool(vector_store_id)
+    use_faiss_search = (
+        not use_vector_store
+        and indexes
+        and all(indexes.get(k) for k in ("platform", "pledge"))
+        and indexes["platform"].size() > 0
+        and indexes["pledge"].size() > 0
+    )
+
+    accumulated: list[str] = []
+
+    if use_vector_store:
+        logger.info("[stream] Vector Store 기반 스트리밍...")
+        from backend.openai_vector_store import run_check
+        gen = run_check(
+            vector_store_id,
+            pledge_key,
+            "",
+            winners2022_vector_store_id or "",
+            max_results=10,
+            user_meta=user_meta,
+            candidates_context=candidates_context,
+            _stream=True,
+        )
+        for chunk in gen:
+            accumulated.append(chunk)
+            yield chunk
+
+    elif use_faiss_search:
+        logger.info("[stream] FAISS 기반 스트리밍...")
+        from backend.report import search_all_indexes
+        from openai import OpenAI
+        hits = search_all_indexes(
+            pledge_key,
+            indexes["platform"],
+            indexes["pledge"],
+            indexes.get("regional"),
+            top_k_platform=12,
+            top_k_pledge=20,
+            top_k_regional=0,
+        )
+        platform_context = _context_from_hits(hits["platform"])
+        pledges_context = _context_from_hits(hits["pledge"])
+
+        if not platform_context.strip() and not pledges_context.strip():
+            yield "[ERROR]검색 결과가 없습니다. 인덱스를 확인하세요."
+            return
+
+        winners2022_ctx = _build_winners2022_context_for_non_vs(
+            pledge_key, winners2022_vector_store_id, user_meta,
+        )
+        system = load_system_prompt()
+        user_msg = build_user_message(
+            platform_context, pledges_context, pledge_key, winners2022_ctx,
+            candidates_pledges_context=candidates_context,
+            user_meta=user_meta,
+        )
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        stream = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                text = chunk.choices[0].delta.content
+                accumulated.append(text)
+                yield text
+
+    else:
+        logger.info("[stream] PDF 컨텍스트 기반 스트리밍...")
+        from backend.pdf_loader import load_platform_context, load_pledges_context
+        from openai import OpenAI
+        platform_context = load_platform_context()
+        pledges_context = load_pledges_context()
+
+        if not platform_context.strip() and not pledges_context.strip():
+            yield "[ERROR]기준 문서가 없습니다. data/pdf/ 폴더에 PDF를 넣어 주세요."
+            return
+
+        winners2022_ctx = _build_winners2022_context_for_non_vs(
+            pledge_key, winners2022_vector_store_id, user_meta,
+        )
+        system = load_system_prompt()
+        user_msg = build_user_message(
+            platform_context, pledges_context, pledge_key, winners2022_ctx,
+            candidates_pledges_context=candidates_context,
+            user_meta=user_meta,
+        )
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        stream = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            stream=True,
+        )
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                text = chunk.choices[0].delta.content
+                accumulated.append(text)
+                yield text
+
+    full_text = "".join(accumulated).strip()
+
+    # JSON 형식 방어
+    head = full_text[:4000]
+    if ("fit_score" in head and "rubric" in head) or ('"breakdown"' in head and "fit_score" in head):
+        logger.warning("[stream] GPT가 JSON 형식 반환 → 안내 문구로 대체")
+        full_text = "점검 결과가 요청한 텍스트 형식으로 생성되지 않았습니다. 잠시 후 다시 시도해 주세요."
+
+    processed = apply_check_postprocessing(full_text, pledge_key)
+    _set_cached_result(pledge_key, processed)
+    logger.info("[stream] 완료, %d자", len(processed))
+    yield "[FINAL]" + processed

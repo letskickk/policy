@@ -125,6 +125,14 @@ RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
 RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
 
+# DB 경로 (로컬에서 서버 DB 복사본 쓰려면 .env에 DATABASE_PATH=data/policy_server.db 등으로 지정)
+_db_env = os.getenv("DATABASE_PATH", "").strip()
+if _db_env:
+    _db_p = Path(_db_env)
+    DATABASE_PATH = _db_p.resolve() if _db_p.is_absolute() else (ROOT_DIR / _db_env).resolve()
+else:
+    DATABASE_PATH = ROOT_DIR / "data" / "policy.db"
+
 # 공공데이터포털 중앙선거관리위원회 API
 # - 당선인 정보: https://apis.data.go.kr/9760000/WinnerInfoInqireService2 (15000864)
 # - 선거공약 정보: https://apis.data.go.kr/9760000/ElecPrmsInfoInqireService (15040587)

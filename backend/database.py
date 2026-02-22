@@ -5,11 +5,11 @@ import sqlite3
 import logging
 from pathlib import Path
 
-from backend.config import ROOT_DIR
+from backend.config import ROOT_DIR, DATABASE_PATH
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = ROOT_DIR / "data" / "policy.db"
+DB_PATH = DATABASE_PATH
 
 
 def get_connection() -> sqlite3.Connection:

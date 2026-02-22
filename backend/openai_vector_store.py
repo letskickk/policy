@@ -1929,7 +1929,8 @@ def run_check(
     max_results: int = 12,
     user_meta: dict | None = None,
     candidates_context: str = "",
-) -> str:
+    _stream: bool = False,
+):
     """
     A안(전면 재설계):
     - 모델에게 file_search 호출을 맡기지 않고,
@@ -2639,6 +2640,23 @@ def run_check(
         user_meta=user_meta,
     )
     t_before_llm = time.perf_counter()
+
+    if _stream:
+        def _gen():
+            s = client.chat.completions.create(
+                model=CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_completion_tokens=4096,
+                timeout=180,
+                stream=True,
+            )
+            for chunk in s:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        return _gen()
 
     resp = client.chat.completions.create(
         model=CHAT_MODEL,
