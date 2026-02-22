@@ -580,17 +580,19 @@
     .error-message::before{ content:"⚠️"; }
 
     .quota-bar-wrap{
-      display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center;
-      margin-top:0.75rem; padding:0.65rem 0.9rem;
+      display:grid; grid-template-columns:1fr; gap:0.55rem;
+      margin-top:0.75rem; padding:0.7rem 1rem;
       background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18);
       border-radius:10px;
     }
     .quota-item{
-      display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; color:var(--muted);
+      display:grid; grid-template-columns:4rem 1fr auto;
+      align-items:center; gap:0.6rem;
+      font-size:0.82rem; color:var(--muted);
     }
     .quota-item .quota-label{ font-weight:700; white-space:nowrap; }
     .quota-track{
-      width:80px; height:6px; border-radius:99px;
+      height:7px; border-radius:99px;
       background:rgba(148,163,184,0.2); overflow:hidden;
     }
     .quota-fill{
@@ -599,7 +601,7 @@
       transition:width 0.4s ease;
     }
     .quota-fill.warn{ background:linear-gradient(90deg,#f59e0b,#ef4444); }
-    .quota-count{ font-weight:700; color:var(--text-strong); white-space:nowrap; }
+    .quota-count{ font-weight:700; color:var(--text-strong); white-space:nowrap; text-align:right; }
 
     .disclaimer-box{
       margin-top: 1.35rem;
@@ -766,7 +768,7 @@
       mFill.className   = 'quota-fill' + (q.monthly_remaining <= 10 ? ' warn' : '');
       document.getElementById('quotaDailyText').textContent   = q.daily_remaining   + '/' + q.daily_limit   + '회 남음';
       document.getElementById('quotaMonthlyText').textContent = q.monthly_remaining + '/' + q.monthly_limit + '회 남음';
-      bar.style.display = 'flex';
+      bar.style.display = 'block';
     }
 
     async function fetchQuota() {
