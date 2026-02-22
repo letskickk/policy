@@ -1368,10 +1368,11 @@
           return;
         }
 
+        initStreamingCards();  // fetch 성공 즉시 플레이스홀더 표시 (캐시 포함)
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
-        let firstChunk = true;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1388,10 +1389,6 @@
             try { msg = JSON.parse(jsonStr); } catch { continue; }
 
             if (msg.type === 'chunk') {
-              if (firstChunk) {
-                firstChunk = false;
-                initStreamingCards();
-              }
               appendStreamChunk(msg.text);
             } else if (msg.type === 'cached') {
               // 캐시 히트: final에서 바로 처리
