@@ -906,9 +906,22 @@ def api_admin_approve(body: ApproveBody, request: Request):
     user = require_admin(request)
     if body.status not in ("APPROVED", "REJECTED", "SUSPENDED"):
         raise HTTPException(status_code=400, detail="status must be APPROVED, REJECTED, or SUSPENDED")
+    # 메일 발송용 대상 사용자 정보 미리 조회
+    target_user = get_user(body.user_id)
     ok = set_user_status(body.user_id, body.status, user["id"], body.note)
     if not ok:
         raise HTTPException(status_code=400, detail="처리 실패")
+    # 승인/거절/정지 결과를 당사자에게 메일로 통보 (실패해도 처리 결과에 영향 없음)
+    if target_user:
+        try:
+            from backend.email_sender import send_approval_status_email
+            send_approval_status_email(
+                to_email=target_user["email"],
+                status=body.status,
+                name=target_user.get("name", ""),
+            )
+        except Exception:
+            logger.exception("승인 알림 메일 발송 중 오류 (무시)")
     return {"message": "처리 완료"}
 
 
