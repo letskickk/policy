@@ -946,6 +946,7 @@
         selectedDistrictCode = null;
         updateURL(null, null, null);
         if (regionSelect) regionSelect.value = "";
+        loadElectionTypeCounts(); // 전체 카운트로 복원
         showEmptyState();
         return;
       }
@@ -968,6 +969,8 @@
       }
 
       const selectedElectionType = electionTypeSelect.value || null;
+      // 선거 타입 카운트를 선택된 지역 기준으로 갱신
+      loadElectionTypeCounts(regionCode);
       // 후보 목록 우선 로드 후 선거구 목록 로드(초기화 시 동시 요청 병목 완화)
       await loadCandidates(regionCode, null, selectedElectionType);
       await loadDistricts(regionCode, initialDistrictCode, selectedElectionType);
@@ -1330,10 +1333,14 @@
     }
 
     // 선거 타입별 후보 수 로드 후 셀렉트 옵션에 카운팅 표시
-    async function loadElectionTypeCounts() {
+    // regionCode 를 넘기면 해당 지역 한정 카운트, 없으면 전체 집계
+    async function loadElectionTypeCounts(regionCode = null) {
       const preserved = electionTypeSelect.value || '';
       try {
-        const counts = await fetchJsonWithTimeout('/api/stats/election-types');
+        const url = regionCode
+          ? `/api/stats/election-types?region_code=${encodeURIComponent(regionCode)}`
+          : '/api/stats/election-types';
+        const counts = await fetchJsonWithTimeout(url);
         electionTypeSelect.innerHTML = '';
         electionTypeOptions.forEach((opt) => {
           const option = document.createElement('option');
@@ -1387,6 +1394,7 @@
         selectedDistrictCode = null;
         updateURL(null, null, electionTypeSelect.value || null);
         mapPaths.forEach(path => path.classList.remove('selected'));
+        loadElectionTypeCounts(); // 전체 카운트로 복원
         showEmptyState();
         return;
       }

@@ -2225,21 +2225,36 @@ def get_regions():
 
 
 @app.get("/api/stats/election-types", tags=["candidates"])
-def get_election_type_counts():
-    """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용)."""
+def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
+    """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용).
+
+    region_code 를 넘기면 해당 지역 한정으로 집계한다.
+    """
     _ensure_db_ready()
     from backend.database import get_connection
 
     conn = get_connection()
     try:
-        rows = conn.execute(
-            """
-            SELECT election_type, COUNT(*) AS n
-            FROM candidates
-            WHERE approval_status = 'APPROVED'
-            GROUP BY election_type
-            """
-        ).fetchall()
+        if region_code:
+            rows = conn.execute(
+                """
+                SELECT election_type, COUNT(*) AS n
+                FROM candidates
+                WHERE approval_status = 'APPROVED'
+                  AND region_code = ?
+                GROUP BY election_type
+                """,
+                (region_code,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT election_type, COUNT(*) AS n
+                FROM candidates
+                WHERE approval_status = 'APPROVED'
+                GROUP BY election_type
+                """
+            ).fetchall()
         return {r["election_type"]: int(r["n"]) for r in rows}
     finally:
         conn.close()
