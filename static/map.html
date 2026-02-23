@@ -172,11 +172,13 @@
       color: var(--text-strong);
       margin-bottom: 0.5rem;
       letter-spacing: -0.03em;
+      word-break: keep-all;
     }
     .subtitle{
       font-size: 1rem;
       color: var(--text);
       opacity: 0.9;
+      word-break: keep-all;
     }
 
     /* 지도 영역 */
@@ -708,7 +710,7 @@
       <div id="panel-content">
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
         </div>
       </div>
     </div>
@@ -983,7 +985,7 @@
       panelContent.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
         </div>
       `;
     }
