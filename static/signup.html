@@ -25,12 +25,13 @@
       max-width: 420px;
       width: 100%;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; word-break: keep-all; }
     .hint {
       margin-bottom: 1.2rem;
       font-size: 0.9rem;
       color: #94a3b8;
       line-height: 1.6;
+      word-break: keep-all;
     }
     .hint strong {
       color: #ffedd5;
@@ -130,10 +131,9 @@
   <div class="card">
     <h1>회원가입</h1>
     <p class="hint">
-      <strong>회원가입은 공천이 확정된 후보자만 가능합니다.</strong><br>
-      이메일은 <strong>공천시스템에 등록된 이메일</strong>로 입력해 주세요.<br>
-      정보 입력 후 회원가입을 완료하면 <strong>이메일 인증</strong>과 <strong>관리자 승인</strong> 절차가 진행되며,<br>
-      승인 완료 후 시스템을 사용할 수 있습니다.
+      <strong>공천이 확정된 후보자만 가입 가능합니다.</strong><br>
+      <strong>공천시스템에 등록한 이메일</strong>을 입력해 주세요.<br>
+      가입 완료 후 <strong>이메일 인증</strong>과 <strong>관리자 승인</strong> 절차가 진행됩니다.
     </p>
     <form id="form">
       <label>가입 유형</label>

@@ -131,7 +131,7 @@
     .sample-title{ font-size:0.88rem; font-weight:900; color:var(--text-strong); }
     .sample-score{ font-size:0.82rem; font-weight:900; color:#86efac; }
     .sample-body{ padding:0.75rem 0.85rem; }
-    .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; }
+    .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; word-break:keep-all; }
 
     .auth-links{ margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
     .auth-link{ color:#ffb37a; font-weight:700; text-decoration:none; }
@@ -157,6 +157,7 @@
       margin: 0 0 0.85rem 0;
       color: var(--text-strong);
       letter-spacing: -0.04em;
+      word-break: keep-all;
     }
 
     .hero-desc{
@@ -165,6 +166,7 @@
       color: var(--text);
       margin: 0 0 1.25rem 0;
       opacity: 0.95;
+      word-break: keep-all;
     }
 
     .flow{
@@ -209,6 +211,7 @@
       font-size: 0.9rem;
       line-height: 1.5;
       color: var(--muted);
+      word-break: keep-all;
     }
 
     .cta{
@@ -248,10 +251,9 @@
       border-top: 1px solid rgba(148,163,184,0.18);
     }
     .features h2{
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.01em;
       color: #ffb37a;
       margin: 0 0 1rem 0;
     }
@@ -293,6 +295,7 @@
       line-height: 1.55;
       color: var(--text);
       opacity: 0.95;
+      word-break: keep-all;
     }
 
     .footer{
@@ -359,11 +362,11 @@
     </div>
 
     <div class="hero">
-      <h1>공약 분석과 지역·선거구 비교를<br />한 번에 확인하세요</h1>
+      <h1>공약 점검부터 지역 비교까지</h1>
 
       <p class="hero-desc">
-        공약안을 입력하면 당의 정강정책에 얼마나 부합하는지와 보완 포인트를 빠르게 확인할 수 있습니다.
-        이어서 지역·선거구 후보 공약 비교까지 한 화면 흐름으로 연결됩니다.
+        공약을 입력하면 정강정책 부합 여부와 보완 포인트를 즉시 확인할 수 있습니다.
+        지역·선거구별 후보 공약 비교도 한 화면에서 이어집니다.
       </p>
       <div class="trust-chips" aria-label="핵심 가치">
         <span class="trust-chip">정강·정책 근거 기반</span>
@@ -378,11 +381,11 @@
         </div>
         <div class="step">
           <div class="k"><span class="badge">2</span> 기준 대조</div>
-          <p>정강·정책·공약 기준으로 적합도와 보완 포인트를 확인합니다.</p>
+          <p>정강·정책 기준으로 적합도와 보완점을 확인합니다.</p>
         </div>
         <div class="step">
           <div class="k"><span class="badge">3</span> 지역 비교</div>
-          <p>지도에서 지역·선거구·선거타입별 후보 공약을 비교합니다.</p>
+          <p>지도에서 지역·선거구별 후보 공약을 비교합니다.</p>
         </div>
       </div>
 
@@ -397,7 +400,7 @@
         </div>
         <div class="sample-body">
           <div class="sample-item"><strong>1. 정강정책 부합성</strong><br/>핵심 방향은 부합하나 재원 계획 구체화 필요</div>
-          <div class="sample-item"><strong>4. 제8회 지방선거(2022) 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
+          <div class="sample-item"><strong>4. 2022 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
         </div>
       </div>
     </div>
@@ -408,26 +411,25 @@
         <li>
           <span class="icon">✓</span>
           <div class="txt">
-            <strong>공약 적합도 점검</strong> — 중앙당 정강·정책·공약 기준으로 부합 여부와 보완 체크리스트 제공
+            <strong>공약 적합도 점검</strong> — 정강·정책 부합 여부 + 보완 체크리스트
           </div>
         </li>
         <li>
           <span class="icon">↔</span>
           <div class="txt">
-            <strong>중복·유사 탐지</strong> — 타 지역 후보 공약과 비교해 유사·중복 항목을 빠르게 확인
+            <strong>중복·유사 탐지</strong> — 타 후보 공약과 유사·중복 항목 파악
           </div>
         </li>
         <li>
           <span class="icon">🗳️</span>
           <div class="txt">
-            <strong>지역·선거구 공약 조회</strong> — 지도에서 시도/선거구/선거 타입 필터로 후보 공약을 비교
+            <strong>지역·선거구 공약 조회</strong> — 시도·선거구·선거 타입별 후보 공약 비교
           </div>
         </li>
-
         <li>
-          <span class="icon">📄</span>
+          <span class="icon">🏆</span>
           <div class="txt">
-            <strong>정강·정책·공약 기반</strong> — 중앙당의 정강·정책·공약을 기준으로 GPT가 분석
+            <strong>2022 당선인 공약 비교</strong> — 당선인 공약과 비교해 차별화 포인트 파악
           </div>
         </li>
       </ul>

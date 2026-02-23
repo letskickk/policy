@@ -155,12 +155,14 @@
       color: var(--text-strong);
       margin-bottom: 0.75rem;
       letter-spacing: -0.03em;
+      word-break: keep-all;
     }
     .subtitle{
       font-size: 1.05rem;
       color: var(--text);
       font-weight: 600;
       line-height: 1.7;
+      word-break: keep-all;
     }
 
     /* --- [카드] --- */
@@ -680,7 +682,7 @@
 
   <header>
     <h1>공약 분석</h1>
-    <p class="subtitle">작성하신 공약을 입력하면 당의 정강정책 및 기존 공약과의 정합성을 AI가 분석해 드립니다.</p>
+    <p class="subtitle">공약을 입력하면 정강정책 부합 여부와 보완 포인트를 AI가 분석해 드립니다.</p>
   </header>
 
   <main>
@@ -735,7 +737,7 @@
       <div class="result-container">
         <div id="result" class="result-content empty">
           <div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>
-          공약 내용을 입력하고<br>'AI 분석 시작하기' 버튼을 눌러주세요.
+          공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
         </div>
       </div>
       <div class="disclaimer-box">
@@ -799,7 +801,7 @@
     const btnEl = document.getElementById('btn');
     let lastResultFullText = '';
 
-    const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고<br>\'AI 분석 시작하기\' 버튼을 눌러주세요.';
+    const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고 \'AI 분석 시작하기\' 버튼을 눌러주세요.';
 
     function showResult(text) {
       resultEl.innerHTML = text;
