@@ -2379,6 +2379,9 @@ def run_check(
         return (text or "").lstrip().startswith(prefix)
 
     pledge = (user_pledge or "").strip()
+    # OpenAI Vector Store 검색 쿼리 최대 길이: 4096자
+    _QUERY_MAX = 4096
+    pledge_query = pledge[:_QUERY_MAX]
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     # 인덱싱 완료 여부 — 병렬 수행
@@ -2402,9 +2405,9 @@ def run_check(
     platform_hits_kw: List[Tuple[float, str, str]] = []
     regional_hits: List[Tuple[float, str, str]] = []
     with ThreadPoolExecutor(max_workers=RUN_CHECK_MAX_WORKERS) as ex:
-        f_policy = ex.submit(_search, client, vector_store_id, pledge, RUN_CHECK_K_POLICY, True)
+        f_policy = ex.submit(_search, client, vector_store_id, pledge_query, RUN_CHECK_K_POLICY, True)
         f_platform = ex.submit(_search, client, vector_store_id, "개혁신당 강령 정강정책 이념 취지 가치", RUN_CHECK_K_PLATFORM, False)
-        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge, RUN_CHECK_K_REGIONAL, True)
+        f_regional = ex.submit(_search, client, regional_vector_store_id or "", pledge_query, RUN_CHECK_K_REGIONAL, True)
         policy_hits = f_policy.result()
         platform_hits_kw = f_platform.result()
         regional_hits = f_regional.result() if regional_vector_store_id else []
