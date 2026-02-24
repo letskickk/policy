@@ -619,6 +619,15 @@
       color: #ffb37a;
       font-weight: 900;
     }
+    .char-counter {
+      text-align: right;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: -0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .char-counter.warn { color: #f59e0b; }
+    .char-counter.over { color: #ef4444; font-weight: 700; }
 
     .footer{
       margin-top: 2.6rem;
@@ -694,7 +703,8 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
         <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
       </div>
-      <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
+      <textarea id="pledge" maxlength="10000" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
+      <div id="charCounter" class="char-counter">0 / 10,000자</div>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
       <div id="quotaBar" class="quota-bar-wrap" style="display:none;">
         <div class="quota-item">
@@ -799,7 +809,16 @@
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
+    const charCounterEl = document.getElementById('charCounter');
+    const MAX_CHARS = 10000;
     let lastResultFullText = '';
+
+    function updateCharCounter() {
+      const len = (pledgeEl.value || '').length;
+      charCounterEl.textContent = len.toLocaleString('ko-KR') + ' / ' + MAX_CHARS.toLocaleString('ko-KR') + '자';
+      charCounterEl.className = 'char-counter' + (len > MAX_CHARS ? ' over' : len > MAX_CHARS * 0.9 ? ' warn' : '');
+    }
+    pledgeEl.addEventListener('input', updateCharCounter);
 
     const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고 \'AI 분석 시작하기\' 버튼을 눌러주세요.';
 
@@ -1352,6 +1371,11 @@
       const text = (pledgeEl.value || '').trim();
       if (!text) {
         showError('공약 내용이 입력되지 않았습니다. 내용을 작성해 주세요.');
+        pledgeEl.focus();
+        return;
+      }
+      if (text.length > MAX_CHARS) {
+        showError(`입력 내용이 너무 깁니다. 현재 ${text.length.toLocaleString('ko-KR')}자 / 최대 ${MAX_CHARS.toLocaleString('ko-KR')}자`);
         pledgeEl.focus();
         return;
       }

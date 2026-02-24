@@ -24,7 +24,7 @@ def send_verification_email(to_email: str, token: str) -> bool:
 
 {link}
 
-(이 링크는 24시간 후 만료됩니다. 본인이 요청하지 않았다면 무시하세요.)
+(이 링크는 72시간 후 만료됩니다. 본인이 요청하지 않았다면 무시하세요.)
 
 ---
 이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다. 문의는 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
