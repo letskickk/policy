@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>개혁신당 AI 정책 멘토링 시스템</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --orange: #E8521A;
+    --orange-light: #FF6B35;
+    --orange-pale: #FFF0EB;
+    --dark: #1A1A1A;
+    --mid: #444;
+    --gray: #888;
+    --light: #F7F7F7;
+    --white: #FFFFFF;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #fff;
+    color: var(--dark);
+    line-height: 1.6;
+  }
+
+  /* ─── 인쇄 최적화 ─── */
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { box-shadow: none; }
+  }
+
+  .page {
+    width: 794px;
+    min-height: 1123px;
+    margin: 24px auto;
+    background: #fff;
+    box-shadow: 0 4px 32px rgba(0,0,0,.12);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── 헤더 ─── */
+  .header {
+    background: linear-gradient(135deg, var(--dark) 0%, #2d2d2d 100%);
+    padding: 36px 48px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 240px; height: 240px;
+    border-radius: 50%;
+    background: var(--orange);
+    opacity: .12;
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; right: 80px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: var(--orange-light);
+    opacity: .09;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--orange);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    padding: 5px 12px;
+    border-radius: 100px;
+    margin-bottom: 14px;
+  }
+  .badge::before { content: '●'; font-size: 8px; }
+
+  .header h1 {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    line-height: 1.25;
+  }
+  .header h1 em {
+    color: var(--orange-light);
+    font-style: normal;
+  }
+
+  .header-sub {
+    color: rgba(255,255,255,.65);
+    font-size: 13px;
+    font-weight: 300;
+    margin-top: 8px;
+    letter-spacing: .01em;
+  }
+
+  .header-url {
+    color: rgba(255,255,255,.4);
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .header-url strong {
+    display: block;
+    color: rgba(255,255,255,.9);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  /* ─── 본문 ─── */
+  .body {
+    flex: 1;
+    padding: 36px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* ─── 섹션 헤더 ─── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--orange);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(232,82,26,.3), transparent);
+  }
+
+  /* ─── 요약 박스 ─── */
+  .summary-box {
+    background: var(--orange-pale);
+    border-left: 4px solid var(--orange);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 24px;
+  }
+  .summary-box p {
+    font-size: 14px;
+    color: var(--mid);
+    line-height: 1.75;
+    word-break: keep-all;
+  }
+  .summary-box strong { color: var(--dark); font-weight: 700; }
+
+  /* ─── 플로우 ─── */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  .flow-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -10px; top: 50%;
+    transform: translateY(-60%);
+    font-size: 20px;
+    color: var(--orange);
+    font-weight: 700;
+    z-index: 1;
+  }
+  .flow-icon {
+    width: 56px; height: 56px;
+    background: var(--dark);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    margin: 0 auto 10px;
+  }
+  .flow-step:nth-child(2) .flow-icon { background: var(--orange); }
+  .flow-step:nth-child(3) .flow-icon { background: #2d6a4f; }
+  .flow-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 4px;
+    word-break: keep-all;
+  }
+  .flow-desc {
+    font-size: 11px;
+    color: var(--gray);
+    line-height: 1.5;
+    word-break: keep-all;
+  }
+
+  /* ─── 6대 분석 그리드 ─── */
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .analysis-card {
+    background: var(--light);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid rgba(0,0,0,.06);
+  }
+  .analysis-card .num {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 4px;
+    letter-spacing: .06em;
+  }
+  .analysis-card .title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 4px;
+    word-break: keep-all;
+  }
+  .analysis-card .desc {
+    font-size: 11px;
+    color: var(--gray);
+    line-height: 1.5;
+    word-break: keep-all;
+  }
+
+  /* ─── 2단 하단 ─── */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* ─── 지도 기능 ─── */
+  .map-feature {
+    background: var(--dark);
+    border-radius: 12px;
+    padding: 20px;
+    color: #fff;
+  }
+  .map-feature .mf-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--orange-light);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .map-feature ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-feature li {
+    font-size: 12px;
+    color: rgba(255,255,255,.8);
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    word-break: keep-all;
+    line-height: 1.45;
+  }
+  .map-feature li::before {
+    content: '✓';
+    color: var(--orange-light);
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ─── 기술 스택 ─── */
+  .tech-stack {
+    background: var(--light);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(0,0,0,.06);
+  }
+  .tech-stack .ts-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tech-row {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .tech-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tech-item .t-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gray);
+    letter-spacing: .06em;
+    width: 46px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .tech-item .t-val {
+    font-size: 12px;
+    color: var(--mid);
+    word-break: keep-all;
+  }
+  .t-dot {
+    width: 6px; height: 6px;
+    background: var(--orange);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ─── 풋터 ─── */
+  .footer {
+    background: var(--dark);
+    padding: 14px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer .f-left {
+    font-size: 11px;
+    color: rgba(255,255,255,.5);
+  }
+  .footer .f-right {
+    font-size: 11px;
+    color: rgba(255,255,255,.5);
+    text-align: right;
+  }
+  .footer .f-right strong {
+    color: var(--orange-light);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── 헤더 ── -->
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="badge">개혁신당 · AI 정책 도구</div>
+        <h1>공약, AI가<br><em>점검</em>합니다</h1>
+        <p class="header-sub">출마자 공약을 입력하면 당 정강·정책 부합 여부,<br>유사 공약 중복, 보완 방향까지 자동 분석해 드립니다.</p>
+      </div>
+      <div class="header-url">
+        <strong>🌐 policy.reformparty.kr</strong>
+        개혁신당 정책 멘토링 시스템
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 본문 ── -->
+  <div class="body">
+
+    <!-- 한줄 요약 -->
+    <div class="summary-box">
+      <p>
+        출마자가 공약을 입력하면 <strong>개혁신당 정강정책</strong>과의 부합성, <strong>중앙당·당선인 공약</strong>과의 유사성,
+        <strong>타 출마자 공약</strong>과의 중복 여부를 GPT 기반 AI가 분석하고 보완 방향을 제시합니다.
+        공약의 완성도를 높이는 <strong>AI 정책 멘토</strong>입니다.
+      </p>
+    </div>
+
+    <!-- 이용 흐름 -->
+    <div>
+      <div class="section-title">이용 흐름</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-icon">📝</div>
+          <div class="flow-label">공약 입력</div>
+          <div class="flow-desc">출마자가 직접 작성한<br>공약 텍스트 입력</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-icon">🤖</div>
+          <div class="flow-label">AI 분석</div>
+          <div class="flow-desc">GPT + 벡터 검색으로<br>6개 영역 자동 점검</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-icon">📊</div>
+          <div class="flow-label">결과 확인</div>
+          <div class="flow-desc">종합 점수·5축 평가·<br>수정 제안 즉시 제공</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6대 분석 영역 -->
+    <div>
+      <div class="section-title">6대 분석 영역</div>
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <div class="num">SECTION 01</div>
+          <div class="title">정강정책 부합성</div>
+          <div class="desc">개혁신당 정강·정책 문서 기반 이념적 정합성 판단</div>
+        </div>
+        <div class="analysis-card">
+          <div class="num">SECTION 02</div>
+          <div class="title">중앙당 공약 유사성</div>
+          <div class="desc">개혁신당 공식 공약집과 내용 중복 여부 검토</div>
+        </div>
+        <div class="analysis-card">
+          <div class="num">SECTION 03</div>
+          <div class="title">2022 당선인 공약 비교</div>
+          <div class="desc">제8회 지방선거 당선인 공약과 비교·참고점 제시</div>
+        </div>
+        <div class="analysis-card">
+          <div class="num">SECTION 04</div>
+          <div class="title">타 출마자 공약 비교</div>
+          <div class="desc">당내 등록 출마자 간 유사·중복 공약 감지</div>
+        </div>
+        <div class="analysis-card">
+          <div class="num">SECTION 05</div>
+          <div class="title">총평 및 종합 점수</div>
+          <div class="desc">5개 축 점수와 종합 평가로 공약 완성도 수치화</div>
+        </div>
+        <div class="analysis-card">
+          <div class="num">SECTION 06</div>
+          <div class="title">수정·보완 제안</div>
+          <div class="desc">미흡한 부분에 대한 구체적 개선 방향 제시</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 지도 기능 + 기술 스택 -->
+    <div class="bottom-grid">
+
+      <div class="map-feature">
+        <div class="mf-title">🗺️ 지역별 출마자 지도</div>
+        <ul>
+          <li>전국 지도를 클릭해 지역별 출마자 목록 확인</li>
+          <li>선거 유형·선거구별 필터 및 이름 검색</li>
+          <li>후보자 클릭 시 등록 공약 전체 열람</li>
+          <li>지역 공약 현황을 한눈에 파악</li>
+        </ul>
+      </div>
+
+      <div class="tech-stack">
+        <div class="ts-title">⚙️ 기술 구성</div>
+        <div class="tech-row">
+          <div class="tech-item">
+            <div class="t-dot"></div>
+            <div class="t-label">AI</div>
+            <div class="t-val">GPT + OpenAI Vector Store (RAG)</div>
+          </div>
+          <div class="tech-item">
+            <div class="t-dot"></div>
+            <div class="t-label">Backend</div>
+            <div class="t-val">FastAPI (Python) + SQLite</div>
+          </div>
+          <div class="tech-item">
+            <div class="t-dot"></div>
+            <div class="t-label">Frontend</div>
+            <div class="t-val">바닐라 JS + HTML</div>
+          </div>
+          <div class="tech-item">
+            <div class="t-dot"></div>
+            <div class="t-label">Infra</div>
+            <div class="t-val">AWS EC2 + Docker + nginx</div>
+          </div>
+          <div class="tech-item">
+            <div class="t-dot"></div>
+            <div class="t-label">접근</div>
+            <div class="t-val">공천 확정 후보자 승인제 운영</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 풋터 ── -->
+  <div class="footer">
+    <div class="f-left">개혁신당 정책국 · 2026 지방선거 대비</div>
+    <div class="f-right"><strong>policy.reformparty.kr</strong> · 문의: letskick@reformparty.kr</div>
+  </div>
+
+</div>
+</body>
+</html>
