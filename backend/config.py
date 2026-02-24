@@ -82,7 +82,7 @@ BUILD_CARDS = os.getenv("BUILD_CARDS", "0") == "1"
 # AWS: PDF 폴더가 비었을 때 S3에서 동기화할 URI (예: s3://bucket/pdf/)
 PDF_S3_URI = os.getenv("PDF_S3_URI", "").strip()
 # /api/debug/* 엔드포인트 활성화 (프로덕션: 0으로 비활성화)
-DEBUG_ENDPOINTS_ENABLED = os.getenv("DEBUG_ENDPOINTS_ENABLED", "1") == "1"
+DEBUG_ENDPOINTS_ENABLED = os.getenv("DEBUG_ENDPOINTS_ENABLED", "0") == "1"
 # OpenAI Vector Store 사용 (1=사용, FAISS 대신). AWS 인프라 복잡도 제거.
 USE_OPENAI_VECTOR_STORE = os.getenv("USE_OPENAI_VECTOR_STORE", "0") == "1"
 # 서버 시작 시 PDF 스캔 생략. 1이면 scripts/index_pdfs_to_vector_store.py로 별도 인덱싱 후 .env의 ID만 사용.
