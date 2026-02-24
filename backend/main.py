@@ -332,7 +332,7 @@ def require_approved(request: Request) -> dict:
 
 
 class PledgeCheckRequest(BaseModel):
-    pledge: str = Field(..., description="점검할 출마자 공약 텍스트")
+    pledge: str = Field(..., max_length=10000, description="점검할 출마자 공약 텍스트")
 
 
 class PledgeCheckResponse(BaseModel):
@@ -1128,155 +1128,6 @@ def test():
     return {"status": "ok", "message": "서버 작동 중", "version": "0.1.0"}
 
 
-@app.get("/debug/context")
-def debug_context(pledge: str = "테스트 공약: 지역경제 활성화"):
-    """실제 GPT에 전달되는 컨텍스트 확인용 엔드포인트."""
-    from backend.prompts import build_user_message, load_system_prompt
-    from backend.pdf_loader import load_regional_pledges_context
-    
-    platform = load_platform_context()
-    pledges = load_pledges_context()
-    regional = load_regional_pledges_context()
-    system = load_system_prompt()
-    user = build_user_message(platform, pledges, regional, pledge)
-    
-    # 공약 컨텍스트에서 특정 키워드 검색
-    search_keywords = []
-    if pledges:
-        # 공약 컨텍스트의 일부를 샘플로 추출
-        sample_text = pledges[:5000] if len(pledges) > 5000 else pledges
-        search_keywords.append(f"컨텍스트 샘플 (처음 5000자): {sample_text}")
-    
-    return {
-        "system_prompt_length": len(system),
-        "user_message_length": len(user),
-        "platform_context_length": len(platform),
-        "pledges_context_length": len(pledges),
-        "regional_pledges_context_length": len(regional),
-        "pledges_file_count": pledges.count("---") if pledges else 0,
-        "regional_file_count": regional.count("---") if regional else 0,
-        "pledges_context_preview": pledges[:5000] + "..." if len(pledges) > 5000 else pledges,
-        "regional_context_preview": regional[:5000] + "..." if len(regional) > 5000 else regional,
-        "user_message_preview": user[:5000] + "..." if len(user) > 5000 else user,
-        "system_prompt": system,
-        "test_pledge": pledge,
-    }
-
-
-@app.get("/debug/pdf")
-def debug_pdf():
-    """PDF 로드 상태 확인용 디버깅 엔드포인트."""
-    from backend.config import PDF_DIR
-    from backend.prompts import build_user_message
-    
-    # PDF 디렉토리 확인 (한글 경로 처리)
-    pdf_dir_str = str(PDF_DIR.resolve())
-    pdf_dir = Path(pdf_dir_str)
-    
-    try:
-        all_pdfs = list(_iter_doc_files(pdf_dir)) if pdf_dir.exists() else []
-    except Exception as e:
-        all_pdfs = []
-        error_msg = str(e)
-    
-    from backend.pdf_loader import load_regional_pledges_context
-    
-    platform = load_platform_context()
-    pledges = load_pledges_context()
-    regional = load_regional_pledges_context()
-    
-    # 파일명 추출
-    platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if platform else []
-    pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if pledges else []
-    regional_files = [line.split("---")[1].strip() for line in regional.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if regional else []
-    
-    # 테스트용 메시지 생성 (실제 GPT에 전달되는 형식)
-    test_message = build_user_message(platform, pledges, regional, "테스트 공약: 지역경제 활성화")
-    
-    # 각 PDF 파일의 상태 확인 (폴더 기반)
-    pdf_status = []
-    for pdf_path in all_pdfs[:30]:  # 처음 30개만
-        try:
-            rel_path = str(pdf_path.relative_to(pdf_dir))
-            path_parts = pdf_path.relative_to(pdf_dir).parts if pdf_dir.exists() else []
-            exists = pdf_path.exists()
-            size = pdf_path.stat().st_size if exists else 0
-            
-            # 폴더 기반 분류
-            is_platform = "정강정책" in path_parts
-            is_pledge = "공약" in path_parts and "지역별 공약" not in str(rel_path)
-            is_regional = "지역별 공약" in str(rel_path)
-            
-            # 실제로 읽혔는지 확인
-            is_loaded = False
-            classification = "기타"
-            if is_platform:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in platform_files)
-                classification = "정강정책"
-            elif is_pledge:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in pledges_files)
-                classification = "공약"
-            elif is_regional:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in regional_files)
-                classification = "지역별 공약"
-            
-            pdf_status.append({
-                "path": rel_path,
-                "name": pdf_path.name,
-                "exists": exists,
-                "size_bytes": size,
-                "is_platform": is_platform,
-                "is_pledge": is_pledge,
-                "is_regional": is_regional,
-                "is_loaded": is_loaded,
-                "classification": classification,
-            })
-        except Exception as e:
-            pdf_status.append({
-                "path": str(pdf_path.relative_to(pdf_dir)) if pdf_dir.exists() else str(pdf_path),
-                "error": str(e)[:100]
-            })
-    
-    result = {
-        "summary": {
-            "pdf_dir_exists": pdf_dir.exists(),
-            "pdf_dir_path": str(pdf_dir),
-            "pdf_dir_absolute": str(pdf_dir.resolve()),
-            "total_pdf_files_found": len(all_pdfs),
-            "platform_files_loaded": len(platform_files),
-            "pledges_files_loaded": len(pledges_files),
-            "regional_files_loaded": len(regional_files),
-            "platform_text_length": len(platform),
-            "pledges_text_length": len(pledges),
-            "regional_text_length": len(regional),
-            "folder_structure": {
-                "정강정책": str(pdf_dir / "정강정책"),
-                "공약": str(pdf_dir / "공약"),
-                "지역별 공약": str(pdf_dir / "지역별 공약"),
-            },
-        },
-        "all_pdf_files": {
-            "count": len(all_pdfs),
-            "paths": [str(p.relative_to(pdf_dir)) for p in all_pdfs] if pdf_dir.exists() else [],
-        },
-        "loaded_files": {
-            "platform": platform_files,
-            "pledges": pledges_files,
-            "regional": regional_files,
-        },
-        "pdf_status": pdf_status,
-        "previews": {
-            "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
-            "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
-            "regional_preview": regional[:2000] + "..." if len(regional) > 2000 else regional,
-            "test_message_preview": test_message[:3000] + "..." if len(test_message) > 3000 else test_message,
-        },
-    }
-    
-    if 'error_msg' in locals():
-        result["error"] = error_msg
-    
-    return result
 
 
 def _get_fs_debug() -> dict:
@@ -1323,7 +1174,6 @@ def debug_admin_check(request: Request):
     in_admin = user is not None and user.get("email") in ADMIN_EMAILS
     return {
         "admin_emails_count": len(ADMIN_EMAILS),
-        "admin_emails_loaded": ADMIN_EMAILS,
         "logged_in": user is not None,
         "user_email": user.get("email") if user else None,
         "user_in_admin_list": in_admin,
@@ -1588,7 +1438,7 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
         raise
     except Exception as e:
         logger.exception("check_pledge 오류 (after %.1fs)", time.perf_counter() - t0)
-        raise HTTPException(status_code=500, detail=str(e)[:500])
+        raise HTTPException(status_code=500, detail="점검 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
 
 
 @app.post("/check/stream")
