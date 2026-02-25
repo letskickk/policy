@@ -398,6 +398,11 @@
           setTimeout(function() { w.print(); }, 250);
         });
         document.getElementById('historyModalNecBtn').addEventListener('click', function() {
+          const s = parseFloat(document.getElementById('historyModalNecBtn').dataset.necScore);
+          if (isNaN(s) || s < 85) {
+            alert('총점 85점 이상부터 선거공약서 작성이 가능합니다.');
+            return;
+          }
           const full = lastHistoryModalFullText || '';
           const inputText = full.includes('\n\n[결과]\n')
             ? full.split('\n\n[결과]\n')[0].replace(/^\[입력\]\n/, '')
@@ -413,10 +418,7 @@
               districtName: dashboardUser.district_name || '',
             },
             {
-              mode: (() => {
-                const s = parseFloat(document.getElementById('historyModalNecBtn').dataset.necScore);
-                return (!isNaN(s) && s >= 85) ? 'generate' : 'extract';
-              })(),
+              mode: 'generate',
               resultText: rawTxt,
             }
           );

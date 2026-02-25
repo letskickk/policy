@@ -1215,6 +1215,10 @@
       const necFormBtn = document.getElementById('necFormBtn');
       if (necFormBtn) {
         necFormBtn.addEventListener('click', () => {
+          if (totalScore === null || totalScore < 85) {
+            alert('총점 85점 이상부터 선거공약서 작성이 가능합니다.');
+            return;
+          }
           const pledgeEl = document.getElementById('pledge');
           const pledgeInput = (pledgeEl && pledgeEl.value) ? pledgeEl.value : '';
           if (!pledgeInput) { alert('공약 내용을 입력해 주세요.'); return; }
@@ -1227,7 +1231,7 @@
               districtName: meData.district_name || '',
             },
             {
-              mode: (totalScore !== null && totalScore >= 85) ? 'generate' : 'extract',
+              mode: 'generate',
               resultText: lastResultFullText || '',
             }
           );
