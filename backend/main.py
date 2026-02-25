@@ -1848,7 +1848,14 @@ def admin_approve_candidate(candidate_id: int, request: Request):
 
     conn = get_connection()
     try:
-        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        existing = conn.execute(
+            """SELECT c.id, c.approval_status, c.name AS candidate_name,
+                      u.email AS user_email, u.name AS user_name
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
         conn.execute(
@@ -1864,6 +1871,20 @@ def admin_approve_candidate(candidate_id: int, request: Request):
         raise
     finally:
         conn.close()
+
+    # 이메일 알림
+    if existing and existing["user_email"]:
+        try:
+            from backend.email_sender import send_candidate_approval_status_email
+            send_candidate_approval_status_email(
+                to_email=existing["user_email"],
+                status="APPROVED",
+                name=existing["user_name"] or "",
+                candidate_name=existing["candidate_name"] or "",
+            )
+        except Exception as e:
+            logger.warning("공약 승인 알림 메일 발송 실패 (무시): %s", e)
+
     return {"ok": True, "approval_status": "APPROVED"}
 
 
@@ -1876,7 +1897,14 @@ def admin_reject_candidate(candidate_id: int, request: Request):
 
     conn = get_connection()
     try:
-        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        existing = conn.execute(
+            """SELECT c.id, c.approval_status, c.name AS candidate_name,
+                      u.email AS user_email, u.name AS user_name
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
         conn.execute(
@@ -1892,6 +1920,20 @@ def admin_reject_candidate(candidate_id: int, request: Request):
         raise
     finally:
         conn.close()
+
+    # 이메일 알림
+    if existing and existing["user_email"]:
+        try:
+            from backend.email_sender import send_candidate_approval_status_email
+            send_candidate_approval_status_email(
+                to_email=existing["user_email"],
+                status="REJECTED",
+                name=existing["user_name"] or "",
+                candidate_name=existing["candidate_name"] or "",
+            )
+        except Exception as e:
+            logger.warning("공약 거절 알림 메일 발송 실패 (무시): %s", e)
+
     return {"ok": True, "approval_status": "REJECTED"}
 
 
