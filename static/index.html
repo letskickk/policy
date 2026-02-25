@@ -626,7 +626,8 @@
         const numCls = rankClass(r.rank);
         const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
         const region = r.district_name ? `${safe(r.region_name)} ${safe(r.district_name)}` : safe(r.region_name);
-        html += `<div class="rank-row${cls}">
+        const cid = r.candidate_id || '';
+        html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="window.location.href='/map?candidate=${cid}'" title="공약 상세 보기">
           <div class="rank-num ${numCls}">${r.rank}</div>
           <div class="rank-info">
             <div class="rank-name">${safe(r.name)}</div>
