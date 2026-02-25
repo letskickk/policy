@@ -3053,7 +3053,7 @@ def api_leaderboard(
         # ── 챔피언 목록 ──
         champions = [
             dict(r) for r in conn.execute(
-                "SELECT week_start, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 10"
+                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 10"
             ).fetchall()
         ]
 
@@ -3103,7 +3103,23 @@ def api_leaderboard(
                 "scored_pledge_count": int(r["scored_pledge_count"]),
             })
 
+        # ── 주차 라벨 ──
+        month = this_monday.month
+        # 이번 주가 해당 월의 몇 째 주인지 계산
+        first_day_of_month = this_monday.replace(day=1)
+        first_monday = first_day_of_month + _dt.timedelta(days=(7 - first_day_of_month.weekday()) % 7)
+        if first_monday > this_monday:
+            # this_monday가 이번 달 첫 월요일 이전이면 1째주
+            week_num = 1
+        else:
+            week_num = ((this_monday - first_monday).days // 7) + 1
+            if first_day_of_month.weekday() != 0:
+                week_num += 1  # 월초가 월요일이 아니면 1주 추가 (첫 주 포함)
+        week_label = f"{month}월 {week_num}째주 랭킹"
+
         return {
+            "week_label": week_label,
+            "week_start": this_monday.isoformat(),
             "champions": champions,
             "ranking": ranking,
             "total_count": len(ranking),

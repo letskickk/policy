@@ -556,7 +556,7 @@
     <section class="leaderboard-section" id="leaderboardSection" style="display:none;">
       <div class="leaderboard-card">
         <div class="leaderboard-header">
-          <div class="leaderboard-title">
+          <div class="leaderboard-title" id="leaderboardTitle">
             <span>&#127942;</span> 공약 랭킹
           </div>
           <div class="leaderboard-filters">
@@ -671,6 +671,7 @@
     const champStrip = document.getElementById('championsStrip');
     const filterRegion = document.getElementById('filterRegion');
     const filterElection = document.getElementById('filterElection');
+    const leaderboardTitle = document.getElementById('leaderboardTitle');
 
     // 지역 셀렉트 채우기
     fetch('/api/regions').then(r => r.json()).then(regions => {
@@ -682,6 +683,15 @@
       });
     }).catch(() => {});
 
+    function weekLabelFromDate(weekStart) {
+      // "2026-02-17" → "2월 3째주"
+      const parts = weekStart.split('-');
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      const weekNum = Math.ceil(d / 7);
+      return m + '월 ' + weekNum + '째주';
+    }
+
     function renderChampions(champions) {
       if (!champions || champions.length === 0) {
         champStrip.innerHTML = '';
@@ -689,11 +699,13 @@
       }
       let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
       champions.forEach(c => {
-        const weekLabel = c.week_start.slice(5).replace('-', '/') + '주';
+        const wLabel = weekLabelFromDate(c.week_start);
         const elLabel = ELECTION_LABELS[c.election_type] || '';
-        html += `<span class="champion-item">
-          <span class="champion-week">${safe(weekLabel)}</span>
+        const regionText = c.district_name ? (c.region_name || '') + ' ' + c.district_name : (c.region_name || '');
+        html += `<span class="champion-item" style="cursor:pointer;" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
+          <span class="champion-week">${safe(wLabel)}</span>
           ${safe(c.candidate_name)}
+          ${regionText ? '<span style="color:var(--muted);font-size:0.72rem;">' + safe(regionText) + '</span>' : ''}
           <span class="champion-score">${c.avg_score}</span>
         </span>`;
       });
@@ -741,6 +753,10 @@
         const res = await fetch('/api/leaderboard' + (qs ? '?' + qs : ''));
         if (!res.ok) return;
         const data = await res.json();
+        // 주차 라벨 표시
+        if (data.week_label && leaderboardTitle) {
+          leaderboardTitle.innerHTML = '<span>&#127942;</span> ' + safe(data.week_label);
+        }
         renderChampions(data.champions);
         renderRanking(data.ranking);
         section.style.display = '';
