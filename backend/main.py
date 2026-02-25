@@ -3094,6 +3094,7 @@ def api_leaderboard(
         for rank, r in enumerate(rows, 1):
             ranking.append({
                 "rank": rank,
+                "candidate_id": r["candidate_id"],
                 "name": r["name"],
                 "region_name": r["region_name"] or "",
                 "district_name": r["district_name"] or "",
