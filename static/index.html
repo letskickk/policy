@@ -330,12 +330,22 @@
     }
     .leaderboard-header {
       display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.2rem;
+      flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-bottom: 1.2rem;
     }
     .leaderboard-title {
       font-size: 1.15rem; font-weight: 950; color: var(--text-strong);
       display: flex; align-items: center; gap: 0.5rem;
     }
+    .week-nav { display: flex; align-items: center; gap: 0.35rem; }
+    .week-nav-btn {
+      background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+      color: var(--muted); width: 30px; height: 30px; border-radius: 8px;
+      cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .week-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.15); color: var(--text-strong); }
+    .week-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .week-nav-label { font-size: 0.82rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
     .leaderboard-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .leaderboard-filters select {
       padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid var(--border);
@@ -559,6 +569,11 @@
           <div class="leaderboard-title" id="leaderboardTitle">
             <span>&#127942;</span> 공약 랭킹
           </div>
+          <div class="week-nav" id="weekNav">
+            <button class="week-nav-btn" id="weekPrev" title="이전 주">◀</button>
+            <span class="week-nav-label" id="weekNavLabel"></span>
+            <button class="week-nav-btn" id="weekNext" title="다음 주" disabled>▶</button>
+          </div>
           <div class="leaderboard-filters">
             <select id="filterRegion">
               <option value="">전체 지역</option>
@@ -672,6 +687,10 @@
     const filterRegion = document.getElementById('filterRegion');
     const filterElection = document.getElementById('filterElection');
     const leaderboardTitle = document.getElementById('leaderboardTitle');
+    const weekPrev = document.getElementById('weekPrev');
+    const weekNext = document.getElementById('weekNext');
+    const weekNavLabel = document.getElementById('weekNavLabel');
+    let currentWeekStart = null; // 현재 보고 있는 주의 week_start
 
     // 지역 셀렉트 채우기
     fetch('/api/regions').then(r => r.json()).then(regions => {
@@ -744,20 +763,38 @@
       rankList.innerHTML = html;
     }
 
-    async function loadLeaderboard() {
+    async function loadLeaderboard(weekStart) {
       const params = new URLSearchParams();
       if (filterRegion.value) params.set('region_code', filterRegion.value);
       if (filterElection.value) params.set('election_type', filterElection.value);
+      if (weekStart) params.set('week_start', weekStart);
       const qs = params.toString();
       try {
         const res = await fetch('/api/leaderboard' + (qs ? '?' + qs : ''));
         if (!res.ok) return;
         const data = await res.json();
+        currentWeekStart = data.week_start;
         // 주차 라벨 표시
         if (data.week_label && leaderboardTitle) {
           leaderboardTitle.innerHTML = '<span>&#127942;</span> ' + safe(data.week_label);
         }
-        renderChampions(data.champions);
+        // 주간 네비게이션 업데이트
+        const ws = data.week_start;
+        const sunday = new Date(ws);
+        sunday.setDate(sunday.getDate() + 6);
+        const mm = String(sunday.getMonth() + 1).padStart(2, '0');
+        const dd = String(sunday.getDate()).padStart(2, '0');
+        weekNavLabel.textContent = ws.slice(5).replace('-', '/') + ' ~ ' + mm + '/' + dd;
+        weekPrev.dataset.week = data.prev_week || '';
+        weekPrev.disabled = false;
+        weekNext.dataset.week = data.next_week || '';
+        weekNext.disabled = !data.next_week;
+        // 챔피언은 이번 주에서만 표시
+        if (data.is_current_week) {
+          renderChampions(data.champions);
+        } else {
+          champStrip.innerHTML = '';
+        }
         renderRanking(data.ranking);
         section.style.display = '';
       } catch (e) {
@@ -765,8 +802,16 @@
       }
     }
 
-    filterRegion.addEventListener('change', loadLeaderboard);
-    filterElection.addEventListener('change', loadLeaderboard);
+    weekPrev.addEventListener('click', function() {
+      const w = this.dataset.week;
+      if (w) loadLeaderboard(w);
+    });
+    weekNext.addEventListener('click', function() {
+      const w = this.dataset.week;
+      if (w) loadLeaderboard(w);
+    });
+    filterRegion.addEventListener('change', function() { loadLeaderboard(currentWeekStart); });
+    filterElection.addEventListener('change', function() { loadLeaderboard(currentWeekStart); });
     loadLeaderboard();
   })();
   </script>
