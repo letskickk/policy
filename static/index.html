@@ -329,28 +329,30 @@
       border-radius: 18px; padding: 1.5rem; box-shadow: var(--shadow); backdrop-filter: blur(10px);
     }
     .leaderboard-header {
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-bottom: 1.2rem;
+      display: flex; align-items: center;
+      gap: 0.6rem; margin-bottom: 1.2rem;
+      flex-wrap: nowrap; overflow-x: auto;
     }
     .leaderboard-title {
-      font-size: 1.15rem; font-weight: 950; color: var(--text-strong);
-      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 1.05rem; font-weight: 950; color: var(--text-strong);
+      display: flex; align-items: center; gap: 0.4rem;
+      white-space: nowrap; flex-shrink: 0;
     }
-    .week-nav { display: flex; align-items: center; gap: 0.35rem; }
+    .week-nav { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
     .week-nav-btn {
       background: rgba(255,255,255,0.08); border: 1px solid var(--border);
-      color: var(--muted); width: 30px; height: 30px; border-radius: 8px;
-      cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s; flex-shrink: 0;
+      color: var(--muted); width: 26px; height: 26px; border-radius: 6px;
+      cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0; padding: 0;
     }
     .week-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.15); color: var(--text-strong); }
     .week-nav-btn:disabled { opacity: 0.3; cursor: default; }
-    .week-nav-label { font-size: 0.82rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
-    .leaderboard-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .week-nav-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    .leaderboard-filters { display: flex; gap: 0.4rem; flex-shrink: 0; margin-left: auto; }
     .leaderboard-filters select {
-      padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid var(--border);
+      padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border);
       background: rgba(255,255,255,0.06); color: var(--text);
-      font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit;
+      font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit;
     }
     .leaderboard-filters select option { background: #0f172a; color: var(--text); }
     .rank-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -492,8 +494,9 @@
       .feature-grid .txt{ font-size: 0.9rem; }
       .cta-group{ gap: 0.6rem; }
       .cta{ padding: 0.85rem 1rem; font-size: 0.95rem; }
-      .leaderboard-header { flex-direction: column; align-items: flex-start; }
+      .leaderboard-header { flex-wrap: wrap; }
       .leaderboard-card { padding: 1rem; }
+      .leaderboard-title { font-size: 0.95rem; }
     }
   </style>
 </head>
