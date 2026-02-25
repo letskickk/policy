@@ -2628,7 +2628,7 @@ def api_my_candidate_get(request: Request):
 
         candidate_id = int(row["id"])
         pledges = conn.execute(
-            "SELECT id, title, content, priority FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
+            "SELECT id, title, content, priority, total_score, analysis_result, analyzed_at FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
             (candidate_id,),
         ).fetchall()
 
@@ -2645,7 +2645,8 @@ def api_my_candidate_get(request: Request):
                 "approval_status": row["approval_status"] or "PENDING",
             },
             "pledges": [
-                {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"]}
+                {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"],
+                 "total_score": p["total_score"], "analysis_result": p["analysis_result"], "analyzed_at": p["analyzed_at"]}
                 for p in pledges
             ],
             "user_info": {
@@ -2667,6 +2668,9 @@ class MyPledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=100, description="공약 제목")
     content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
+    imported_score: Optional[float] = Field(default=None, description="불러오기한 점수 (analysis_history에서)")
+    imported_result: Optional[str] = Field(default=None, max_length=80000, description="불러오기한 분석 결과")
+    imported_analyzed_at: Optional[str] = Field(default=None, description="불러오기한 분석 일시")
 
 
 class MyPledgesBody(BaseModel):
@@ -2744,8 +2748,18 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
         for idx, p in enumerate(body.pledges):
             conn.execute(
-                "INSERT INTO candidate_pledges (candidate_id, title, content, priority) VALUES (?, ?, ?, ?)",
-                (candidate_id, p.title.strip(), (p.content or "").strip() or None, p.priority if p.priority else (idx + 1)),
+                """INSERT INTO candidate_pledges
+                   (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    candidate_id,
+                    p.title.strip(),
+                    (p.content or "").strip() or None,
+                    p.priority if p.priority else (idx + 1),
+                    p.imported_score,
+                    (p.imported_result or "").strip() or None,
+                    p.imported_analyzed_at,
+                ),
             )
         conn.commit()
     except HTTPException:
@@ -2894,3 +2908,204 @@ def api_my_candidate_delete(request: Request):
         conn.close()
 
     return {"ok": True}
+
+
+# ─────────────────────── 개별 공약 분석 ───────────────────────
+
+@app.post("/api/my/pledges/{pledge_id}/analyze", tags=["my-candidate"])
+def api_analyze_pledge(pledge_id: int, request: Request):
+    """등록된 개별 공약을 AI로 분석하여 점수를 매긴다."""
+    import time
+    _ensure_startup()
+    user = require_approved(request)
+    uid = user["id"]
+    ip = _client_ip(request)
+
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+    ok, msg = check_rate_limit_user(uid)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id, cp.title, cp.content, cp.candidate_id, c.user_id
+            FROM candidate_pledges cp
+            JOIN candidates c ON c.id = cp.candidate_id
+            WHERE cp.id = ? AND c.user_id = ?
+            """,
+            (pledge_id, uid),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="해당 공약을 찾을 수 없습니다.")
+    finally:
+        conn.close()
+
+    pledge_title = row["title"] or ""
+    pledge_content = row["content"] or ""
+    text = f"{pledge_title}\n\n{pledge_content}".strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
+
+    from backend.analysis_service import run_check_analysis
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
+    vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    winners2022_vs_id = _winners2022_vector_store_id
+
+    t0 = time.perf_counter()
+    result, status_code, from_cache = run_check_analysis(
+        uid, text, ip, vs_id, regional_vs_id, winners2022_vs_id,
+        _indexes if not USE_OPENAI_VECTOR_STORE else None,
+    )
+    elapsed = time.perf_counter() - t0
+    logger.info("[analyze_pledge] pledge_id=%d completed in %.1fs", pledge_id, elapsed)
+
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=result)
+
+    from backend.score_parser import parse_total_score
+    score = parse_total_score(str(result))
+
+    # candidate_pledges 업데이트
+    conn2 = get_connection()
+    try:
+        result_text = str(result) if not isinstance(result, str) else result
+        conn2.execute(
+            "UPDATE candidate_pledges SET total_score = ?, analysis_result = ?, analyzed_at = datetime('now') WHERE id = ?",
+            (score, result_text[:60000], pledge_id),
+        )
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    # analysis_history에도 저장
+    try:
+        from backend.history import add_history
+        add_history(user_id=uid, kind="check", input_text=text, result=result,
+                    status_code=status_code, from_cache=from_cache, options={"source": "pledge_analyze", "pledge_id": pledge_id})
+    except Exception:
+        pass
+
+    return {"score": score, "result_text": str(result), "pledge_id": pledge_id}
+
+
+# ─────────────────────── 리더보드 ───────────────────────
+
+@app.get("/api/leaderboard", tags=["leaderboard"])
+def api_leaderboard(
+    region_code: Optional[str] = Query(default=None),
+    election_type: Optional[str] = Query(default=None),
+):
+    """공약 평균 점수 기준 후보자 랭킹 (공개 API). 주간 챔피언 포함."""
+    _ensure_db_ready()
+    import datetime as _dt
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        # ── 주간 챔피언 lazy snapshot ──
+        today = _dt.date.today()
+        this_monday = today - _dt.timedelta(days=today.weekday())
+        last_monday = this_monday - _dt.timedelta(days=7)
+        last_monday_str = last_monday.isoformat()
+
+        existing = conn.execute(
+            "SELECT id FROM weekly_champions WHERE week_start = ?", (last_monday_str,)
+        ).fetchone()
+        if existing is None:
+            last_sunday_str = (this_monday - _dt.timedelta(days=1)).isoformat()
+            champ = conn.execute(
+                """
+                SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                       ROUND(AVG(cp.total_score), 1) AS avg_score,
+                       COUNT(cp.id) AS cnt
+                FROM candidates c
+                JOIN users u ON u.id = c.user_id
+                JOIN candidate_pledges cp ON cp.candidate_id = c.id
+                WHERE cp.total_score IS NOT NULL
+                  AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
+                GROUP BY c.id
+                HAVING cnt > 0
+                ORDER BY avg_score DESC, cnt DESC
+                LIMIT 1
+                """,
+                (last_monday_str, last_sunday_str),
+            ).fetchone()
+            if champ and champ["avg_score"] and champ["avg_score"] > 0:
+                try:
+                    conn.execute(
+                        """INSERT OR IGNORE INTO weekly_champions
+                           (week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (last_monday_str, champ["candidate_id"], champ["name"], champ["region_name"],
+                         champ["district_name"], champ["election_type"], champ["avg_score"], champ["cnt"]),
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
+
+        # ── 챔피언 목록 ──
+        champions = [
+            dict(r) for r in conn.execute(
+                "SELECT week_start, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 10"
+            ).fetchall()
+        ]
+
+        # ── 현재 랭킹 (챔피언 제외) ──
+        champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
+
+        sql = """
+            SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                   ROUND(AVG(cp.total_score), 1) AS avg_score,
+                   COUNT(cp.id) AS scored_pledge_count
+            FROM candidates c
+            JOIN users u ON u.id = c.user_id
+            JOIN candidate_pledges cp ON cp.candidate_id = c.id
+            WHERE cp.total_score IS NOT NULL
+        """
+        params: list = []
+
+        if champion_ids:
+            placeholders = ",".join("?" for _ in champion_ids)
+            sql += f" AND c.id NOT IN ({placeholders})"
+            params.extend(champion_ids)
+        if region_code:
+            sql += " AND u.region_code = ?"
+            params.append(region_code.strip())
+        if election_type:
+            sql += " AND c.election_type = ?"
+            params.append(election_type.strip())
+
+        sql += """
+            GROUP BY c.id
+            HAVING scored_pledge_count > 0
+            ORDER BY avg_score DESC, scored_pledge_count DESC
+            LIMIT 50
+        """
+        rows = conn.execute(sql, tuple(params)).fetchall()
+
+        ranking = []
+        for rank, r in enumerate(rows, 1):
+            ranking.append({
+                "rank": rank,
+                "name": r["name"],
+                "region_name": r["region_name"] or "",
+                "district_name": r["district_name"] or "",
+                "election_type": r["election_type"] or "",
+                "avg_score": float(r["avg_score"]),
+                "scored_pledge_count": int(r["scored_pledge_count"]),
+            })
+
+        return {
+            "champions": champions,
+            "ranking": ranking,
+            "total_count": len(ranking),
+        }
+    finally:
+        conn.close()

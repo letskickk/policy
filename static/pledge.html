@@ -701,7 +701,9 @@
 
   <main>
     <section class="card">
-      <label for="pledge" class="form-label">공약 내용 입력</label>
+      <label for="pledgeTitle" class="form-label">공약 제목</label>
+      <input type="text" id="pledgeTitle" maxlength="100" placeholder="예: AI 기반 통학버스 안전 3대 혁신방안" style="width:100%;padding:0.75rem 1rem;border-radius:12px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text-strong);font-size:1.05rem;margin-bottom:0.75rem;outline:none;" />
+      <label for="pledge" class="form-label">공약 내용</label>
       <p class="form-hint">
         아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
@@ -1398,13 +1400,18 @@
       }
     });
 
+    const pledgeTitleEl = document.getElementById('pledgeTitle');
+
     btnEl.addEventListener('click', async function () {
-      const text = (pledgeEl.value || '').trim();
-      if (!text) {
+      const titleText = (pledgeTitleEl.value || '').trim();
+      const contentText = (pledgeEl.value || '').trim();
+      if (!contentText && !titleText) {
         showError('공약 내용이 입력되지 않았습니다. 내용을 작성해 주세요.');
         pledgeEl.focus();
         return;
       }
+      // 제목 + 내용을 결합하여 분석 텍스트 구성
+      const text = titleText ? (titleText + '\n\n' + contentText) : contentText;
       if (text.length > MAX_CHARS) {
         showError(`입력 내용이 너무 깁니다. 현재 ${text.length.toLocaleString('ko-KR')}자 / 최대 ${MAX_CHARS.toLocaleString('ko-KR')}자`);
         pledgeEl.focus();
