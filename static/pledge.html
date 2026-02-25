@@ -220,6 +220,20 @@
       background: var(--input-bg-focus);
       box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
     }
+    /* 통합 입력 그룹 내 textarea는 개별 스타일 해제 */
+    .pledge-input-group textarea{
+      min-height: 200px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 0.6rem 1.25rem 1.25rem;
+    }
+    .pledge-input-group textarea:focus{
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
     .input-text{
       width: 100%;
       padding: 0.85rem 1rem;
@@ -236,6 +250,56 @@
       border-color: rgba(255,255,255,0.45);
       background: var(--input-bg-focus);
       box-shadow: 0 0 0 4px var(--cta-ring);
+    }
+
+    /* 제목+내용 통합 입력 영역 */
+    .pledge-input-group{
+      border: 1px solid var(--input-border);
+      border-radius: 16px;
+      background: var(--input-bg);
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.22);
+    }
+    .pledge-input-group:focus-within{
+      border-color: rgba(255,255,255,0.45);
+      box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
+    }
+    .pledge-input-group .pledge-title-input{
+      width: 100%;
+      padding: 0.9rem 1.25rem 0.6rem;
+      border: none;
+      background: transparent;
+      color: var(--text-strong);
+      font-size: 1.1rem;
+      font-weight: 800;
+      outline: none;
+      letter-spacing: -0.01em;
+    }
+    .pledge-input-group .pledge-title-input::placeholder{
+      color: rgba(203,213,225,0.7);
+      font-weight: 700;
+    }
+    .pledge-input-group .pledge-divider{
+      height: 1px;
+      margin: 0 1.25rem;
+      background: var(--input-border);
+    }
+    .pledge-input-group .pledge-content-area{
+      width: 100%;
+      min-height: 200px;
+      padding: 0.6rem 1.25rem 1.25rem;
+      border: none;
+      background: transparent;
+      color: var(--text-strong);
+      font-size: 1.02rem;
+      line-height: 1.65;
+      resize: vertical;
+      outline: none;
+      box-shadow: none;
+    }
+    .pledge-input-group .pledge-content-area::placeholder{
+      color: rgba(203,213,225,0.75);
     }
 
     /* --- [버튼: 메인 CTA 톤(화이트)로 통일] --- */
@@ -701,16 +765,18 @@
 
   <main>
     <section class="card">
-      <label for="pledgeTitle" class="form-label">공약 제목</label>
-      <input type="text" id="pledgeTitle" maxlength="100" placeholder="예: AI 기반 통학버스 안전 3대 혁신방안" style="width:100%;padding:0.75rem 1rem;border-radius:12px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text-strong);font-size:1.05rem;margin-bottom:0.75rem;outline:none;" />
-      <label for="pledge" class="form-label">공약 내용</label>
+      <label class="form-label">공약 입력</label>
       <p class="form-hint">
         아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
         <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
       </div>
-      <textarea id="pledge" maxlength="10000" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
+      <div class="pledge-input-group">
+        <input type="text" id="pledgeTitle" class="pledge-title-input" maxlength="100" placeholder="공약 제목을 입력하세요  (예: AI 기반 통학버스 안전 3대 혁신방안)" />
+        <div class="pledge-divider"></div>
+        <textarea id="pledge" class="pledge-content-area" maxlength="10000" placeholder="공약 내용을 입력하세요&#13;&#10;&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축 ③ 교통안전공단 내 전담기구 설치&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소"></textarea>
+      </div>
       <div id="charCounter" class="char-counter">0 / 10,000자</div>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
       <div id="quotaBar" class="quota-bar-wrap" style="display:none;">
