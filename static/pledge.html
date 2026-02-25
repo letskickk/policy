@@ -1142,6 +1142,7 @@
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
           <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
+          <button type="button" class="btn-secondary" id="necFormBtn">선관위 서식으로</button>
           <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
@@ -1204,6 +1205,20 @@
           w.document.close();
           w.focus();
           setTimeout(() => { w.print(); }, 250);
+        });
+      }
+      const necFormBtn = document.getElementById('necFormBtn');
+      if (necFormBtn) {
+        necFormBtn.addEventListener('click', () => {
+          const pledgeEl = document.getElementById('pledge');
+          const text = (pledgeEl && pledgeEl.value) ? pledgeEl.value : (lastResultFullText || '');
+          if (!text) return;
+          showNecFormModal(text, {
+            candidateName: meData.name || meData.email || '',
+            electionType: meData.election_position || meData.election_type || '',
+            regionName: meData.region_name || '',
+            districtName: meData.district_name || '',
+          });
         });
       }
     }
@@ -1528,5 +1543,6 @@
     });
 
   </script>
+  <script src="/static/js/nec-form-modal.js"></script>
 </body>
 </html>

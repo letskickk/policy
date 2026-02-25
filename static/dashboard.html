@@ -234,6 +234,7 @@
       <div class="history-modal-actions">
         <button type="button" class="btn-secondary" id="historyModalCopyBtn">결과 복사</button>
         <button type="button" class="btn-secondary" id="historyModalTxtBtn">TXT로 저장</button>
+        <button type="button" class="btn-secondary" id="historyModalNecBtn">선관위 서식으로</button>
         <button type="button" class="btn-secondary" id="historyModalPrintBtn">인쇄하기</button>
       </div>
     </div>
@@ -244,8 +245,9 @@
       try {
         const r = await fetch('/api/usage/summary', { credentials: 'include' });
         if (!r.ok) { if (r.status === 401) window.location.href = '/login?next=' + encodeURIComponent(location.pathname); return; }
+        let dashboardUser = {};
         const me = await fetch('/api/auth/me', { credentials: 'include' });
-        if (me.ok) { const u = await me.json(); const el = document.getElementById('loginInfo'); if (el && u.email) el.textContent = u.email + ' 로그인 중'; }
+        if (me.ok) { dashboardUser = await me.json(); const el = document.getElementById('loginInfo'); if (el && dashboardUser.email) el.textContent = dashboardUser.email + ' 로그인 중'; }
         const d = await r.json();
         document.getElementById('daily').textContent = d.daily_used ?? '-';
         document.getElementById('monthly').textContent = d.monthly_used ?? '-';
@@ -379,10 +381,24 @@
           w.focus();
           setTimeout(function() { w.print(); }, 250);
         });
+        document.getElementById('historyModalNecBtn').addEventListener('click', function() {
+          const full = lastHistoryModalFullText || '';
+          const inputText = full.includes('\n\n[결과]\n')
+            ? full.split('\n\n[결과]\n')[0].replace('[입력]\n', '')
+            : full;
+          if (!inputText.trim()) return;
+          showNecFormModal(inputText, {
+            candidateName: dashboardUser.name || dashboardUser.email || '',
+            electionType: dashboardUser.election_position || dashboardUser.election_type || '',
+            regionName: dashboardUser.region_name || '',
+            districtName: dashboardUser.district_name || '',
+          });
+        });
 
         await loadHistory();
       } catch (e) { console.error(e); }
     })();
   </script>
+  <script src="/static/js/nec-form-modal.js"></script>
 </body>
 </html>
