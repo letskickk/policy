@@ -11,7 +11,7 @@
       background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%);
       min-height: 100vh; color: #e2e8f0; padding: 2rem;
     }
-    .wrap { max-width: 720px; margin: 0 auto; }
+    .wrap { max-width: 960px; margin: 0 auto; }
     .top-bar {
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
@@ -131,9 +131,9 @@
       margin-top: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 10px;
       background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.1);
       font-size: 0.82rem; color: #94a3b8; line-height: 1.6;
-      max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+      max-height: 420px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
     }
-    .analysis-preview.collapsed { max-height: 80px; overflow: hidden; position: relative; }
+    .analysis-preview.collapsed { max-height: 120px; overflow: hidden; position: relative; }
     .analysis-preview.collapsed::after {
       content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
       background: linear-gradient(transparent, rgba(0,0,0,0.35));
@@ -152,7 +152,7 @@
     .modal-overlay.hidden { display: none; }
     .modal-box {
       background: #0f1e36; border: 1px solid rgba(148,163,184,0.25); border-radius: 18px;
-      width: 100%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;
+      width: 100%; max-width: 840px; max-height: 85vh; display: flex; flex-direction: column;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
     .modal-header {
@@ -418,13 +418,11 @@
           }
 
           const pledges = data.pledges || [];
-          if (pledges.length === 0) { addPledgeRow(); }
-          else { pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result)); }
+          pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result));
         } else {
           statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
           approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
           submitBtn.textContent = '공약 등록';
-          addPledgeRow();
         }
 
         loadingEl.style.display = 'none';
@@ -449,6 +447,8 @@
         const content = (block.querySelector('textarea[name="pledge_content"]').value || '').trim();
         const priority = parseInt(block.querySelector('input[name="pledge_priority"]')?.value, 10) || (idx + 1);
         const pledge = { title, content: content || null, priority };
+        // 기존 공약 ID 전달 (삭제-전용 판별용)
+        if (block.dataset.pledgeId) pledge.pledge_id = parseInt(block.dataset.pledgeId, 10);
         // 점수 보존
         if (block.dataset.savedScore !== undefined && block.dataset.savedScore !== '') {
           const s = parseFloat(block.dataset.savedScore);
