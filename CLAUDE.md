@@ -138,3 +138,10 @@ uvicorn backend.main:app --reload
 - Linux(Docker): `ENV LANG=C.UTF-8`
 - AWS: `INDEX_CACHE_DIR` 등 캐시 경로를 `/tmp` 대신 영구 경로로 지정 (`/tmp` 휘발)
 - git push 후 GitHub Actions에서 `scripts/sync_vector_store.py` 등 자동 실행 여부는 워크플로 설정 참고
+
+---
+
+## 작업 가이드라인
+
+- **스크린샷 금지**: 명시적으로 요청하지 않는 한 `preview_screenshot` 등 스크린샷 도구 사용 금지.
+  코드 변경 검증은 `curl`, `grep`, `preview_snapshot`, `preview_logs` 등 텍스트 기반 도구로 수행.
