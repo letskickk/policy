@@ -303,12 +303,12 @@
               const CRR = window.CheckResultRender;
               const rawTxt = item.result_text || '';
               lastHistoryModalFullText = '[입력]\n' + (item.input_text || '') + '\n\n[결과]\n' + rawTxt;
-              // 총점 ≥ 85이면 선거공약서 작성 버튼 표시
+              // 점수 파싱 → necBtn mode 결정 (버튼은 항상 표시)
               const necBtn = document.getElementById('historyModalNecBtn');
               if (necBtn && CRR && CRR.parseScoresFromText) {
                 const histScores = CRR.parseScoresFromText(rawTxt);
-                const histScore = histScores.totalScore;
-                necBtn.style.display = (histScore !== null && histScore >= 85) ? '' : 'none';
+                necBtn.dataset.necScore = histScores.totalScore ?? '';
+                necBtn.style.display = '';
               }
               const resultHtml = CRR ? CRR.buildResultHtml(rawTxt) : ('<div class="analysis-text">' + esc(rawTxt).replace(/\n/g, '<br>') + '</div>');
               const inputBlock = '<div class="input-label">AI 분석에 넣었던 공약</div><div class="input-block">' + esc(item.input_text || '') + '</div>';
@@ -404,7 +404,10 @@
               districtName: dashboardUser.district_name || '',
             },
             {
-              mode: 'generate',
+              mode: (() => {
+                const s = parseFloat(document.getElementById('historyModalNecBtn').dataset.necScore);
+                return (!isNaN(s) && s >= 85) ? 'generate' : 'extract';
+              })(),
               resultText: rawTxt,
             }
           );

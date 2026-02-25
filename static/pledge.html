@@ -1138,15 +1138,11 @@
         html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';
       }
 
-      const necFormBtnHtml = (totalScore !== null && totalScore >= 85)
-        ? `<button type="button" class="btn-primary" id="necFormBtn">선거공약서 작성</button>`
-        : '';
-
       html += `
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
           <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
-          ${necFormBtnHtml}
+          <button type="button" class="btn-primary" id="necFormBtn">선거공약서 작성</button>
           <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
@@ -1226,7 +1222,7 @@
               districtName: meData.district_name || '',
             },
             {
-              mode: 'generate',
+              mode: (totalScore !== null && totalScore >= 85) ? 'generate' : 'extract',
               resultText: lastResultFullText || '',
             }
           );
