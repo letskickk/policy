@@ -2668,6 +2668,7 @@ class MyPledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=100, description="공약 제목")
     content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
+    pledge_id: Optional[int] = Field(default=None, description="기존 공약 ID (삭제-전용 판별용)")
     imported_score: Optional[float] = Field(default=None, description="불러오기한 점수 (analysis_history에서)")
     imported_result: Optional[str] = Field(default=None, max_length=80000, description="불러오기한 분석 결과")
     imported_analyzed_at: Optional[str] = Field(default=None, description="불러오기한 분석 일시")
@@ -2740,10 +2741,32 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 )
         else:
             candidate_id = int(row["id"])
-            conn.execute(
-                "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
-                (candidate_name, candidate_id),
+            # 삭제-전용 여부 판별: 기존 공약의 부분집합이면 승인 상태 유지
+            existing_rows = conn.execute(
+                "SELECT id, title, content FROM candidate_pledges WHERE candidate_id = ?",
+                (candidate_id,),
+            ).fetchall()
+            existing_map = {r["id"]: (r["title"], (r["content"] or "").strip()) for r in existing_rows}
+            submitted_ids = {p.pledge_id for p in body.pledges if p.pledge_id is not None}
+            is_delete_only = (
+                len(body.pledges) <= len(existing_rows)
+                and submitted_ids.issubset(existing_map.keys())
+                and all(
+                    p.pledge_id is not None
+                    and existing_map.get(p.pledge_id) == (p.title.strip(), (p.content or "").strip())
+                    for p in body.pledges
+                )
             )
+            if is_delete_only:
+                conn.execute(
+                    "UPDATE candidates SET name = ?, updated_at = datetime('now') WHERE id = ?",
+                    (candidate_name, candidate_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
+                    (candidate_name, candidate_id),
+                )
 
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
         for idx, p in enumerate(body.pledges):
