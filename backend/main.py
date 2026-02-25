@@ -2997,10 +2997,26 @@ def api_analyze_pledge(pledge_id: int, request: Request):
 
 # ─────────────────────── 리더보드 ───────────────────────
 
+def _week_label(monday_date):
+    """월요일 날짜로부터 'N월 M째주' 라벨 생성."""
+    import datetime as _dt
+    m = monday_date.month
+    first_of_month = monday_date.replace(day=1)
+    first_monday = first_of_month + _dt.timedelta(days=(7 - first_of_month.weekday()) % 7)
+    if first_monday > monday_date:
+        wn = 1
+    else:
+        wn = ((monday_date - first_monday).days // 7) + 1
+        if first_of_month.weekday() != 0:
+            wn += 1
+    return f"{m}월 {wn}째주"
+
+
 @app.get("/api/leaderboard", tags=["leaderboard"])
 def api_leaderboard(
     region_code: Optional[str] = Query(default=None),
     election_type: Optional[str] = Query(default=None),
+    week_start: Optional[str] = Query(default=None, description="조회할 주의 월요일 ISO날짜 (예: 2026-02-16). 미지정 시 이번 주"),
 ):
     """공약 평균 점수 기준 후보자 랭킹 (공개 API). 주간 챔피언 포함."""
     _ensure_db_ready()
@@ -3009,57 +3025,73 @@ def api_leaderboard(
     from backend.database import get_connection
     conn = get_connection()
     try:
-        # ── 주간 챔피언 lazy snapshot ──
         today = _dt.date.today()
-        this_monday = today - _dt.timedelta(days=today.weekday())
-        last_monday = this_monday - _dt.timedelta(days=7)
-        last_monday_str = last_monday.isoformat()
+        current_monday = today - _dt.timedelta(days=today.weekday())
 
-        existing = conn.execute(
-            "SELECT id FROM weekly_champions WHERE week_start = ?", (last_monday_str,)
-        ).fetchone()
-        if existing is None:
-            last_sunday_str = (this_monday - _dt.timedelta(days=1)).isoformat()
-            champ = conn.execute(
-                """
-                SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
-                       ROUND(AVG(cp.total_score), 1) AS avg_score,
-                       COUNT(cp.id) AS cnt
-                FROM candidates c
-                JOIN users u ON u.id = c.user_id
-                JOIN candidate_pledges cp ON cp.candidate_id = c.id
-                WHERE cp.total_score IS NOT NULL
-                  AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
-                GROUP BY c.id
-                HAVING cnt > 0
-                ORDER BY avg_score DESC, cnt DESC
-                LIMIT 1
-                """,
-                (last_monday_str, last_sunday_str),
+        # 조회 대상 주 결정
+        if week_start:
+            try:
+                req_date = _dt.date.fromisoformat(week_start)
+                target_monday = req_date - _dt.timedelta(days=req_date.weekday())
+            except ValueError:
+                target_monday = current_monday
+        else:
+            target_monday = current_monday
+
+        # 미래 주는 허용하지 않음
+        if target_monday > current_monday:
+            target_monday = current_monday
+
+        target_sunday = target_monday + _dt.timedelta(days=6)
+        is_current_week = (target_monday == current_monday)
+
+        # ── 주간 챔피언 lazy snapshot (이번 주 조회 시만) ──
+        if is_current_week:
+            last_monday = current_monday - _dt.timedelta(days=7)
+            last_monday_str = last_monday.isoformat()
+            existing = conn.execute(
+                "SELECT id FROM weekly_champions WHERE week_start = ?", (last_monday_str,)
             ).fetchone()
-            if champ and champ["avg_score"] and champ["avg_score"] > 0:
-                try:
-                    conn.execute(
-                        """INSERT OR IGNORE INTO weekly_champions
-                           (week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (last_monday_str, champ["candidate_id"], champ["name"], champ["region_name"],
-                         champ["district_name"], champ["election_type"], champ["avg_score"], champ["cnt"]),
-                    )
-                    conn.commit()
-                except Exception:
-                    pass
+            if existing is None:
+                last_sunday_str = (current_monday - _dt.timedelta(days=1)).isoformat()
+                champ = conn.execute(
+                    """
+                    SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                           ROUND(AVG(cp.total_score), 1) AS avg_score,
+                           COUNT(cp.id) AS cnt
+                    FROM candidates c
+                    JOIN users u ON u.id = c.user_id
+                    JOIN candidate_pledges cp ON cp.candidate_id = c.id
+                    WHERE cp.total_score IS NOT NULL
+                      AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
+                    GROUP BY c.id
+                    HAVING cnt > 0
+                    ORDER BY avg_score DESC, cnt DESC
+                    LIMIT 1
+                    """,
+                    (last_monday_str, last_sunday_str),
+                ).fetchone()
+                if champ and champ["avg_score"] and champ["avg_score"] > 0:
+                    try:
+                        conn.execute(
+                            """INSERT OR IGNORE INTO weekly_champions
+                               (week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (last_monday_str, champ["candidate_id"], champ["name"], champ["region_name"],
+                             champ["district_name"], champ["election_type"], champ["avg_score"], champ["cnt"]),
+                        )
+                        conn.commit()
+                    except Exception:
+                        pass
 
         # ── 챔피언 목록 ──
         champions = [
             dict(r) for r in conn.execute(
-                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 10"
+                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 20"
             ).fetchall()
         ]
 
-        # ── 현재 랭킹 (챔피언 제외) ──
-        champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
-
+        # ── 랭킹 쿼리 ──
         sql = """
             SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
@@ -3071,10 +3103,18 @@ def api_leaderboard(
         """
         params: list = []
 
-        if champion_ids:
-            placeholders = ",".join("?" for _ in champion_ids)
-            sql += f" AND c.id NOT IN ({placeholders})"
-            params.extend(champion_ids)
+        if not is_current_week:
+            # 과거 주: 해당 주에 분석된 공약만 (챔피언 제외 없음)
+            sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
+            params.extend([target_monday.isoformat(), target_sunday.isoformat()])
+        else:
+            # 이번 주: 챔피언 제외
+            champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
+            if champion_ids:
+                placeholders = ",".join("?" for _ in champion_ids)
+                sql += f" AND c.id NOT IN ({placeholders})"
+                params.extend(champion_ids)
+
         if region_code:
             sql += " AND u.region_code = ?"
             params.append(region_code.strip())
@@ -3103,23 +3143,17 @@ def api_leaderboard(
                 "scored_pledge_count": int(r["scored_pledge_count"]),
             })
 
-        # ── 주차 라벨 ──
-        month = this_monday.month
-        # 이번 주가 해당 월의 몇 째 주인지 계산
-        first_day_of_month = this_monday.replace(day=1)
-        first_monday = first_day_of_month + _dt.timedelta(days=(7 - first_day_of_month.weekday()) % 7)
-        if first_monday > this_monday:
-            # this_monday가 이번 달 첫 월요일 이전이면 1째주
-            week_num = 1
-        else:
-            week_num = ((this_monday - first_monday).days // 7) + 1
-            if first_day_of_month.weekday() != 0:
-                week_num += 1  # 월초가 월요일이 아니면 1주 추가 (첫 주 포함)
-        week_label = f"{month}월 {week_num}째주 랭킹"
+        # ── 주차 라벨 + 네비게이션 ──
+        label = _week_label(target_monday) + " 랭킹"
+        prev_monday = target_monday - _dt.timedelta(days=7)
+        next_monday = target_monday + _dt.timedelta(days=7)
 
         return {
-            "week_label": week_label,
-            "week_start": this_monday.isoformat(),
+            "week_label": label,
+            "week_start": target_monday.isoformat(),
+            "is_current_week": is_current_week,
+            "prev_week": prev_monday.isoformat(),
+            "next_week": next_monday.isoformat() if next_monday <= current_monday else None,
             "champions": champions,
             "ranking": ranking,
             "total_count": len(ranking),
