@@ -330,6 +330,7 @@
       div.querySelector('[data-remove]').addEventListener('click', () => { div.remove(); renumberPledges(); });
 
       bindPreviewToggle(div);
+      renumberPledges();
     }
 
     function buildPreviewHtml(text) {
@@ -554,7 +555,6 @@
           const parent = importTargetBlock.parentNode;
           const next = importTargetBlock.nextSibling;
           importTargetBlock.remove();
-          pledgeIndex--;
           const tempDiv = document.createElement('div');
           parent.insertBefore(tempDiv, next);
           // 일반 편집 가능 블록으로 추가 (공약 내용이 메인)
