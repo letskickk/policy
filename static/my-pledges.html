@@ -116,18 +116,6 @@
     .pledge-action-row {
       display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap;
     }
-    .btn-analyze {
-      background: rgba(148,163,184,0.15); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.25);
-      padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;
-      transition: background 0.15s;
-    }
-    .btn-analyze:hover { background: rgba(148,163,184,0.25); }
-    .btn-analyze:disabled { opacity: 0.35; cursor: not-allowed; }
-    .btn-analyze.done {
-      background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.2);
-      font-size: 0.8rem; padding: 0.3rem 0.6rem;
-    }
-    .btn-analyze.done:hover { background: rgba(34,197,94,0.18); }
     .btn-import-inline {
       background: rgba(56,189,248,0.1); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.2);
       padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;
@@ -157,11 +145,6 @@
       font-weight: 700; cursor: pointer; padding: 0.2rem 0; margin-top: 0.15rem;
     }
     .btn-toggle-preview:hover { color: #93c5fd; }
-    .imported-badge {
-      display: inline-block; padding: 0.08rem 0.35rem; border-radius: 5px;
-      font-size: 0.7rem; font-weight: 700;
-      background: rgba(56,189,248,0.1); color: #7dd3fc;
-    }
     /* 불러오기 모달 */
     .modal-overlay {
       position: fixed; inset: 0; z-index: 1000;
@@ -297,11 +280,10 @@
     function scoreClass(s) { return s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red'; }
 
     // ── 공약 행 추가 ──
-    function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null, opts = {}) {
+    function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null) {
       pledgeIndex++;
       const id = 'p' + pledgeIndex;
       const div = document.createElement('div');
-      const isAnalyzed = totalScore != null || analysisResult;
       div.className = 'pledge-block';
       div.id = id;
       if (pledgeDbId) div.dataset.pledgeId = pledgeDbId;
@@ -318,27 +300,8 @@
         ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}점</span>`
         : (analysisResult ? '<span class="muted">분석완료</span>' : '');
       const dateHtml = analyzedAt ? `<span class="score-date">${analyzedAt.slice(0,10)}</span>` : '';
-      const isImported = opts.imported === true;
-
-      if (isImported) {
-        // ── 불러온 공약: 제목만 편집 ──
-        div.innerHTML = `
-          <div class="pledge-header">
-            <span class="pledge-num">${pledgeIndex}</span>
-            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
-            <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
-          </div>
-          <div class="char-count title-count">${titleLen}/100 <span class="imported-badge">불러옴</span></div>
-          <textarea name="pledge_content" style="display:none;">${esc(content)}</textarea>
-          <input type="number" name="pledge_priority" value="${esc(priority || pledgeIndex)}" style="display:none;" />
-          <div class="pledge-action-row">
-            ${scoreHtml} ${dateHtml}
-          </div>
-          ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
-        `;
-      } else {
-        // ── 일반 공약 (수동 입력 또는 DB 로드) ──
-        div.innerHTML = `
+      // ── 공약 블록 (수동 입력, DB 로드, 불러오기 공통) ──
+      div.innerHTML = `
           <div class="pledge-header">
             <span class="pledge-num">${pledgeIndex}</span>
             <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
@@ -349,13 +312,11 @@
           <div class="char-count content-count">${contentLen}/50,000</div>
           <div class="pledge-action-row">
             <button type="button" class="btn-import-inline">기록에서 불러오기</button>
-            <button type="button" class="btn-analyze${isAnalyzed ? ' done' : ''}" ${pledgeDbId ? '' : 'disabled title="먼저 저장 후 분석"'}>${isAnalyzed ? '재분석' : '분석하기'}</button>
             <span class="score-area">${scoreHtml}</span>
             ${dateHtml}
           </div>
           ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
         `;
-      }
 
       pledgesContainer.appendChild(div);
 
@@ -364,20 +325,15 @@
       const titleCounter = div.querySelector('.title-count');
       titleInput.addEventListener('input', () => updateCounter(titleInput, titleCounter, 100));
 
-      if (!isImported) {
-        const contentInput = div.querySelector('textarea[name="pledge_content"]');
-        const contentCounter = div.querySelector('.content-count');
-        if (contentInput && contentCounter) {
-          contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
-        }
-        const importBtn = div.querySelector('.btn-import-inline');
-        if (importBtn) importBtn.addEventListener('click', () => openImportModal(div));
+      const contentInput = div.querySelector('textarea[name="pledge_content"]');
+      const contentCounter = div.querySelector('.content-count');
+      if (contentInput && contentCounter) {
+        contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
       }
+      const importBtn = div.querySelector('.btn-import-inline');
+      if (importBtn) importBtn.addEventListener('click', () => openImportModal(div));
 
       div.querySelector('[data-remove]').addEventListener('click', () => { div.remove(); renumberPledges(); });
-
-      const analyzeBtn = div.querySelector('.btn-analyze');
-      if (analyzeBtn) analyzeBtn.addEventListener('click', () => analyzePledge(div, analyzeBtn));
 
       bindPreviewToggle(div);
     }
@@ -395,62 +351,6 @@
         const isCollapsed = preview.classList.toggle('collapsed');
         toggle.textContent = isCollapsed ? '분석 결과 더보기 ▼' : '접기 ▲';
       });
-    }
-
-    // ── 분석 ──
-    async function analyzePledge(block, btn) {
-      const pledgeId = block.dataset.pledgeId;
-      if (!pledgeId) { alert('먼저 공약을 저장하세요.'); return; }
-      btn.disabled = true;
-      const origText = btn.textContent;
-      btn.textContent = '분석 중...';
-      const scoreArea = block.querySelector('.score-area');
-      try {
-        const res = await fetch(`/api/my/pledges/${pledgeId}/analyze`, { method: 'POST', credentials: 'include' });
-        if (res.status === 401) { location.href = '/login?next=/my-pledges'; return; }
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          alert(data.detail || '분석 실패 (' + res.status + ')');
-          btn.disabled = false; btn.textContent = origText;
-          return;
-        }
-        const score = data.score;
-        const resultText = data.result_text || '';
-
-        if (scoreArea) {
-          scoreArea.innerHTML = score != null
-            ? `<span class="score-badge ${scoreClass(score)}">${score}점</span>`
-            : '<span class="muted">분석완료</span>';
-        }
-
-        let dateEl = block.querySelector('.score-date');
-        const today = new Date().toISOString().slice(0,10);
-        if (dateEl) { dateEl.textContent = today; }
-        else {
-          const row = block.querySelector('.pledge-action-row');
-          if (row) { const s = document.createElement('span'); s.className='score-date'; s.textContent=today; row.appendChild(s); }
-        }
-
-        // 미리보기 업데이트
-        let old1 = block.querySelector('.analysis-preview');
-        let old2 = block.querySelector('.btn-toggle-preview');
-        if (old1) old1.remove();
-        if (old2) old2.remove();
-        if (resultText) { block.insertAdjacentHTML('beforeend', buildPreviewHtml(resultText)); bindPreviewToggle(block); }
-
-        // dataset 업데이트 (저장 시 보존용)
-        if (score != null) block.dataset.savedScore = score;
-        if (resultText) block.dataset.savedResult = resultText;
-        block.dataset.savedAnalyzedAt = new Date().toISOString();
-
-        btn.classList.add('done');
-        btn.disabled = false;
-        btn.textContent = '재분석';
-      } catch (e) {
-        console.error(e);
-        alert('서버 연결 실패');
-        btn.disabled = false; btn.textContent = origText;
-      }
     }
 
     function renumberPledges() {
@@ -651,24 +551,27 @@
         const m = resultText.match(/종합\s*점수[^0-9]*(\d{1,3}(?:\.\d+)?)/);
         if (m) score = parseFloat(m[1]);
         const now = new Date().toISOString();
-        const firstLine = inputText.split('\n')[0].trim().slice(0, 100) || '불러온 공약';
+
+        // 첫 줄 = 제목, 나머지 = 내용 (공약 텍스트 기준)
+        const lines = inputText.split('\n');
+        const title = (lines[0] || '').trim().slice(0, 100) || '불러온 공약';
+        const body = lines.slice(1).join('\n').trim();
 
         if (importTargetBlock) {
-          // 기존 블록을 교체: 삭제 후 새로 추가 (같은 위치)
           const parent = importTargetBlock.parentNode;
           const next = importTargetBlock.nextSibling;
           importTargetBlock.remove();
-          pledgeIndex--; // addPledgeRow에서 다시 증가
+          pledgeIndex--;
           const tempDiv = document.createElement('div');
           parent.insertBefore(tempDiv, next);
-          addPledgeRow(firstLine, inputText, '', null, score, now, resultText, { imported: true });
-          // 방금 추가된 블록을 tempDiv 위치로 이동
+          // 일반 편집 가능 블록으로 추가 (공약 내용이 메인)
+          addPledgeRow(title, body, '', null, score, now, resultText);
           const newBlock = pledgesContainer.lastElementChild;
           parent.insertBefore(newBlock, tempDiv);
           tempDiv.remove();
           renumberPledges();
         } else {
-          addPledgeRow(firstLine, inputText, '', null, score, now, resultText, { imported: true });
+          addPledgeRow(title, body, '', null, score, now, resultText);
         }
         importModal.classList.add('hidden');
         importTargetBlock = null;
