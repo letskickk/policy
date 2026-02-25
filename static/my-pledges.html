@@ -13,12 +13,8 @@
     }
     .wrap { max-width: 720px; margin: 0 auto; }
     .top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
     }
     .top-bar .brand { display: inline-flex; align-items: center; gap: 0.75rem; }
     .top-bar .brand-logo {
@@ -30,9 +26,7 @@
       height: 30px; width: auto; display: inline-block;
       filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
     }
-    .top-bar .brand-title {
-      font-size: 1.05rem; font-weight: 900; letter-spacing: -0.02em; color: #f8fafc;
-    }
+    .top-bar .brand-title { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.02em; color: #f8fafc; }
     .top-bar .brand-tag {
       display: block; margin-top: 0.35rem; font-size: 0.84rem;
       color: #ffb37a; letter-spacing: -0.01em; font-weight: 800; opacity: 0.95;
@@ -42,12 +36,9 @@
     .subtitle { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.2rem; word-break: keep-all; }
     .nav-link {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 36px; padding: 0 0.9rem;
-      color: #e2e8f0; text-decoration: none;
-      font-size: 0.875rem; font-weight: 700;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(148,163,184,0.18);
+      min-height: 36px; padding: 0 0.9rem; color: #e2e8f0; text-decoration: none;
+      font-size: 0.875rem; font-weight: 700; border-radius: 8px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18);
       transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     .nav-link:hover { background: rgba(255,255,255,0.10); color: #f8fafc; border-color: rgba(148,163,184,0.28); }
@@ -55,65 +46,45 @@
     .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
     .footer a:hover { text-decoration: underline; }
     .card {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(148,163,184,0.18);
-      border-radius: 18px;
-      padding: 1.5rem;
-      margin-bottom: 1rem;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18);
+      border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem;
     }
     .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; margin-bottom: 1.2rem; }
     .info-grid .lbl { font-weight: 700; font-size: 0.85rem; color: #94a3b8; }
     .info-grid .val { font-size: 0.95rem; color: #fff; }
     label { display: block; font-weight: 700; margin-bottom: 0.35rem; font-size: 0.9rem; }
     .pledge-block {
-      background: rgba(0,0,0,0.15);
-      border: 1px solid rgba(148,163,184,0.15);
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 0.75rem;
-      position: relative;
+      background: rgba(0,0,0,0.15); border: 1px solid rgba(148,163,184,0.15);
+      border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; position: relative;
     }
     .pledge-block .pledge-header { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
     .pledge-block .pledge-header input[type="text"] { flex: 1; margin-bottom: 0; }
-    .pledge-block .pledge-header input[type="number"] { width: 60px; margin-bottom: 0; }
     .pledge-block .pledge-num {
       flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-      background: rgba(255,114,16,0.25); color: #ffb37a; font-weight: 900; font-size: 0.85rem;
+      background: rgba(148,163,184,0.15); color: #94a3b8; font-weight: 900; font-size: 0.85rem;
       display: flex; align-items: center; justify-content: center;
     }
     .pledge-block textarea { margin-bottom: 0; }
     input[type="text"], input[type="number"] {
-      width: 100%;
-      padding: 0.6rem 0.75rem;
-      border-radius: 10px;
-      border: 1px solid rgba(148,163,184,0.28);
-      background: rgba(0,0,0,0.22);
-      color: #fff;
-      margin-bottom: 1rem;
-      font-size: 1rem;
+      width: 100%; padding: 0.6rem 0.75rem; border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28); background: rgba(0,0,0,0.22);
+      color: #fff; margin-bottom: 1rem; font-size: 1rem;
     }
     textarea {
-      width: 100%;
-      padding: 0.6rem 0.75rem;
-      border-radius: 10px;
-      border: 1px solid rgba(148,163,184,0.28);
-      background: rgba(0,0,0,0.22);
-      color: #fff;
-      font-family: inherit;
-      font-size: 0.95rem;
-      resize: vertical;
-      min-height: 80px;
+      width: 100%; padding: 0.6rem 0.75rem; border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.28); background: rgba(0,0,0,0.22);
+      color: #fff; font-family: inherit; font-size: 0.95rem; resize: vertical; min-height: 80px;
     }
     button {
-      padding: 0.5rem 1rem;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 0.95rem;
+      padding: 0.5rem 1rem; border-radius: 10px; border: none;
+      cursor: pointer; font-weight: 700; font-size: 0.95rem;
     }
-    .btn-add { background: #22c55e; color: #fff; margin-bottom: 1rem; }
-    .btn-submit { background: #ff7210; color: #fff; width: 100%; padding: 0.75rem; font-size: 1rem; }
+    .btn-add { background: rgba(148,163,184,0.15); color: #cbd5e1; margin-bottom: 1rem; border: 1px solid rgba(148,163,184,0.2); }
+    .btn-add:hover { background: rgba(148,163,184,0.25); }
+    .btn-submit {
+      background: rgba(59,130,246,0.8); color: #fff; width: 100%; padding: 0.75rem; font-size: 1rem;
+    }
+    .btn-submit:hover { background: rgba(59,130,246,0.9); }
     .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-remove { background: transparent; color: #94a3b8; padding: 0.25rem 0.5rem; font-size: 0.85rem; }
     .btn-remove:hover { color: #ef4444; }
@@ -126,25 +97,102 @@
       display: inline-block; padding: 0.15rem 0.55rem; border-radius: 6px;
       font-size: 0.8rem; font-weight: 700;
     }
-    .badge-new { background: rgba(34,197,94,0.2); color: #86efac; }
-    .badge-edit { background: rgba(56,189,248,0.2); color: #7dd3fc; }
-    .badge-pending { background: rgba(250,204,21,0.2); color: #fde047; }
-    .badge-approved { background: rgba(34,197,94,0.2); color: #86efac; }
-    .badge-rejected { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .badge-new { background: rgba(34,197,94,0.15); color: #86efac; }
+    .badge-edit { background: rgba(56,189,248,0.15); color: #7dd3fc; }
+    .badge-pending { background: rgba(250,204,21,0.15); color: #fde047; }
+    .badge-approved { background: rgba(34,197,94,0.15); color: #86efac; }
+    .badge-rejected { background: rgba(239,68,68,0.15); color: #fca5a5; }
     .approval-info {
-      margin-top: 0.6rem;
-      padding: 0.6rem 0.8rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      line-height: 1.5;
+      margin-top: 0.6rem; padding: 0.6rem 0.8rem; border-radius: 10px;
+      font-size: 0.85rem; line-height: 1.5;
     }
-    .approval-info.pending { background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.2); color: #fde047; }
-    .approval-info.approved { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
-    .approval-info.rejected { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+    .approval-info.pending { background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.15); color: #fde047; }
+    .approval-info.approved { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.15); color: #86efac; }
+    .approval-info.rejected { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); color: #fca5a5; }
     .char-count { text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
     .char-count.warn { color: #fde047; }
     .char-count.over { color: #fca5a5; }
     .loading { text-align: center; padding: 2rem; color: #64748b; }
+    .pledge-action-row {
+      display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap;
+    }
+    .btn-analyze {
+      background: rgba(148,163,184,0.15); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.25);
+      padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .btn-analyze:hover { background: rgba(148,163,184,0.25); }
+    .btn-analyze:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-analyze.done {
+      background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.2);
+      font-size: 0.8rem; padding: 0.3rem 0.6rem;
+    }
+    .btn-analyze.done:hover { background: rgba(34,197,94,0.18); }
+    .btn-import-inline {
+      background: rgba(56,189,248,0.1); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.2);
+      padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .btn-import-inline:hover { background: rgba(56,189,248,0.2); }
+    .score-badge {
+      font-size: 0.82rem; font-weight: 800; padding: 0.12rem 0.5rem; border-radius: 6px;
+    }
+    .score-badge.green { background: rgba(34,197,94,0.12); color: #86efac; }
+    .score-badge.yellow { background: rgba(250,204,21,0.12); color: #fde047; }
+    .score-badge.red { background: rgba(239,68,68,0.12); color: #fca5a5; }
+    .score-date { font-size: 0.75rem; color: #64748b; }
+    .analysis-preview {
+      margin-top: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 10px;
+      background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.1);
+      font-size: 0.82rem; color: #94a3b8; line-height: 1.6;
+      max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+    }
+    .analysis-preview.collapsed { max-height: 80px; overflow: hidden; position: relative; }
+    .analysis-preview.collapsed::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.35));
+    }
+    .btn-toggle-preview {
+      background: none; border: none; color: #64748b; font-size: 0.76rem;
+      font-weight: 700; cursor: pointer; padding: 0.2rem 0; margin-top: 0.15rem;
+    }
+    .btn-toggle-preview:hover { color: #93c5fd; }
+    .imported-badge {
+      display: inline-block; padding: 0.08rem 0.35rem; border-radius: 5px;
+      font-size: 0.7rem; font-weight: 700;
+      background: rgba(56,189,248,0.1); color: #7dd3fc;
+    }
+    /* 불러오기 모달 */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: #0f1e36; border: 1px solid rgba(148,163,184,0.25); border-radius: 18px;
+      width: 100%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem; border-bottom: 1px solid rgba(148,163,184,0.15);
+    }
+    .modal-header h3 { font-size: 1.05rem; color: #f8fafc; margin: 0; }
+    .modal-close { background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.25rem; }
+    .modal-close:hover { color: #fff; }
+    .modal-body { overflow-y: auto; padding: 0.75rem 1.25rem; flex: 1; }
+    .modal-empty { text-align: center; color: #64748b; padding: 2rem 0; }
+    .history-item {
+      padding: 0.75rem; border-radius: 10px; margin-bottom: 0.5rem; cursor: pointer;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(148,163,184,0.12);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .history-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(148,163,184,0.25); }
+    .history-item .hi-top { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+    .history-item .hi-score { font-weight: 800; font-size: 0.9rem; }
+    .history-item .hi-date { font-size: 0.75rem; color: #64748b; }
+    .history-item .hi-preview { font-size: 0.82rem; color: #94a3b8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     @media (max-width: 560px) {
       body { padding: 1rem; }
       .wrap { padding: 0 0.5rem; }
@@ -209,13 +257,23 @@
     </div>
   </div>
 
+  <!-- 불러오기 모달 -->
+  <div class="modal-overlay hidden" id="importModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>분석 기록에서 불러오기</h3>
+        <button class="modal-close" id="importModalClose">&times;</button>
+      </div>
+      <div class="modal-body" id="importModalBody">
+        <div class="modal-empty">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const ELECTION_TYPE_LABELS = {
-      metro_mayor: '광역단체장',
-      regional_council: '광역의원',
-      local_mayor: '기초단체장',
-      local_council: '기초의원',
-      party_official: '당직자',
+      metro_mayor: '광역단체장', regional_council: '광역의원',
+      local_mayor: '기초단체장', local_council: '기초의원', party_official: '당직자',
     };
 
     const loadingEl = document.getElementById('loading');
@@ -231,46 +289,172 @@
 
     let pledgeIndex = 0;
     let hasExistingCandidate = false;
+    let importTargetBlock = null; // 불러오기 대상 블록
 
     function esc(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
+    function scoreClass(s) { return s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red'; }
 
-    function addPledgeRow(title = '', content = '', priority = '') {
+    // ── 공약 행 추가 ──
+    function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null, opts = {}) {
       pledgeIndex++;
       const id = 'p' + pledgeIndex;
       const div = document.createElement('div');
+      const isAnalyzed = totalScore != null || analysisResult;
       div.className = 'pledge-block';
       div.id = id;
+      if (pledgeDbId) div.dataset.pledgeId = pledgeDbId;
+      // 점수/결과 보존 (저장 시 전송용)
+      if (totalScore != null || analysisResult) {
+        div.dataset.savedScore = totalScore ?? '';
+        div.dataset.savedResult = analysisResult || '';
+        div.dataset.savedAnalyzedAt = analyzedAt || '';
+      }
+
       const titleLen = (title || '').length;
       const contentLen = (content || '').length;
-      div.innerHTML = `
-        <div class="pledge-header">
-          <span class="pledge-num">${pledgeIndex}</span>
-          <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
-          <input type="number" name="pledge_priority" placeholder="순서" value="${esc(priority || pledgeIndex)}" min="1" max="9999" style="width:60px;" />
-          <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
-        </div>
-        <div class="char-count title-count">${titleLen}/100</div>
-        <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000">${esc(content)}</textarea>
-        <div class="char-count content-count">${contentLen}/50,000</div>
-      `;
+      const scoreHtml = totalScore != null
+        ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}점</span>`
+        : (analysisResult ? '<span class="muted">분석완료</span>' : '');
+      const dateHtml = analyzedAt ? `<span class="score-date">${analyzedAt.slice(0,10)}</span>` : '';
+      const isImported = opts.imported === true;
+
+      if (isImported) {
+        // ── 불러온 공약: 제목만 편집 ──
+        div.innerHTML = `
+          <div class="pledge-header">
+            <span class="pledge-num">${pledgeIndex}</span>
+            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
+            <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
+          </div>
+          <div class="char-count title-count">${titleLen}/100 <span class="imported-badge">불러옴</span></div>
+          <textarea name="pledge_content" style="display:none;">${esc(content)}</textarea>
+          <input type="number" name="pledge_priority" value="${esc(priority || pledgeIndex)}" style="display:none;" />
+          <div class="pledge-action-row">
+            ${scoreHtml} ${dateHtml}
+          </div>
+          ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
+        `;
+      } else {
+        // ── 일반 공약 (수동 입력 또는 DB 로드) ──
+        div.innerHTML = `
+          <div class="pledge-header">
+            <span class="pledge-num">${pledgeIndex}</span>
+            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
+            <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
+          </div>
+          <div class="char-count title-count">${titleLen}/100</div>
+          <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000">${esc(content)}</textarea>
+          <div class="char-count content-count">${contentLen}/50,000</div>
+          <div class="pledge-action-row">
+            <button type="button" class="btn-import-inline">기록에서 불러오기</button>
+            <button type="button" class="btn-analyze${isAnalyzed ? ' done' : ''}" ${pledgeDbId ? '' : 'disabled title="먼저 저장 후 분석"'}>${isAnalyzed ? '재분석' : '분석하기'}</button>
+            <span class="score-area">${scoreHtml}</span>
+            ${dateHtml}
+          </div>
+          ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
+        `;
+      }
+
       pledgesContainer.appendChild(div);
+
+      // 이벤트 바인딩
       const titleInput = div.querySelector('input[name="pledge_title"]');
       const titleCounter = div.querySelector('.title-count');
-      const contentInput = div.querySelector('textarea[name="pledge_content"]');
-      const contentCounter = div.querySelector('.content-count');
       titleInput.addEventListener('input', () => updateCounter(titleInput, titleCounter, 100));
-      contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
-      div.querySelector('[data-remove]').addEventListener('click', () => {
-        div.remove();
-        renumberPledges();
+
+      if (!isImported) {
+        const contentInput = div.querySelector('textarea[name="pledge_content"]');
+        const contentCounter = div.querySelector('.content-count');
+        if (contentInput && contentCounter) {
+          contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
+        }
+        const importBtn = div.querySelector('.btn-import-inline');
+        if (importBtn) importBtn.addEventListener('click', () => openImportModal(div));
+      }
+
+      div.querySelector('[data-remove]').addEventListener('click', () => { div.remove(); renumberPledges(); });
+
+      const analyzeBtn = div.querySelector('.btn-analyze');
+      if (analyzeBtn) analyzeBtn.addEventListener('click', () => analyzePledge(div, analyzeBtn));
+
+      bindPreviewToggle(div);
+    }
+
+    function buildPreviewHtml(text) {
+      return `<div class="analysis-preview collapsed">${esc(text)}</div>
+              <button type="button" class="btn-toggle-preview">분석 결과 더보기 ▼</button>`;
+    }
+
+    function bindPreviewToggle(block) {
+      const toggle = block.querySelector('.btn-toggle-preview');
+      const preview = block.querySelector('.analysis-preview');
+      if (!toggle || !preview) return;
+      toggle.addEventListener('click', () => {
+        const isCollapsed = preview.classList.toggle('collapsed');
+        toggle.textContent = isCollapsed ? '분석 결과 더보기 ▼' : '접기 ▲';
       });
     }
 
+    // ── 분석 ──
+    async function analyzePledge(block, btn) {
+      const pledgeId = block.dataset.pledgeId;
+      if (!pledgeId) { alert('먼저 공약을 저장하세요.'); return; }
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = '분석 중...';
+      const scoreArea = block.querySelector('.score-area');
+      try {
+        const res = await fetch(`/api/my/pledges/${pledgeId}/analyze`, { method: 'POST', credentials: 'include' });
+        if (res.status === 401) { location.href = '/login?next=/my-pledges'; return; }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.detail || '분석 실패 (' + res.status + ')');
+          btn.disabled = false; btn.textContent = origText;
+          return;
+        }
+        const score = data.score;
+        const resultText = data.result_text || '';
+
+        if (scoreArea) {
+          scoreArea.innerHTML = score != null
+            ? `<span class="score-badge ${scoreClass(score)}">${score}점</span>`
+            : '<span class="muted">분석완료</span>';
+        }
+
+        let dateEl = block.querySelector('.score-date');
+        const today = new Date().toISOString().slice(0,10);
+        if (dateEl) { dateEl.textContent = today; }
+        else {
+          const row = block.querySelector('.pledge-action-row');
+          if (row) { const s = document.createElement('span'); s.className='score-date'; s.textContent=today; row.appendChild(s); }
+        }
+
+        // 미리보기 업데이트
+        let old1 = block.querySelector('.analysis-preview');
+        let old2 = block.querySelector('.btn-toggle-preview');
+        if (old1) old1.remove();
+        if (old2) old2.remove();
+        if (resultText) { block.insertAdjacentHTML('beforeend', buildPreviewHtml(resultText)); bindPreviewToggle(block); }
+
+        // dataset 업데이트 (저장 시 보존용)
+        if (score != null) block.dataset.savedScore = score;
+        if (resultText) block.dataset.savedResult = resultText;
+        block.dataset.savedAnalyzedAt = new Date().toISOString();
+
+        btn.classList.add('done');
+        btn.disabled = false;
+        btn.textContent = '재분석';
+      } catch (e) {
+        console.error(e);
+        alert('서버 연결 실패');
+        btn.disabled = false; btn.textContent = origText;
+      }
+    }
+
     function renumberPledges() {
-      const blocks = pledgesContainer.querySelectorAll('.pledge-block');
-      blocks.forEach((block, i) => {
+      pledgesContainer.querySelectorAll('.pledge-block').forEach((block, i) => {
         const num = block.querySelector('.pledge-num');
         if (num) num.textContent = i + 1;
       });
@@ -288,10 +472,11 @@
     function showMsg(text, ok) {
       msgEl.textContent = text;
       msgEl.style.display = 'block';
-      msgEl.style.background = ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
+      msgEl.style.background = ok ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
       msgEl.style.color = ok ? '#86efac' : '#fca5a5';
     }
 
+    // ── 데이터 로드 ──
     async function loadData() {
       try {
         const res = await fetch('/api/my/candidate', { credentials: 'include' });
@@ -304,32 +489,25 @@
         if (ui.election_position === 'party_official') {
           loadingEl.style.display = 'none';
           noPosEl.querySelector('p').innerHTML = '당직자 유형으로 가입되어<br>공약 등록 대상이 아닙니다.';
-          noPosEl.style.display = 'block';
-          return;
+          noPosEl.style.display = 'block'; return;
         }
         if (!ui.election_position || !ui.region_code) {
-          loadingEl.style.display = 'none';
-          noPosEl.style.display = 'block';
-          return;
+          loadingEl.style.display = 'none'; noPosEl.style.display = 'block'; return;
         }
-
-        const typeLabel = ELECTION_TYPE_LABELS[ui.election_type] || ui.election_type || '';
-        const regionLabel = ui.region_name || ui.region_code || '';
-        const districtLabel = ui.district_name || '';
 
         let infoHtml = '';
         infoHtml += `<span class="lbl">이름</span><span class="val">${esc(ui.name)}</span>`;
-        infoHtml += `<span class="lbl">선거 유형</span><span class="val">${esc(typeLabel)}</span>`;
-        infoHtml += `<span class="lbl">지역</span><span class="val">${esc(regionLabel)}</span>`;
-        if (districtLabel && ui.election_type !== 'metro_mayor') {
-          infoHtml += `<span class="lbl">선거구</span><span class="val">${esc(districtLabel)}</span>`;
+        infoHtml += `<span class="lbl">선거 유형</span><span class="val">${esc(ELECTION_TYPE_LABELS[ui.election_type] || ui.election_type || '')}</span>`;
+        infoHtml += `<span class="lbl">지역</span><span class="val">${esc(ui.region_name || ui.region_code || '')}</span>`;
+        if (ui.district_name && ui.election_type !== 'metro_mayor') {
+          infoHtml += `<span class="lbl">선거구</span><span class="val">${esc(ui.district_name)}</span>`;
         }
         userInfoEl.innerHTML = infoHtml;
 
         const approvalInfoEl = document.getElementById('approval-info');
         if (data.candidate) {
           hasExistingCandidate = true;
-          statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드 - 기존 공약이 있습니다</span>';
+          statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드</span>';
           submitBtn.textContent = '공약 수정 저장';
           deleteAllBtn.style.display = 'inline-block';
 
@@ -346,11 +524,8 @@
           }
 
           const pledges = data.pledges || [];
-          if (pledges.length === 0) {
-            addPledgeRow();
-          } else {
-            pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority));
-          }
+          if (pledges.length === 0) { addPledgeRow(); }
+          else { pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result)); }
         } else {
           statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
           approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
@@ -366,6 +541,7 @@
       }
     }
 
+    // ── 저장 ──
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       msgEl.style.display = 'none';
@@ -373,31 +549,34 @@
 
       const blocks = pledgesContainer.querySelectorAll('.pledge-block');
       const pledges = [];
-      let hasEmpty = false;
       blocks.forEach((block, idx) => {
         const title = (block.querySelector('input[name="pledge_title"]').value || '').trim();
-        if (!title) { hasEmpty = true; return; }
+        if (!title) return;
         const content = (block.querySelector('textarea[name="pledge_content"]').value || '').trim();
-        const priority = parseInt(block.querySelector('input[name="pledge_priority"]').value, 10) || (idx + 1);
-        pledges.push({ title, content: content || null, priority });
+        const priority = parseInt(block.querySelector('input[name="pledge_priority"]')?.value, 10) || (idx + 1);
+        const pledge = { title, content: content || null, priority };
+        // 점수 보존
+        if (block.dataset.savedScore !== undefined && block.dataset.savedScore !== '') {
+          const s = parseFloat(block.dataset.savedScore);
+          pledge.imported_score = isNaN(s) ? null : s;
+          pledge.imported_result = block.dataset.savedResult || null;
+          pledge.imported_analyzed_at = block.dataset.savedAnalyzedAt || null;
+        }
+        pledges.push(pledge);
       });
 
       if (pledges.length === 0) {
         showMsg('최소 1개 이상의 공약 제목을 입력하세요.', false);
-        submitBtn.disabled = false;
-        return;
+        submitBtn.disabled = false; return;
       }
 
       try {
         const res = await fetch('/api/my/candidate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ pledges }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify({ pledges }),
         });
         const text = await res.text();
-        let data = {};
-        try { data = JSON.parse(text); } catch (_) {}
+        let data = {}; try { data = JSON.parse(text); } catch (_) {}
         if (!res.ok) {
           let errMsg = '저장 실패 (' + res.status + ')';
           if (data.detail) {
@@ -406,23 +585,100 @@
             else errMsg = JSON.stringify(data.detail);
           }
           showMsg(errMsg, false);
-          console.error('Save error:', res.status, data);
-          submitBtn.disabled = false;
-          return;
+          submitBtn.disabled = false; return;
         }
         showMsg(`공약 ${data.pledge_count || pledges.length}개가 저장되었습니다. 관리자 승인 후 지도에 공개됩니다.`, true);
-        hasExistingCandidate = true;
-        statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드</span> <span class="badge badge-pending">승인 대기</span>';
-        const aInfoEl = document.getElementById('approval-info');
-        if (aInfoEl) aInfoEl.innerHTML = '<div class="approval-info pending">관리자 승인 대기 중입니다. 승인 후 지도에 공개됩니다.</div>';
-        submitBtn.textContent = '공약 수정 저장';
-        deleteAllBtn.style.display = 'inline-block';
-      } catch (err) {
-        showMsg('서버 연결 실패', false);
-      }
+        pledgesContainer.innerHTML = '';
+        pledgeIndex = 0;
+        await loadData();
+      } catch (err) { showMsg('서버 연결 실패', false); }
       submitBtn.disabled = false;
     });
 
+    // ── 불러오기 모달 ──
+    const importModal = document.getElementById('importModal');
+    const importModalBody = document.getElementById('importModalBody');
+    document.getElementById('importModalClose').addEventListener('click', () => importModal.classList.add('hidden'));
+    importModal.addEventListener('click', (e) => { if (e.target === importModal) importModal.classList.add('hidden'); });
+
+    function openImportModal(targetBlock) {
+      importTargetBlock = targetBlock || null;
+      importModal.classList.remove('hidden');
+      importModalBody.innerHTML = '<div class="modal-empty">불러오는 중...</div>';
+      fetch('/api/history?limit=50', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+          const items = (data.items || []).filter(it => it.status_code === 200);
+          if (items.length === 0) {
+            importModalBody.innerHTML = '<div class="modal-empty">분석 기록이 없습니다.<br><a href="/pledge" style="color:#93c5fd;">공약 분석 페이지</a>에서 먼저 분석해 주세요.</div>';
+            return;
+          }
+          importModalBody.innerHTML = '';
+          items.forEach(it => {
+            const scoreText = it.total_score != null ? `${it.total_score}점` : '점수 없음';
+            const scoreColor = it.total_score != null ? scoreClass(it.total_score) : '';
+            const dateText = (it.created_at || '').slice(0, 16).replace('T', ' ');
+            // 첫 줄을 제목으로 표시, 나머지는 내용 미리보기
+            const preview = it.input_preview || '';
+            const nlIdx = preview.indexOf('\n');
+            const title = nlIdx > 0 ? preview.slice(0, nlIdx).trim() : preview.trim();
+            const body = nlIdx > 0 ? preview.slice(nlIdx + 1).trim() : '';
+            const el = document.createElement('div');
+            el.className = 'history-item';
+            el.innerHTML = `
+              <div class="hi-top">
+                <span class="hi-score score-badge ${scoreColor}">${esc(scoreText)}</span>
+                <span class="hi-date">${esc(dateText)}</span>
+              </div>
+              <div style="font-size:0.88rem;color:#e2e8f0;font-weight:700;margin-bottom:0.15rem;">${esc(title)}</div>
+              ${body ? `<div class="hi-preview">${esc(body)}</div>` : ''}
+            `;
+            el.addEventListener('click', () => importFromHistory(it.id));
+            importModalBody.appendChild(el);
+          });
+        })
+        .catch(() => { importModalBody.innerHTML = '<div class="modal-empty">오류가 발생했습니다.</div>'; });
+    }
+
+    async function importFromHistory(historyId) {
+      try {
+        const res = await fetch(`/api/history/${historyId}`, { credentials: 'include' });
+        if (!res.ok) { alert('기록을 불러올 수 없습니다.'); return; }
+        const item = await res.json();
+        const inputText = item.input_text || '';
+        const resultText = item.result_text || '';
+        let score = null;
+        const m = resultText.match(/종합\s*점수[^0-9]*(\d{1,3}(?:\.\d+)?)/);
+        if (m) score = parseFloat(m[1]);
+        const now = new Date().toISOString();
+        const firstLine = inputText.split('\n')[0].trim().slice(0, 100) || '불러온 공약';
+
+        if (importTargetBlock) {
+          // 기존 블록을 교체: 삭제 후 새로 추가 (같은 위치)
+          const parent = importTargetBlock.parentNode;
+          const next = importTargetBlock.nextSibling;
+          importTargetBlock.remove();
+          pledgeIndex--; // addPledgeRow에서 다시 증가
+          const tempDiv = document.createElement('div');
+          parent.insertBefore(tempDiv, next);
+          addPledgeRow(firstLine, inputText, '', null, score, now, resultText, { imported: true });
+          // 방금 추가된 블록을 tempDiv 위치로 이동
+          const newBlock = pledgesContainer.lastElementChild;
+          parent.insertBefore(newBlock, tempDiv);
+          tempDiv.remove();
+          renumberPledges();
+        } else {
+          addPledgeRow(firstLine, inputText, '', null, score, now, resultText, { imported: true });
+        }
+        importModal.classList.add('hidden');
+        importTargetBlock = null;
+      } catch (e) {
+        console.error(e);
+        alert('불러오기 실패');
+      }
+    }
+
+    // ── 삭제 ──
     deleteAllBtn.addEventListener('click', async () => {
       if (!confirm('등록된 후보 정보와 공약이 모두 삭제됩니다. 계속하시겠습니까?')) return;
       try {

@@ -322,6 +322,75 @@
       gap: 0.75rem;
     }
 
+    /* ===== 리더보드 섹션 ===== */
+    .leaderboard-section { margin-top: 1.8rem; }
+    .leaderboard-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 1.5rem; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    }
+    .leaderboard-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.2rem;
+    }
+    .leaderboard-title {
+      font-size: 1.15rem; font-weight: 950; color: var(--text-strong);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .leaderboard-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .leaderboard-filters select {
+      padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06); color: var(--text);
+      font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .leaderboard-filters select option { background: #0f172a; color: var(--text); }
+    .rank-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .rank-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 0.85rem; border-radius: 12px;
+      background: var(--card2); border: 1px solid rgba(148,163,184,0.10);
+      transition: background 0.15s;
+    }
+    .rank-row:hover { background: rgba(255,255,255,0.08); }
+    .rank-row.top-3 { border-color: rgba(255,179,122,0.3); background: rgba(255,114,16,0.06); }
+    .rank-num {
+      width: 32px; height: 32px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 950; font-size: 0.88rem; flex-shrink: 0;
+    }
+    .rank-num.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e293b; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+    .rank-num.silver { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; box-shadow: 0 2px 8px rgba(148,163,184,0.3); }
+    .rank-num.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; box-shadow: 0 2px 8px rgba(217,119,6,0.3); }
+    .rank-num.normal { background: rgba(255,255,255,0.08); color: var(--muted); }
+    .rank-info { flex: 1; min-width: 0; }
+    .rank-name { font-weight: 800; color: var(--text-strong); font-size: 0.95rem; }
+    .rank-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+    .rank-meta .election-badge {
+      display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+      background: rgba(59,130,246,0.15); color: #93c5fd;
+      font-size: 0.72rem; font-weight: 700; margin-right: 0.3rem;
+    }
+    .rank-score { text-align: right; flex-shrink: 0; }
+    .score-value { font-size: 1.1rem; font-weight: 950; letter-spacing: -0.02em; }
+    .score-value.green { color: #86efac; }
+    .score-value.yellow { color: #fde047; }
+    .score-value.red { color: #fca5a5; }
+    .score-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
+    .pledge-count { font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
+    .champions-strip {
+      margin-bottom: 1rem; padding: 0.8rem; border-radius: 12px;
+      background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.2);
+    }
+    .champions-strip-title { font-size: 0.85rem; font-weight: 800; color: #fde047; margin-bottom: 0.5rem; }
+    .champion-item {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.2rem 0.55rem; border-radius: 6px;
+      background: rgba(250,204,21,0.1); font-size: 0.8rem; color: var(--text);
+      margin: 0.15rem 0.25rem 0.15rem 0;
+    }
+    .champion-week { color: var(--muted); font-size: 0.72rem; }
+    .champion-score { font-weight: 800; color: #fde047; }
+    .rank-empty { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.9rem; }
+
     @media (min-width: 720px){
       .cta-group{
         grid-template-columns: 1fr 1fr;
@@ -341,6 +410,8 @@
       .feature-grid .txt{ font-size: 0.9rem; }
       .cta-group{ gap: 0.6rem; }
       .cta{ padding: 0.85rem 1rem; font-size: 0.95rem; }
+      .leaderboard-header { flex-direction: column; align-items: flex-start; }
+      .leaderboard-card { padding: 1rem; }
     }
   </style>
 </head>
@@ -409,6 +480,33 @@
       </div>
     </div>
 
+    <!-- ===== 리더보드 섹션 ===== -->
+    <section class="leaderboard-section" id="leaderboardSection" style="display:none;">
+      <div class="leaderboard-card">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title">
+            <span>&#127942;</span> 공약 랭킹
+          </div>
+          <div class="leaderboard-filters">
+            <select id="filterRegion">
+              <option value="">전체 지역</option>
+            </select>
+            <select id="filterElection">
+              <option value="">전체 선거유형</option>
+              <option value="metro_mayor">광역단체장</option>
+              <option value="regional_council">광역의원</option>
+              <option value="local_mayor">기초단체장</option>
+              <option value="local_council">기초의원</option>
+            </select>
+          </div>
+        </div>
+        <div id="championsStrip"></div>
+        <div class="rank-list" id="rankList">
+          <div class="rank-empty">불러오는 중...</div>
+        </div>
+      </div>
+    </section>
+
     <section class="features">
       <h2>주요 기능</h2>
       <ul class="feature-grid">
@@ -468,6 +566,106 @@
         }
       } catch (e) {}
     })();
+  </script>
+
+  <script>
+  (function() {
+    const ELECTION_LABELS = {
+      metro_mayor: '광역단체장',
+      regional_council: '광역의원',
+      local_mayor: '기초단체장',
+      local_council: '기초의원',
+    };
+    const safe = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const scoreClass = s => s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red';
+    const rankClass = r => r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : 'normal';
+
+    const section = document.getElementById('leaderboardSection');
+    const rankList = document.getElementById('rankList');
+    const champStrip = document.getElementById('championsStrip');
+    const filterRegion = document.getElementById('filterRegion');
+    const filterElection = document.getElementById('filterElection');
+
+    // 지역 셀렉트 채우기
+    fetch('/api/regions').then(r => r.json()).then(regions => {
+      (regions || []).forEach(rg => {
+        const opt = document.createElement('option');
+        opt.value = rg.region_code;
+        opt.textContent = rg.region_name;
+        filterRegion.appendChild(opt);
+      });
+    }).catch(() => {});
+
+    function renderChampions(champions) {
+      if (!champions || champions.length === 0) {
+        champStrip.innerHTML = '';
+        return;
+      }
+      let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
+      champions.forEach(c => {
+        const weekLabel = c.week_start.slice(5).replace('-', '/') + '주';
+        const elLabel = ELECTION_LABELS[c.election_type] || '';
+        html += `<span class="champion-item">
+          <span class="champion-week">${safe(weekLabel)}</span>
+          ${safe(c.candidate_name)}
+          <span class="champion-score">${c.avg_score}</span>
+        </span>`;
+      });
+      html += '</div>';
+      champStrip.innerHTML = html;
+    }
+
+    function renderRanking(ranking) {
+      if (!ranking || ranking.length === 0) {
+        rankList.innerHTML = '<div class="rank-empty">아직 분석된 공약이 없습니다.</div>';
+        return;
+      }
+      let html = '';
+      ranking.forEach(r => {
+        const cls = r.rank <= 3 ? ' top-3' : '';
+        const numCls = rankClass(r.rank);
+        const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
+        const region = r.district_name ? `${safe(r.region_name)} ${safe(r.district_name)}` : safe(r.region_name);
+        html += `<div class="rank-row${cls}">
+          <div class="rank-num ${numCls}">${r.rank}</div>
+          <div class="rank-info">
+            <div class="rank-name">${safe(r.name)}</div>
+            <div class="rank-meta">
+              ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
+              ${region}
+            </div>
+          </div>
+          <div class="rank-score">
+            <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
+            <div class="score-label">평균점수</div>
+            <div class="pledge-count">공약 ${r.scored_pledge_count}개</div>
+          </div>
+        </div>`;
+      });
+      rankList.innerHTML = html;
+    }
+
+    async function loadLeaderboard() {
+      const params = new URLSearchParams();
+      if (filterRegion.value) params.set('region_code', filterRegion.value);
+      if (filterElection.value) params.set('election_type', filterElection.value);
+      const qs = params.toString();
+      try {
+        const res = await fetch('/api/leaderboard' + (qs ? '?' + qs : ''));
+        if (!res.ok) return;
+        const data = await res.json();
+        renderChampions(data.champions);
+        renderRanking(data.ranking);
+        section.style.display = '';
+      } catch (e) {
+        console.error('leaderboard fetch error:', e);
+      }
+    }
+
+    filterRegion.addEventListener('change', loadLeaderboard);
+    filterElection.addEventListener('change', loadLeaderboard);
+    loadLeaderboard();
+  })();
   </script>
 </body>
 </html>
