@@ -131,8 +131,26 @@ function _necInjectStyles() {
 .nec-pledge-page {
   padding: 20px 0;
   border-bottom: 1px solid #d1d5db;
+  position: relative;
+  overflow: hidden;
 }
 .nec-pledge-page:last-child { border-bottom: none; }
+
+/* AI 참고용 워터마크 */
+.nec-pledge-page::after {
+  content: 'AI를 활용하여 작성된 자료이며 참고 용도로만 활용하시기 바랍니다';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-35deg);
+  font-size: 1.3rem;
+  color: rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
 
 /* 인쇄용 페이지별 헤더 — 화면에서는 숨김 */
 .nec-page-header { display: none; }
@@ -274,6 +292,12 @@ function _necInjectStyles() {
     page-break-after: always;
     border-bottom: none;
     padding: 0;
+  }
+  .nec-pledge-page::after {
+    color: rgba(0, 0, 0, 0.08) !important;
+    font-size: 14pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .nec-pledge-page:last-child { page-break-after: avoid; }
   .nec-add-item, .nec-item-del { display: none !important; }
