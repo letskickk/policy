@@ -1138,11 +1138,15 @@
         html += '<div class="analysis-text">' + escapeHtml(fullText).replace(/\n{2,}/g, '\n').replace(/\n/g, '<br>') + '</div>';
       }
 
+      const necFormBtnHtml = (totalScore !== null && totalScore >= 85)
+        ? `<button type="button" class="btn-primary" id="necFormBtn">선거공약서 작성</button>`
+        : '';
+
       html += `
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
           <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
-
+          ${necFormBtnHtml}
           <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
@@ -1211,14 +1215,21 @@
       if (necFormBtn) {
         necFormBtn.addEventListener('click', () => {
           const pledgeEl = document.getElementById('pledge');
-          const text = (pledgeEl && pledgeEl.value) ? pledgeEl.value : (lastResultFullText || '');
-          if (!text) return;
-          showNecFormModal(text, {
-            candidateName: meData.name || meData.email || '',
-            electionType: meData.election_position || meData.election_type || '',
-            regionName: meData.region_name || '',
-            districtName: meData.district_name || '',
-          });
+          const pledgeInput = (pledgeEl && pledgeEl.value) ? pledgeEl.value : '';
+          if (!pledgeInput) { alert('공약 내용을 입력해 주세요.'); return; }
+          showNecFormModal(
+            pledgeInput,
+            {
+              candidateName: meData.name || meData.email || '',
+              electionType: meData.election_position || meData.election_type || '',
+              regionName: meData.region_name || '',
+              districtName: meData.district_name || '',
+            },
+            {
+              mode: 'generate',
+              resultText: lastResultFullText || '',
+            }
+          );
         });
       }
     }

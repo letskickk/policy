@@ -2767,6 +2767,8 @@ class NecFormRequest(BaseModel):
     election_type: str = Field(default="", description="선거유형 (예: metro_mayor)")
     region_name: str = Field(default="", description="시·도명")
     district_name: str = Field(default="", description="선거구명")
+    result_text: str = Field(default="", description="AI 분석 결과 텍스트 (generate 모드 컨텍스트)")
+    mode: str = Field(default="extract", description="'extract' | 'generate'")
 
 
 @app.post("/api/documents/nec-form", tags=["documents"])
@@ -2778,33 +2780,62 @@ def api_generate_nec_form(body: NecFormRequest, request: Request):
     if not pledge_text:
         raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
 
+    mode = (body.mode or "extract").strip().lower()
+    result_text = (body.result_text or "").strip()
+
     from openai import OpenAI
     from backend.config import OPENAI_API_KEY, CHAT_MODEL
 
-    system_prompt = (
-        "당신은 선거공약서 작성 전문가입니다. "
-        "입력된 공약 텍스트를 분석하여, 각 공약 항목을 공직선거법 제66조에 따른 선거공약서 양식에 맞게 구조화하세요. "
-        "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
-    )
-    user_prompt = (
-        "다음 공약 텍스트를 선관위 제출용 선거공약서 형식으로 구조화해주세요.\n"
-        "각 공약 항목을 분리하고, 아래 형식의 JSON 배열로만 응답하세요.\n\n"
-        "각 항목(목표, 이행방법, 이행기간, 재원조달방안)은 공약 내용에 자연스럽게 존재하는 것만 채우세요.\n"
-        "명시되지 않은 항목은 빈 배열([])로 두세요. 억지로 추론하거나 없는 내용을 만들어내지 마세요.\n"
-        "세부 항목들은 배열로 표현하세요.\n\n"
+    json_schema = (
         "[\n"
         "  {\n"
         "    \"순위\": 1,\n"
         "    \"제목\": \"공약 제목\",\n"
         "    \"내용\": [\"핵심 공약 내용 또는 세부 추진 항목 1\", \"세부 항목 2\"],\n"
-        "    \"목표\": [\"목표 내용이 있으면 작성\"],\n"
+        "    \"목표\": [\"목표 내용\"],\n"
         "    \"이행방법\": [\"방법 1\", \"방법 2\"],\n"
         "    \"이행기간\": [\"예: 취임 후 1년 이내\"],\n"
-        "    \"재원조달방안\": [\"시비, 국비보조 등 재원 내용이 있으면 작성\"]\n"
+        "    \"재원조달방안\": [\"시비, 국비보조 등\"]\n"
         "  }\n"
-        "]\n\n"
-        f"공약 텍스트:\n{pledge_text}"
+        "]"
     )
+
+    if mode == "generate" and result_text:
+        system_prompt = (
+            "당신은 선거공약서 작성 전문가입니다. "
+            "AI 분석이 제안한 수정·보완 사항을 실제로 공약에 반영하여, "
+            "공직선거법 제66조에 따른 완성된 선거공약서를 작성하세요. "
+            "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
+        )
+        user_prompt = (
+            "아래 공약 원문과 AI 분석 결과를 읽으세요.\n"
+            "분석 결과의 '수정·보완 제안' 내용을 실제로 공약에 반영하여, "
+            "선관위 제출용 선거공약서 최종본을 완성된 문장으로 작성해주세요.\n\n"
+            "작성 규칙:\n"
+            "- 각 공약을 하나의 JSON 객체로 표현하고, 아래 형식의 JSON 배열로만 응답하세요.\n"
+            "- 보완 제안이 있는 항목은 반드시 반영하여 내용을 강화하세요.\n"
+            "- 모든 항목(목표, 이행방법, 이행기간, 재원조달방안)을 완성된 문장으로 작성하세요.\n"
+            "- 이행기간, 재원조달방안이 원문에 없으면 공약 성격에 맞게 합리적으로 작성하세요.\n"
+            "- 기호는 빈 문자열로 두세요.\n\n"
+            f"{json_schema}\n\n"
+            f"공약 원문:\n{pledge_text}\n\n"
+            f"AI 분석 결과 (수정·보완 제안 포함):\n{result_text}"
+        )
+    else:
+        system_prompt = (
+            "당신은 선거공약서 작성 전문가입니다. "
+            "입력된 공약 텍스트를 분석하여, 각 공약 항목을 공직선거법 제66조에 따른 선거공약서 양식에 맞게 구조화하세요. "
+            "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
+        )
+        user_prompt = (
+            "다음 공약 텍스트를 선관위 제출용 선거공약서 형식으로 구조화해주세요.\n"
+            "각 공약 항목을 분리하고, 아래 형식의 JSON 배열로만 응답하세요.\n\n"
+            "각 항목(목표, 이행방법, 이행기간, 재원조달방안)은 공약 내용에 자연스럽게 존재하는 것만 채우세요.\n"
+            "명시되지 않은 항목은 빈 배열([])로 두세요. 억지로 추론하거나 없는 내용을 만들어내지 마세요.\n"
+            "세부 항목들은 배열로 표현하세요.\n\n"
+            f"{json_schema}\n\n"
+            f"공약 텍스트:\n{pledge_text}"
+        )
 
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
