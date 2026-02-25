@@ -234,7 +234,7 @@
       <div class="history-modal-actions">
         <button type="button" class="btn-secondary" id="historyModalCopyBtn">결과 복사</button>
         <button type="button" class="btn-secondary" id="historyModalTxtBtn">TXT로 저장</button>
-
+        <button type="button" class="btn-primary" id="historyModalNecBtn" style="display:none">선거공약서 작성</button>
         <button type="button" class="btn-secondary" id="historyModalPrintBtn">인쇄하기</button>
       </div>
     </div>
@@ -303,6 +303,13 @@
               const CRR = window.CheckResultRender;
               const rawTxt = item.result_text || '';
               lastHistoryModalFullText = '[입력]\n' + (item.input_text || '') + '\n\n[결과]\n' + rawTxt;
+              // 총점 ≥ 85이면 선거공약서 작성 버튼 표시
+              const necBtn = document.getElementById('historyModalNecBtn');
+              if (necBtn && CRR && CRR.parseScoresFromText) {
+                const histScores = CRR.parseScoresFromText(rawTxt);
+                const histScore = histScores.totalScore;
+                necBtn.style.display = (histScore !== null && histScore >= 85) ? '' : 'none';
+              }
               const resultHtml = CRR ? CRR.buildResultHtml(rawTxt) : ('<div class="analysis-text">' + esc(rawTxt).replace(/\n/g, '<br>') + '</div>');
               const inputBlock = '<div class="input-label">AI 분석에 넣었던 공약</div><div class="input-block">' + esc(item.input_text || '') + '</div>';
               const resultBlock = '<div class="result-label">분석 결과</div><div class="result-content">' + resultHtml + '</div>';
@@ -384,15 +391,23 @@
         document.getElementById('historyModalNecBtn').addEventListener('click', function() {
           const full = lastHistoryModalFullText || '';
           const inputText = full.includes('\n\n[결과]\n')
-            ? full.split('\n\n[결과]\n')[0].replace('[입력]\n', '')
+            ? full.split('\n\n[결과]\n')[0].replace(/^\[입력\]\n/, '')
             : full;
           if (!inputText.trim()) return;
-          showNecFormModal(inputText, {
-            candidateName: dashboardUser.name || dashboardUser.email || '',
-            electionType: dashboardUser.election_position || dashboardUser.election_type || '',
-            regionName: dashboardUser.region_name || '',
-            districtName: dashboardUser.district_name || '',
-          });
+          const rawTxt = full.includes('\n\n[결과]\n') ? full.split('\n\n[결과]\n')[1] || '' : '';
+          showNecFormModal(
+            inputText,
+            {
+              candidateName: dashboardUser.name || dashboardUser.email || '',
+              electionType: dashboardUser.election_position || dashboardUser.election_type || '',
+              regionName: dashboardUser.region_name || '',
+              districtName: dashboardUser.district_name || '',
+            },
+            {
+              mode: 'generate',
+              resultText: rawTxt,
+            }
+          );
         });
 
         await loadHistory();
