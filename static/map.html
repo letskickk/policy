@@ -1370,6 +1370,30 @@
       await renderRealKoreaMap();
       await Promise.all([loadRegionData(), loadElectionTypeCounts()]);
 
+      // ?candidate=ID 파라미터: 리더보드에서 클릭 시 지역 하이라이트 + 모달
+      const candidateId = new URLSearchParams(window.location.search).get('candidate');
+      if (candidateId) {
+        try {
+          const res = await fetch(`/api/candidates/${candidateId}`);
+          if (res.ok) {
+            const d = await res.json();
+            // 지역 선택 → 지도 하이라이트 + 패널 후보 목록 로드
+            if (d.region_code) {
+              await selectRegion(d.region_code, null, d.election_type || null, false);
+            }
+            // 모달 열기
+            const etype = electionTypeLabels[d.election_type] || d.election_type || '';
+            const region = d.district_name ? `${d.region_name || ''} ${d.district_name}` : (d.region_name || '');
+            pledgeModalTitle.textContent = d.name || '';
+            pledgeModalSub.textContent = `${region} · ${etype}`;
+            pledgeModalOverlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            renderModalPledges(d.pledges || []);
+          }
+        } catch (e) { console.warn('candidate modal open failed:', e); }
+        return;
+      }
+
       const urlRegionCode = getRegionFromURL();
       const urlDistrictCode = getDistrictFromURL();
       const urlElectionType = getElectionTypeFromURL();
@@ -1521,24 +1545,6 @@
       }
     });
 
-    // ?candidate=ID 파라미터로 직접 모달 열기 (리더보드 연동)
-    (async function checkCandidateParam() {
-      const cid = new URLSearchParams(window.location.search).get('candidate');
-      if (!cid) return;
-      try {
-        const res = await fetch(`/api/candidates/${cid}`);
-        if (!res.ok) return;
-        const d = await res.json();
-        const name = d.name || '';
-        const etype = electionTypeLabels[d.election_type] || d.election_type || '';
-        const region = d.district_name ? `${d.region_name || ''} ${d.district_name}` : (d.region_name || '');
-        pledgeModalTitle.textContent = name;
-        pledgeModalSub.textContent = `${region} · ${etype}`;
-        pledgeModalOverlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        renderModalPledges(d.pledges || []);
-      } catch (e) { console.warn('candidate modal open failed:', e); }
-    })();
   </script>
 
   <footer class="footer">
