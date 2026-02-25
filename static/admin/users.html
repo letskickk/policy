@@ -20,8 +20,16 @@
       padding: 1.5rem;
       margin-bottom: 1rem;
     }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); white-space: nowrap; }
+    td:nth-child(3) { white-space: normal; max-width: 160px; word-break: break-all; } /* 이메일 */
+    td:nth-child(4) { white-space: normal; max-width: 140px; word-break: keep-all; } /* 출마/선거구 */
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .card { padding: 1rem; border-radius: 14px; }
+      h1 { font-size: 1.25rem; }
+    }
     .status { padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
     .PENDING { background: rgba(251,191,36,0.3); }
     .APPROVED { background: rgba(34,197,94,0.3); }
@@ -76,6 +84,7 @@
     <div class="links"><a href="/admin">← 관리자</a></div>
     <h1>사용자 관리</h1>
     <div class="card">
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -91,6 +100,7 @@
         </thead>
         <tbody id="list"></tbody>
       </table>
+      </div><!-- /.table-scroll -->
       <div class="muted">
         삭제는 하드삭제(되돌릴 수 없음)로 처리됩니다. 삭제 전 반드시 확인하십시오.
       </div>
