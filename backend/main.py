@@ -2761,6 +2761,81 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
     return {"ok": True, "candidate_id": candidate_id, "pledge_count": len(body.pledges)}
 
 
+class NecFormRequest(BaseModel):
+    pledge_text: str = Field(..., description="공약 원문 텍스트")
+    candidate_name: str = Field(default="", description="후보자명")
+    election_type: str = Field(default="", description="선거유형 (예: metro_mayor)")
+    region_name: str = Field(default="", description="시·도명")
+    district_name: str = Field(default="", description="선거구명")
+
+
+@app.post("/api/documents/nec-form", tags=["documents"])
+def api_generate_nec_form(body: NecFormRequest, request: Request):
+    """공약 텍스트를 선관위 제출용 선거공약서 구조(JSON)로 변환."""
+    _ = require_user(request)
+
+    pledge_text = (body.pledge_text or "").strip()
+    if not pledge_text:
+        raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
+
+    from openai import OpenAI
+    from backend.config import OPENAI_API_KEY, CHAT_MODEL
+
+    system_prompt = (
+        "당신은 선거공약서 작성 전문가입니다. "
+        "입력된 공약 텍스트를 분석하여, 각 공약 항목을 공직선거법 제66조에 따른 선거공약서 양식에 맞게 구조화하세요. "
+        "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
+    )
+    user_prompt = (
+        "다음 공약 텍스트를 선관위 제출용 선거공약서 형식으로 구조화해주세요.\n"
+        "각 공약 항목을 분리하고, 아래 형식의 JSON 배열로만 응답하세요.\n\n"
+        "각 항목(목표, 이행방법, 이행기간, 재원조달방안)은 공약 내용에 자연스럽게 존재하는 것만 채우세요.\n"
+        "명시되지 않은 항목은 빈 배열([])로 두세요. 억지로 추론하거나 없는 내용을 만들어내지 마세요.\n"
+        "세부 항목들은 배열로 표현하세요.\n\n"
+        "[\n"
+        "  {\n"
+        "    \"순위\": 1,\n"
+        "    \"제목\": \"공약 제목\",\n"
+        "    \"내용\": [\"핵심 공약 내용 또는 세부 추진 항목 1\", \"세부 항목 2\"],\n"
+        "    \"목표\": [\"목표 내용이 있으면 작성\"],\n"
+        "    \"이행방법\": [\"방법 1\", \"방법 2\"],\n"
+        "    \"이행기간\": [\"예: 취임 후 1년 이내\"],\n"
+        "    \"재원조달방안\": [\"시비, 국비보조 등 재원 내용이 있으면 작성\"]\n"
+        "  }\n"
+        "]\n\n"
+        f"공약 텍스트:\n{pledge_text}"
+    )
+
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+        raw = response.choices[0].message.content or ""
+        # JSON 블록 추출 (```json ... ``` 감싸인 경우 대비)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+            raw = raw.strip()
+        items = json.loads(raw)
+        if not isinstance(items, list):
+            items = [items]
+    except json.JSONDecodeError as e:
+        logger.warning("NEC form JSON 파싱 실패: %s | raw=%s", e, raw[:200])
+        raise HTTPException(status_code=502, detail="GPT 응답 파싱 실패. 다시 시도해 주세요.")
+    except Exception as e:
+        logger.exception("NEC form 생성 오류: %s", e)
+        raise HTTPException(status_code=500, detail="선거공약서 생성 중 오류가 발생했습니다.")
+
+    return {"items": items}
+
+
 @app.delete("/api/my/candidate", tags=["my-candidate"])
 def api_my_candidate_delete(request: Request):
     """사용자 본인의 후보 프로필 + 공약 전체 삭제."""
