@@ -700,6 +700,9 @@ _SGG_NUMBER_TO_GANADARA = (
 )
 
 
+_local_council_cache: dict[str, list] = {}
+
+
 @app.get("/api/signup/district-sub")
 def api_signup_district_sub(
     district_code: str = Query(..., description="시군구 코드 (예: 11:강북구)"),
@@ -714,7 +717,11 @@ def api_signup_district_sub(
     is_local_council = (election_position or "").strip().lower() in ("local_council", "기초의원", "기초 의원")
 
     # 기초의원 + API 키 있으면 공공 API로 해당 구 세부선거구 전부 조회 (가~까 등)
+    # 결과를 메모리 캐시하여 반복 호출 시 즉시 반환
     if is_local_council and DATA_GO_KR_API_KEY and ":" in key:
+        cached = _local_council_cache.get(key)
+        if cached is not None:
+            return cached if cached else default
         parts = key.split(":", 1)
         region_code = (parts[0] or "").strip()
         wiw_norm = "".join((parts[1] or "").split()) or (parts[1] or "").strip()
@@ -757,7 +764,9 @@ def api_signup_district_sub(
                                 continue
                     out.append({"sub_code": sub, "sub_name": sub})
                 if out:
+                    _local_council_cache[key] = out
                     return out
+            _local_council_cache[key] = []
 
     path = ROOT_DIR / "data" / "district_sub_map.json"
     if not path.exists():
