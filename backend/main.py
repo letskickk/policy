@@ -777,6 +777,7 @@ def api_signup_district_sub(
         ganadara = [s for s in all_items if not s.startswith("제") and s != "단독" and s.endswith("선거구")]
         if ganadara:
             return [{"sub_code": s, "sub_name": s} for s in sorted(ganadara)]
+        return default  # 기초의원인데 가나다 선거구가 없으면 단독 반환 (광역의원 선거구 노출 방지)
     elif is_regional_council:
         jenu = [s for s in all_items if _re.match(r"제\d+선거구", s)]
         if jenu:

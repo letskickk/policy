@@ -325,9 +325,8 @@ def run_verify_analysis(
     if not user or user["status"] != STATUS_APPROVED:
         return {"detail": "승인되지 않은 사용자입니다."}, 403, False
 
-    ok, msg = check_quota(user_id)
-    if not ok:
-        return {"detail": msg}, 429, False
+    # verify는 /check/stream과 항상 병렬 호출되므로 별도 쿼터 차감 안 함
+    # (쿼터는 /check/stream 쪽에서만 1회 차감)
 
     normalized = (pledge_text or "").strip()
     if not normalized:
