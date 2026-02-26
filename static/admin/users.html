@@ -11,7 +11,7 @@
       background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%);
       min-height: 100vh; color: #e2e8f0; padding: 2rem;
     }
-    .wrap { max-width: 1100px; margin: 0 auto; }
+    .wrap { max-width: 1600px; margin: 0 auto; }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
     .card {
       background: rgba(255,255,255,0.06);
@@ -20,8 +20,24 @@
       padding: 1.5rem;
       margin-bottom: 1rem;
     }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { border-collapse: collapse; min-width: 800px; width: max-content; }
+    th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); white-space: nowrap; }
+    /* 컬럼별 최소 너비 */
+    th:nth-child(1), td:nth-child(1) { min-width: 80px; }   /* 이름 */
+    th:nth-child(2), td:nth-child(2) { min-width: 110px; }  /* 전화번호 */
+    th:nth-child(3), td:nth-child(3) { min-width: 180px; white-space: normal; word-break: break-all; } /* 이메일 */
+    th:nth-child(4), td:nth-child(4) { min-width: 150px; white-space: normal; word-break: keep-all; } /* 출마/선거구 */
+    th:nth-child(5), td:nth-child(5) { min-width: 60px; }   /* 확인 */
+    th:nth-child(6), td:nth-child(6) { min-width: 80px; }   /* 상태 */
+    th:nth-child(7), td:nth-child(7) { min-width: 60px; }   /* 역할 */
+    th:nth-child(8), td:nth-child(8) { min-width: 90px; }   /* 가입일 */
+    th:nth-child(9), td:nth-child(9) { min-width: 180px; }  /* 액션 버튼 */
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .card { padding: 1rem; border-radius: 14px; }
+      h1 { font-size: 1.25rem; }
+    }
     .status { padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
     .PENDING { background: rgba(251,191,36,0.3); }
     .APPROVED { background: rgba(34,197,94,0.3); }
@@ -47,6 +63,12 @@
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
     .muted { color: rgba(226,232,240,0.75); font-size: 0.9rem; margin-top: 0.5rem; }
     .btn-edit { background: #3b82f6; color: #fff; }
+    .btn-upload { background: #ff7210; color: #fff; padding: 0.5rem 1rem; font-size: 0.95rem; }
+    .upload-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .upload-bar .info { font-size: 0.85rem; color: rgba(226,232,240,0.7); }
+    .badge-verified { background: rgba(34,197,94,0.3); color: #4ade80; padding: 0.15rem 0.45rem; border-radius: 5px; font-size: 0.8rem; display: inline-block; cursor: default; }
+    .badge-unverified { background: rgba(239,68,68,0.3); color: #f87171; padding: 0.15rem 0.45rem; border-radius: 5px; font-size: 0.8rem; display: inline-block; cursor: default; }
+    .badge-unchecked { background: rgba(148,163,184,0.3); color: #94a3b8; padding: 0.15rem 0.45rem; border-radius: 5px; font-size: 0.8rem; display: inline-block; cursor: default; }
 
     .modal-overlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -75,7 +97,15 @@
   <div class="wrap">
     <div class="links"><a href="/admin">← 관리자</a></div>
     <h1>사용자 관리</h1>
+    <div class="card" style="padding: 1rem 1.5rem;">
+      <div class="upload-bar">
+        <input type="file" id="applicantFile" accept=".xlsx,.xls" style="display:none" />
+        <button class="btn-upload" onclick="document.getElementById('applicantFile').click()">📎 지원서 엑셀 업로드</button>
+        <span class="info" id="uploadStatus"></span>
+      </div>
+    </div>
     <div class="card">
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -83,6 +113,7 @@
             <th>전화번호</th>
             <th>이메일</th>
             <th>출마/선거구</th>
+            <th>확인</th>
             <th>상태</th>
             <th>역할</th>
             <th>가입일</th>
@@ -91,6 +122,7 @@
         </thead>
         <tbody id="list"></tbody>
       </table>
+      </div><!-- /.table-scroll -->
       <div class="muted">
         삭제는 하드삭제(되돌릴 수 없음)로 처리됩니다. 삭제 전 반드시 확인하십시오.
       </div>
@@ -148,6 +180,13 @@
       return t.length >= 10 ? t.slice(0, 10) : t;
     }
     const ELECTION_LABEL = { metro_mayor: '광역 단체장', regional_council: '광역 의원', local_mayor: '기초 단체장', local_council: '기초 의원', party_official: '당직자' };
+    function verifyBadge(u) {
+      const v = u.applicant_verified;
+      const note = escapeHtml(u.applicant_match_note || '');
+      if (v === 1) return `<span class="badge-verified" title="${note}">확인됨</span>`;
+      if (v === -1) return `<span class="badge-unverified" title="${note}">미확인</span>`;
+      return `<span class="badge-unchecked" title="검증 전">-</span>`;
+    }
     function formatElection(u) {
       const ep = ELECTION_LABEL[u.election_position] || u.election_position || '-';
       const rn = (u.region_name || '').trim();
@@ -183,11 +222,14 @@
         const actions = buildActionsHtml(u);
         const election = escapeHtml(formatElection(u));
 
+        const verify = verifyBadge(u);
+
         tr.innerHTML =
           `<td>${name}</td>` +
           `<td>${phone}</td>` +
           `<td>${email}</td>` +
           `<td>${election}</td>` +
+          `<td>${verify}</td>` +
           `<td><span class="status ${escapeHtml(statusCls)}">${escapeHtml(statusCls)}</span></td>` +
           `<td>${role}</td>` +
           `<td>${created}</td>` +
@@ -431,6 +473,36 @@
 
     editModal.addEventListener('click', (e) => {
       if (e.target === editModal) closeEditModal();
+    });
+
+    // ── 지원서 엑셀 업로드 ──
+    document.getElementById('applicantFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const statusEl = document.getElementById('uploadStatus');
+      statusEl.textContent = '업로드 중...';
+      const fd = new FormData();
+      fd.append('file', f);
+      try {
+        const r = await fetch('/api/admin/applicants/upload', {
+          method: 'POST',
+          body: fd,
+          credentials: 'include'
+        });
+        if (r.status === 413) { statusEl.textContent = '파일 크기 초과 (nginx 설정 확인)'; return; }
+        const text = await r.text();
+        let d;
+        try { d = JSON.parse(text); } catch (_) { statusEl.textContent = '서버 오류: ' + text.slice(0, 100); return; }
+        if (r.ok) {
+          statusEl.textContent = d.message || '완료';
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          statusEl.textContent = d.detail || '업로드 실패';
+        }
+      } catch (err) {
+        statusEl.textContent = '서버 연결 실패: ' + (err.message || '');
+      }
+      e.target.value = '';
     });
   </script>
 </body>

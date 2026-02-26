@@ -172,11 +172,13 @@
       color: var(--text-strong);
       margin-bottom: 0.5rem;
       letter-spacing: -0.03em;
+      word-break: keep-all;
     }
     .subtitle{
       font-size: 1rem;
       color: var(--text);
       opacity: 0.9;
+      word-break: keep-all;
     }
 
     /* 지도 영역 */
@@ -294,6 +296,27 @@
       cursor: pointer;
     }
 
+    .panel-cta-section{
+      margin-bottom: 1.25rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-cta-section .panel-cta-btn{
+      background: rgba(255,114,16,0.12);
+      border-color: rgba(255,179,122,0.3);
+      color: #ffb37a;
+    }
+    .panel-cta-section .panel-cta-btn:hover{
+      background: rgba(255,114,16,0.2);
+      color: #ffd4a8;
+      border-color: rgba(255,179,122,0.45);
+    }
+    .panel-cta-desc{
+      margin-top: 0.45rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      opacity: 0.8;
+    }
     .panel-cta-row{
       margin-top: 1rem;
     }
@@ -649,7 +672,7 @@
     <div class="top-bar-left">
       <div class="brand">
         <a href="/" class="brand-logo">
-          <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+          <img src="/static/logo.svg" alt="개혁신당 로고">
           <span class="brand-inner">
             <span class="brand-title">개혁신당 정책 멘토링</span>
             <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
@@ -675,9 +698,13 @@
     </div>
 
     <div class="panel">
+      <div class="panel-cta-section">
+        <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
+        <p class="panel-cta-desc">나의 공약을 등록하고 지도에 공개하세요</p>
+      </div>
       <div class="panel-header">
-        <h2 class="panel-title" id="panel-title">지역을 선택하세요</h2>
-        <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요</p>
+        <h2 class="panel-title" id="panel-title">다른 출마자 공약 보기</h2>
+        <p class="panel-subtitle" id="panel-subtitle">지역·선거구별로 등록된 출마자의 공약을 비교해 보세요</p>
         <div class="filter-row">
           <label for="regionSelect">지역 선택</label>
           <select id="regionSelect" class="filter-select" aria-label="지역 선택">
@@ -700,15 +727,12 @@
             <option value="">지역을 먼저 선택하세요</option>
           </select>
         </div>
-        <div class="panel-cta-row">
-          <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
-        </div>
       </div>
 
       <div id="panel-content">
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
         </div>
       </div>
     </div>
@@ -944,6 +968,7 @@
         selectedDistrictCode = null;
         updateURL(null, null, null);
         if (regionSelect) regionSelect.value = "";
+        loadElectionTypeCounts(); // 전체 카운트로 복원
         showEmptyState();
         return;
       }
@@ -966,6 +991,8 @@
       }
 
       const selectedElectionType = electionTypeSelect.value || null;
+      // 선거 타입 카운트를 선택된 지역 기준으로 갱신
+      loadElectionTypeCounts(regionCode);
       // 후보 목록 우선 로드 후 선거구 목록 로드(초기화 시 동시 요청 병목 완화)
       await loadCandidates(regionCode, null, selectedElectionType);
       await loadDistricts(regionCode, initialDistrictCode, selectedElectionType);
@@ -983,7 +1010,7 @@
       panelContent.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여<br>해당 지역의 출마자를 확인하세요</p>
+          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
         </div>
       `;
     }
@@ -1328,10 +1355,14 @@
     }
 
     // 선거 타입별 후보 수 로드 후 셀렉트 옵션에 카운팅 표시
-    async function loadElectionTypeCounts() {
+    // regionCode 를 넘기면 해당 지역 한정 카운트, 없으면 전체 집계
+    async function loadElectionTypeCounts(regionCode = null) {
       const preserved = electionTypeSelect.value || '';
       try {
-        const counts = await fetchJsonWithTimeout('/api/stats/election-types');
+        const url = regionCode
+          ? `/api/stats/election-types?region_code=${encodeURIComponent(regionCode)}`
+          : '/api/stats/election-types';
+        const counts = await fetchJsonWithTimeout(url);
         electionTypeSelect.innerHTML = '';
         electionTypeOptions.forEach((opt) => {
           const option = document.createElement('option');
@@ -1361,6 +1392,30 @@
       await renderRealKoreaMap();
       await Promise.all([loadRegionData(), loadElectionTypeCounts()]);
 
+      // ?candidate=ID 파라미터: 리더보드에서 클릭 시 지역 하이라이트 + 모달
+      const candidateId = new URLSearchParams(window.location.search).get('candidate');
+      if (candidateId) {
+        try {
+          const res = await fetch(`/api/candidates/${candidateId}`);
+          if (res.ok) {
+            const d = await res.json();
+            // 지역 선택 → 지도 하이라이트 + 패널 후보 목록 로드
+            if (d.region_code) {
+              await selectRegion(d.region_code, null, d.election_type || null, false);
+            }
+            // 모달 열기
+            const etype = electionTypeLabels[d.election_type] || d.election_type || '';
+            const region = d.district_name ? `${d.region_name || ''} ${d.district_name}` : (d.region_name || '');
+            pledgeModalTitle.textContent = d.name || '';
+            pledgeModalSub.textContent = `${region} · ${etype}`;
+            pledgeModalOverlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            renderModalPledges(d.pledges || []);
+          }
+        } catch (e) { console.warn('candidate modal open failed:', e); }
+        return;
+      }
+
       const urlRegionCode = getRegionFromURL();
       const urlDistrictCode = getDistrictFromURL();
       const urlElectionType = getElectionTypeFromURL();
@@ -1385,6 +1440,7 @@
         selectedDistrictCode = null;
         updateURL(null, null, electionTypeSelect.value || null);
         mapPaths.forEach(path => path.classList.remove('selected'));
+        loadElectionTypeCounts(); // 전체 카운트로 복원
         showEmptyState();
         return;
       }
@@ -1510,6 +1566,7 @@
         closePledgeModal();
       }
     });
+
   </script>
 
   <footer class="footer">

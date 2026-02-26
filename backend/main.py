@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -332,7 +332,7 @@ def require_approved(request: Request) -> dict:
 
 
 class PledgeCheckRequest(BaseModel):
-    pledge: str = Field(..., description="점검할 출마자 공약 텍스트")
+    pledge: str = Field(..., max_length=10000, description="점검할 출마자 공약 텍스트")
 
 
 class PledgeCheckResponse(BaseModel):
@@ -917,9 +917,22 @@ def api_admin_approve(body: ApproveBody, request: Request):
     user = require_admin(request)
     if body.status not in ("APPROVED", "REJECTED", "SUSPENDED"):
         raise HTTPException(status_code=400, detail="status must be APPROVED, REJECTED, or SUSPENDED")
+    # 메일 발송용 대상 사용자 정보 미리 조회
+    target_user = get_user(body.user_id)
     ok = set_user_status(body.user_id, body.status, user["id"], body.note)
     if not ok:
         raise HTTPException(status_code=400, detail="처리 실패")
+    # 승인/거절/정지 결과를 당사자에게 메일로 통보 (실패해도 처리 결과에 영향 없음)
+    if target_user:
+        try:
+            from backend.email_sender import send_approval_status_email
+            send_approval_status_email(
+                to_email=target_user["email"],
+                status=body.status,
+                name=target_user.get("name", ""),
+            )
+        except Exception:
+            logger.exception("승인 알림 메일 발송 중 오류 (무시)")
     return {"message": "처리 완료"}
 
 
@@ -1011,6 +1024,93 @@ def api_admin_delete_user(body: DeleteUserBody, request: Request):
     except Exception:
         conn.rollback()
         raise HTTPException(status_code=500, detail="삭제 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
+
+
+@app.post("/api/admin/applicants/upload")
+async def api_admin_applicants_upload(request: Request, file: UploadFile = File(...)):
+    """관리자가 지원서 엑셀을 업로드하면 party_applicants 테이블에 저장 후 기존 사용자 재검증."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx)만 업로드 가능합니다.")
+
+    try:
+        import io
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="서버에 openpyxl이 설치되지 않았습니다. pip install openpyxl")
+
+    from backend.database import get_connection
+    from backend.applicant_verify import reverify_all_users
+
+    content = await file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"엑셀 파일을 열 수 없습니다: {str(e)[:100]}")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(min_row=2, values_only=True))  # 헤더 제외
+    wb.close()
+
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM party_applicants")  # 전체 교체
+        inserted = 0
+        for row in rows:
+            if not row or len(row) < 9:
+                continue
+            name = str(row[1] or "").strip()
+            if not name:
+                continue
+            phone = str(row[4] or "").strip()
+            email = str(row[5] or "").strip()
+            region_province = str(row[6] or "").strip()
+            district_info = str(row[7] or "").strip()
+            election_position = str(row[8] or "").strip()
+            doc_submitted = 1 if (len(row) > 9 and str(row[9] or "").strip() == "●") else 0
+            interview_done = 1 if (len(row) > 10 and str(row[10] or "").strip() == "●") else 0
+            status_note = str(row[11] or "").strip() if len(row) > 11 else ""
+            conn.execute(
+                """INSERT INTO party_applicants (name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note),
+            )
+            inserted += 1
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("엑셀 업로드 DB 저장 실패")
+        raise HTTPException(status_code=500, detail=f"DB 저장 실패: {str(e)[:200]}")
+    finally:
+        conn.close()
+
+    # 기존 가입자 전원 재검증
+    try:
+        reverified = reverify_all_users()
+    except Exception:
+        logger.exception("재검증 실패")
+        reverified = 0
+    return {"message": f"지원서 {inserted}건 저장, 기존 사용자 {reverified}명 재검증 완료"}
+
+
+@app.get("/api/admin/applicants")
+def api_admin_applicants(request: Request):
+    """업로드된 지원서 목록 조회."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note FROM party_applicants ORDER BY id"
+        ).fetchall()
+        return {"applicants": [dict(r) for r in rows], "total": len(rows)}
     finally:
         conn.close()
 
@@ -1126,155 +1226,6 @@ def test():
     return {"status": "ok", "message": "서버 작동 중", "version": "0.1.0"}
 
 
-@app.get("/debug/context")
-def debug_context(pledge: str = "테스트 공약: 지역경제 활성화"):
-    """실제 GPT에 전달되는 컨텍스트 확인용 엔드포인트."""
-    from backend.prompts import build_user_message, load_system_prompt
-    from backend.pdf_loader import load_regional_pledges_context
-    
-    platform = load_platform_context()
-    pledges = load_pledges_context()
-    regional = load_regional_pledges_context()
-    system = load_system_prompt()
-    user = build_user_message(platform, pledges, regional, pledge)
-    
-    # 공약 컨텍스트에서 특정 키워드 검색
-    search_keywords = []
-    if pledges:
-        # 공약 컨텍스트의 일부를 샘플로 추출
-        sample_text = pledges[:5000] if len(pledges) > 5000 else pledges
-        search_keywords.append(f"컨텍스트 샘플 (처음 5000자): {sample_text}")
-    
-    return {
-        "system_prompt_length": len(system),
-        "user_message_length": len(user),
-        "platform_context_length": len(platform),
-        "pledges_context_length": len(pledges),
-        "regional_pledges_context_length": len(regional),
-        "pledges_file_count": pledges.count("---") if pledges else 0,
-        "regional_file_count": regional.count("---") if regional else 0,
-        "pledges_context_preview": pledges[:5000] + "..." if len(pledges) > 5000 else pledges,
-        "regional_context_preview": regional[:5000] + "..." if len(regional) > 5000 else regional,
-        "user_message_preview": user[:5000] + "..." if len(user) > 5000 else user,
-        "system_prompt": system,
-        "test_pledge": pledge,
-    }
-
-
-@app.get("/debug/pdf")
-def debug_pdf():
-    """PDF 로드 상태 확인용 디버깅 엔드포인트."""
-    from backend.config import PDF_DIR
-    from backend.prompts import build_user_message
-    
-    # PDF 디렉토리 확인 (한글 경로 처리)
-    pdf_dir_str = str(PDF_DIR.resolve())
-    pdf_dir = Path(pdf_dir_str)
-    
-    try:
-        all_pdfs = list(_iter_doc_files(pdf_dir)) if pdf_dir.exists() else []
-    except Exception as e:
-        all_pdfs = []
-        error_msg = str(e)
-    
-    from backend.pdf_loader import load_regional_pledges_context
-    
-    platform = load_platform_context()
-    pledges = load_pledges_context()
-    regional = load_regional_pledges_context()
-    
-    # 파일명 추출
-    platform_files = [line.split("---")[1].strip() for line in platform.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if platform else []
-    pledges_files = [line.split("---")[1].strip() for line in pledges.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if pledges else []
-    regional_files = [line.split("---")[1].strip() for line in regional.split("\n") if "---" in line and (".pdf" in line or ".txt" in line)] if regional else []
-    
-    # 테스트용 메시지 생성 (실제 GPT에 전달되는 형식)
-    test_message = build_user_message(platform, pledges, regional, "테스트 공약: 지역경제 활성화")
-    
-    # 각 PDF 파일의 상태 확인 (폴더 기반)
-    pdf_status = []
-    for pdf_path in all_pdfs[:30]:  # 처음 30개만
-        try:
-            rel_path = str(pdf_path.relative_to(pdf_dir))
-            path_parts = pdf_path.relative_to(pdf_dir).parts if pdf_dir.exists() else []
-            exists = pdf_path.exists()
-            size = pdf_path.stat().st_size if exists else 0
-            
-            # 폴더 기반 분류
-            is_platform = "정강정책" in path_parts
-            is_pledge = "공약" in path_parts and "지역별 공약" not in str(rel_path)
-            is_regional = "지역별 공약" in str(rel_path)
-            
-            # 실제로 읽혔는지 확인
-            is_loaded = False
-            classification = "기타"
-            if is_platform:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in platform_files)
-                classification = "정강정책"
-            elif is_pledge:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in pledges_files)
-                classification = "공약"
-            elif is_regional:
-                is_loaded = any(pdf_path.name in f or str(rel_path) in f for f in regional_files)
-                classification = "지역별 공약"
-            
-            pdf_status.append({
-                "path": rel_path,
-                "name": pdf_path.name,
-                "exists": exists,
-                "size_bytes": size,
-                "is_platform": is_platform,
-                "is_pledge": is_pledge,
-                "is_regional": is_regional,
-                "is_loaded": is_loaded,
-                "classification": classification,
-            })
-        except Exception as e:
-            pdf_status.append({
-                "path": str(pdf_path.relative_to(pdf_dir)) if pdf_dir.exists() else str(pdf_path),
-                "error": str(e)[:100]
-            })
-    
-    result = {
-        "summary": {
-            "pdf_dir_exists": pdf_dir.exists(),
-            "pdf_dir_path": str(pdf_dir),
-            "pdf_dir_absolute": str(pdf_dir.resolve()),
-            "total_pdf_files_found": len(all_pdfs),
-            "platform_files_loaded": len(platform_files),
-            "pledges_files_loaded": len(pledges_files),
-            "regional_files_loaded": len(regional_files),
-            "platform_text_length": len(platform),
-            "pledges_text_length": len(pledges),
-            "regional_text_length": len(regional),
-            "folder_structure": {
-                "정강정책": str(pdf_dir / "정강정책"),
-                "공약": str(pdf_dir / "공약"),
-                "지역별 공약": str(pdf_dir / "지역별 공약"),
-            },
-        },
-        "all_pdf_files": {
-            "count": len(all_pdfs),
-            "paths": [str(p.relative_to(pdf_dir)) for p in all_pdfs] if pdf_dir.exists() else [],
-        },
-        "loaded_files": {
-            "platform": platform_files,
-            "pledges": pledges_files,
-            "regional": regional_files,
-        },
-        "pdf_status": pdf_status,
-        "previews": {
-            "platform_preview": platform[:2000] + "..." if len(platform) > 2000 else platform,
-            "pledges_preview": pledges[:2000] + "..." if len(pledges) > 2000 else pledges,
-            "regional_preview": regional[:2000] + "..." if len(regional) > 2000 else regional,
-            "test_message_preview": test_message[:3000] + "..." if len(test_message) > 3000 else test_message,
-        },
-    }
-    
-    if 'error_msg' in locals():
-        result["error"] = error_msg
-    
-    return result
 
 
 def _get_fs_debug() -> dict:
@@ -1321,7 +1272,6 @@ def debug_admin_check(request: Request):
     in_admin = user is not None and user.get("email") in ADMIN_EMAILS
     return {
         "admin_emails_count": len(ADMIN_EMAILS),
-        "admin_emails_loaded": ADMIN_EMAILS,
         "logged_in": user is not None,
         "user_email": user.get("email") if user else None,
         "user_in_admin_list": in_admin,
@@ -1586,7 +1536,7 @@ def check_pledge(body: PledgeCheckRequest, request: Request):
         raise
     except Exception as e:
         logger.exception("check_pledge 오류 (after %.1fs)", time.perf_counter() - t0)
-        raise HTTPException(status_code=500, detail=str(e)[:500])
+        raise HTTPException(status_code=500, detail="점검 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
 
 
 @app.post("/check/stream")
@@ -1996,7 +1946,14 @@ def admin_approve_candidate(candidate_id: int, request: Request):
 
     conn = get_connection()
     try:
-        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        existing = conn.execute(
+            """SELECT c.id, c.approval_status, c.name AS candidate_name,
+                      u.email AS user_email, u.name AS user_name
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
         conn.execute(
@@ -2012,6 +1969,20 @@ def admin_approve_candidate(candidate_id: int, request: Request):
         raise
     finally:
         conn.close()
+
+    # 이메일 알림
+    if existing and existing["user_email"]:
+        try:
+            from backend.email_sender import send_candidate_approval_status_email
+            send_candidate_approval_status_email(
+                to_email=existing["user_email"],
+                status="APPROVED",
+                name=existing["user_name"] or "",
+                candidate_name=existing["candidate_name"] or "",
+            )
+        except Exception as e:
+            logger.warning("공약 승인 알림 메일 발송 실패 (무시): %s", e)
+
     return {"ok": True, "approval_status": "APPROVED"}
 
 
@@ -2024,7 +1995,14 @@ def admin_reject_candidate(candidate_id: int, request: Request):
 
     conn = get_connection()
     try:
-        existing = conn.execute("SELECT id, approval_status FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+        existing = conn.execute(
+            """SELECT c.id, c.approval_status, c.name AS candidate_name,
+                      u.email AS user_email, u.name AS user_name
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
         conn.execute(
@@ -2040,6 +2018,20 @@ def admin_reject_candidate(candidate_id: int, request: Request):
         raise
     finally:
         conn.close()
+
+    # 이메일 알림
+    if existing and existing["user_email"]:
+        try:
+            from backend.email_sender import send_candidate_approval_status_email
+            send_candidate_approval_status_email(
+                to_email=existing["user_email"],
+                status="REJECTED",
+                name=existing["user_name"] or "",
+                candidate_name=existing["candidate_name"] or "",
+            )
+        except Exception as e:
+            logger.warning("공약 거절 알림 메일 발송 실패 (무시): %s", e)
+
     return {"ok": True, "approval_status": "REJECTED"}
 
 
@@ -2223,21 +2215,36 @@ def get_regions():
 
 
 @app.get("/api/stats/election-types", tags=["candidates"])
-def get_election_type_counts():
-    """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용)."""
+def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
+    """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용).
+
+    region_code 를 넘기면 해당 지역 한정으로 집계한다.
+    """
     _ensure_db_ready()
     from backend.database import get_connection
 
     conn = get_connection()
     try:
-        rows = conn.execute(
-            """
-            SELECT election_type, COUNT(*) AS n
-            FROM candidates
-            WHERE approval_status = 'APPROVED'
-            GROUP BY election_type
-            """
-        ).fetchall()
+        if region_code:
+            rows = conn.execute(
+                """
+                SELECT election_type, COUNT(*) AS n
+                FROM candidates
+                WHERE approval_status = 'APPROVED'
+                  AND region_code = ?
+                GROUP BY election_type
+                """,
+                (region_code,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT election_type, COUNT(*) AS n
+                FROM candidates
+                WHERE approval_status = 'APPROVED'
+                GROUP BY election_type
+                """
+            ).fetchall()
         return {r["election_type"]: int(r["n"]) for r in rows}
     finally:
         conn.close()
@@ -2719,7 +2726,7 @@ def api_my_candidate_get(request: Request):
 
         candidate_id = int(row["id"])
         pledges = conn.execute(
-            "SELECT id, title, content, priority FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
+            "SELECT id, title, content, priority, total_score, analysis_result, analyzed_at FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
             (candidate_id,),
         ).fetchall()
 
@@ -2736,7 +2743,8 @@ def api_my_candidate_get(request: Request):
                 "approval_status": row["approval_status"] or "PENDING",
             },
             "pledges": [
-                {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"]}
+                {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"],
+                 "total_score": p["total_score"], "analysis_result": p["analysis_result"], "analyzed_at": p["analyzed_at"]}
                 for p in pledges
             ],
             "user_info": {
@@ -2758,6 +2766,10 @@ class MyPledgeInput(BaseModel):
     title: str = Field(..., min_length=1, max_length=100, description="공약 제목")
     content: Optional[str] = Field(default=None, max_length=50000, description="공약 세부내용")
     priority: int = Field(default=100, ge=1, le=9999, description="정렬 우선순위")
+    pledge_id: Optional[int] = Field(default=None, description="기존 공약 ID (삭제-전용 판별용)")
+    imported_score: Optional[float] = Field(default=None, description="불러오기한 점수 (analysis_history에서)")
+    imported_result: Optional[str] = Field(default=None, max_length=80000, description="불러오기한 분석 결과")
+    imported_analyzed_at: Optional[str] = Field(default=None, description="불러오기한 분석 일시")
 
 
 class MyPledgesBody(BaseModel):
@@ -2827,16 +2839,48 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 )
         else:
             candidate_id = int(row["id"])
-            conn.execute(
-                "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
-                (candidate_name, candidate_id),
+            # 삭제-전용 여부 판별: 기존 공약의 부분집합이면 승인 상태 유지
+            existing_rows = conn.execute(
+                "SELECT id, title, content FROM candidate_pledges WHERE candidate_id = ?",
+                (candidate_id,),
+            ).fetchall()
+            existing_map = {r["id"]: (r["title"], (r["content"] or "").strip()) for r in existing_rows}
+            submitted_ids = {p.pledge_id for p in body.pledges if p.pledge_id is not None}
+            is_delete_only = (
+                len(body.pledges) <= len(existing_rows)
+                and submitted_ids.issubset(existing_map.keys())
+                and all(
+                    p.pledge_id is not None
+                    and existing_map.get(p.pledge_id) == (p.title.strip(), (p.content or "").strip())
+                    for p in body.pledges
+                )
             )
+            if is_delete_only:
+                conn.execute(
+                    "UPDATE candidates SET name = ?, updated_at = datetime('now') WHERE id = ?",
+                    (candidate_name, candidate_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
+                    (candidate_name, candidate_id),
+                )
 
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
         for idx, p in enumerate(body.pledges):
             conn.execute(
-                "INSERT INTO candidate_pledges (candidate_id, title, content, priority) VALUES (?, ?, ?, ?)",
-                (candidate_id, p.title.strip(), (p.content or "").strip() or None, p.priority if p.priority else (idx + 1)),
+                """INSERT INTO candidate_pledges
+                   (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    candidate_id,
+                    p.title.strip(),
+                    (p.content or "").strip() or None,
+                    p.priority if p.priority else (idx + 1),
+                    p.imported_score,
+                    (p.imported_result or "").strip() or None,
+                    p.imported_analyzed_at,
+                ),
             )
         conn.commit()
     except HTTPException:
@@ -2850,6 +2894,112 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
         conn.close()
 
     return {"ok": True, "candidate_id": candidate_id, "pledge_count": len(body.pledges)}
+
+
+class NecFormRequest(BaseModel):
+    pledge_text: str = Field(..., description="공약 원문 텍스트")
+    candidate_name: str = Field(default="", description="후보자명")
+    election_type: str = Field(default="", description="선거유형 (예: metro_mayor)")
+    region_name: str = Field(default="", description="시·도명")
+    district_name: str = Field(default="", description="선거구명")
+    result_text: str = Field(default="", description="AI 분석 결과 텍스트 (generate 모드 컨텍스트)")
+    mode: str = Field(default="extract", description="'extract' | 'generate'")
+
+
+@app.post("/api/documents/nec-form", tags=["documents"])
+def api_generate_nec_form(body: NecFormRequest, request: Request):
+    """공약 텍스트를 선관위 제출용 선거공약서 구조(JSON)로 변환."""
+    _ = require_user(request)
+
+    pledge_text = (body.pledge_text or "").strip()
+    if not pledge_text:
+        raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
+
+    mode = (body.mode or "extract").strip().lower()
+    result_text = (body.result_text or "").strip()
+
+    from openai import OpenAI
+    from backend.config import OPENAI_API_KEY, CHAT_MODEL
+
+    json_schema = (
+        "[\n"
+        "  {\n"
+        "    \"순위\": 1,\n"
+        "    \"제목\": \"공약 제목\",\n"
+        "    \"내용\": [\"핵심 공약 내용 또는 세부 추진 항목 1\", \"세부 항목 2\"],\n"
+        "    \"목표\": [\"목표 내용\"],\n"
+        "    \"이행방법\": [\"방법 1\", \"방법 2\"],\n"
+        "    \"이행기간\": [\"예: 취임 후 1년 이내\"],\n"
+        "    \"재원조달방안\": [\"시비, 국비보조 등\"]\n"
+        "  }\n"
+        "]"
+    )
+
+    if mode == "generate" and result_text:
+        system_prompt = (
+            "당신은 선거공약서 작성 전문가입니다. "
+            "AI 분석이 제안한 수정·보완 사항을 실제로 공약에 반영하여, "
+            "공직선거법 제66조에 따른 완성된 선거공약서를 작성하세요. "
+            "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
+        )
+        user_prompt = (
+            "아래 공약 원문과 AI 분석 결과를 읽으세요.\n"
+            "분석 결과의 '수정·보완 제안' 내용을 실제로 공약에 반영하여, "
+            "선관위 제출용 선거공약서 최종본을 완성된 문장으로 작성해주세요.\n\n"
+            "작성 규칙:\n"
+            "- 각 공약을 하나의 JSON 객체로 표현하고, 아래 형식의 JSON 배열로만 응답하세요.\n"
+            "- 보완 제안이 있는 항목은 반드시 반영하여 내용을 강화하세요.\n"
+            "- 모든 항목(목표, 이행방법, 이행기간, 재원조달방안)을 완성된 문장으로 작성하세요.\n"
+            "- 이행기간, 재원조달방안이 원문에 없으면 공약 성격에 맞게 합리적으로 작성하세요.\n"
+            "- 기호는 빈 문자열로 두세요.\n\n"
+            f"{json_schema}\n\n"
+            f"공약 원문:\n{pledge_text}\n\n"
+            f"AI 분석 결과 (수정·보완 제안 포함):\n{result_text}"
+        )
+    else:
+        system_prompt = (
+            "당신은 선거공약서 작성 전문가입니다. "
+            "입력된 공약 텍스트를 분석하여, 각 공약 항목을 공직선거법 제66조에 따른 선거공약서 양식에 맞게 구조화하세요. "
+            "반드시 JSON 배열만 출력하고 다른 텍스트는 포함하지 마세요."
+        )
+        user_prompt = (
+            "다음 공약 텍스트를 선관위 제출용 선거공약서 형식으로 구조화해주세요.\n"
+            "각 공약 항목을 분리하고, 아래 형식의 JSON 배열로만 응답하세요.\n\n"
+            "각 항목(목표, 이행방법, 이행기간, 재원조달방안)은 공약 내용에 자연스럽게 존재하는 것만 채우세요.\n"
+            "명시되지 않은 항목은 빈 배열([])로 두세요. 억지로 추론하거나 없는 내용을 만들어내지 마세요.\n"
+            "세부 항목들은 배열로 표현하세요.\n\n"
+            f"{json_schema}\n\n"
+            f"공약 텍스트:\n{pledge_text}"
+        )
+
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+        raw = response.choices[0].message.content or ""
+        # JSON 블록 추출 (```json ... ``` 감싸인 경우 대비)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+            raw = raw.strip()
+        items = json.loads(raw)
+        if not isinstance(items, list):
+            items = [items]
+    except json.JSONDecodeError as e:
+        logger.warning("NEC form JSON 파싱 실패: %s | raw=%s", e, raw[:200])
+        raise HTTPException(status_code=502, detail="GPT 응답 파싱 실패. 다시 시도해 주세요.")
+    except Exception as e:
+        logger.exception("NEC form 생성 오류: %s", e)
+        raise HTTPException(status_code=500, detail="선거공약서 생성 중 오류가 발생했습니다.")
+
+    return {"items": items}
 
 
 @app.delete("/api/my/candidate", tags=["my-candidate"])
@@ -2879,3 +3029,257 @@ def api_my_candidate_delete(request: Request):
         conn.close()
 
     return {"ok": True}
+
+
+# ─────────────────────── 개별 공약 분석 ───────────────────────
+
+@app.post("/api/my/pledges/{pledge_id}/analyze", tags=["my-candidate"])
+def api_analyze_pledge(pledge_id: int, request: Request):
+    """등록된 개별 공약을 AI로 분석하여 점수를 매긴다."""
+    import time
+    _ensure_startup()
+    user = require_approved(request)
+    uid = user["id"]
+    ip = _client_ip(request)
+
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+    ok, msg = check_rate_limit_user(uid)
+    if not ok:
+        raise HTTPException(status_code=429, detail=msg)
+
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id, cp.title, cp.content, cp.candidate_id, c.user_id
+            FROM candidate_pledges cp
+            JOIN candidates c ON c.id = cp.candidate_id
+            WHERE cp.id = ? AND c.user_id = ?
+            """,
+            (pledge_id, uid),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="해당 공약을 찾을 수 없습니다.")
+    finally:
+        conn.close()
+
+    pledge_title = row["title"] or ""
+    pledge_content = row["content"] or ""
+    text = f"{pledge_title}\n\n{pledge_content}".strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="공약 내용이 비어 있습니다.")
+
+    from backend.analysis_service import run_check_analysis
+    global _indexes, _vector_store_id, _regional_vector_store_id, _winners2022_vector_store_id
+    vs_id = _vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    regional_vs_id = _regional_vector_store_id if USE_OPENAI_VECTOR_STORE else None
+    winners2022_vs_id = _winners2022_vector_store_id
+
+    t0 = time.perf_counter()
+    result, status_code, from_cache = run_check_analysis(
+        uid, text, ip, vs_id, regional_vs_id, winners2022_vs_id,
+        _indexes if not USE_OPENAI_VECTOR_STORE else None,
+    )
+    elapsed = time.perf_counter() - t0
+    logger.info("[analyze_pledge] pledge_id=%d completed in %.1fs", pledge_id, elapsed)
+
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=result)
+
+    from backend.score_parser import parse_total_score
+    score = parse_total_score(str(result))
+
+    # candidate_pledges 업데이트
+    conn2 = get_connection()
+    try:
+        result_text = str(result) if not isinstance(result, str) else result
+        conn2.execute(
+            "UPDATE candidate_pledges SET total_score = ?, analysis_result = ?, analyzed_at = datetime('now') WHERE id = ?",
+            (score, result_text[:60000], pledge_id),
+        )
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    # analysis_history에도 저장
+    try:
+        from backend.history import add_history
+        add_history(user_id=uid, kind="check", input_text=text, result=result,
+                    status_code=status_code, from_cache=from_cache, options={"source": "pledge_analyze", "pledge_id": pledge_id})
+    except Exception:
+        pass
+
+    return {"score": score, "result_text": str(result), "pledge_id": pledge_id}
+
+
+# ─────────────────────── 리더보드 ───────────────────────
+
+def _week_label(monday_date):
+    """월요일 날짜로부터 'N월 M째주' 라벨 생성."""
+    import datetime as _dt
+    m = monday_date.month
+    first_of_month = monday_date.replace(day=1)
+    first_monday = first_of_month + _dt.timedelta(days=(7 - first_of_month.weekday()) % 7)
+    if first_monday > monday_date:
+        wn = 1
+    else:
+        wn = ((monday_date - first_monday).days // 7) + 1
+        if first_of_month.weekday() != 0:
+            wn += 1
+    return f"{m}월 {wn}째주"
+
+
+@app.get("/api/leaderboard", tags=["leaderboard"])
+def api_leaderboard(
+    region_code: Optional[str] = Query(default=None),
+    election_type: Optional[str] = Query(default=None),
+    week_start: Optional[str] = Query(default=None, description="조회할 주의 월요일 ISO날짜 (예: 2026-02-16). 미지정 시 이번 주"),
+):
+    """공약 평균 점수 기준 후보자 랭킹 (공개 API). 주간 챔피언 포함."""
+    _ensure_db_ready()
+    import datetime as _dt
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        today = _dt.date.today()
+        current_monday = today - _dt.timedelta(days=today.weekday())
+
+        # 조회 대상 주 결정
+        if week_start:
+            try:
+                req_date = _dt.date.fromisoformat(week_start)
+                target_monday = req_date - _dt.timedelta(days=req_date.weekday())
+            except ValueError:
+                target_monday = current_monday
+        else:
+            target_monday = current_monday
+
+        # 미래 주는 허용하지 않음
+        if target_monday > current_monday:
+            target_monday = current_monday
+
+        target_sunday = target_monday + _dt.timedelta(days=6)
+        is_current_week = (target_monday == current_monday)
+
+        # ── 주간 챔피언 lazy snapshot (이번 주 조회 시만) ──
+        if is_current_week:
+            last_monday = current_monday - _dt.timedelta(days=7)
+            last_monday_str = last_monday.isoformat()
+            existing = conn.execute(
+                "SELECT id FROM weekly_champions WHERE week_start = ?", (last_monday_str,)
+            ).fetchone()
+            if existing is None:
+                last_sunday_str = (current_monday - _dt.timedelta(days=1)).isoformat()
+                champ = conn.execute(
+                    """
+                    SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                           ROUND(AVG(cp.total_score), 1) AS avg_score,
+                           COUNT(cp.id) AS cnt
+                    FROM candidates c
+                    JOIN users u ON u.id = c.user_id
+                    JOIN candidate_pledges cp ON cp.candidate_id = c.id
+                    WHERE cp.total_score IS NOT NULL
+                      AND c.approval_status = 'APPROVED'
+                      AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
+                    GROUP BY c.id
+                    HAVING cnt > 0
+                    ORDER BY avg_score DESC, cnt DESC
+                    LIMIT 1
+                    """,
+                    (last_monday_str, last_sunday_str),
+                ).fetchone()
+                if champ and champ["avg_score"] and champ["avg_score"] > 0:
+                    try:
+                        conn.execute(
+                            """INSERT OR IGNORE INTO weekly_champions
+                               (week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (last_monday_str, champ["candidate_id"], champ["name"], champ["region_name"],
+                             champ["district_name"], champ["election_type"], champ["avg_score"], champ["cnt"]),
+                        )
+                        conn.commit()
+                    except Exception:
+                        pass
+
+        # ── 챔피언 목록 ──
+        champions = [
+            dict(r) for r in conn.execute(
+                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 20"
+            ).fetchall()
+        ]
+
+        # ── 랭킹 쿼리 ──
+        sql = """
+            SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                   ROUND(AVG(cp.total_score), 1) AS avg_score,
+                   COUNT(cp.id) AS scored_pledge_count
+            FROM candidates c
+            JOIN users u ON u.id = c.user_id
+            JOIN candidate_pledges cp ON cp.candidate_id = c.id
+            WHERE cp.total_score IS NOT NULL
+              AND c.approval_status = 'APPROVED'
+        """
+        params: list = []
+
+        if not is_current_week:
+            # 과거 주: 해당 주에 분석된 공약만 (챔피언 제외 없음)
+            sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
+            params.extend([target_monday.isoformat(), target_sunday.isoformat()])
+        else:
+            # 이번 주: 챔피언 제외
+            champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
+            if champion_ids:
+                placeholders = ",".join("?" for _ in champion_ids)
+                sql += f" AND c.id NOT IN ({placeholders})"
+                params.extend(champion_ids)
+
+        if region_code:
+            sql += " AND u.region_code = ?"
+            params.append(region_code.strip())
+        if election_type:
+            sql += " AND c.election_type = ?"
+            params.append(election_type.strip())
+
+        sql += """
+            GROUP BY c.id
+            HAVING scored_pledge_count > 0
+            ORDER BY avg_score DESC, scored_pledge_count DESC
+            LIMIT 50
+        """
+        rows = conn.execute(sql, tuple(params)).fetchall()
+
+        ranking = []
+        for rank, r in enumerate(rows, 1):
+            ranking.append({
+                "rank": rank,
+                "candidate_id": r["candidate_id"],
+                "name": r["name"],
+                "region_name": r["region_name"] or "",
+                "district_name": r["district_name"] or "",
+                "election_type": r["election_type"] or "",
+                "avg_score": float(r["avg_score"]),
+                "scored_pledge_count": int(r["scored_pledge_count"]),
+            })
+
+        # ── 주차 라벨 + 네비게이션 ──
+        label = _week_label(target_monday) + " 랭킹"
+        prev_monday = target_monday - _dt.timedelta(days=7)
+        next_monday = target_monday + _dt.timedelta(days=7)
+
+        return {
+            "week_label": label,
+            "week_start": target_monday.isoformat(),
+            "is_current_week": is_current_week,
+            "prev_week": prev_monday.isoformat(),
+            "next_week": next_monday.isoformat() if next_monday <= current_monday else None,
+            "champions": champions,
+            "ranking": ranking,
+            "total_count": len(ranking),
+        }
+    finally:
+        conn.close()

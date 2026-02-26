@@ -165,6 +165,15 @@
     .history-modal-actions .btn-secondary:hover {
       background: rgba(255,255,255,0.12); border-color: rgba(148,163,184,0.35);
     }
+    .history-modal-actions .btn-primary {
+      padding: 0.5rem 0.9rem; font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px; border: 1px solid var(--accent, #3b82f6);
+      background: var(--accent, #3b82f6); color: #fff;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .history-modal-actions .btn-primary:hover {
+      background: #2563eb;
+    }
     @media (max-width: 768px) {
       .top-bar { flex-wrap: wrap; }
     }
@@ -183,7 +192,7 @@
     <div class="top-bar">
       <div class="brand">
         <a href="/" class="brand-logo">
-          <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+          <img src="/static/logo.svg" alt="개혁신당 로고">
           <span class="brand-inner">
             <span class="brand-title">개혁신당 정책 멘토링</span>
             <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
@@ -234,6 +243,7 @@
       <div class="history-modal-actions">
         <button type="button" class="btn-secondary" id="historyModalCopyBtn">결과 복사</button>
         <button type="button" class="btn-secondary" id="historyModalTxtBtn">TXT로 저장</button>
+        <button type="button" class="btn-primary" id="historyModalNecBtn" style="display:none">선거공약서 작성</button>
         <button type="button" class="btn-secondary" id="historyModalPrintBtn">인쇄하기</button>
       </div>
     </div>
@@ -244,8 +254,9 @@
       try {
         const r = await fetch('/api/usage/summary', { credentials: 'include' });
         if (!r.ok) { if (r.status === 401) window.location.href = '/login?next=' + encodeURIComponent(location.pathname); return; }
+        let dashboardUser = {};
         const me = await fetch('/api/auth/me', { credentials: 'include' });
-        if (me.ok) { const u = await me.json(); const el = document.getElementById('loginInfo'); if (el && u.email) el.textContent = u.email + ' 로그인 중'; }
+        if (me.ok) { dashboardUser = await me.json(); const el = document.getElementById('loginInfo'); if (el && dashboardUser.email) el.textContent = dashboardUser.email + ' 로그인 중'; }
         const d = await r.json();
         document.getElementById('daily').textContent = d.daily_used ?? '-';
         document.getElementById('monthly').textContent = d.monthly_used ?? '-';
@@ -301,6 +312,13 @@
               const CRR = window.CheckResultRender;
               const rawTxt = item.result_text || '';
               lastHistoryModalFullText = '[입력]\n' + (item.input_text || '') + '\n\n[결과]\n' + rawTxt;
+              // 점수 파싱 → necBtn mode 결정 (버튼은 항상 표시)
+              const necBtn = document.getElementById('historyModalNecBtn');
+              if (necBtn && CRR && CRR.parseScoresFromText) {
+                const histScores = CRR.parseScoresFromText(rawTxt);
+                necBtn.dataset.necScore = histScores.totalScore ?? '';
+                necBtn.style.display = '';
+              }
               const resultHtml = CRR ? CRR.buildResultHtml(rawTxt) : ('<div class="analysis-text">' + esc(rawTxt).replace(/\n/g, '<br>') + '</div>');
               const inputBlock = '<div class="input-label">AI 분석에 넣었던 공약</div><div class="input-block">' + esc(item.input_text || '') + '</div>';
               const resultBlock = '<div class="result-label">분석 결과</div><div class="result-content">' + resultHtml + '</div>';
@@ -379,10 +397,37 @@
           w.focus();
           setTimeout(function() { w.print(); }, 250);
         });
+        document.getElementById('historyModalNecBtn').addEventListener('click', function() {
+          const s = parseFloat(document.getElementById('historyModalNecBtn').dataset.necScore);
+          if (isNaN(s) || s < 85) {
+            alert('총점 85점 이상부터 선거공약서 작성이 가능합니다.');
+            return;
+          }
+          const full = lastHistoryModalFullText || '';
+          const inputText = full.includes('\n\n[결과]\n')
+            ? full.split('\n\n[결과]\n')[0].replace(/^\[입력\]\n/, '')
+            : full;
+          if (!inputText.trim()) return;
+          const rawTxt = full.includes('\n\n[결과]\n') ? full.split('\n\n[결과]\n')[1] || '' : '';
+          showNecFormModal(
+            inputText,
+            {
+              candidateName: dashboardUser.name || dashboardUser.email || '',
+              electionType: dashboardUser.election_position || dashboardUser.election_type || '',
+              regionName: dashboardUser.region_name || '',
+              districtName: dashboardUser.district_name || '',
+            },
+            {
+              mode: 'generate',
+              resultText: rawTxt,
+            }
+          );
+        });
 
         await loadHistory();
       } catch (e) { console.error(e); }
     })();
   </script>
+  <script src="/static/js/nec-form-modal.js"></script>
 </body>
 </html>
