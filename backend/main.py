@@ -3086,6 +3086,7 @@ def api_leaderboard(
                     JOIN users u ON u.id = c.user_id
                     JOIN candidate_pledges cp ON cp.candidate_id = c.id
                     WHERE cp.total_score IS NOT NULL
+                      AND c.approval_status = 'APPROVED'
                       AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
                     GROUP BY c.id
                     HAVING cnt > 0
@@ -3123,6 +3124,7 @@ def api_leaderboard(
             JOIN users u ON u.id = c.user_id
             JOIN candidate_pledges cp ON cp.candidate_id = c.id
             WHERE cp.total_score IS NOT NULL
+              AND c.approval_status = 'APPROVED'
         """
         params: list = []
 
