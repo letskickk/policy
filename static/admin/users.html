@@ -352,10 +352,15 @@
         loadEditDistricts(u.region_code).then(() => {
           const dc = (u.district_code || '').trim();
           if (dc) {
-            const baseDc = dc.includes(':') ? dc.split(':').slice(0, 2).join(':') : dc;
+            const parts = dc.split(':');
+            const baseDc = parts.length >= 2 ? parts.slice(0, 2).join(':') : dc;
+            const subCode = parts.length >= 3 ? parts.slice(2).join(':') : '';
             for (let i = 0; i < editDistrict.options.length; i++) {
               if (editDistrict.options[i].value === baseDc || editDistrict.options[i].value === dc) {
-                editDistrict.selectedIndex = i; break;
+                editDistrict.selectedIndex = i;
+                // 하위 선거구(가/나/다) 드롭다운 로드를 위해 change 이벤트 발생
+                loadEditDistrictSub(baseDc, subCode);
+                break;
               }
             }
           }
@@ -407,8 +412,8 @@
       } catch (e) { console.error(e); }
     }
 
-    editDistrict.addEventListener('change', () => {
-      const dc = (editDistrict.value || '').trim();
+    // 하위 선거구 로드 (모달 열기 시 & 드롭다운 변경 시 공용)
+    function loadEditDistrictSub(dc, preselectSub) {
       editSub.innerHTML = '<option value="">선택하세요</option>';
       editSubWrap.style.display = 'none';
       if (!dc) return;
@@ -420,10 +425,25 @@
           if (arr.length > 1) arr = arr.filter(x => (x.sub_code||'').trim() !== '단독');
           editSub.innerHTML = '<option value="">선택하세요</option>' +
             arr.map(x => `<option value="${escapeHtml(x.sub_code||'')}">${escapeHtml(x.sub_name||'')}</option>`).join('');
-          if (arr.length > 1) editSubWrap.style.display = '';
-          else if (arr.length === 1) editSub.selectedIndex = 1;
+          if (arr.length > 1) {
+            editSubWrap.style.display = '';
+            // 기존 사용자의 하위 선거구 값이 있으면 자동 선택
+            if (preselectSub) {
+              for (let i = 0; i < editSub.options.length; i++) {
+                if (editSub.options[i].value === preselectSub) {
+                  editSub.selectedIndex = i; break;
+                }
+              }
+            }
+          } else if (arr.length === 1) {
+            editSub.selectedIndex = 1;
+          }
         })
         .catch(e => console.error(e));
+    }
+
+    editDistrict.addEventListener('change', () => {
+      loadEditDistrictSub((editDistrict.value || '').trim(), '');
     });
 
     async function saveUserProfile() {
