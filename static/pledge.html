@@ -759,7 +759,7 @@
   </div>
 
   <header>
-    <h1>공약 분석</h1>
+    <h1>공약 분석 <span style="font-size:0.45em;font-weight:400;color:#64748b;vertical-align:middle;">v1.1</span></h1>
     <p class="subtitle">공약을 입력하면 정강정책 부합 여부와 보완 포인트를 AI가 분석해 드립니다.</p>
   </header>
 
@@ -1471,8 +1471,13 @@
     btnEl.addEventListener('click', async function () {
       const titleText = (pledgeTitleEl.value || '').trim();
       const contentText = (pledgeEl.value || '').trim();
-      if (!contentText && !titleText) {
-        showError('공약 내용이 입력되지 않았습니다. 내용을 작성해 주세요.');
+      if (!titleText) {
+        showError('공약 제목을 입력해 주세요.');
+        pledgeTitleEl.focus();
+        return;
+      }
+      if (!contentText) {
+        showError('공약 내용을 입력해 주세요.');
         pledgeEl.focus();
         return;
       }
