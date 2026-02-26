@@ -104,6 +104,20 @@ def signup(
             (email, _hash_password(password), status, role, email_verified, verification_token, verification_expires_at, name, phone, ep or None, rc or None, rn or None, dc or None, dn or None),
         )
         conn.commit()
+        # 가입 직후 지원서 자동 검증 (실패해도 가입에 영향 없음)
+        try:
+            new_user = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+            if new_user:
+                from backend.applicant_verify import verify_user_against_applicants
+                verify_user_against_applicants(
+                    new_user["id"],
+                    user_phone=phone,
+                    user_email=email,
+                    user_name=name,
+                    user_region=rn,
+                )
+        except Exception:
+            logger.warning("지원서 자동 검증 실패 (가입 자체는 정상 처리)")
         # 관리자에게 가입 알림 메일 (비동기적으로, 실패해도 가입에 영향 없음)
         try:
             from backend.email_sender import send_signup_notification
@@ -310,7 +324,7 @@ def list_users_pending() -> list[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role, created_at, name, phone, election_position, region_code, region_name, district_code, district_name FROM users WHERE status = ? ORDER BY created_at",
+            "SELECT id, email, status, role, created_at, name, phone, election_position, region_code, region_name, district_code, district_name, applicant_verified, applicant_match_id, applicant_match_note FROM users WHERE status = ? ORDER BY created_at",
             (STATUS_PENDING,),
         )
         return [dict(r) for r in cur.fetchall()]
@@ -322,7 +336,7 @@ def list_users_all() -> list[dict]:
     conn = get_connection()
     try:
         cur = conn.execute(
-            "SELECT id, email, status, role, created_at, last_login_at, name, phone, election_position, region_code, region_name, district_code, district_name FROM users ORDER BY created_at DESC"
+            "SELECT id, email, status, role, created_at, last_login_at, name, phone, election_position, region_code, region_name, district_code, district_name, applicant_verified, applicant_match_id, applicant_match_note FROM users ORDER BY created_at DESC"
         )
         return [dict(r) for r in cur.fetchall()]
     finally:

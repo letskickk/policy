@@ -24,7 +24,7 @@ def send_verification_email(to_email: str, token: str) -> bool:
 
 {link}
 
-(이 링크는 24시간 후 만료됩니다. 본인이 요청하지 않았다면 무시하세요.)
+(이 링크는 72시간 후 만료됩니다. 본인이 요청하지 않았다면 무시하세요.)
 
 ---
 이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다. 문의는 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
@@ -54,6 +54,141 @@ ELECTION_LABELS = {
     "local_council": "기초의원",
     "party_official": "당직자",
 }
+
+
+def send_approval_status_email(to_email: str, status: str, name: str = "") -> bool:
+    """회원 승인/거절/정지 시 당사자에게 알림 메일 발송.
+
+    status: 'APPROVED' | 'REJECTED' | 'SUSPENDED'
+    """
+    if not SMTP_HOST or not SMTP_USER:
+        logger.warning("SMTP 미설정. 승인 알림 메일 건너뜀.")
+        return False
+
+    greeting = f"{name}님" if name else "안녕하세요"
+
+    if status == "APPROVED":
+        subject = "[개혁신당] 정책 멘토링 서비스 가입이 승인되었습니다"
+        body = f"""{greeting}, 안녕하세요.
+
+개혁신당 지방선거 정책 멘토링 서비스 가입 신청이 승인되었습니다.
+
+아래 링크에서 로그인 후 바로 이용하실 수 있습니다.
+
+{APP_BASE_URL}
+
+공약 점검, 정강정책 부합 여부 분석, 지역 비교 등 다양한 기능을 활용해 좋은 공약을 만드시길 응원합니다.
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다. 문의는 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+"""
+    elif status == "REJECTED":
+        subject = "[개혁신당] 정책 멘토링 서비스 가입 신청 결과 안내"
+        body = f"""{greeting}, 안녕하세요.
+
+개혁신당 지방선거 정책 멘토링 서비스 가입 신청을 검토한 결과, 이번에는 승인이 어렵게 되었습니다.
+
+문의 사항이 있으시면 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다.
+"""
+    elif status == "SUSPENDED":
+        subject = "[개혁신당] 정책 멘토링 서비스 계정 이용 제한 안내"
+        body = f"""{greeting}, 안녕하세요.
+
+개혁신당 지방선거 정책 멘토링 서비스 계정이 일시 정지되었습니다.
+
+문의 사항이 있으시면 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다.
+"""
+    else:
+        logger.warning("send_approval_status_email: 알 수 없는 status=%s", status)
+        return False
+
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+        logger.info("승인 알림 메일 발송: %s (status=%s)", to_email, status)
+        return True
+    except Exception as e:
+        logger.exception("승인 알림 메일 발송 실패: %s", e)
+        return False
+
+
+def send_candidate_approval_status_email(
+    to_email: str,
+    status: str,
+    name: str = "",
+    candidate_name: str = "",
+) -> bool:
+    """공약 등록 후보 승인/거절 시 당사자에게 알림 메일 발송.
+
+    status: 'APPROVED' | 'REJECTED'
+    name: 회원 이름(users.name)
+    candidate_name: 후보 등록명(candidates.name), 없으면 name 사용
+    """
+    if not SMTP_HOST or not SMTP_USER:
+        logger.warning("SMTP 미설정. 공약 승인 알림 메일 건너뜀.")
+        return False
+
+    display_name = candidate_name or name or ""
+    greeting = f"{display_name}님" if display_name else "안녕하세요"
+
+    if status == "APPROVED":
+        subject = "[개혁신당] 공약 등록이 승인되었습니다"
+        body = f"""{greeting}, 안녕하세요.
+
+개혁신당 지방선거 정책 멘토링 서비스에 등록하신 공약이 승인되었습니다.
+
+이제 공약 지도에서 공약이 공개되며, 정책 점검 기능을 계속 이용하실 수 있습니다.
+
+{APP_BASE_URL}/my-pledges
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다. 문의는 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+"""
+    elif status == "REJECTED":
+        subject = "[개혁신당] 공약 등록 검토 결과 안내"
+        body = f"""{greeting}, 안녕하세요.
+
+개혁신당 지방선거 정책 멘토링 서비스에 등록하신 공약을 검토한 결과, 이번에는 승인이 어렵게 되었습니다.
+
+문의 사항이 있으시면 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다.
+"""
+    else:
+        logger.warning("send_candidate_approval_status_email: 알 수 없는 status=%s", status)
+        return False
+
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+        logger.info("공약 승인 알림 메일 발송: %s (status=%s)", to_email, status)
+        return True
+    except Exception as e:
+        logger.exception("공약 승인 알림 메일 발송 실패: %s", e)
+        return False
 
 
 def send_signup_notification(

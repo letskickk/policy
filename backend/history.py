@@ -7,6 +7,7 @@ import logging
 from typing import Any, Optional
 
 from backend.database import get_connection
+from backend.score_parser import parse_total_score_any
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +48,17 @@ def add_history(
 
     options_json = json.dumps(options, ensure_ascii=False, sort_keys=True) if options else None
 
+    # Extract total score for leaderboard
+    score = parse_total_score_any(result_text, result_format) if int(status_code) == 200 else None
+
     conn = get_connection()
     try:
         conn.execute(
             """
             INSERT INTO analysis_history (
               user_id, kind, input_text, options_json, result_text, result_format,
-              status_code, from_cache
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              status_code, from_cache, total_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -65,6 +69,7 @@ def add_history(
                 result_format,
                 int(status_code),
                 1 if from_cache else 0,
+                score,
             ),
         )
         # prune old rows for this user
@@ -97,7 +102,7 @@ def list_history(user_id: int, limit: int = 20) -> list[dict]:
             SELECT id, kind, created_at, status_code, from_cache,
                    substr(input_text, 1, 160) AS input_preview,
                    substr(result_text, 1, 220) AS result_preview,
-                   result_format
+                   result_format, total_score
             FROM analysis_history
             WHERE user_id = ? AND kind != 'verify'
             ORDER BY created_at DESC, id DESC

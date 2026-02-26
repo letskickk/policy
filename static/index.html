@@ -131,7 +131,7 @@
     .sample-title{ font-size:0.88rem; font-weight:900; color:var(--text-strong); }
     .sample-score{ font-size:0.82rem; font-weight:900; color:#86efac; }
     .sample-body{ padding:0.75rem 0.85rem; }
-    .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; }
+    .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; word-break:keep-all; }
 
     .auth-links{ margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
     .auth-link{ color:#ffb37a; font-weight:700; text-decoration:none; }
@@ -157,6 +157,7 @@
       margin: 0 0 0.85rem 0;
       color: var(--text-strong);
       letter-spacing: -0.04em;
+      word-break: keep-all;
     }
 
     .hero-desc{
@@ -165,6 +166,7 @@
       color: var(--text);
       margin: 0 0 1.25rem 0;
       opacity: 0.95;
+      word-break: keep-all;
     }
 
     .flow{
@@ -209,6 +211,7 @@
       font-size: 0.9rem;
       line-height: 1.5;
       color: var(--muted);
+      word-break: keep-all;
     }
 
     .cta{
@@ -231,6 +234,10 @@
       color: var(--text-strong);
       border-color: rgba(148,163,184,0.35);
     }
+    .cta.secondary:hover{
+      background: rgba(255,255,255,0.18);
+      color: var(--text-strong);
+    }
     .cta:hover{
       background: var(--cta-hover);
       transform: translateY(-1px);
@@ -248,10 +255,9 @@
       border-top: 1px solid rgba(148,163,184,0.18);
     }
     .features h2{
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.01em;
       color: #ffb37a;
       margin: 0 0 1rem 0;
     }
@@ -270,7 +276,7 @@
       padding: 1.05rem;
       display:flex;
       gap: 0.9rem;
-      align-items:flex-start;
+      align-items: center;
     }
     .icon{
       flex-shrink: 0;
@@ -293,6 +299,7 @@
       line-height: 1.55;
       color: var(--text);
       opacity: 0.95;
+      word-break: keep-all;
     }
 
     .footer{
@@ -315,6 +322,159 @@
       gap: 0.75rem;
     }
 
+    /* ===== 리더보드 섹션 ===== */
+    .leaderboard-section { margin-top: 1.8rem; }
+    .leaderboard-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 1.5rem; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    }
+    .leaderboard-header {
+      display: flex; align-items: center;
+      gap: 0.6rem; margin-bottom: 1.2rem;
+      flex-wrap: nowrap; overflow-x: auto;
+    }
+    .leaderboard-title {
+      font-size: 1.05rem; font-weight: 950; color: var(--text-strong);
+      display: flex; align-items: center; gap: 0.4rem;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .week-nav { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+    .week-nav-btn {
+      background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+      color: var(--muted); width: 26px; height: 26px; border-radius: 6px;
+      cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0; padding: 0;
+    }
+    .week-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.15); color: var(--text-strong); }
+    .week-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .week-nav-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    .leaderboard-filters { display: flex; gap: 0.4rem; flex-shrink: 0; margin-left: auto; }
+    .leaderboard-filters select {
+      padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06); color: var(--text);
+      font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .leaderboard-filters select option { background: #0f172a; color: var(--text); }
+    .rank-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .rank-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 0.85rem; border-radius: 12px;
+      background: var(--card2); border: 1px solid rgba(148,163,184,0.10);
+      transition: background 0.15s;
+    }
+    .rank-row:hover { background: rgba(255,255,255,0.08); }
+    .rank-row.top-3 { border-color: rgba(255,179,122,0.3); background: rgba(255,114,16,0.06); }
+    .rank-num {
+      width: 32px; height: 32px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 950; font-size: 0.88rem; flex-shrink: 0;
+    }
+    .rank-num.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e293b; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+    .rank-num.silver { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; box-shadow: 0 2px 8px rgba(148,163,184,0.3); }
+    .rank-num.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; box-shadow: 0 2px 8px rgba(217,119,6,0.3); }
+    .rank-num.normal { background: rgba(255,255,255,0.08); color: var(--muted); }
+    .rank-info { flex: 1; min-width: 0; }
+    .rank-name { font-weight: 800; color: var(--text-strong); font-size: 0.95rem; }
+    .rank-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+    .rank-meta .election-badge {
+      display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+      background: rgba(59,130,246,0.15); color: #93c5fd;
+      font-size: 0.72rem; font-weight: 700; margin-right: 0.3rem;
+    }
+    .rank-score { text-align: right; flex-shrink: 0; }
+    .score-value { font-size: 1.1rem; font-weight: 950; letter-spacing: -0.02em; }
+    .score-value.green { color: #86efac; }
+    .score-value.yellow { color: #fde047; }
+    .score-value.red { color: #fca5a5; }
+    .score-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
+    .pledge-count { font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
+    .champions-strip {
+      margin-bottom: 1rem; padding: 0.8rem; border-radius: 12px;
+      background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.2);
+    }
+    .champions-strip-title { font-size: 0.85rem; font-weight: 800; color: #fde047; margin-bottom: 0.5rem; }
+    .champion-item {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.2rem 0.55rem; border-radius: 6px;
+      background: rgba(250,204,21,0.1); font-size: 0.8rem; color: var(--text);
+      margin: 0.15rem 0.25rem 0.15rem 0;
+    }
+    .champion-week { color: var(--muted); font-size: 0.72rem; }
+    .champion-score { font-weight: 800; color: #fde047; }
+    .rank-empty { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.9rem; }
+
+    /* ===== 공약 상세 모달 (map.html 동일) ===== */
+    .pledge-modal-overlay{
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);
+      justify-content:center; align-items:center; padding:1.5rem;
+    }
+    .pledge-modal-overlay.open{ display:flex; }
+    .pledge-modal{
+      background: linear-gradient(160deg, #0a2540 0%, #0e3a63 100%);
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 18px;
+      width: 100%; max-width: 900px;
+      max-height: calc(100vh - 3rem);
+      display: flex; flex-direction: column;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    }
+    .pledge-modal-header{
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(148,163,184,0.15);
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+      flex-shrink: 0;
+    }
+    .pledge-modal-header h3{
+      font-size: 1.15rem; font-weight: 900; color: #f8fafc; margin: 0; line-height: 1.4;
+    }
+    .pledge-modal-header .modal-sub{
+      font-size: 0.85rem; color: #94a3b8; font-weight: 400; margin-top: 0.15rem;
+    }
+    .pledge-modal-close{
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(148,163,184,0.2);
+      color: #94a3b8; width: 36px; height: 36px; border-radius: 10px;
+      cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s;
+    }
+    .pledge-modal-close:hover{ background: rgba(255,255,255,0.15); color: #fff; }
+    .pledge-modal-body{
+      padding: 1.25rem 1.5rem 2rem; overflow-y: auto; flex: 1; min-height: 0;
+    }
+    .modal-pledge-item{
+      background: rgba(0,0,0,0.18); border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 0.75rem;
+    }
+    .modal-pledge-item:last-child{ margin-bottom: 0; }
+    .modal-pledge-num{
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,114,16,0.2); color: #ffb37a;
+      font-weight: 900; font-size: 0.8rem; margin-right: 0.5rem; flex-shrink: 0;
+    }
+    .modal-pledge-title{
+      font-weight: 800; font-size: 1rem; color: #f8fafc; line-height: 1.5;
+    }
+    .modal-pledge-content{
+      margin-top: 0.6rem; padding-top: 0.6rem;
+      border-top: 1px solid rgba(148,163,184,0.1);
+      font-size: 0.9rem; color: #cbd5e1; line-height: 1.75;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .modal-pledge-empty{
+      color: #64748b; font-style: italic; font-size: 0.9rem; margin-top: 0.4rem;
+    }
+    .modal-pledge-count{
+      font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;
+    }
+    @media (max-width: 640px){
+      .pledge-modal-overlay{ padding: 0.75rem 0.5rem; align-items: flex-start; }
+      .pledge-modal{ border-radius: 14px; max-height: calc(100vh - 1.5rem); }
+      .pledge-modal-header{ padding: 1rem 1.1rem; }
+      .pledge-modal-header h3{ font-size: 1.05rem; }
+      .pledge-modal-body{ padding: 1rem 1.1rem 1.5rem; }
+    }
+
     @media (min-width: 720px){
       .cta-group{
         grid-template-columns: 1fr 1fr;
@@ -323,8 +483,10 @@
 
     @media (max-width: 640px){
       .wrap{ padding: 0 0.75rem; }
-      .top-bar{ margin-bottom: 1rem; flex-direction: column; align-items: flex-start; }
+      .top-bar{ margin-bottom: 1rem; flex-direction: row; flex-wrap: wrap; align-items: center; }
+      .top-bar .top-bar-left{ width: 100%; justify-content: space-between; }
       .top-bar .brand-tag{ display: none; }
+      .top-bar .nav-wrap{ margin-left: 0; }
       .top-bar .nav-link{ min-height: 32px; padding: 0 0.75rem; font-size: 0.85rem; }
       h1{ font-size: 1.75rem; line-height: 1.3; }
       .hero{ padding: 1.25rem; border-radius: 16px; }
@@ -334,6 +496,11 @@
       .feature-grid .txt{ font-size: 0.9rem; }
       .cta-group{ gap: 0.6rem; }
       .cta{ padding: 0.85rem 1rem; font-size: 0.95rem; }
+      .leaderboard-header { flex-wrap: wrap; gap: 0.4rem; }
+      .leaderboard-card { padding: 1rem; }
+      .leaderboard-title { font-size: 0.95rem; }
+      .leaderboard-filters { width: 100%; }
+      .leaderboard-filters select { flex: 1; min-width: 0; }
     }
   </style>
 </head>
@@ -344,7 +511,7 @@
       <div class="top-bar-left">
         <div class="brand">
           <a href="/" class="brand-logo">
-            <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고" />
+            <img src="/static/logo.svg" alt="개혁신당 로고" />
             <span class="brand-inner">
               <span class="brand-title">개혁신당 정책 멘토링</span>
               <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
@@ -359,11 +526,11 @@
     </div>
 
     <div class="hero">
-      <h1>공약 분석과 지역·선거구 비교를<br />한 번에 확인하세요</h1>
+      <h1>공약 점검부터 지역 비교까지</h1>
 
       <p class="hero-desc">
-        공약안을 입력하면 당의 정강정책에 얼마나 부합하는지와 보완 포인트를 빠르게 확인할 수 있습니다.
-        이어서 지역·선거구 후보 공약 비교까지 한 화면 흐름으로 연결됩니다.
+        공약을 입력하면 정강정책 부합 여부와 보완 포인트를 즉시 확인할 수 있습니다.<br>
+        지역·선거구별 후보 공약 비교도 한 화면에서 이어집니다.
       </p>
       <div class="trust-chips" aria-label="핵심 가치">
         <span class="trust-chip">정강·정책 근거 기반</span>
@@ -378,11 +545,11 @@
         </div>
         <div class="step">
           <div class="k"><span class="badge">2</span> 기준 대조</div>
-          <p>정강·정책·공약 기준으로 적합도와 보완 포인트를 확인합니다.</p>
+          <p>정강·정책 기준으로 적합도와 보완점을 확인합니다.</p>
         </div>
         <div class="step">
           <div class="k"><span class="badge">3</span> 지역 비교</div>
-          <p>지도에서 지역·선거구·선거타입별 후보 공약을 비교합니다.</p>
+          <p>지도에서 지역·선거구별 후보 공약을 비교합니다.</p>
         </div>
       </div>
 
@@ -397,10 +564,42 @@
         </div>
         <div class="sample-body">
           <div class="sample-item"><strong>1. 정강정책 부합성</strong><br/>핵심 방향은 부합하나 재원 계획 구체화 필요</div>
-          <div class="sample-item"><strong>4. 제8회 지방선거(2022) 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
+          <div class="sample-item"><strong>4. 2022 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
         </div>
       </div>
     </div>
+
+    <!-- ===== 리더보드 섹션 ===== -->
+    <section class="leaderboard-section" id="leaderboardSection" style="display:none;">
+      <div class="leaderboard-card">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title" id="leaderboardTitle">
+            <span>&#127942;</span> 공약 랭킹
+          </div>
+          <div class="week-nav" id="weekNav">
+            <button class="week-nav-btn" id="weekPrev" title="이전 주">◀</button>
+            <span class="week-nav-label" id="weekNavLabel"></span>
+            <button class="week-nav-btn" id="weekNext" title="다음 주" disabled>▶</button>
+          </div>
+          <div class="leaderboard-filters">
+            <select id="filterRegion">
+              <option value="">전체 지역</option>
+            </select>
+            <select id="filterElection">
+              <option value="">전체 선거유형</option>
+              <option value="metro_mayor">광역단체장</option>
+              <option value="regional_council">광역의원</option>
+              <option value="local_mayor">기초단체장</option>
+              <option value="local_council">기초의원</option>
+            </select>
+          </div>
+        </div>
+        <div id="championsStrip"></div>
+        <div class="rank-list" id="rankList">
+          <div class="rank-empty">불러오는 중...</div>
+        </div>
+      </div>
+    </section>
 
     <section class="features">
       <h2>주요 기능</h2>
@@ -408,26 +607,25 @@
         <li>
           <span class="icon">✓</span>
           <div class="txt">
-            <strong>공약 적합도 점검</strong> — 중앙당 정강·정책·공약 기준으로 부합 여부와 보완 체크리스트 제공
+            <strong>공약 적합도 점검</strong> — 정강·정책 부합 여부 + 보완 체크리스트
           </div>
         </li>
         <li>
           <span class="icon">↔</span>
           <div class="txt">
-            <strong>중복·유사 탐지</strong> — 타 지역 후보 공약과 비교해 유사·중복 항목을 빠르게 확인
+            <strong>중복·유사 탐지</strong> — 타 후보 공약과 유사·중복 항목 파악
           </div>
         </li>
         <li>
           <span class="icon">🗳️</span>
           <div class="txt">
-            <strong>지역·선거구 공약 조회</strong> — 지도에서 시도/선거구/선거 타입 필터로 후보 공약을 비교
+            <strong>지역·선거구 공약 조회</strong> — 시도·선거구·선거 타입별 후보 공약 비교
           </div>
         </li>
-
         <li>
-          <span class="icon">📄</span>
+          <span class="icon">🏆</span>
           <div class="txt">
-            <strong>정강·정책·공약 기반</strong> — 중앙당의 정강·정책·공약을 기준으로 GPT가 분석
+            <strong>2022 당선인 공약 비교</strong> — 당선인 공약과 비교해 차별화 포인트 파악
           </div>
         </li>
       </ul>
@@ -437,6 +635,20 @@
       개혁신당 정책국<br>
       문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
     </p>
+  </div>
+
+  <!-- 공약 상세 모달 (map.html 동일) -->
+  <div class="pledge-modal-overlay" id="pledgeModalOverlay" onclick="closePledgeModal(event)">
+    <div class="pledge-modal" onclick="event.stopPropagation()">
+      <div class="pledge-modal-header">
+        <div>
+          <h3 id="pledgeModalTitle"></h3>
+          <div class="modal-sub" id="pledgeModalSub"></div>
+        </div>
+        <button class="pledge-modal-close" onclick="closePledgeModal()" title="닫기">✕</button>
+      </div>
+      <div class="pledge-modal-body" id="pledgeModalBody"></div>
+    </div>
   </div>
 
   <script>
@@ -462,6 +674,231 @@
         }
       } catch (e) {}
     })();
+  </script>
+
+  <script>
+  (function() {
+    const ELECTION_LABELS = {
+      metro_mayor: '광역단체장',
+      regional_council: '광역의원',
+      local_mayor: '기초단체장',
+      local_council: '기초의원',
+    };
+    const safe = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const scoreClass = s => s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red';
+    const rankClass = r => r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : 'normal';
+
+    const section = document.getElementById('leaderboardSection');
+    const rankList = document.getElementById('rankList');
+    const champStrip = document.getElementById('championsStrip');
+    const filterRegion = document.getElementById('filterRegion');
+    const filterElection = document.getElementById('filterElection');
+    const leaderboardTitle = document.getElementById('leaderboardTitle');
+    const weekPrev = document.getElementById('weekPrev');
+    const weekNext = document.getElementById('weekNext');
+    const weekNavLabel = document.getElementById('weekNavLabel');
+    let currentWeekStart = null; // 현재 보고 있는 주의 week_start
+
+    // 지역 셀렉트 채우기
+    fetch('/api/regions').then(r => r.json()).then(regions => {
+      (regions || []).forEach(rg => {
+        const opt = document.createElement('option');
+        opt.value = rg.region_code;
+        opt.textContent = rg.region_name;
+        filterRegion.appendChild(opt);
+      });
+    }).catch(() => {});
+
+    function weekLabelFromDate(weekStart) {
+      // "2026-02-17" → "2월 3째주"
+      const parts = weekStart.split('-');
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      const weekNum = Math.ceil(d / 7);
+      return m + '월 ' + weekNum + '째주';
+    }
+
+    function renderChampions(champions) {
+      if (!champions || champions.length === 0) {
+        champStrip.innerHTML = '';
+        return;
+      }
+      let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
+      champions.forEach(c => {
+        const wLabel = weekLabelFromDate(c.week_start);
+        const elLabel = ELECTION_LABELS[c.election_type] || '';
+        const regionText = c.district_name ? (c.region_name || '') + ' ' + c.district_name : (c.region_name || '');
+        html += `<span class="champion-item" style="cursor:pointer;" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
+          <span class="champion-week">${safe(wLabel)}</span>
+          ${safe(c.candidate_name)}
+          ${regionText ? '<span style="color:var(--muted);font-size:0.72rem;">' + safe(regionText) + '</span>' : ''}
+          <span class="champion-score">${c.avg_score}</span>
+        </span>`;
+      });
+      html += '</div>';
+      champStrip.innerHTML = html;
+    }
+
+    function renderRanking(ranking) {
+      if (!ranking || ranking.length === 0) {
+        rankList.innerHTML = '<div class="rank-empty">아직 분석된 공약이 없습니다.</div>';
+        return;
+      }
+      let html = '';
+      ranking.forEach(r => {
+        const cls = r.rank <= 3 ? ' top-3' : '';
+        const numCls = rankClass(r.rank);
+        const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
+        const region = r.district_name ? `${safe(r.region_name)} ${safe(r.district_name)}` : safe(r.region_name);
+        const cid = r.candidate_id || '';
+        html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid})"" title="공약 상세 보기">
+          <div class="rank-num ${numCls}">${r.rank}</div>
+          <div class="rank-info">
+            <div class="rank-name">${safe(r.name)}</div>
+            <div class="rank-meta">
+              ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
+              ${region}
+            </div>
+          </div>
+          <div class="rank-score">
+            <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
+            <div class="score-label">평균점수</div>
+            <div class="pledge-count">공약 ${r.scored_pledge_count}개</div>
+          </div>
+        </div>`;
+      });
+      rankList.innerHTML = html;
+    }
+
+    async function loadLeaderboard(weekStart) {
+      const params = new URLSearchParams();
+      if (filterRegion.value) params.set('region_code', filterRegion.value);
+      if (filterElection.value) params.set('election_type', filterElection.value);
+      if (weekStart) params.set('week_start', weekStart);
+      const qs = params.toString();
+      try {
+        const res = await fetch('/api/leaderboard' + (qs ? '?' + qs : ''));
+        if (!res.ok) return;
+        const data = await res.json();
+        currentWeekStart = data.week_start;
+        // 주차 라벨 표시
+        if (data.week_label && leaderboardTitle) {
+          leaderboardTitle.innerHTML = '<span>&#127942;</span> ' + safe(data.week_label);
+        }
+        // 주간 네비게이션 업데이트 (과거 주 데이터가 있을 때만 표시)
+        const ws = data.week_start;
+        const sunday = new Date(ws);
+        sunday.setDate(sunday.getDate() + 6);
+        const mm = String(sunday.getMonth() + 1).padStart(2, '0');
+        const dd = String(sunday.getDate()).padStart(2, '0');
+        weekNavLabel.textContent = ws.slice(5).replace('-', '/') + ' ~ ' + mm + '/' + dd;
+        weekPrev.dataset.week = data.prev_week || '';
+        weekPrev.disabled = !data.prev_week;
+        weekNext.dataset.week = data.next_week || '';
+        // 서비스 시작 주(2026-02-23) 이전으로는 이동 불가
+        const FIRST_WEEK = '2026-02-23';
+        weekPrev.style.display = (data.prev_week && data.prev_week >= FIRST_WEEK) ? '' : 'none';
+        weekNext.disabled = !data.next_week;
+        // 챔피언은 이번 주에서만 표시
+        if (data.is_current_week) {
+          renderChampions(data.champions);
+        } else {
+          champStrip.innerHTML = '';
+        }
+        renderRanking(data.ranking);
+        section.style.display = '';
+      } catch (e) {
+        console.error('leaderboard fetch error:', e);
+      }
+    }
+
+    weekPrev.addEventListener('click', function() {
+      const w = this.dataset.week;
+      if (w) loadLeaderboard(w);
+    });
+    weekNext.addEventListener('click', function() {
+      const w = this.dataset.week;
+      if (w) loadLeaderboard(w);
+    });
+    filterRegion.addEventListener('change', function() { loadLeaderboard(currentWeekStart); });
+    filterElection.addEventListener('change', function() { loadLeaderboard(currentWeekStart); });
+    loadLeaderboard();
+  })();
+  </script>
+
+  <!-- 공약 상세 모달 JS -->
+  <script>
+  (function() {
+    const ELECTION_LABELS = {
+      metro_mayor: '광역단체장', regional_council: '광역의원',
+      local_mayor: '기초단체장', local_council: '기초의원',
+    };
+    const pledgeModalOverlay = document.getElementById('pledgeModalOverlay');
+    const pledgeModalTitle = document.getElementById('pledgeModalTitle');
+    const pledgeModalSub = document.getElementById('pledgeModalSub');
+    const pledgeModalBody = document.getElementById('pledgeModalBody');
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderModalPledges(pledges) {
+      if (!pledges || pledges.length === 0) {
+        pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">등록된 공약이 없습니다.</div>';
+        return;
+      }
+      pledgeModalBody.innerHTML =
+        '<div class="modal-pledge-count">공약 ' + pledges.length + '개</div>' +
+        pledges.map(function(p, i) {
+          const title = escapeHtml(p.title || p);
+          const content = (p.content || '').trim();
+          return '<div class="modal-pledge-item">' +
+            '<div class="modal-pledge-title"><span class="modal-pledge-num">' + (i + 1) + '</span>' + title + '</div>' +
+            (content
+              ? '<div class="modal-pledge-content">' + escapeHtml(content) + '</div>'
+              : '<div class="modal-pledge-empty">세부내용 없음</div>') +
+            '</div>';
+        }).join('');
+    }
+
+    window.openCandidateModal = async function(candidateId) {
+      if (!candidateId) return;
+      pledgeModalTitle.textContent = '';
+      pledgeModalSub.textContent = '';
+      pledgeModalBody.innerHTML = '<div style="color:#94a3b8;padding:1rem 0;text-align:center;">공약을 불러오는 중...</div>';
+      pledgeModalOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      try {
+        const res = await fetch('/api/candidates/' + candidateId);
+        if (!res.ok) {
+          pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">후보 정보를 불러올 수 없습니다.</div>';
+          return;
+        }
+        const d = await res.json();
+        const etype = ELECTION_LABELS[d.election_type] || d.election_type || '';
+        const region = d.district_name ? (d.region_name || '') + ' ' + d.district_name : (d.region_name || '');
+        pledgeModalTitle.textContent = d.name || '';
+        pledgeModalSub.textContent = region + ' \u00B7 ' + etype;
+        renderModalPledges(d.pledges || []);
+      } catch (e) {
+        pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">오류가 발생했습니다.</div>';
+      }
+    };
+
+    window.closePledgeModal = function(event) {
+      if (event && event.target && event.target !== pledgeModalOverlay) return;
+      pledgeModalOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    };
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && pledgeModalOverlay.classList.contains('open')) {
+        window.closePledgeModal();
+      }
+    });
+  })();
   </script>
 </body>
 </html>

@@ -182,16 +182,68 @@ def init_db() -> None:
             "ALTER TABLE candidates ADD COLUMN user_id INTEGER REFERENCES users(id)",
             "ALTER TABLE candidates ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'PENDING'",
             "ALTER TABLE candidate_pledges ADD COLUMN content TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN total_score REAL",
+            "ALTER TABLE candidate_pledges ADD COLUMN analysis_result TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN analyzed_at TEXT",
+            "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
         ]:
             try:
                 conn.execute(stmt)
             except sqlite3.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
                     raise
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cp_score ON candidate_pledges(total_score)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hist_score ON analysis_history(total_score, created_at)")
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS weekly_champions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start TEXT NOT NULL,
+            candidate_id INTEGER NOT NULL,
+            candidate_name TEXT NOT NULL,
+            region_name TEXT,
+            district_name TEXT,
+            election_type TEXT,
+            avg_score REAL NOT NULL,
+            scored_pledge_count INTEGER NOT NULL,
+            recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(week_start)
+        );
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_district_code ON candidates(district_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_region_district ON candidates(region_code, district_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_user_id ON candidates(user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_approval ON candidates(approval_status)")
+
+        # ── 지원서(공천 신청) 검증용 ──
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS party_applicants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            region_province TEXT,
+            district_info TEXT,
+            election_position TEXT,
+            doc_submitted INTEGER NOT NULL DEFAULT 0,
+            interview_done INTEGER NOT NULL DEFAULT 0,
+            status_note TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_pa_phone ON party_applicants(phone);
+        CREATE INDEX IF NOT EXISTS idx_pa_email ON party_applicants(email);
+        CREATE INDEX IF NOT EXISTS idx_pa_name ON party_applicants(name);
+        """)
+        for stmt in [
+            "ALTER TABLE users ADD COLUMN applicant_verified INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN applicant_match_id INTEGER",
+            "ALTER TABLE users ADD COLUMN applicant_match_note TEXT",
+        ]:
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
         conn.commit()
         logger.info("DB 초기화 완료: %s", DB_PATH)
     finally:

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개혁신당 정책 멘토링</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root{
+      --bg1:#04162b;
+      --bg2:#073053;
+      --bg3:#0a3b69;
+      --text:#e2e8f0;
+      --text-strong:#f8fafc;
+      --muted:#cbd5e1;
+      --brand:#ff7210;
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
+      --cta:#ffffff;
+      --cta-text:#0f172a;
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+    }
+    body{
+      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+                  linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      color: var(--text); padding: 2rem 1rem; font-size: 16px; line-height: 1.6;
+    }
+    .wrap{ max-width: 720px; margin: 0 auto; }
+
+    /* Top bar */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; }
+    .top-bar-left { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .brand { display: inline-flex; align-items: center; gap: 0.75rem; }
+    .brand-logo { display: inline-flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit; }
+    .brand-logo img { height: 30px; width: auto; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25)); }
+    .brand-title { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.02em; color: var(--text-strong); }
+    .brand-tag { display: block; margin-top: 0.35rem; font-size: 0.84rem; color: #ffb37a; letter-spacing: -0.01em; font-weight: 800; opacity: 0.95; }
+    .nav-wrap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto; }
+    .nav-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 36px; padding: 0 0.9rem;
+      color: var(--text); text-decoration: none; font-size: 0.875rem; font-weight: 700;
+      border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    }
+
+    /* Hero */
+    .hero{
+      background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+      padding: 1.75rem; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    }
+    h1{ font-size: 2.05rem; font-weight: 950; line-height: 1.25; margin: 0 0 0.85rem 0; color: var(--text-strong); letter-spacing: -0.04em; }
+    .hero-desc{ font-size: 1.05rem; line-height: 1.7; color: var(--text); margin: 0 0 1.25rem 0; opacity: 0.95; }
+    .trust-chips{ display:flex; gap:0.45rem; flex-wrap:wrap; margin:0.5rem 0 1rem; }
+    .trust-chip{ font-size:0.78rem; font-weight:800; color:#dbeafe; border:1px solid rgba(147,197,253,0.35); background:rgba(59,130,246,0.12); border-radius:999px; padding:0.22rem 0.6rem; }
+
+    .flow{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin: 1.25rem 0 1.4rem 0; }
+    .step{ background: var(--card2); border: 1px solid rgba(148,163,184,0.12); border-radius: 14px; padding: 0.9rem; min-height: 86px; }
+    .step .k{ display:flex; align-items:center; gap: 0.55rem; font-size: 0.92rem; font-weight: 800; color: var(--text-strong); margin-bottom: 0.35rem; }
+    .badge{ width: 28px; height: 28px; border-radius: 10px; display:flex; align-items:center; justify-content:center; background: #ffffff; color: #0f172a; font-weight: 950; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .step p{ margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--muted); }
+    .cta-group{ display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .cta{
+      display:block; width: 100%; text-align:center; padding: 1.05rem 1.25rem;
+      font-size: 1.08rem; font-weight: 950; color: var(--cta-text); background: var(--cta);
+      border: 1px solid rgba(255,255,255,0.5); border-radius: 14px; text-decoration: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .cta.secondary{ background: rgba(255,255,255,0.10); color: var(--text-strong); border-color: rgba(148,163,184,0.35); }
+
+    /* ===== 리더보드 섹션 (NEW) ===== */
+    .leaderboard-section {
+      margin-top: 1.8rem;
+    }
+    .leaderboard-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .leaderboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.2rem;
+    }
+    .leaderboard-title {
+      font-size: 1.15rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .leaderboard-filters {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .leaderboard-filters select {
+      padding: 0.35rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .leaderboard-filters select option {
+      background: #0f172a;
+      color: var(--text);
+    }
+
+    /* 랭킹 리스트 */
+    .rank-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .rank-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 12px;
+      background: var(--card2);
+      border: 1px solid rgba(148,163,184,0.10);
+      transition: background 0.15s;
+    }
+    .rank-row:hover {
+      background: rgba(255,255,255,0.08);
+    }
+    .rank-row.top-3 {
+      border-color: rgba(255,179,122,0.3);
+      background: rgba(255,114,16,0.06);
+    }
+    .rank-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 950;
+      font-size: 0.88rem;
+      flex-shrink: 0;
+    }
+    .rank-num.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e293b; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+    .rank-num.silver { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; box-shadow: 0 2px 8px rgba(148,163,184,0.3); }
+    .rank-num.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; box-shadow: 0 2px 8px rgba(217,119,6,0.3); }
+    .rank-num.normal { background: rgba(255,255,255,0.08); color: var(--muted); }
+
+    .rank-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .rank-name {
+      font-weight: 800;
+      color: var(--text-strong);
+      font-size: 0.95rem;
+    }
+    .rank-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+    }
+    .rank-meta .election-badge {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      background: rgba(59,130,246,0.15);
+      color: #93c5fd;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-right: 0.3rem;
+    }
+
+    .rank-score {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .score-value {
+      font-size: 1.1rem;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+    }
+    .score-value.green { color: #86efac; }
+    .score-value.yellow { color: #fde047; }
+    .score-value.red { color: #fca5a5; }
+    .score-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .pledge-count {
+      font-size: 0.72rem;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    /* Features */
+    .features{ margin-top: 2.2rem; padding-top: 1.6rem; border-top: 1px solid rgba(148,163,184,0.18); }
+    .features h2{ font-size: 0.9rem; font-weight: 900; color: #ffb37a; margin: 0 0 1rem 0; }
+    .feature-grid{ list-style: none; padding: 0; margin: 0; display: grid; gap: 0.9rem; }
+    .feature-grid li{ background: var(--card2); border: 1px solid rgba(148,163,184,0.12); border-radius: 14px; padding: 1.05rem; display:flex; gap: 0.9rem; align-items: center; }
+    .icon{ flex-shrink: 0; width: 34px; height: 34px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); display:flex; align-items:center; justify-content:center; font-size: 1rem; }
+    .feature-grid strong{ color: var(--text-strong); font-weight: 900; }
+    .feature-grid .txt{ font-size: 0.95rem; line-height: 1.55; color: var(--text); opacity: 0.95; }
+
+    .footer{ margin-top: 2.3rem; font-size: 0.88rem; color: rgba(203,213,225,0.92); line-height: 1.6; }
+    .footer a{ color: #ffb37a; text-decoration: none; font-weight: 900; }
+
+    @media (max-width: 640px){
+      .wrap{ padding: 0 0.75rem; }
+      h1{ font-size: 1.75rem; }
+      .hero{ padding: 1.25rem; }
+      .flow{ grid-template-columns: 1fr; }
+      .cta-group{ grid-template-columns: 1fr; }
+      .leaderboard-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div class="brand">
+          <a href="/" class="brand-logo">
+            <img src="/static/logo.svg" alt="개혁신당 로고" />
+            <span class="brand-inner">
+              <span class="brand-title">개혁신당 정책 멘토링</span>
+              <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+            </span>
+          </a>
+        </div>
+      </div>
+      <div class="nav-wrap">
+        <a href="/dashboard" class="nav-link">내 기록</a>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <h1>공약 점검부터 지역 비교까지</h1>
+      <p class="hero-desc">
+        공약을 입력하면 정강정책 부합 여부와 보완 포인트를 즉시 확인할 수 있습니다.
+        지역·선거구별 후보 공약 비교도 한 화면에서 이어집니다.
+      </p>
+      <div class="trust-chips">
+        <span class="trust-chip">정강·정책 근거 기반</span>
+        <span class="trust-chip">지역·선거구 비교 지원</span>
+        <span class="trust-chip">실행 보완점 즉시 제안</span>
+      </div>
+      <div class="flow">
+        <div class="step"><div class="k"><span class="badge">1</span> 공약 입력</div><p>검토할 공약을 그대로 붙여넣습니다.</p></div>
+        <div class="step"><div class="k"><span class="badge">2</span> 기준 대조</div><p>정강·정책 기준으로 적합도와 보완점을 확인합니다.</p></div>
+        <div class="step"><div class="k"><span class="badge">3</span> 지역 비교</div><p>지도에서 지역·선거구별 후보 공약을 비교합니다.</p></div>
+      </div>
+      <div class="cta-group">
+        <a href="/pledge" class="cta">공약 분석하기</a>
+        <a href="/map" class="cta secondary">지역·선거구 공약 보기</a>
+      </div>
+    </div>
+
+    <!-- ===== 리더보드 섹션 (NEW) ===== -->
+    <section class="leaderboard-section">
+      <div class="leaderboard-card">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title">
+            <span>🏆</span> 이번 주 공약 랭킹
+          </div>
+          <div class="leaderboard-filters">
+            <select>
+              <option>이번 주</option>
+              <option>이번 달</option>
+              <option>전체</option>
+            </select>
+            <select>
+              <option>전체 지역</option>
+              <option>서울특별시</option>
+              <option>경기도</option>
+              <option>부산광역시</option>
+            </select>
+            <select>
+              <option>전체 선거유형</option>
+              <option>광역단체장</option>
+              <option>기초단체장</option>
+              <option>광역의원</option>
+              <option>기초의원</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="rank-list">
+          <div class="rank-row top-3">
+            <div class="rank-num gold">1</div>
+            <div class="rank-info">
+              <div class="rank-name">김민정</div>
+              <div class="rank-meta">
+                <span class="election-badge">광역단체장</span>
+                서울특별시
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value green">93.2</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 5개</div>
+            </div>
+          </div>
+
+          <div class="rank-row top-3">
+            <div class="rank-num silver">2</div>
+            <div class="rank-info">
+              <div class="rank-name">박성호</div>
+              <div class="rank-meta">
+                <span class="election-badge">기초단체장</span>
+                경기도 성남시
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value green">89.7</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 4개</div>
+            </div>
+          </div>
+
+          <div class="rank-row top-3">
+            <div class="rank-num bronze">3</div>
+            <div class="rank-info">
+              <div class="rank-name">이수연</div>
+              <div class="rank-meta">
+                <span class="election-badge">광역의원</span>
+                부산광역시 해운대구
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value green">87.4</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 3개</div>
+            </div>
+          </div>
+
+          <div class="rank-row">
+            <div class="rank-num normal">4</div>
+            <div class="rank-info">
+              <div class="rank-name">최준혁</div>
+              <div class="rank-meta">
+                <span class="election-badge">기초의원</span>
+                대구광역시 수성구
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value green">82.1</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 6개</div>
+            </div>
+          </div>
+
+          <div class="rank-row">
+            <div class="rank-num normal">5</div>
+            <div class="rank-info">
+              <div class="rank-name">정다운</div>
+              <div class="rank-meta">
+                <span class="election-badge">광역단체장</span>
+                인천광역시
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value green">80.5</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 4개</div>
+            </div>
+          </div>
+
+          <div class="rank-row">
+            <div class="rank-num normal">6</div>
+            <div class="rank-info">
+              <div class="rank-name">한지원</div>
+              <div class="rank-meta">
+                <span class="election-badge">기초의원</span>
+                경기도 고양시
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value yellow">76.3</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 3개</div>
+            </div>
+          </div>
+
+          <div class="rank-row">
+            <div class="rank-num normal">7</div>
+            <div class="rank-info">
+              <div class="rank-name">송현우</div>
+              <div class="rank-meta">
+                <span class="election-badge">광역의원</span>
+                대전광역시 유성구
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-value yellow">72.8</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">공약 2개</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <h2>주요 기능</h2>
+      <ul class="feature-grid">
+        <li><span class="icon">✓</span><div class="txt"><strong>공약 적합도 점검</strong> — 정강·정책 부합 여부 + 보완 체크리스트</div></li>
+        <li><span class="icon">↔</span><div class="txt"><strong>중복·유사 탐지</strong> — 타 후보 공약과 유사·중복 항목 파악</div></li>
+        <li><span class="icon">🗳️</span><div class="txt"><strong>지역·선거구 공약 조회</strong> — 시도·선거구·선거 타입별 후보 공약 비교</div></li>
+        <li><span class="icon">🏆</span><div class="txt"><strong>2022 당선인 공약 비교</strong> — 당선인 공약과 비교해 차별화 포인트 파악</div></li>
+      </ul>
+    </section>
+
+    <p class="footer">
+      개혁신당 정책국<br>
+      문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+    </p>
+  </div>
+</body>
+</html>
