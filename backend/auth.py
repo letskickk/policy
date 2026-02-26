@@ -73,6 +73,12 @@ def signup(
     if not phone:
         return False, "전화번호를 입력하세요."
 
+    ep_lower = (election_position or "").strip().lower()
+    if ep_lower != "party_official" and not (region_code or "").strip():
+        return False, "시·도를 선택하세요."
+    if ep_lower in ("regional_council", "local_mayor", "local_council") and not (district_code or "").strip():
+        return False, "선거구를 선택하세요."
+
     role = ROLE_ADMIN if email in ADMIN_EMAILS else ROLE_USER
     status = STATUS_APPROVED if email in ADMIN_EMAILS else STATUS_PENDING
     email_verified = 1
