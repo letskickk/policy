@@ -1026,16 +1026,20 @@ async def api_admin_applicants_upload(request: Request, file: UploadFile = File(
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx)만 업로드 가능합니다.")
 
-    import io
-    import openpyxl
+    try:
+        import io
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="서버에 openpyxl이 설치되지 않았습니다. pip install openpyxl")
+
     from backend.database import get_connection
     from backend.applicant_verify import reverify_all_users
 
     content = await file.read()
     try:
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
-    except Exception:
-        raise HTTPException(status_code=400, detail="엑셀 파일을 열 수 없습니다.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"엑셀 파일을 열 수 없습니다: {str(e)[:100]}")
 
     ws = wb.active
     rows = list(ws.iter_rows(min_row=2, values_only=True))  # 헤더 제외
@@ -1056,7 +1060,7 @@ async def api_admin_applicants_upload(request: Request, file: UploadFile = File(
             region_province = str(row[6] or "").strip()
             district_info = str(row[7] or "").strip()
             election_position = str(row[8] or "").strip()
-            doc_submitted = 1 if str(row[9] or "").strip() == "●" else 0
+            doc_submitted = 1 if (len(row) > 9 and str(row[9] or "").strip() == "●") else 0
             interview_done = 1 if (len(row) > 10 and str(row[10] or "").strip() == "●") else 0
             status_note = str(row[11] or "").strip() if len(row) > 11 else ""
             conn.execute(
@@ -1066,14 +1070,21 @@ async def api_admin_applicants_upload(request: Request, file: UploadFile = File(
             )
             inserted += 1
         conn.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
+        logger.exception("엑셀 업로드 DB 저장 실패")
         raise HTTPException(status_code=500, detail=f"DB 저장 실패: {str(e)[:200]}")
     finally:
         conn.close()
 
     # 기존 가입자 전원 재검증
-    reverified = reverify_all_users()
+    try:
+        reverified = reverify_all_users()
+    except Exception:
+        logger.exception("재검증 실패")
+        reverified = 0
     return {"message": f"지원서 {inserted}건 저장, 기존 사용자 {reverified}명 재검증 완료"}
 
 
