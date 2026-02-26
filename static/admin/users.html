@@ -489,7 +489,10 @@
           body: fd,
           credentials: 'include'
         });
-        const d = await r.json();
+        if (r.status === 413) { statusEl.textContent = '파일 크기 초과 (nginx 설정 확인)'; return; }
+        const text = await r.text();
+        let d;
+        try { d = JSON.parse(text); } catch (_) { statusEl.textContent = '서버 오류: ' + text.slice(0, 100); return; }
         if (r.ok) {
           statusEl.textContent = d.message || '완료';
           setTimeout(() => location.reload(), 1500);
@@ -497,7 +500,7 @@
           statusEl.textContent = d.detail || '업로드 실패';
         }
       } catch (err) {
-        statusEl.textContent = '서버 연결 실패';
+        statusEl.textContent = '서버 연결 실패: ' + (err.message || '');
       }
       e.target.value = '';
     });
