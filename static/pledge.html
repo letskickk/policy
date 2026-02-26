@@ -155,12 +155,14 @@
       color: var(--text-strong);
       margin-bottom: 0.75rem;
       letter-spacing: -0.03em;
+      word-break: keep-all;
     }
     .subtitle{
       font-size: 1.05rem;
       color: var(--text);
       font-weight: 600;
       line-height: 1.7;
+      word-break: keep-all;
     }
 
     /* --- [카드] --- */
@@ -218,6 +220,20 @@
       background: var(--input-bg-focus);
       box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
     }
+    /* 통합 입력 그룹 내 textarea는 개별 스타일 해제 */
+    .pledge-input-group textarea{
+      min-height: 200px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 0.6rem 1.25rem 1.25rem;
+    }
+    .pledge-input-group textarea:focus{
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
     .input-text{
       width: 100%;
       padding: 0.85rem 1rem;
@@ -234,6 +250,56 @@
       border-color: rgba(255,255,255,0.45);
       background: var(--input-bg-focus);
       box-shadow: 0 0 0 4px var(--cta-ring);
+    }
+
+    /* 제목+내용 통합 입력 영역 */
+    .pledge-input-group{
+      border: 1px solid var(--input-border);
+      border-radius: 16px;
+      background: var(--input-bg);
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.22);
+    }
+    .pledge-input-group:focus-within{
+      border-color: rgba(255,255,255,0.45);
+      box-shadow: 0 0 0 4px var(--cta-ring), inset 0 2px 4px rgba(0,0,0,0.22);
+    }
+    .pledge-input-group .pledge-title-input{
+      width: 100%;
+      padding: 0.9rem 1.25rem 0.6rem;
+      border: none;
+      background: transparent;
+      color: var(--text-strong);
+      font-size: 1.1rem;
+      font-weight: 800;
+      outline: none;
+      letter-spacing: -0.01em;
+    }
+    .pledge-input-group .pledge-title-input::placeholder{
+      color: rgba(203,213,225,0.7);
+      font-weight: 700;
+    }
+    .pledge-input-group .pledge-divider{
+      height: 1px;
+      margin: 0 1.25rem;
+      background: var(--input-border);
+    }
+    .pledge-input-group .pledge-content-area{
+      width: 100%;
+      min-height: 200px;
+      padding: 0.6rem 1.25rem 1.25rem;
+      border: none;
+      background: transparent;
+      color: var(--text-strong);
+      font-size: 1.02rem;
+      line-height: 1.65;
+      resize: vertical;
+      outline: none;
+      box-shadow: none;
+    }
+    .pledge-input-group .pledge-content-area::placeholder{
+      color: rgba(203,213,225,0.75);
     }
 
     /* --- [버튼: 메인 CTA 톤(화이트)로 통일] --- */
@@ -310,6 +376,11 @@
     .badge.yellow{ background: rgba(250,204,21,0.18); color: #fef08a; border: 1px solid rgba(250,204,21,0.35); }
     .badge.red{ background: rgba(248,113,113,0.18); color: #fca5a5; border: 1px solid rgba(248,113,113,0.35); }
     .result-actions{ display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap; }
+    .result-actions .btn-primary{
+      display:inline-block; width:auto; margin-top:0;
+      padding:0.5rem 1rem; font-size:0.85rem; border-radius:10px;
+      box-shadow:none;
+    }
     .btn-secondary{
       padding:0.5rem 1rem; border-radius:10px; font-weight:700; font-size:0.85rem;
       color:var(--text); background:rgba(255,255,255,0.08); border:1px solid var(--border);
@@ -561,6 +632,10 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     .error-message{
       padding: 1rem 1.25rem;
@@ -574,6 +649,30 @@
       gap: 0.75rem;
     }
     .error-message::before{ content:"⚠️"; }
+
+    .quota-bar-wrap{
+      display:grid; grid-template-columns:1fr; gap:0.55rem;
+      margin-top:0.75rem; padding:0.7rem 1rem;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18);
+      border-radius:10px;
+    }
+    .quota-item{
+      display:grid; grid-template-columns:4rem 1fr auto;
+      align-items:center; gap:0.6rem;
+      font-size:0.82rem; color:var(--muted);
+    }
+    .quota-item .quota-label{ font-weight:700; white-space:nowrap; }
+    .quota-track{
+      height:7px; border-radius:99px;
+      background:rgba(148,163,184,0.2); overflow:hidden;
+    }
+    .quota-fill{
+      height:100%; border-radius:99px;
+      background:linear-gradient(90deg,#ff7210,#38bdf8);
+      transition:width 0.4s ease;
+    }
+    .quota-fill.warn{ background:linear-gradient(90deg,#f59e0b,#ef4444); }
+    .quota-count{ font-weight:700; color:var(--text-strong); white-space:nowrap; text-align:right; }
 
     .disclaimer-box{
       margin-top: 1.35rem;
@@ -589,6 +688,15 @@
       color: #ffb37a;
       font-weight: 900;
     }
+    .char-counter {
+      text-align: right;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+    .char-counter.warn { color: #f59e0b; }
+    .char-counter.over { color: #ef4444; font-weight: 700; }
 
     .footer{
       margin-top: 2.6rem;
@@ -633,7 +741,7 @@
   <div class="top-bar">
     <div class="brand">
       <a href="/" class="brand-logo">
-        <img src="https://www.reformparty.kr/theme/basic/download/Logo_01.svg" alt="개혁신당 로고">
+        <img src="/static/logo.svg" alt="개혁신당 로고">
         <span class="brand-inner">
           <span class="brand-title">개혁신당 정책 멘토링</span>
           <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
@@ -651,21 +759,38 @@
   </div>
 
   <header>
-    <h1>공약 분석</h1>
-    <p class="subtitle">작성하신 공약을 입력하면 당의 정강정책 및 기존 공약과의 정합성을 AI가 분석해 드립니다.</p>
+    <h1>공약 분석 <span style="font-size:0.45em;font-weight:400;color:#64748b;vertical-align:middle;">v1.1</span></h1>
+    <p class="subtitle">공약을 입력하면 정강정책 부합 여부와 보완 포인트를 AI가 분석해 드립니다.</p>
   </header>
 
   <main>
     <section class="card">
-      <label for="pledge" class="form-label">공약 내용 입력</label>
+      <label class="form-label">공약 입력</label>
       <p class="form-hint">
         아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
         <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
       </div>
-      <textarea id="pledge" placeholder="여기에 공약 내용을 입력해 주세요&#13;&#10;&lt;예시&gt;&#13;&#10;(제목) AI 기반 통학버스 안전 3대 혁신방안&#13;&#10;이제는 AI가 아이들의 안전벨트가 됩니다&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축(EDR 기반 중증도 분석 + 병원/구급차 자동 연계) ③ 교통안전공단 내 전담기구 설치로 범부처 연계 운영&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소 ▲ 기술 기반 교통안전 체계 확산 기반 마련"></textarea>
+      <div class="pledge-input-group">
+        <input type="text" id="pledgeTitle" class="pledge-title-input" maxlength="100" placeholder="공약 제목을 입력하세요  (예: AI 기반 통학버스 안전 3대 혁신방안)" />
+        <div class="pledge-divider"></div>
+        <textarea id="pledge" class="pledge-content-area" maxlength="10000" placeholder="공약 내용을 입력하세요&#13;&#10;&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축 ③ 교통안전공단 내 전담기구 설치&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소"></textarea>
+      </div>
+      <div id="charCounter" class="char-counter">0 / 10,000자</div>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
+      <div id="quotaBar" class="quota-bar-wrap" style="display:none;">
+        <div class="quota-item">
+          <span class="quota-label">오늘</span>
+          <div class="quota-track"><div class="quota-fill" id="quotaDailyFill" style="width:0%"></div></div>
+          <span class="quota-count" id="quotaDailyText">-</span>
+        </div>
+        <div class="quota-item">
+          <span class="quota-label">이번달</span>
+          <div class="quota-track"><div class="quota-fill" id="quotaMonthlyFill" style="width:0%"></div></div>
+          <span class="quota-count" id="quotaMonthlyText">-</span>
+        </div>
+      </div>
     </section>
 
     <div id="draftHelperModal" class="draft-modal" style="display:none;" aria-hidden="true">
@@ -693,7 +818,10 @@
     <section class="card">
       <h2 class="form-label">분석 결과</h2>
       <div class="result-container">
-        <div id="result" class="result-content"></div>
+        <div id="result" class="result-content empty">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>
+          공약 내용을 입력하고 'AI 분석 시작하기' 버튼을 눌러주세요.
+        </div>
       </div>
       <div class="disclaimer-box">
         본 분석 결과는 <strong><bold>AI를 활용하여 작성된 참고 자료</strong></bold>입니다.<br>
@@ -711,6 +839,30 @@
 
   <script>
     let meData = { is_admin: false };
+    function renderQuota(q) {
+      if (!q) return;
+      const bar = document.getElementById('quotaBar');
+      if (!bar) return;
+      const dailyPct   = Math.min(100, Math.round(q.daily_used   / q.daily_limit   * 100));
+      const monthlyPct = Math.min(100, Math.round(q.monthly_used / q.monthly_limit * 100));
+      const dFill = document.getElementById('quotaDailyFill');
+      const mFill = document.getElementById('quotaMonthlyFill');
+      dFill.style.width = dailyPct + '%';
+      mFill.style.width = monthlyPct + '%';
+      dFill.className   = 'quota-fill' + (q.daily_remaining   <= 3  ? ' warn' : '');
+      mFill.className   = 'quota-fill' + (q.monthly_remaining <= 10 ? ' warn' : '');
+      document.getElementById('quotaDailyText').textContent   = q.daily_used   + '/' + q.daily_limit   + '회';
+      document.getElementById('quotaMonthlyText').textContent = q.monthly_used + '/' + q.monthly_limit + '회';
+      bar.style.display = 'block';
+    }
+
+    async function fetchQuota() {
+      try {
+        const r = await fetch('/api/usage/summary', { credentials: 'include' });
+        if (r.ok) renderQuota(await r.json());
+      } catch(e) {}
+    }
+
     (async function() {
       try {
         const r = await fetch('/api/auth/me', { credentials: 'include' });
@@ -722,6 +874,7 @@
             const row = document.getElementById('loginRow');
             row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
             row.style.display = 'block';
+            fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
         }
       } catch (e) {}
@@ -729,9 +882,18 @@
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
+    const charCounterEl = document.getElementById('charCounter');
+    const MAX_CHARS = 10000;
     let lastResultFullText = '';
 
-    // 초기 스켈레톤은 SECTION_TITLES 정의 후 showSkeleton()으로 렌더링됨
+    function updateCharCounter() {
+      const len = (pledgeEl.value || '').length;
+      charCounterEl.textContent = len.toLocaleString('ko-KR') + ' / ' + MAX_CHARS.toLocaleString('ko-KR') + '자';
+      charCounterEl.className = 'char-counter' + (len > MAX_CHARS ? ' over' : len > MAX_CHARS * 0.9 ? ' warn' : '');
+    }
+    pledgeEl.addEventListener('input', updateCharCounter);
+
+    const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고 \'AI 분석 시작하기\' 버튼을 눌러주세요.';
 
     function showResult(text) {
       resultEl.innerHTML = text;
@@ -764,29 +926,6 @@
     let _streamSectionIdx = 0;
     let _streamActiveBadge = null;  // 현재 스트리밍 중인 섹션의 뱃지 참조
 
-    function showSkeleton() {
-      let cardsHtml = '';
-      SECTION_TITLES.forEach(function(title, i) {
-        const idx = i + 1;
-        cardsHtml +=
-          '<div class="section-card">' +
-            '<div class="section-card-head">' +
-              '<div class="section-card-title">' + idx + '. ' + escapeHtml(title) + '</div>' +
-              '<span class="line-tag" id="sBdg' + idx + '">' + idx + '</span>' +
-            '</div>' +
-            '<div class="section-card-body" id="sBdy' + idx + '">' +
-              '<div class="section-line" style="color:var(--muted);font-style:italic;">분석 시작 후 결과가 여기에 표시됩니다</div>' +
-            '</div>' +
-          '</div>';
-      });
-      resultEl.innerHTML =
-        '<div class="score-board" id="scorePlaceholder" style="opacity:0.45;">' +
-          '<div class="score" style="font-size:1.3rem;">총점: ———</div>' +
-          '<span style="color:var(--muted);font-size:0.9rem;">분석 후 총점이 여기에 표시됩니다</span>' +
-        '</div>' +
-        '<div class="section-cards" id="streamCards">' + cardsHtml + '</div>';
-      resultEl.className = 'result-content';
-    }
 
     function initStreamingCards() {
       _streamBuf = '';
@@ -794,25 +933,27 @@
       _streamSectionIdx = 0;
       _streamActiveBadge = null;
 
-      // 스켈레톤이 없으면(재분석 등) 새로 렌더링
-      if (!document.getElementById('scorePlaceholder')) showSkeleton();
+      // 섹션 카드를 처음부터 로딩 상태로 생성
+      let cardsHtml = '';
+      SECTION_TITLES.forEach(function(title, i) {
+        const idx = i + 1;
+        cardsHtml +=
+          '<div class="section-card" style="animation:fadeInUp 0.3s ease both;animation-delay:' + (i * 0.06) + 's">' +
+            '<div class="section-card-head">' +
+              '<div class="section-card-title">' + idx + '. ' + escapeHtml(title) + '</div>' +
+              '<span class="line-tag streaming" id="sBdg' + idx + '">' + idx + '</span>' +
+            '</div>' +
+            '<div class="section-card-body" id="sBdy' + idx + '"></div>' +
+          '</div>';
+      });
 
-      // 스코어보드 → 스피너 + 플레이스홀더 텍스트
-      const scorePh = document.getElementById('scorePlaceholder');
-      if (scorePh) {
-        scorePh.style.opacity = '1';
-        scorePh.innerHTML =
+      resultEl.innerHTML =
+        '<div class="score-board" id="scorePlaceholder">' +
           '<div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0;"></div>' +
-          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">분석 완료 후 총점이 여기에 표시됩니다</span>';
-      }
-
-      // 각 섹션 카드 body 비우기 + badge를 streaming 상태로
-      for (let i = 1; i <= SECTION_TITLES.length; i++) {
-        const bodyEl = document.getElementById('sBdy' + i);
-        const badgeEl = document.getElementById('sBdg' + i);
-        if (bodyEl) bodyEl.innerHTML = '';
-        if (badgeEl) badgeEl.classList.add('streaming');
-      }
+          '<span style="font-size:1rem;font-weight:700;color:var(--muted);">분석 완료 후 총점이 여기에 표시됩니다</span>' +
+        '</div>' +
+        '<div class="section-cards" id="streamCards">' + cardsHtml + '</div>';
+      resultEl.className = 'result-content';
     }
 
     function _stopActiveBadge() {
@@ -894,9 +1035,6 @@
         .replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;');
     }
-
-    // 페이지 로드 시 스켈레톤 렌더링
-    showSkeleton();
 
     function toNumber(v) {
       return (typeof v === 'number' && !Number.isNaN(v)) ? v : null;
@@ -1077,6 +1215,7 @@
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
           <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
+          <button type="button" class="btn-primary" id="necFormBtn">선거공약서 작성</button>
           <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
@@ -1139,6 +1278,31 @@
           w.document.close();
           w.focus();
           setTimeout(() => { w.print(); }, 250);
+        });
+      }
+      const necFormBtn = document.getElementById('necFormBtn');
+      if (necFormBtn) {
+        necFormBtn.addEventListener('click', () => {
+          if (totalScore === null || totalScore < 85) {
+            alert('총점 85점 이상부터 선거공약서 작성이 가능합니다.');
+            return;
+          }
+          const pledgeEl = document.getElementById('pledge');
+          const pledgeInput = (pledgeEl && pledgeEl.value) ? pledgeEl.value : '';
+          if (!pledgeInput) { alert('공약 내용을 입력해 주세요.'); return; }
+          showNecFormModal(
+            pledgeInput,
+            {
+              candidateName: meData.name || meData.email || '',
+              electionType: meData.election_position || meData.election_type || '',
+              regionName: meData.region_name || '',
+              districtName: meData.district_name || '',
+            },
+            {
+              mode: 'generate',
+              resultText: lastResultFullText || '',
+            }
+          );
         });
       }
     }
@@ -1302,10 +1466,25 @@
       }
     });
 
+    const pledgeTitleEl = document.getElementById('pledgeTitle');
+
     btnEl.addEventListener('click', async function () {
-      const text = (pledgeEl.value || '').trim();
-      if (!text) {
-        showError('공약 내용이 입력되지 않았습니다. 내용을 작성해 주세요.');
+      const titleText = (pledgeTitleEl.value || '').trim();
+      const contentText = (pledgeEl.value || '').trim();
+      if (!titleText) {
+        showError('공약 제목을 입력해 주세요.');
+        pledgeTitleEl.focus();
+        return;
+      }
+      if (!contentText) {
+        showError('공약 내용을 입력해 주세요.');
+        pledgeEl.focus();
+        return;
+      }
+      // 제목 + 내용을 결합하여 분석 텍스트 구성
+      const text = titleText ? (titleText + '\n\n' + contentText) : contentText;
+      if (text.length > MAX_CHARS) {
+        showError(`입력 내용이 너무 깁니다. 현재 ${text.length.toLocaleString('ko-KR')}자 / 최대 ${MAX_CHARS.toLocaleString('ko-KR')}자`);
         pledgeEl.focus();
         return;
       }
@@ -1351,6 +1530,7 @@
         finalRendered = true;
         renderCombinedResult(baseText, verifyData || {});
         resetBtn();
+        fetchQuota();  // 분석 완료 후 쿼터 갱신
         console.log('[perf] final render in', Math.round(performance.now() - t0), 'ms');
       }
 
@@ -1457,5 +1637,6 @@
     });
 
   </script>
+  <script src="/static/js/nec-form-modal.js"></script>
 </body>
 </html>
