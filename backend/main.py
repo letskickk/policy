@@ -554,8 +554,9 @@ def _data_gokr_gusigun(sd_name: Optional[str] = None, page_no: int = 1, num_of_r
     return items if isinstance(items, list) else [items]
 
 
-def _data_gokr_sgg_list(sg_typecode: int, page_no: int = 1, num_of_rows: int = 1000) -> list:
-    """공공데이터 getCommonSggCodeList. sgId=20220601, sgTypecode 4=광역의원 5=기초의원."""
+def _data_gokr_sgg_list(sg_typecode: int, page_no: int = 1, num_of_rows: int = 100) -> list:
+    """공공데이터 getCommonSggCodeList. sgId=20220601, sgTypecode 4=광역의원 6=기초의원.
+    NOTE: 이 API는 numOfRows 최대 100개 제한."""
     if not DATA_GO_KR_API_KEY:
         return []
     from urllib.parse import urlencode
@@ -722,7 +723,7 @@ def api_signup_district_sub(
             seen = set()
             page = 1
             while True:
-                items = _data_gokr_sgg_list(6, page_no=page, num_of_rows=500)
+                items = _data_gokr_sgg_list(6, page_no=page, num_of_rows=100)
                 if not items:
                     break
                 for it in items:
@@ -739,7 +740,7 @@ def api_signup_district_sub(
                     )
                     if sub and sub != "단독" and sub not in seen:
                         seen.add(sub)
-                if len(items) < 500:
+                if len(items) < 100:
                     break
                 page += 1
             if seen:
