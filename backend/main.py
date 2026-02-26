@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -1013,6 +1013,82 @@ def api_admin_delete_user(body: DeleteUserBody, request: Request):
     except Exception:
         conn.rollback()
         raise HTTPException(status_code=500, detail="삭제 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
+
+
+@app.post("/api/admin/applicants/upload")
+async def api_admin_applicants_upload(request: Request, file: UploadFile = File(...)):
+    """관리자가 지원서 엑셀을 업로드하면 party_applicants 테이블에 저장 후 기존 사용자 재검증."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx)만 업로드 가능합니다.")
+
+    import io
+    import openpyxl
+    from backend.database import get_connection
+    from backend.applicant_verify import reverify_all_users
+
+    content = await file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="엑셀 파일을 열 수 없습니다.")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(min_row=2, values_only=True))  # 헤더 제외
+    wb.close()
+
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM party_applicants")  # 전체 교체
+        inserted = 0
+        for row in rows:
+            if not row or len(row) < 9:
+                continue
+            name = str(row[1] or "").strip()
+            if not name:
+                continue
+            phone = str(row[4] or "").strip()
+            email = str(row[5] or "").strip()
+            region_province = str(row[6] or "").strip()
+            district_info = str(row[7] or "").strip()
+            election_position = str(row[8] or "").strip()
+            doc_submitted = 1 if str(row[9] or "").strip() == "●" else 0
+            interview_done = 1 if (len(row) > 10 and str(row[10] or "").strip() == "●") else 0
+            status_note = str(row[11] or "").strip() if len(row) > 11 else ""
+            conn.execute(
+                """INSERT INTO party_applicants (name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note),
+            )
+            inserted += 1
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"DB 저장 실패: {str(e)[:200]}")
+    finally:
+        conn.close()
+
+    # 기존 가입자 전원 재검증
+    reverified = reverify_all_users()
+    return {"message": f"지원서 {inserted}건 저장, 기존 사용자 {reverified}명 재검증 완료"}
+
+
+@app.get("/api/admin/applicants")
+def api_admin_applicants(request: Request):
+    """업로드된 지원서 목록 조회."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note FROM party_applicants ORDER BY id"
+        ).fetchall()
+        return {"applicants": [dict(r) for r in rows], "total": len(rows)}
     finally:
         conn.close()
 
