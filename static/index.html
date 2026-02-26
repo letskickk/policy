@@ -576,7 +576,7 @@
           <div class="leaderboard-title" id="leaderboardTitle">
             <span>&#127942;</span> 공약 랭킹
           </div>
-          <div class="week-nav" id="weekNav" style="display:none;">
+          <div class="week-nav" id="weekNav">
             <button class="week-nav-btn" id="weekPrev" title="이전 주">◀</button>
             <span class="week-nav-label" id="weekNavLabel"></span>
             <button class="week-nav-btn" id="weekNext" title="다음 주" disabled>▶</button>
@@ -795,9 +795,9 @@
         weekPrev.dataset.week = data.prev_week || '';
         weekPrev.disabled = !data.prev_week;
         weekNext.dataset.week = data.next_week || '';
-        // 주간 네비게이션은 당분간 숨김 (데이터 충분히 쌓이면 활성화)
-        // const weekNav = document.getElementById('weekNav');
-        // weekNav.style.display = (data.prev_week || data.next_week) ? '' : 'none';
+        // 서비스 시작 주(2026-02-23) 이전으로는 이동 불가
+        const FIRST_WEEK = '2026-02-23';
+        weekPrev.style.display = (data.prev_week && data.prev_week >= FIRST_WEEK) ? '' : 'none';
         weekNext.disabled = !data.next_week;
         // 챔피언은 이번 주에서만 표시
         if (data.is_current_week) {
