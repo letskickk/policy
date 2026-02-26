@@ -511,7 +511,13 @@
           items.forEach(it => {
             const scoreText = it.total_score != null ? `${it.total_score}점` : '점수 없음';
             const scoreColor = it.total_score != null ? scoreClass(it.total_score) : '';
-            const dateText = (it.created_at || '').slice(0, 16).replace('T', ' ');
+            // UTC → KST 변환
+            const rawDate = it.created_at || '';
+            let dateText = rawDate.slice(0, 16).replace('T', ' ');
+            try {
+              const utc = new Date(rawDate.endsWith('Z') ? rawDate : rawDate + 'Z');
+              if (!isNaN(utc)) dateText = utc.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\./g, '-').replace(/\s+/g, ' ');
+            } catch (_) {}
             // 첫 줄을 제목으로 표시, 나머지는 내용 미리보기
             const preview = it.input_preview || '';
             const nlIdx = preview.indexOf('\n');

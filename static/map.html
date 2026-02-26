@@ -296,6 +296,27 @@
       cursor: pointer;
     }
 
+    .panel-cta-section{
+      margin-bottom: 1.25rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-cta-section .panel-cta-btn{
+      background: rgba(255,114,16,0.12);
+      border-color: rgba(255,179,122,0.3);
+      color: #ffb37a;
+    }
+    .panel-cta-section .panel-cta-btn:hover{
+      background: rgba(255,114,16,0.2);
+      color: #ffd4a8;
+      border-color: rgba(255,179,122,0.45);
+    }
+    .panel-cta-desc{
+      margin-top: 0.45rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      opacity: 0.8;
+    }
     .panel-cta-row{
       margin-top: 1rem;
     }
@@ -677,6 +698,10 @@
     </div>
 
     <div class="panel">
+      <div class="panel-cta-section">
+        <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
+        <p class="panel-cta-desc">나의 공약을 등록하고 지도에 공개하세요</p>
+      </div>
       <div class="panel-header">
         <h2 class="panel-title" id="panel-title">지역을 선택하세요</h2>
         <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하여 해당 지역의 출마자 목록을 확인하세요</p>
@@ -701,9 +726,6 @@
           <select id="districtSelect" class="filter-select" disabled aria-label="선거구 선택">
             <option value="">지역을 먼저 선택하세요</option>
           </select>
-        </div>
-        <div class="panel-cta-row">
-          <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
         </div>
       </div>
 
