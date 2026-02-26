@@ -576,7 +576,7 @@
           <div class="leaderboard-title" id="leaderboardTitle">
             <span>&#127942;</span> 공약 랭킹
           </div>
-          <div class="week-nav" id="weekNav">
+          <div class="week-nav" id="weekNav" style="display:none;">
             <button class="week-nav-btn" id="weekPrev" title="이전 주">◀</button>
             <span class="week-nav-label" id="weekNavLabel"></span>
             <button class="week-nav-btn" id="weekNext" title="다음 주" disabled>▶</button>
@@ -785,7 +785,7 @@
         if (data.week_label && leaderboardTitle) {
           leaderboardTitle.innerHTML = '<span>&#127942;</span> ' + safe(data.week_label);
         }
-        // 주간 네비게이션 업데이트
+        // 주간 네비게이션 업데이트 (과거 주 데이터가 있을 때만 표시)
         const ws = data.week_start;
         const sunday = new Date(ws);
         sunday.setDate(sunday.getDate() + 6);
@@ -793,8 +793,11 @@
         const dd = String(sunday.getDate()).padStart(2, '0');
         weekNavLabel.textContent = ws.slice(5).replace('-', '/') + ' ~ ' + mm + '/' + dd;
         weekPrev.dataset.week = data.prev_week || '';
-        weekPrev.disabled = false;
+        weekPrev.disabled = !data.prev_week;
         weekNext.dataset.week = data.next_week || '';
+        // 주간 네비게이션은 당분간 숨김 (데이터 충분히 쌓이면 활성화)
+        // const weekNav = document.getElementById('weekNav');
+        // weekNav.style.display = (data.prev_week || data.next_week) ? '' : 'none';
         weekNext.disabled = !data.next_week;
         // 챔피언은 이번 주에서만 표시
         if (data.is_current_week) {
