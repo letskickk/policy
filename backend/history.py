@@ -121,7 +121,7 @@ def get_history_item(user_id: int, history_id: int) -> Optional[dict]:
         cur = conn.execute(
             """
             SELECT id, kind, created_at, status_code, from_cache,
-                   input_text, options_json, result_text, result_format
+                   input_text, options_json, result_text, result_format, total_score
             FROM analysis_history
             WHERE user_id = ? AND id = ?
             """,

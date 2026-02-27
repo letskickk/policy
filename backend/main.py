@@ -3315,3 +3315,33 @@ def api_leaderboard(
         }
     finally:
         conn.close()
+
+
+@app.post("/api/admin/repair-pledge-scores", tags=["admin"])
+def api_admin_repair_pledge_scores(request: Request):
+    """analysis_result가 있지만 total_score가 NULL인 공약의 점수를 재파싱하여 복구한다."""
+    require_admin(request)
+    _ensure_db_ready()
+    from backend.database import get_connection
+    from backend.score_parser import parse_total_score
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, analysis_result FROM candidate_pledges WHERE total_score IS NULL AND analysis_result IS NOT NULL AND analysis_result != ''"
+        ).fetchall()
+        repaired = 0
+        details = []
+        for r in rows:
+            score = parse_total_score(r["analysis_result"])
+            if score is not None:
+                conn.execute(
+                    "UPDATE candidate_pledges SET total_score = ? WHERE id = ?",
+                    (score, r["id"]),
+                )
+                repaired += 1
+                details.append({"pledge_id": r["id"], "score": score})
+        conn.commit()
+        return {"total_null": len(rows), "repaired": repaired, "details": details}
+    finally:
+        conn.close()

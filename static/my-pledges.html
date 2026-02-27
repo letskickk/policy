@@ -553,8 +553,13 @@
         const inputText = item.input_text || '';
         const resultText = item.result_text || '';
         let score = null;
-        const m = resultText.match(/종합\s*점수[^0-9]*(\d{1,3}(?:\.\d+)?)/);
-        if (m) score = parseFloat(m[1]);
+        // 백엔드 파서가 추출한 점수 우선 사용 (프론트 정규식보다 정확)
+        if (item.total_score != null) {
+          score = item.total_score;
+        } else {
+          const m = resultText.match(/종합\s*점수[^0-9]*(\d{1,3}(?:\.\d+)?)/);
+          if (m) score = parseFloat(m[1]);
+        }
         const now = new Date().toISOString();
 
         // 첫 줄 = 제목, 나머지 = 내용 (공약 텍스트 기준)
