@@ -411,7 +411,11 @@
             approvalInfoEl.innerHTML = '<div class="approval-info approved">공약이 승인되어 지도에 공개 중입니다. 수정 시 재승인이 필요합니다.</div>';
           } else if (status === 'REJECTED') {
             statusBadgeEl.innerHTML += ' <span class="badge badge-rejected">거절됨</span>';
-            approvalInfoEl.innerHTML = '<div class="approval-info rejected">공약이 거절되었습니다. 수정 후 다시 저장하면 재심사 요청됩니다.</div>';
+            const rejReason = data.candidate.rejection_reason || '';
+            const rejReasonHtml = rejReason
+              ? `<div style="margin-top:0.5rem;padding:0.5rem 0.7rem;background:rgba(239,68,68,0.08);border-radius:8px;font-size:0.88rem;color:#fca5a5;line-height:1.5;"><strong style="color:#f87171;">거절 사유:</strong> ${esc(rejReason)}</div>`
+              : '';
+            approvalInfoEl.innerHTML = '<div class="approval-info rejected">공약이 거절되었습니다. 수정 후 다시 저장하면 재심사 요청됩니다.</div>' + rejReasonHtml;
           } else {
             statusBadgeEl.innerHTML += ' <span class="badge badge-pending">승인 대기</span>';
             approvalInfoEl.innerHTML = '<div class="approval-info pending">관리자 승인 대기 중입니다. 승인 후 지도에 공개됩니다.</div>';
@@ -421,7 +425,8 @@
           pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result));
         } else {
           statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
-          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
+          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>'
+            + '<div style="margin-top:0.4rem;padding:0.45rem 0.7rem;background:rgba(250,204,21,0.08);border-radius:8px;font-size:0.83rem;color:#fde047;line-height:1.5;">AI 분석 점수가 높더라도, 정책위원회에서 공약의 완성도·구체성이 부족하다고 판단하면 등록이 거절될 수 있습니다.</div>';
           submitBtn.textContent = '공약 등록';
         }
 

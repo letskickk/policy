@@ -86,6 +86,17 @@
     .list-item .badge-admin { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(255,114,16,0.15); color: #ffb37a; margin-left: 0.5rem; }
     .btn-del { background: transparent; color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
     .btn-del:hover { color: #ef4444; border-color: #ef4444; }
+    .reject-modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; }
+    .reject-modal-overlay.show { display:flex; }
+    .reject-modal { background:#0f1d2f; border:1px solid rgba(148,163,184,0.25); border-radius:16px; padding:1.5rem; width:90%; max-width:440px; }
+    .reject-modal h3 { font-size:1rem; margin-bottom:0.75rem; color:#f8fafc; }
+    .reject-modal textarea { width:100%; min-height:80px; padding:0.6rem; border-radius:8px; border:1px solid rgba(148,163,184,0.25); background:rgba(0,0,0,0.3); color:#fff; font-family:inherit; font-size:0.9rem; resize:vertical; margin-bottom:0.75rem; }
+    .reject-modal .modal-btns { display:flex; gap:0.5rem; justify-content:flex-end; }
+    .reject-modal .modal-btns button { padding:0.4rem 1rem; border-radius:8px; border:none; font-weight:700; font-size:0.85rem; cursor:pointer; }
+    .reject-modal .btn-modal-cancel { background:rgba(148,163,184,0.15); color:#94a3b8; }
+    .reject-modal .btn-modal-confirm { background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); }
+    .rejection-reason-text { margin-top:0.4rem; padding:0.4rem 0.6rem; background:rgba(239,68,68,0.08); border-radius:6px; font-size:0.8rem; color:#fca5a5; line-height:1.5; }
+    .rejection-reason-text .reason-label { font-weight:700; color:#f87171; margin-right:0.3rem; }
     .badge-pending { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(250,204,21,0.18); color: #fde047; margin-left: 0.4rem; }
     .badge-approved { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(34,197,94,0.18); color: #86efac; margin-left: 0.4rem; }
     .badge-rejected { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(239,68,68,0.18); color: #fca5a5; margin-left: 0.4rem; }
@@ -195,7 +206,45 @@
     </div>
   </div>
 
+  <div class="reject-modal-overlay" id="rejectModal">
+    <div class="reject-modal">
+      <h3>공약 거절 사유</h3>
+      <textarea id="rejectReasonInput" placeholder="거절 사유를 입력하세요 (선택사항, 사용자에게 전달됩니다)"></textarea>
+      <div class="modal-btns">
+        <button class="btn-modal-cancel" onclick="closeRejectModal()">취소</button>
+        <button class="btn-modal-confirm" onclick="confirmReject()">거절</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    /* ===== 거절 모달 ===== */
+    let _rejectTargetCid = null;
+    function openRejectModal(cid) {
+      _rejectTargetCid = cid;
+      document.getElementById('rejectReasonInput').value = '';
+      document.getElementById('rejectModal').classList.add('show');
+    }
+    function closeRejectModal() {
+      _rejectTargetCid = null;
+      document.getElementById('rejectModal').classList.remove('show');
+    }
+    async function confirmReject() {
+      const cid = _rejectTargetCid;
+      if (!cid) return;
+      const reason = (document.getElementById('rejectReasonInput').value || '').trim();
+      closeRejectModal();
+      try {
+        const r = await fetch('/api/admin/candidates/' + cid + '/reject', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
+        else alert('거절 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
+
     /* ===== 승인 관리 섹션 ===== */
     const REGION_NAMES = {
       '11':'서울','26':'부산','27':'대구','28':'인천','29':'광주','30':'대전','31':'울산',
@@ -267,6 +316,10 @@
               ${p.content ? `<div class="pledge-content-text">${_escHtml(p.content)}</div>` : '<div class="no-content">세부내용 없음</div>'}
             </div>`).join('');
 
+        const rejReasonHtml = (st === 'REJECTED' && c.rejection_reason)
+          ? `<div class="rejection-reason-text"><span class="reason-label">거절 사유:</span>${_escHtml(c.rejection_reason)}</div>`
+          : '';
+
         return `
         <div class="approval-item" data-cid="${c.candidate_id}">
           <div class="approval-item-header" onclick="togglePledges(this)">
@@ -280,6 +333,7 @@
               ${approveBtn} ${rejectBtn} ${delBtn}
             </span>
           </div>
+          ${rejReasonHtml}
           <div class="approval-pledges">
             ${pledgesHtml}
           </div>
@@ -304,12 +358,7 @@
       } catch (e) { alert('서버 오류'); }
     }
     async function doReject(cid) {
-      if (!confirm('이 후보의 공약을 거절하시겠습니까?')) return;
-      try {
-        const r = await fetch('/api/admin/candidates/' + cid + '/reject', { method: 'POST', credentials: 'include' });
-        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
-        else alert('거절 실패');
-      } catch (e) { alert('서버 오류'); }
+      openRejectModal(cid);
     }
     async function doDeleteApproval(cid, name) {
       if (!confirm(`"${name}" 후보를 삭제하시겠습니까? 공약도 모두 삭제됩니다.`)) return;
@@ -514,12 +563,7 @@
       } catch (e) { alert('서버 오류'); }
     }
     async function rejectCandidate(cid) {
-      if (!confirm('이 후보의 공약을 거절하시겠습니까?')) return;
-      try {
-        const res = await fetch('/api/admin/candidates/' + cid + '/reject', { method: 'POST', credentials: 'include' });
-        if (res.ok) { loadCandidatesList(); loadAllCandidates(); }
-        else alert('거절 실패');
-      } catch (e) { alert('서버 오류'); }
+      openRejectModal(cid);
     }
     function escapeHtml(s) {
       const d = document.createElement('div');

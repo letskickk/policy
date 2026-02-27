@@ -1847,6 +1847,7 @@ def admin_list_candidates(
         sql = """
             SELECT c.id, c.name, c.district_name, c.district_code, c.region_code,
                    c.election_type, c.election_level, c.user_id, c.approval_status,
+                   c.rejection_reason,
                    u.email AS user_email, u.name AS user_name
             FROM candidates c
             LEFT JOIN users u ON c.user_id = u.id
@@ -1906,6 +1907,7 @@ def admin_list_candidates(
             "user_id": r["user_id"],
             "registered_by": r["user_email"] or r["user_name"] if r["user_id"] else None,
             "approval_status": r["approval_status"] or "PENDING",
+            "rejection_reason": r["rejection_reason"] or "",
             "pledges": pledges_map.get(cid, []),
         })
     return result
@@ -1986,12 +1988,18 @@ def admin_approve_candidate(candidate_id: int, request: Request):
     return {"ok": True, "approval_status": "APPROVED"}
 
 
+class RejectBody(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500, description="거절 사유")
+
+
 @app.post("/api/admin/candidates/{candidate_id}/reject", tags=["admin", "candidates"])
-def admin_reject_candidate(candidate_id: int, request: Request):
+def admin_reject_candidate(candidate_id: int, request: Request, body: Optional[RejectBody] = None):
     """관리자 전용 후보 거절."""
     _ensure_db_ready()
     _ = require_admin(request)
     from backend.database import get_connection
+
+    rejection_reason = (body.reason or "").strip() if body else ""
 
     conn = get_connection()
     try:
@@ -2006,8 +2014,8 @@ def admin_reject_candidate(candidate_id: int, request: Request):
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
         conn.execute(
-            "UPDATE candidates SET approval_status = 'REJECTED', updated_at = datetime('now') WHERE id = ?",
-            (candidate_id,),
+            "UPDATE candidates SET approval_status = 'REJECTED', rejection_reason = ?, updated_at = datetime('now') WHERE id = ?",
+            (rejection_reason or None, candidate_id),
         )
         conn.commit()
     except HTTPException:
@@ -2028,6 +2036,7 @@ def admin_reject_candidate(candidate_id: int, request: Request):
                 status="REJECTED",
                 name=existing["user_name"] or "",
                 candidate_name=existing["candidate_name"] or "",
+                rejection_reason=rejection_reason,
             )
         except Exception as e:
             logger.warning("공약 거절 알림 메일 발송 실패 (무시): %s", e)
@@ -2704,7 +2713,7 @@ def api_my_candidate_get(request: Request):
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status FROM candidates WHERE user_id = ? LIMIT 1",
+            "SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status, rejection_reason FROM candidates WHERE user_id = ? LIMIT 1",
             (uid,),
         ).fetchone()
 
@@ -2741,6 +2750,7 @@ def api_my_candidate_get(request: Request):
                 "election_type": row["election_type"],
                 "election_level": row["election_level"],
                 "approval_status": row["approval_status"] or "PENDING",
+                "rejection_reason": row["rejection_reason"] or "",
             },
             "pledges": [
                 {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"],
