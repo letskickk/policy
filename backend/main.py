@@ -197,13 +197,25 @@ _db_ready = False
 
 
 def _ensure_db_ready():
-    """후보/관리자 API용 경량 초기화: DB만 보장."""
+    """후보/관리자 API용 경량 초기화: DB만 보장. 최초 1회 전원 재검증."""
     global _db_ready
     if _db_ready:
         return
-    from backend.database import init_db
+    from backend.database import init_db, get_connection
     init_db()
     _db_ready = True
+
+    # 서버 시작 시 전원 재검증 (party_applicants 데이터가 있을 때만)
+    try:
+        conn = get_connection()
+        has_data = conn.execute("SELECT 1 FROM party_applicants LIMIT 1").fetchone()
+        conn.close()
+        if has_data:
+            from backend.applicant_verify import reverify_all_users
+            n = reverify_all_users()
+            logger.info("서버 시작 시 전원 재검증 완료: %d명", n)
+    except Exception:
+        logger.debug("서버 시작 시 재검증 스킵 (party_applicants 미생성)")
 
 def _ensure_startup():
     """지연 초기화: 첫 요청 시 한 번만 실행."""
