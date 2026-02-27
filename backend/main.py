@@ -1707,6 +1707,7 @@ class RegionResponse(BaseModel):
 class CandidatePledgeResponse(BaseModel):
     title: str = Field(..., description="공약 제목")
     content: Optional[str] = Field(default=None, description="공약 세부내용")
+    total_score: Optional[float] = Field(default=None, description="점검 종합점수")
 
 
 class CandidateListItemResponse(BaseModel):
@@ -1766,7 +1767,7 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
     conn = get_connection()
     try:
         sql = """
-            SELECT title, content
+            SELECT title, content, total_score
             FROM candidate_pledges
             WHERE candidate_id = ?
             ORDER BY priority ASC, datetime(created_at) DESC, id DESC
@@ -1776,7 +1777,7 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
             sql += " LIMIT ?"
             params = (candidate_id, limit)
         rows = conn.execute(sql, params).fetchall()
-        return [CandidatePledgeResponse(title=r["title"], content=r["content"]) for r in rows]
+        return [CandidatePledgeResponse(title=r["title"], content=r["content"], total_score=r["total_score"]) for r in rows]
     finally:
         conn.close()
 
