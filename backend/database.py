@@ -186,6 +186,7 @@ def init_db() -> None:
             "ALTER TABLE candidate_pledges ADD COLUMN analysis_result TEXT",
             "ALTER TABLE candidate_pledges ADD COLUMN analyzed_at TEXT",
             "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
+            "ALTER TABLE candidates ADD COLUMN rejection_reason TEXT",
         ]:
             try:
                 conn.execute(stmt)

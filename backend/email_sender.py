@@ -131,6 +131,7 @@ def send_candidate_approval_status_email(
     status: str,
     name: str = "",
     candidate_name: str = "",
+    rejection_reason: str = "",
 ) -> bool:
     """공약 등록 후보 승인/거절 시 당사자에게 알림 메일 발송.
 
@@ -160,9 +161,12 @@ def send_candidate_approval_status_email(
 """
     elif status == "REJECTED":
         subject = "[개혁신당] 공약 등록 검토 결과 안내"
+        reason_line = f"\n[거절 사유]\n{rejection_reason}\n" if rejection_reason else ""
         body = f"""{greeting}, 안녕하세요.
 
 개혁신당 지방선거 정책 멘토링 서비스에 등록하신 공약을 검토한 결과, 이번에는 승인이 어렵게 되었습니다.
+{reason_line}
+공약을 수정하신 후 다시 저장하시면 재심사가 진행됩니다.
 
 문의 사항이 있으시면 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
 
