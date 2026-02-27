@@ -38,35 +38,15 @@ def verify_user_against_applicants(
         match = None
         match_method = ""
 
-        # 1차: 전화번호 매칭 (가장 신뢰)
-        if phone_norm:
+        # 이메일 + 이름 둘 다 일치해야 확인
+        if email_lower and name_clean:
             row = conn.execute(
-                "SELECT * FROM party_applicants WHERE replace(replace(phone, '-', ''), ' ', '') = ?",
-                (phone_norm,),
+                "SELECT * FROM party_applicants WHERE lower(trim(email)) = ? AND trim(name) = ?",
+                (email_lower, name_clean),
             ).fetchone()
             if row:
                 match = row
-                match_method = "전화번호 일치"
-
-        # 2차: 이메일 매칭
-        if not match and email_lower:
-            row = conn.execute(
-                "SELECT * FROM party_applicants WHERE lower(trim(email)) = ?",
-                (email_lower,),
-            ).fetchone()
-            if row:
-                match = row
-                match_method = "이메일 일치"
-
-        # 3차: 이름 + 시·도 매칭
-        if not match and name_clean and region_clean:
-            row = conn.execute(
-                "SELECT * FROM party_applicants WHERE trim(name) = ? AND trim(region_province) = ?",
-                (name_clean, region_clean),
-            ).fetchone()
-            if row:
-                match = row
-                match_method = "이름+지역 일치"
+                match_method = "이메일+이름 일치"
 
         if match:
             status_note = (match["status_note"] or "").strip()
