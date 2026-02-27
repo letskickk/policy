@@ -1111,6 +1111,16 @@ async def api_admin_applicants_upload(request: Request, file: UploadFile = File(
     return {"message": f"지원서 {inserted}건 저장, 기존 사용자 {reverified}명 재검증 완료"}
 
 
+@app.post("/api/admin/applicants/reverify")
+def api_admin_reverify(request: Request):
+    """관리자가 수동으로 전원 재검증 실행."""
+    _ = require_admin(request)
+    _ensure_db_ready()
+    from backend.applicant_verify import reverify_all_users
+    n = reverify_all_users()
+    return {"message": f"{n}명 재검증 완료"}
+
+
 @app.get("/api/admin/applicants")
 def api_admin_applicants(request: Request):
     """업로드된 지원서 목록 조회."""

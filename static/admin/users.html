@@ -101,6 +101,7 @@
       <div class="upload-bar">
         <input type="file" id="applicantFile" accept=".xlsx,.xls" style="display:none" />
         <button class="btn-upload" onclick="document.getElementById('applicantFile').click()">📎 지원서 엑셀 업로드</button>
+        <button class="btn-upload" style="background:#3b82f6;" onclick="doReverify()">🔄 전원 재검증</button>
         <span class="info" id="uploadStatus"></span>
       </div>
     </div>
@@ -524,6 +525,19 @@
       }
       e.target.value = '';
     });
+
+    async function doReverify() {
+      const statusEl = document.getElementById('uploadStatus');
+      statusEl.textContent = '재검증 중...';
+      try {
+        const r = await fetch('/api/admin/applicants/reverify', { method: 'POST', credentials: 'include' });
+        const d = await r.json();
+        statusEl.textContent = r.ok ? (d.message || '완료') : (d.detail || '실패');
+        if (r.ok) setTimeout(() => location.reload(), 1000);
+      } catch (err) {
+        statusEl.textContent = '서버 연결 실패';
+      }
+    }
   </script>
 </body>
 </html>
