@@ -226,8 +226,9 @@
       <div class="card">
         <div style="background:rgba(255,114,16,0.10);border:1px solid rgba(255,114,16,0.30);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.75rem;font-size:0.88rem;line-height:1.55;color:#ffd6b0;">
           <strong style="color:#ff9d52;">AI로 생성한 공약을 그대로 붙여넣지 마세요.</strong><br>
-          AI 자동 생성 특유의 패턴이 높게 감지되면 승인이 어렵습니다.
-          AI를 참고 자료로 활용하는 것은 무방하나, 최종 공약문은 반드시 본인의 언어로 다듬어 주시기 바랍니다.
+          AI 분석 점수가 높더라도 정책위원회 검토 과정에서 반려될 수 있습니다.
+          AI 자동 생성 특유의 패턴이 높게 감지되거나, 공약의 완성도·구체성이 부족한 경우가 이에 해당합니다.
+          본인의 지역 현안과 실정에 맞게 꼭 직접 다듬어 주세요.
         </div>
         <form id="form">
           <label>공약 목록</label>
@@ -430,8 +431,7 @@
           pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result));
         } else {
           statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
-          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>'
-            + '<div style="margin-top:0.4rem;padding:0.45rem 0.7rem;background:rgba(250,204,21,0.08);border-radius:8px;font-size:0.83rem;color:#fde047;line-height:1.5;">참고: AI 분석 점수가 높더라도 정책위원회 검토 과정에서 반려될 수 있습니다. 공약의 완성도·구체성이 부족하거나, AI가 생성한 내용을 충분히 검토·편집하지 않은 것으로 판단되는 경우가 이에 해당합니다. 본인의 지역 현안과 실정에 맞게 꼭 직접 다듬어 주세요.</div>';
+          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
           submitBtn.textContent = '공약 등록';
         }
 
