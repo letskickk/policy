@@ -2901,6 +2901,10 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
 
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
         for idx, p in enumerate(body.pledges):
+            # 분석 결과 없이 점수만 있는 경우 점수 무시 (불러오기 통해서만 점수 허용)
+            imported_result = (p.imported_result or "").strip() or None
+            valid_score = p.imported_score if (p.imported_score is not None and imported_result) else None
+            valid_analyzed_at = p.imported_analyzed_at if valid_score is not None else None
             conn.execute(
                 """INSERT INTO candidate_pledges
                    (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
@@ -2910,9 +2914,9 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                     p.title.strip(),
                     (p.content or "").strip() or None,
                     p.priority if p.priority else (idx + 1),
-                    p.imported_score,
-                    (p.imported_result or "").strip() or None,
-                    p.imported_analyzed_at,
+                    valid_score,
+                    imported_result,
+                    valid_analyzed_at,
                 ),
             )
         conn.commit()
