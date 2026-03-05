@@ -19,18 +19,7 @@
       "Bash(git push -u origin claude/add-markdown-attachment-6hEU2)",
       "Bash(git push -u origin main)",
       "Bash(git stash pop)",
-      "Bash(git remote get-url origin)",
-      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2 --force-with-lease)",
-      "Bash(gh pr list --repo letskickk/policy --state open --head claude/add-markdown-attachment-6hEU2)",
-      "Bash(gh auth status)",
-      "Bash(git show 85f70e1 --no-stat -p)",
-      "Bash(curl -sL https://github.com/cli/cli/releases/latest/download/gh_2.65.0_linux_amd64.tar.gz -o /tmp/gh.tar.gz)",
-      "Bash(tar -xzf /tmp/gh.tar.gz -C /tmp)",
-      "Read(//tmp/**)",
-      "Bash(curl -sI https://github.com/cli/cli/releases/latest)",
-      "Bash(curl -sL \"https://github.com/cli/cli/releases/download/v2.87.3/gh_2.87.3_linux_amd64.tar.gz\" -o /tmp/gh.tar.gz)",
-      "Bash(cp /tmp/gh_2.87.3_linux_amd64/bin/gh /usr/local/bin/gh)",
-      "Bash(gh --version)"
+      "Bash(git remote get-url origin)"
     ]
   }
 }
