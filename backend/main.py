@@ -3210,11 +3210,14 @@ def api_leaderboard(
                 last_sunday_str = (current_monday - _dt.timedelta(days=1)).isoformat()
                 champ = conn.execute(
                     """
-                    SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                    SELECT c.id AS candidate_id, c.name,
+                           COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
+                           c.district_name, c.election_type,
                            ROUND(AVG(cp.total_score), 1) AS avg_score,
                            COUNT(cp.id) AS cnt
                     FROM candidates c
-                    JOIN users u ON u.id = c.user_id
+                    LEFT JOIN users u ON u.id = c.user_id
+                    LEFT JOIN region_codes rc ON rc.region_code = c.region_code
                     JOIN candidate_pledges cp ON cp.candidate_id = c.id
                     WHERE cp.total_score IS NOT NULL
                       AND c.approval_status = 'APPROVED'
@@ -3248,11 +3251,14 @@ def api_leaderboard(
 
         # ── 랭킹 쿼리 ──
         sql = """
-            SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+            SELECT c.id AS candidate_id, c.name,
+                   COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
+                   c.district_name, c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
                    COUNT(cp.id) AS scored_pledge_count
             FROM candidates c
-            JOIN users u ON u.id = c.user_id
+            LEFT JOIN users u ON u.id = c.user_id
+            LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             JOIN candidate_pledges cp ON cp.candidate_id = c.id
             WHERE cp.total_score IS NOT NULL
               AND c.approval_status = 'APPROVED'
