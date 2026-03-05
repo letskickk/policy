@@ -22,7 +22,8 @@
       "Bash(git remote get-url origin)",
       "Bash(git commit:*)",
       "Bash(git add .claude/settings.local.json)",
-      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2 --force-with-lease)"
+      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2 --force-with-lease)",
+      "Bash(gh pr list --head claude/add-markdown-attachment-6hEU2)"
     ]
   }
 }
