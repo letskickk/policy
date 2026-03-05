@@ -580,10 +580,9 @@
         }
         const now = new Date().toISOString();
 
-        // 첫 줄 = 제목, 나머지 = 내용 (공약 텍스트 기준)
+        // 첫 줄 = 제목, 전체 텍스트 = 내용 textarea에 표시
         const lines = inputText.split('\n');
         const title = (lines[0] || '').trim().slice(0, 100) || '불러온 공약';
-        const body = lines.slice(1).join('\n').trim();
 
         if (importTargetBlock) {
           const parent = importTargetBlock.parentNode;
@@ -591,14 +590,13 @@
           importTargetBlock.remove();
           const tempDiv = document.createElement('div');
           parent.insertBefore(tempDiv, next);
-          // 일반 편집 가능 블록으로 추가 (공약 내용이 메인)
-          addPledgeRow(title, body, '', null, score, now, resultText);
+          addPledgeRow(title, inputText, '', null, score, now, resultText);
           const newBlock = pledgesContainer.lastElementChild;
           parent.insertBefore(newBlock, tempDiv);
           tempDiv.remove();
           renumberPledges();
         } else {
-          addPledgeRow(title, body, '', null, score, now, resultText);
+          addPledgeRow(title, inputText, '', null, score, now, resultText);
         }
         importModal.classList.add('hidden');
         importTargetBlock = null;
