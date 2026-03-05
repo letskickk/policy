@@ -2901,6 +2901,10 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
 
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
         for idx, p in enumerate(body.pledges):
+            # 분석 결과 없이 점수만 있는 경우 점수 무시 (불러오기 통해서만 점수 허용)
+            imported_result = (p.imported_result or "").strip() or None
+            valid_score = p.imported_score if (p.imported_score is not None and imported_result) else None
+            valid_analyzed_at = p.imported_analyzed_at if valid_score is not None else None
             conn.execute(
                 """INSERT INTO candidate_pledges
                    (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
@@ -2910,9 +2914,9 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                     p.title.strip(),
                     (p.content or "").strip() or None,
                     p.priority if p.priority else (idx + 1),
-                    p.imported_score,
-                    (p.imported_result or "").strip() or None,
-                    p.imported_analyzed_at,
+                    valid_score,
+                    imported_result,
+                    valid_analyzed_at,
                 ),
             )
         conn.commit()
@@ -3210,11 +3214,14 @@ def api_leaderboard(
                 last_sunday_str = (current_monday - _dt.timedelta(days=1)).isoformat()
                 champ = conn.execute(
                     """
-                    SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+                    SELECT c.id AS candidate_id, c.name,
+                           COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
+                           c.district_name, c.election_type,
                            ROUND(AVG(cp.total_score), 1) AS avg_score,
                            COUNT(cp.id) AS cnt
                     FROM candidates c
-                    JOIN users u ON u.id = c.user_id
+                    LEFT JOIN users u ON u.id = c.user_id
+                    LEFT JOIN region_codes rc ON rc.region_code = c.region_code
                     JOIN candidate_pledges cp ON cp.candidate_id = c.id
                     WHERE cp.total_score IS NOT NULL
                       AND c.approval_status = 'APPROVED'
@@ -3248,11 +3255,14 @@ def api_leaderboard(
 
         # ── 랭킹 쿼리 ──
         sql = """
-            SELECT c.id AS candidate_id, c.name, u.region_name, c.district_name, c.election_type,
+            SELECT c.id AS candidate_id, c.name,
+                   COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
+                   c.district_name, c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
                    COUNT(cp.id) AS scored_pledge_count
             FROM candidates c
-            JOIN users u ON u.id = c.user_id
+            LEFT JOIN users u ON u.id = c.user_id
+            LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             JOIN candidate_pledges cp ON cp.candidate_id = c.id
             WHERE cp.total_score IS NOT NULL
               AND c.approval_status = 'APPROVED'
