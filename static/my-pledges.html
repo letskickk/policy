@@ -143,6 +143,15 @@
       font-weight: 700; cursor: pointer; padding: 0.2rem 0; margin-top: 0.15rem;
     }
     .btn-toggle-preview:hover { color: #93c5fd; }
+    input.locked, textarea.locked {
+      background: rgba(0,0,0,0.35); color: #94a3b8; cursor: not-allowed;
+      border-color: rgba(148,163,184,0.12);
+    }
+    .locked-notice {
+      font-size: 0.78rem; color: #fde047; margin: 0.3rem 0 0.4rem;
+      padding: 0.35rem 0.6rem; border-radius: 6px;
+      background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.12);
+    }
     /* 불러오기 모달 */
     .modal-overlay {
       position: fixed; inset: 0; z-index: 1000;
@@ -295,21 +304,25 @@
 
       const titleLen = (title || '').length;
       const contentLen = (content || '').length;
-      const scoreHtml = totalScore != null
+      const hasScore = totalScore != null;
+      const scoreHtml = hasScore
         ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}점</span>`
         : (analysisResult ? '<span class="muted">분석완료</span>' : '');
       const dateHtml = analyzedAt ? `<span class="score-date">${analyzedAt.slice(0,10)}</span>` : '';
+      const readonlyAttr = hasScore ? 'readonly' : '';
+      const lockedClass = hasScore ? ' locked' : '';
       // ── 공약 블록 (수동 입력, DB 로드, 불러오기 공통) ──
       div.innerHTML = `
           <div class="pledge-header">
             <span class="pledge-num">${pledgeIndex}</span>
-            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required />
+            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required ${readonlyAttr} class="${lockedClass}" />
             ${scoreHtml}
             <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
           </div>
           <div class="char-count title-count">${titleLen}/100</div>
-          <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000">${esc(content)}</textarea>
+          <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000" ${readonlyAttr} class="${lockedClass}">${esc(content)}</textarea>
           <div class="char-count content-count">${contentLen}/50,000</div>
+          ${hasScore ? '<div class="locked-notice">분석 완료된 공약입니다. 수정하려면 삭제 후 다시 불러오기 하세요.</div>' : ''}
           <div class="pledge-action-row">
             <button type="button" class="btn-import-inline">기록에서 불러오기</button>
             ${dateHtml}
@@ -326,34 +339,9 @@
       const contentInput = div.querySelector('textarea[name="pledge_content"]');
       const contentCounter = div.querySelector('.content-count');
 
-      // 원본 값 저장 (수정 감지용)
-      div.dataset.origTitle = title || '';
-      div.dataset.origContent = content || '';
-
-      function clearScoreIfChanged() {
-        const curTitle = titleInput.value.trim();
-        const curContent = (contentInput ? contentInput.value.trim() : '');
-        if (curTitle === div.dataset.origTitle && curContent === div.dataset.origContent) return;
-        if (!div.dataset.savedScore && div.dataset.savedScore !== '0') return; // 이미 없으면 무시
-        delete div.dataset.savedScore;
-        delete div.dataset.savedResult;
-        delete div.dataset.savedAnalyzedAt;
-        // UI에서 점수 뱃지·분석 미리보기·날짜 제거
-        const badge = div.querySelector('.pledge-header .score-badge');
-        if (badge) badge.remove();
-        const muted = div.querySelector('.pledge-header .muted');
-        if (muted) muted.remove();
-        const preview = div.querySelector('.analysis-preview');
-        if (preview) preview.remove();
-        const toggle = div.querySelector('.btn-toggle-preview');
-        if (toggle) toggle.remove();
-        const dateEl = div.querySelector('.score-date');
-        if (dateEl) dateEl.remove();
-      }
-
-      titleInput.addEventListener('input', () => { updateCounter(titleInput, titleCounter, 100); clearScoreIfChanged(); });
+      titleInput.addEventListener('input', () => updateCounter(titleInput, titleCounter, 100));
       if (contentInput && contentCounter) {
-        contentInput.addEventListener('input', () => { updateCounter(contentInput, contentCounter, 50000); clearScoreIfChanged(); });
+        contentInput.addEventListener('input', () => updateCounter(contentInput, contentCounter, 50000));
       }
       const importBtn = div.querySelector('.btn-import-inline');
       if (importBtn) importBtn.addEventListener('click', () => openImportModal(div));
