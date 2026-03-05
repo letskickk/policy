@@ -20,7 +20,9 @@
       "Bash(git push -u origin main)",
       "Bash(git stash pop)",
       "Bash(git remote get-url origin)",
-      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2 --force-with-lease)"
+      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2 --force-with-lease)",
+      "Bash(gh pr list --repo letskickk/policy --state open --head claude/add-markdown-attachment-6hEU2)",
+      "Bash(gh auth status)"
     ]
   }
 }
