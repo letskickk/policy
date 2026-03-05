@@ -16,7 +16,9 @@
       "Bash(cd:*)",
       "Bash(git checkout -b claude/add-markdown-attachment-6hEU2)",
       "Bash(git checkout claude/add-markdown-attachment-6hEU2)",
-      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2)"
+      "Bash(git push -u origin claude/add-markdown-attachment-6hEU2)",
+      "Bash(git push -u origin main)",
+      "Bash(git stash pop)"
     ]
   }
 }
