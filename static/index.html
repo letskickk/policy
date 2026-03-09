@@ -389,18 +389,22 @@
     .score-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
     .pledge-count { font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
     .champions-strip {
-      margin-bottom: 1rem; padding: 0.8rem; border-radius: 12px;
+      margin-bottom: 1rem; padding: 0.8rem 0.8rem 0.4rem; border-radius: 12px;
       background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.2);
     }
     .champions-strip-title { font-size: 0.85rem; font-weight: 800; color: #fde047; margin-bottom: 0.5rem; }
     .champion-item {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.2rem 0.55rem; border-radius: 6px;
-      background: rgba(250,204,21,0.1); font-size: 0.8rem; color: var(--text);
-      margin: 0.15rem 0.25rem 0.15rem 0;
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.45rem 0.65rem; border-radius: 8px;
+      background: rgba(250,204,21,0.08); font-size: 0.82rem; color: var(--text);
+      margin-bottom: 0.35rem; cursor: pointer; transition: background 0.15s;
     }
-    .champion-week { color: var(--muted); font-size: 0.72rem; }
-    .champion-score { font-weight: 800; color: #fde047; }
+    .champion-item:last-child { margin-bottom: 0; }
+    .champion-item:hover { background: rgba(250,204,21,0.18); }
+    .champion-week { color: var(--muted); font-size: 0.72rem; min-width: 5.5em; flex-shrink: 0; }
+    .champion-name { font-weight: 700; min-width: 3.5em; }
+    .champion-region { color: var(--muted); font-size: 0.75rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .champion-score { font-weight: 800; color: #fde047; margin-left: auto; flex-shrink: 0; }
     .rank-empty { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.9rem; }
 
     /* ===== 공약 상세 모달 (map.html 동일) ===== */
@@ -735,14 +739,13 @@
       let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
       champions.forEach(c => {
         const wLabel = weekLabelFromDate(c.week_start);
-        const elLabel = ELECTION_LABELS[c.election_type] || '';
         const regionText = c.district_name ? (c.region_name || '') + ' ' + c.district_name : (c.region_name || '');
-        html += `<span class="champion-item" style="cursor:pointer;" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
+        html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
           <span class="champion-week">${safe(wLabel)}</span>
-          ${safe(c.candidate_name)}
-          ${regionText ? '<span style="color:var(--muted);font-size:0.72rem;">' + safe(regionText) + '</span>' : ''}
+          <span class="champion-name">${safe(c.candidate_name)}</span>
+          <span class="champion-region">${safe(regionText)}</span>
           <span class="champion-score">${c.avg_score}</span>
-        </span>`;
+        </div>`;
       });
       html += '</div>';
       champStrip.innerHTML = html;
