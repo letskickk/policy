@@ -388,6 +388,7 @@
     .score-value.red { color: #fca5a5; }
     .score-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
     .pledge-count { font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
+    .rank-updated { font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; }
     .champions-strip {
       margin-bottom: 1rem; padding: 0.8rem 0.8rem 0.4rem; border-radius: 12px;
       background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.2);
@@ -763,6 +764,7 @@
         const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
         const region = r.district_name ? `${safe(r.region_name)} ${safe(r.district_name)}` : safe(r.region_name);
         const cid = r.candidate_id || '';
+        const updatedDate = r.updated_at ? r.updated_at.slice(0, 10) : '';
         html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid})"" title="공약 상세 보기">
           <div class="rank-num ${numCls}">${r.rank}</div>
           <div class="rank-info">
@@ -771,6 +773,7 @@
               ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
               ${region}
             </div>
+            ${updatedDate ? `<div class="rank-updated">업데이트 ${safe(updatedDate)}</div>` : ''}
           </div>
           <div class="rank-score">
             <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>

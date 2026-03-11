@@ -3287,7 +3287,8 @@ def api_leaderboard(
                    COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                    c.district_name, c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
-                   COUNT(cp.id) AS scored_pledge_count
+                   COUNT(cp.id) AS scored_pledge_count,
+                   c.updated_at
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
@@ -3302,12 +3303,20 @@ def api_leaderboard(
             sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
             params.extend([target_monday.isoformat(), target_sunday.isoformat()])
         else:
-            # 이번 주: 챔피언 제외
+            # 이번 주: 챔피언 제외 (단, 이번 주에 공약을 업데이트한 챔피언은 다시 포함)
             champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
             if champion_ids:
-                placeholders = ",".join("?" for _ in champion_ids)
-                sql += f" AND c.id NOT IN ({placeholders})"
-                params.extend(champion_ids)
+                updated_champ_ids = {
+                    r["candidate_id"] for r in conn.execute(
+                        f"SELECT id AS candidate_id FROM candidates WHERE id IN ({','.join('?' for _ in champion_ids)}) AND date(updated_at) >= ?",
+                        (*champion_ids, target_monday.isoformat()),
+                    ).fetchall()
+                }
+                exclude_ids = [cid for cid in champion_ids if cid not in updated_champ_ids]
+                if exclude_ids:
+                    placeholders = ",".join("?" for _ in exclude_ids)
+                    sql += f" AND c.id NOT IN ({placeholders})"
+                    params.extend(exclude_ids)
 
         if region_code:
             sql += " AND u.region_code = ?"
@@ -3335,6 +3344,7 @@ def api_leaderboard(
                 "election_type": r["election_type"] or "",
                 "avg_score": float(r["avg_score"]),
                 "scored_pledge_count": int(r["scored_pledge_count"]),
+                "updated_at": r["updated_at"] or "",
             })
 
         # ── 주차 라벨 + 네비게이션 ──
