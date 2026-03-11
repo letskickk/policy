@@ -214,7 +214,7 @@
       </nav>
     </div>
     <h1>내 공약 등록</h1>
-    <p class="subtitle">회원가입 시 선택한 지역·선거 유형에 맞는 공약을 등록하세요. 관리자 승인 후 지도 페이지에 공개됩니다.</p>
+    <p class="subtitle">공약 분석 페이지에서 점검받은 공약을 불러와 등록하세요. 관리자 승인 후 지도 페이지에 공개됩니다.</p>
 
     <div id="loading" class="loading">불러오는 중...</div>
 
@@ -288,7 +288,8 @@
     function scoreClass(s) { return s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red'; }
 
     // ── 공약 행 추가 ──
-    function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null) {
+    // isFromImport: true면 분석 기록에서 불러온 것 (편집 허용), false면 빈 블록 (불러오기만 가능)
+    function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null, isFromImport = false) {
       pledgeIndex++;
       const id = 'p' + pledgeIndex;
       const div = document.createElement('div');
@@ -302,29 +303,34 @@
         div.dataset.savedAnalyzedAt = analyzedAt || '';
       }
 
+      // 기존 DB 로드(pledgeDbId 있음) 또는 불러오기한 경우만 입력 허용
+      const hasData = !!(pledgeDbId || isFromImport || (title && totalScore != null));
+      const readonlyAttr = hasData ? '' : 'readonly';
+      const placeholderTitle = hasData ? '공약 제목 (최대 100자)' : '아래 [분석 기록에서 불러오기] 버튼을 눌러주세요';
+      const placeholderContent = hasData ? '공약 세부내용 (배경, 실행방안, 기대효과 등)' : '';
+
       const titleLen = (title || '').length;
       const contentLen = (content || '').length;
       const hasScore = totalScore != null;
       const scoreHtml = hasScore
         ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}점</span>`
-        : (analysisResult ? '<span class="muted">분석완료</span>' : '');
+        : (analysisResult ? '<span class="muted">분석완료</span>' : '<span class="muted" style="color:#fde047;">분석 필요</span>');
       const dateHtml = analyzedAt ? `<span class="score-date">${analyzedAt.slice(0,10)}</span>` : '';
-      const readonlyAttr = hasScore ? 'readonly' : '';
-      const lockedClass = hasScore ? ' locked' : '';
-      // ── 공약 블록 (수동 입력, DB 로드, 불러오기 공통) ──
+      // 데이터가 있으면(불러오기/DB) readonly + locked, 빈 블록도 readonly (불러오기만 가능)
+      const lockedClass = hasData ? ' locked' : '';
       div.innerHTML = `
           <div class="pledge-header">
             <span class="pledge-num">${pledgeIndex}</span>
-            <input type="text" name="pledge_title" placeholder="공약 제목 (최대 100자)" value="${esc(title)}" maxlength="100" required ${readonlyAttr} class="${lockedClass}" />
+            <input type="text" name="pledge_title" placeholder="${esc(placeholderTitle)}" value="${esc(title)}" maxlength="100" readonly required class="${lockedClass}" />
             ${scoreHtml}
             <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
           </div>
           <div class="char-count title-count">${titleLen}/100</div>
-          <textarea name="pledge_content" placeholder="공약 세부내용 (배경, 실행방안, 기대효과 등)" rows="4" maxlength="50000" ${readonlyAttr} class="${lockedClass}">${esc(content)}</textarea>
+          <textarea name="pledge_content" placeholder="${esc(placeholderContent)}" rows="4" maxlength="50000" readonly class="${lockedClass}">${esc(content)}</textarea>
           <div class="char-count content-count">${contentLen}/50,000</div>
           ${hasScore ? '<div class="locked-notice">분석 완료된 공약입니다. 수정하려면 삭제 후 다시 불러오기 하세요.</div>' : ''}
           <div class="pledge-action-row">
-            <button type="button" class="btn-import-inline">기록에서 불러오기</button>
+            <button type="button" class="btn-import-inline">분석 기록에서 불러오기</button>
             ${dateHtml}
           </div>
           ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
@@ -487,6 +493,13 @@
         submitBtn.disabled = false; return;
       }
 
+      // 분석 안 된 공약 차단
+      const unanalyzed = pledges.filter(p => p.imported_score == null);
+      if (unanalyzed.length > 0) {
+        showMsg(`분석되지 않은 공약이 ${unanalyzed.length}개 있습니다. 모든 공약은 [분석 기록에서 불러오기]로 등록해야 합니다.`, false);
+        submitBtn.disabled = false; return;
+      }
+
       try {
         const res = await fetch('/api/my/candidate', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -590,13 +603,13 @@
           importTargetBlock.remove();
           const tempDiv = document.createElement('div');
           parent.insertBefore(tempDiv, next);
-          addPledgeRow(title, inputText, '', null, score, now, resultText);
+          addPledgeRow(title, inputText, '', null, score, now, resultText, true);
           const newBlock = pledgesContainer.lastElementChild;
           parent.insertBefore(newBlock, tempDiv);
           tempDiv.remove();
           renumberPledges();
         } else {
-          addPledgeRow(title, inputText, '', null, score, now, resultText);
+          addPledgeRow(title, inputText, '', null, score, now, resultText, true);
         }
         importModal.classList.add('hidden');
         importTargetBlock = null;
