@@ -1906,11 +1906,11 @@ def admin_list_candidates(
         conn2 = get_connection()
         try:
             p_rows = conn2.execute(
-                f"SELECT candidate_id, title, content FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
+                f"SELECT candidate_id, title, content, total_score FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
                 tuple(candidate_ids),
             ).fetchall()
             for p in p_rows:
-                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"]})
+                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"], "total_score": p["total_score"]})
         finally:
             conn2.close()
 
@@ -2827,6 +2827,14 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
     if not region_code:
         raise HTTPException(status_code=400, detail="회원가입 시 지역을 선택하지 않아 공약을 등록할 수 없습니다.")
 
+    # 분석 안 된 공약 차단: 모든 공약에 imported_score 필수
+    unanalyzed = [p for p in body.pledges if p.imported_score is None]
+    if unanalyzed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"분석되지 않은 공약이 {len(unanalyzed)}개 있습니다. 모든 공약은 분석 기록에서 불러와야 합니다.",
+        )
+
     election_type = ELECTION_POSITION_TO_TYPE.get(election_position, election_position)
     election_level = ELECTION_POSITION_TO_LEVEL.get(election_position, "regional")
     region_name = user.get("region_name") or REGION_NAME_MAP.get(region_code, "")
@@ -2929,6 +2937,26 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
         raise HTTPException(status_code=500, detail=f"저장 중 오류: {str(e)[:200]}")
     finally:
         conn.close()
+
+    # 관리자에게 공약 등록 알림 메일 발송
+    try:
+        from backend.email_sender import send_pledge_registration_notification
+        pledges_summary_lines = []
+        for i, p in enumerate(body.pledges):
+            score_str = f" ({p.imported_score}점)" if p.imported_score is not None else ""
+            pledges_summary_lines.append(f"{i+1}. {p.title.strip()}{score_str}")
+        send_pledge_registration_notification(
+            user_email=user.get("email", ""),
+            name=user.get("name", ""),
+            candidate_name=candidate_name,
+            election_position=election_position,
+            region_name=region_name,
+            district_name=district_name,
+            pledge_count=len(body.pledges),
+            pledges_summary="\n".join(pledges_summary_lines),
+        )
+    except Exception as e:
+        logger.warning("공약 등록 알림 메일 발송 실패 (무시): %s", e)
 
     return {"ok": True, "candidate_id": candidate_id, "pledge_count": len(body.pledges)}
 

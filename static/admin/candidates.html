@@ -308,13 +308,24 @@
 
         const pledges = c.pledges || [];
         const pledgeCount = pledges.length;
+        const scored = pledges.filter(p => p.total_score != null);
+        const avgScore = scored.length > 0 ? (scored.reduce((s, p) => s + p.total_score, 0) / scored.length).toFixed(1) : null;
+        const avgScoreHtml = avgScore != null
+          ? `<span style="font-size:0.8rem;font-weight:800;color:${avgScore>=80?'#86efac':avgScore>=60?'#fde047':'#fca5a5'};">평균 ${avgScore}점</span>`
+          : (pledgeCount > 0 ? '<span style="font-size:0.8rem;color:#fde047;">미분석</span>' : '');
         const pledgesHtml = pledgeCount === 0
           ? '<div style="color:#64748b;font-size:0.85rem;padding:0.5rem 0;">등록된 공약이 없습니다.</div>'
-          : pledges.map((p, i) => `
+          : pledges.map((p, i) => {
+            const sc = p.total_score;
+            const scoreTag = sc != null
+              ? `<span style="margin-left:0.5rem;font-size:0.8rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:5px;background:${sc>=80?'rgba(34,197,94,0.15)':sc>=60?'rgba(250,204,21,0.15)':'rgba(239,68,68,0.15)'};color:${sc>=80?'#86efac':sc>=60?'#fde047':'#fca5a5'}">${sc}점</span>`
+              : '<span style="margin-left:0.5rem;font-size:0.75rem;color:#fde047;">미분석</span>';
+            return `
             <div class="pledge-detail">
-              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}</div>
+              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}${scoreTag}</div>
               ${p.content ? `<div class="pledge-content-text">${_escHtml(p.content)}</div>` : '<div class="no-content">세부내용 없음</div>'}
-            </div>`).join('');
+            </div>`;
+          }).join('');
 
         const rejReasonHtml = (st === 'REJECTED' && c.rejection_reason)
           ? `<div class="rejection-reason-text"><span class="reason-label">거절 사유:</span>${_escHtml(c.rejection_reason)}</div>`
@@ -326,7 +337,7 @@
             <span>
               <span class="toggle-icon">▶</span>
               <strong>${_escHtml(c.name)}</strong>
-              <span style="color:#94a3b8;font-size:0.85rem;margin-left:0.4rem;">${_escHtml(location)} · ${_escHtml(etype)} · 공약 ${pledgeCount}개</span>
+              <span style="color:#94a3b8;font-size:0.85rem;margin-left:0.4rem;">${_escHtml(location)} · ${_escHtml(etype)} · 공약 ${pledgeCount}개 ${avgScoreHtml}</span>
               ${regBadge}${statusBadge}
             </span>
             <span>
