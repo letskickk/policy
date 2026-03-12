@@ -3324,10 +3324,17 @@ def api_leaderboard(
                     except Exception:
                         pass
 
-        # ── 챔피언 목록 ──
+        # ── 챔피언 목록 (최신 district_name 반영) ──
         champions = [
             dict(r) for r in conn.execute(
-                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 20"
+                """SELECT wc.week_start, wc.candidate_id, wc.candidate_name,
+                          wc.region_name,
+                          COALESCE(u.district_name, wc.district_name) AS district_name,
+                          wc.election_type, wc.avg_score, wc.scored_pledge_count
+                   FROM weekly_champions wc
+                   LEFT JOIN candidates c ON c.id = wc.candidate_id
+                   LEFT JOIN users u ON u.id = c.user_id
+                   ORDER BY wc.week_start DESC LIMIT 20"""
             ).fetchall()
         ]
 
