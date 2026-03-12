@@ -699,6 +699,8 @@
       local_council: '기초의원',
     };
     const safe = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // 시명 중복 제거: "안양시동안구 안양시바선거구" → "안양시동안구 바선거구"
+    function cleanDN(s) { if (!s) return ''; var p = s.trim().split(/\s+/), m = p[0].match(/^(.+?[시군])/); if (m) { var c = m[1]; for (var i = 1; i < p.length; i++) { if (p[i].startsWith(c) && p[i].length > c.length) p[i] = p[i].slice(c.length); } } return p.join(' '); }
     const scoreClass = s => s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red';
     const rankClass = r => r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : 'normal';
 
@@ -740,7 +742,7 @@
       let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
       champions.forEach(c => {
         const wLabel = weekLabelFromDate(c.week_start);
-        const regionText = c.district_name ? (c.region_name || '') + ' ' + c.district_name : (c.region_name || '');
+        const regionText = c.district_name ? (c.region_name || '') + ' ' + cleanDN(c.district_name) : (c.region_name || '');
         html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
           <span class="champion-week">${safe(wLabel)}</span>
           <span class="champion-name">${safe(c.candidate_name)}</span>
@@ -762,7 +764,7 @@
         const cls = r.rank <= 3 ? ' top-3' : '';
         const numCls = rankClass(r.rank);
         const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
-        const region = r.district_name ? `${safe(r.region_name)} ${safe(r.district_name)}` : safe(r.region_name);
+        const region = r.district_name ? `${safe(r.region_name)} ${safe(cleanDN(r.district_name))}` : safe(r.region_name);
         const cid = r.candidate_id || '';
         const updatedDate = r.updated_at ? r.updated_at.slice(0, 10) : '';
         html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid})"" title="공약 상세 보기">
@@ -899,7 +901,7 @@
         }
         const d = await res.json();
         const etype = ELECTION_LABELS[d.election_type] || d.election_type || '';
-        const region = d.district_name ? (d.region_name || '') + ' ' + d.district_name : (d.region_name || '');
+        const region = d.district_name ? (d.region_name || '') + ' ' + cleanDN(d.district_name) : (d.region_name || '');
         pledgeModalTitle.textContent = d.name || '';
         pledgeModalSub.textContent = region + ' \u00B7 ' + etype;
         renderModalPledges(d.pledges || []);
