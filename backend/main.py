@@ -616,6 +616,16 @@ def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
     if wiw in sgg:
         sub = sgg.replace(wiw, "", 1).strip()
         return sub if sub else "단독"
+    # 다구 도시: wiwName("성남시 분당구")과 sggName("성남시아선거구") 접두사가 다를 때
+    # 시/군 단위까지만 제거하여 세부선거구 추출
+    for suffix in ("시", "군"):
+        idx = wiw_compact.find(suffix)
+        if idx >= 0:
+            city = wiw_compact[: idx + 1]
+            if sgg_compact.startswith(city):
+                sub = sgg_compact[len(city) :].strip()
+                if sub:
+                    return sub
     return sgg
 
 
