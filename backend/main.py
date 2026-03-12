@@ -752,7 +752,9 @@ def api_signup_district_sub(
                     if sd != sd_name and "".join(sd.split()) != "".join(sd_name.split()):
                         continue
                     if wiw_c != wiw_norm and wiw != wiw_norm:
-                        continue
+                        # 다구(多區) 도시 지원: "성남시분당구"가 "성남시"로 시작하면 매칭
+                        if not wiw_norm.startswith(wiw_c):
+                            continue
                     sub = _extract_sub_from_sgg(
                         it.get("sggName") or it.get("SGG_NAME") or "",
                         wiw,
