@@ -3282,7 +3282,8 @@ def api_leaderboard(
                     """
                     SELECT c.id AS candidate_id, c.name,
                            COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
-                           c.district_name, c.election_type,
+                           COALESCE(u.district_name, c.district_name) AS district_name,
+                           c.election_type,
                            ROUND(AVG(cp.total_score), 1) AS avg_score,
                            COUNT(cp.id) AS cnt
                     FROM candidates c
@@ -3323,7 +3324,8 @@ def api_leaderboard(
         sql = """
             SELECT c.id AS candidate_id, c.name,
                    COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
-                   c.district_name, c.election_type,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
                    COUNT(cp.id) AS scored_pledge_count,
                    c.updated_at
