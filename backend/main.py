@@ -982,6 +982,12 @@ def api_admin_update_user_profile(body: UpdateUserProfileBody, request: Request)
         if not row:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
+        ep = (body.election_position or "").strip()
+        rc = (body.region_code or "").strip()
+        rn = (body.region_name or "").strip()
+        dc = (body.district_code or "").strip()
+        dn = (body.district_name or "").strip()
+
         conn.execute(
             """
             UPDATE users
@@ -993,15 +999,35 @@ def api_admin_update_user_profile(body: UpdateUserProfileBody, request: Request)
                 updated_at = datetime('now')
             WHERE id = ?
             """,
-            (
-                (body.election_position or "").strip(),
-                (body.region_code or "").strip(),
-                (body.region_name or "").strip(),
-                (body.district_code or "").strip(),
-                (body.district_name or "").strip(),
-                body.user_id,
-            ),
+            (ep, rc, rn, dc, dn, body.user_id),
         )
+
+        # candidates 테이블도 동기화 (랭킹·지도 등에서 참조)
+        _ep_to_election_type = {
+            "metro_mayor": "metro_mayor", "local_mayor": "local_mayor",
+            "regional_council": "regional_council", "local_council": "local_council",
+        }
+        et = _ep_to_election_type.get(ep, ep)
+        el = "metro" if ep == "metro_mayor" else "local"
+        # district_code에서 세부선거구(:가선거구 등) 포함된 경우 district_name 생성
+        # dc 예: "41:성남시분당구:아선거구" → district_name: "성남시분당구 아선거구"
+        parts = dc.split(":") if dc else []
+        cand_district_name = dn
+        cand_district_code = parts[0] + ":" + parts[1] if len(parts) >= 2 else dc
+        conn.execute(
+            """
+            UPDATE candidates
+            SET district_name = ?,
+                district_code = ?,
+                region_code = ?,
+                election_type = ?,
+                election_level = ?,
+                updated_at = datetime('now')
+            WHERE user_id = ?
+            """,
+            (cand_district_name, cand_district_code, rc, et, el, body.user_id),
+        )
+
         conn.commit()
         return {"ok": True, "message": "수정 완료"}
     except HTTPException:
