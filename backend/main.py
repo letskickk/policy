@@ -2461,9 +2461,12 @@ def get_candidate_detail(candidate_id: int):
     try:
         row = conn.execute(
             """
-            SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status
-            FROM candidates
-            WHERE id = ? AND approval_status = 'APPROVED'
+            SELECT c.id, c.name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status
+            FROM candidates c
+            LEFT JOIN users u ON u.id = c.user_id
+            WHERE c.id = ? AND c.approval_status = 'APPROVED'
             """,
             (candidate_id,),
         ).fetchone()
@@ -2494,7 +2497,12 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT id, name, district_name, district_code, region_code, election_type, election_level FROM candidates WHERE id = ?",
+            """SELECT c.id, c.name,
+                      COALESCE(u.district_name, c.district_name) AS district_name,
+                      c.district_code, c.region_code, c.election_type, c.election_level
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
             (candidate_id,),
         ).fetchone()
     finally:
