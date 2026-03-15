@@ -21,6 +21,17 @@ BILL_SEARCH_URL = f"{BASE_URL}/bi/bill/sch/findSchPaging.do"
 BILL_DETAIL_URL = f"{BASE_URL}/bi/billDetailPage.do"
 BILL_INFO_URL = f"{BASE_URL}/bi/bill/detail/billInfo.do"
 SUMMARY_POPUP_URL = f"{BASE_URL}/bi/popup/billSummary.do"
+PAL_LINK_RE = re.compile(
+    r'<a[^>]+href="(?P<url>https://pal\.assembly\.go\.kr/napal/[^"]+lgsltPaId=[^"]+)"[^>]*>\s*입법예고\s*</a>',
+    re.I | re.S,
+)
+PAL_PERIOD_RE = re.compile(
+    r"입법예고기간\s*:\s*(?P<start>\d{4}-\d{2}-\d{2})\s*[~～]\s*(?P<end>\d{4}-\d{2}-\d{2})"
+)
+PAL_STATUS_RE = re.compile(
+    r'<span[^>]*class="[^"]*bill_state[^"]*"[^>]*>\s*(?P<status>[^<]+?)\s*</span>',
+    re.I | re.S,
+)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
@@ -338,6 +349,38 @@ def fetch_bill_timeline(detail_html: str) -> list[dict]:
     return parse_bill_info_timeline(fragment)
 
 
+def extract_legislation_notice_url(detail_html: str) -> str:
+    match = PAL_LINK_RE.search(detail_html)
+    return unescape(match.group("url")).strip() if match else ""
+
+
+def parse_legislation_notice(html: str, *, source_url: str = "") -> dict:
+    period_match = PAL_PERIOD_RE.search(html)
+    status_match = PAL_STATUS_RE.search(html)
+    period_start = _normalize_date(period_match.group("start")) if period_match else None
+    period_end = _normalize_date(period_match.group("end")) if period_match else None
+    status = _strip_html(status_match.group("status")) if status_match else ""
+    if not status:
+        if "lgsltpaOngoing" in source_url:
+            status = "입법예고중"
+        elif "lgsltpaDone" in source_url:
+            status = "입법예고 종료"
+    return {
+        "url": source_url,
+        "status": status,
+        "start_at": period_start,
+        "end_at": period_end,
+    }
+
+
+def fetch_legislation_notice(detail_html: str) -> dict:
+    notice_url = extract_legislation_notice_url(detail_html)
+    if not notice_url:
+        return {"url": "", "status": "", "start_at": None, "end_at": None}
+    html = _fetch_text(notice_url)
+    return parse_legislation_notice(html, source_url=notice_url)
+
+
 def parse_bill_summary_popup(html: str) -> str:
     text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
@@ -396,6 +439,7 @@ def sync_reform_party_bills(
             for bill in bill_items:
                 detail = fetch_bill_detail(bill.bill_id)
                 bill_timeline = fetch_bill_timeline(detail.get("detail_html") or "")
+                legislation_notice = fetch_legislation_notice(detail.get("detail_html") or "")
                 summary_body = fetch_bill_summary(bill.bill_id)
                 processed += 1
                 title = detail["title"] or bill.title
@@ -411,6 +455,7 @@ def sync_reform_party_bills(
                     "decision_result": detail["decision_result"] or bill.decision_result or "",
                     "bill_stage": bill.stage or "",
                     "bill_timeline": bill_timeline,
+                    "legislation_notice": legislation_notice,
                     "status_badge": bill.status_badge or "",
                     "proposer_kind": bill.proposer_kind or "",
                     "representative_member_name": member_name,

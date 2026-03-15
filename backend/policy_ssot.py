@@ -1318,6 +1318,7 @@ def _build_bill_timeline(document: dict) -> list[dict]:
     metadata = document.get("metadata") or {}
     progress = _bill_progress_stage(document)
     stored_timeline = metadata.get("bill_timeline") or []
+    legislation_notice = metadata.get("legislation_notice") or {}
     if isinstance(stored_timeline, list) and stored_timeline:
         normalized: list[dict] = []
         for entry in stored_timeline:
@@ -1344,6 +1345,23 @@ def _build_bill_timeline(document: dict) -> list[dict]:
                     "is_current": is_current,
                 }
             )
+        notice_status = str(legislation_notice.get("status") or "").strip()
+        notice_start = str(legislation_notice.get("start_at") or "").strip()
+        notice_end = str(legislation_notice.get("end_at") or "").strip()
+        if notice_start:
+            notice_summary = notice_status or "입법예고"
+            if notice_end:
+                notice_summary = f"{notice_summary} ({notice_start} ~ {notice_end})"
+            normalized.append(
+                {
+                    "kind": "bill_event",
+                    "code": "LEG_NOTICE",
+                    "at": notice_start,
+                    "title": "입법예고",
+                    "summary": notice_summary,
+                    "is_current": notice_status == "입법예고중",
+                }
+            )
         decision_at = str(metadata.get("decision_at") or "").strip()
         decision_result = str(metadata.get("decision_result") or "").strip()
         has_terminal = any(item.get("code") in {"RESULT", "DISPOSED", "PASSED"} for item in normalized)
@@ -1359,6 +1377,7 @@ def _build_bill_timeline(document: dict) -> list[dict]:
                 }
             )
         if normalized:
+            normalized.sort(key=lambda item: ((item.get("at") or "9999-99-99"), item.get("title") or ""))
             return normalized
 
     timeline: list[dict] = []
@@ -1373,6 +1392,22 @@ def _build_bill_timeline(document: dict) -> list[dict]:
         if representative_name:
             summary = f"{representative_name} 의원 대표발의 법안이 국회에 접수됐습니다."
         timeline.append({"kind": "bill_event", "at": proposed_at, "title": "법안 접수", "summary": summary})
+
+    notice_status = str(legislation_notice.get("status") or "").strip()
+    notice_start = str(legislation_notice.get("start_at") or "").strip()
+    notice_end = str(legislation_notice.get("end_at") or "").strip()
+    if notice_start:
+        notice_summary = notice_status or "입법예고"
+        if notice_end:
+            notice_summary = f"{notice_summary} ({notice_start} ~ {notice_end})"
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "at": notice_start,
+                "title": "입법예고",
+                "summary": notice_summary,
+            }
+        )
 
     if committee:
         timeline.append(
@@ -1447,6 +1482,14 @@ def _build_document_key_points(document: dict) -> str:
         committee = str(metadata.get("committee") or "").strip()
         if committee:
             parts.append(f"소관 상임위는 {committee}입니다.")
+        legislation_notice = metadata.get("legislation_notice") or {}
+        notice_status = str(legislation_notice.get("status") or "").strip()
+        notice_start = str(legislation_notice.get("start_at") or "").strip()
+        notice_end = str(legislation_notice.get("end_at") or "").strip()
+        if notice_start and notice_end:
+            parts.append(f"입법예고는 {notice_status or '진행'} 상태로 {notice_start}부터 {notice_end}까지 진행됩니다.")
+        elif notice_status:
+            parts.append(f"입법예고 상태는 {notice_status}입니다.")
         progress = document.get("bill_progress") or _bill_progress_stage(document)
         if progress.get("raw"):
             parts.append(f"현재 국회 처리 단계는 {progress['raw']}입니다.")
@@ -1482,8 +1525,15 @@ def _build_document_relevance_note(document: dict) -> str:
 
     if document.get("doc_type") == "bill":
         progress = document.get("bill_progress") or _bill_progress_stage(document)
+        legislation_notice = metadata.get("legislation_notice") or {}
+        notice_status = str(legislation_notice.get("status") or "").strip()
+        notice_end = str(legislation_notice.get("end_at") or "").strip()
         if linked_positions:
             return f"연결된 정책 {len(linked_positions)}건을 실제 제도화하려는 입법 시도라서 중요합니다."
+        if notice_status == "입법예고중":
+            if notice_end:
+                return f"현재 입법예고가 진행 중이며 의견수렴 마감일은 {notice_end}입니다. 실제 입법 추진의 현재성을 보여주는 자료입니다."
+            return "현재 입법예고가 진행 중인 법안으로, 실제 입법 추진이 살아 있는지 확인하는 데 중요합니다."
         if progress.get("code") == "disposed":
             return "법안은 종료됐지만, 이 의제가 실제 국회 입법으로 시도된 이력을 보여주기 때문에 중요합니다."
         if progress.get("code") == "passed":
@@ -1524,7 +1574,7 @@ def _sort_person_documents(documents_list: list[dict]) -> list[dict]:
 def _build_person_focus_positions(documents_list: list[dict], linked_positions: list[dict]) -> list[dict]:
     stats: dict[int, dict] = {}
     for item in documents_list:
-        for link in (item.get("linked_positions") or item.get("related_positions") or []):
+        for link in (item.get("linked_positions") or []):
             position_id = int(link["position_id"])
             entry = stats.setdefault(
                 position_id,

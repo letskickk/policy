@@ -69,6 +69,19 @@ def test_parse_bill_info_timeline_extracts_stage_nodes():
     assert timeline[2]["code"] == "MAIN"
 
 
+def test_parse_legislation_notice_extracts_status_and_period():
+    html = Path("data/assembly_legislation_notice_sample.html").read_text(encoding="utf-8")
+
+    parsed = assembly_bills.parse_legislation_notice(
+        html,
+        source_url="https://pal.assembly.go.kr/napal/lgsltpa/lgsltpaOngoing/view.do?lgsltPaId=sample",
+    )
+
+    assert parsed["status"] == "입법예고중"
+    assert parsed["start_at"] == "2026-03-12"
+    assert parsed["end_at"] == "2026-03-21"
+
+
 def test_sync_reform_party_bills_imports_documents(monkeypatch):
     db_file = _workspace_db_path("assembly-sync")
     monkeypatch.setattr(database, "DB_PATH", db_file)
@@ -77,6 +90,7 @@ def test_sync_reform_party_bills_imports_documents(monkeypatch):
     sample_list_html = Path("data/assembly_bill_search_result_lee2.html").read_text(encoding="utf-8")
     sample_detail_html = Path("data/assembly_bill_detail_sample.html").read_text(encoding="utf-8")
     sample_info_html = Path("data/assembly_bill_info_fragment_sample.html").read_text(encoding="utf-8")
+    sample_notice_html = Path("data/assembly_legislation_notice_sample.html").read_text(encoding="utf-8")
 
     monkeypatch.setattr(assembly_bills, "resolve_member_id", lambda *args, **kwargs: "QWL7778X")
     monkeypatch.setattr(
@@ -90,7 +104,11 @@ def test_sync_reform_party_bills_imports_documents(monkeypatch):
             else '{"membId":"QWL7778X"}'
         ),
     )
-    monkeypatch.setattr(assembly_bills, "_fetch_text", lambda url, params=None, timeout=20: sample_detail_html)
+    monkeypatch.setattr(
+        assembly_bills,
+        "_fetch_text",
+        lambda url, params=None, timeout=20: sample_notice_html if "pal.assembly.go.kr" in url else sample_detail_html,
+    )
 
     result = assembly_bills.sync_reform_party_bills(
         actor_id=None,
@@ -109,3 +127,5 @@ def test_sync_reform_party_bills_imports_documents(monkeypatch):
     assert fetched["timeline"]
     assert fetched["timeline"][0]["title"] == "접수"
     assert all(item["at"] for item in fetched["timeline"])
+    assert any(item["title"] == "입법예고" for item in fetched["timeline"])
+    assert fetched["metadata"]["legislation_notice"]["status"] == "입법예고중"

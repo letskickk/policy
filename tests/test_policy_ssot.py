@@ -386,6 +386,7 @@ def test_public_person_detail_infers_focus_from_documents(monkeypatch):
             }
         ],
     )
+    link_policy_document(position_id=position["id"], document_id=bill["id"], relation_type="implements", notes=None, actor_id=None)
 
     detail = get_public_person_detail("이준석")
     assert "대표발의 법안" in detail["brief"]
