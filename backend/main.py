@@ -616,6 +616,16 @@ def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
     if wiw in sgg:
         sub = sgg.replace(wiw, "", 1).strip()
         return sub if sub else "단독"
+    # 다구 도시: wiwName("성남시 분당구")과 sggName("성남시아선거구") 접두사가 다를 때
+    # 시/군 단위까지만 제거하여 세부선거구 추출
+    for suffix in ("시", "군"):
+        idx = wiw_compact.find(suffix)
+        if idx >= 0:
+            city = wiw_compact[: idx + 1]
+            if sgg_compact.startswith(city):
+                sub = sgg_compact[len(city) :].strip()
+                if sub:
+                    return sub
     return sgg
 
 
@@ -752,7 +762,9 @@ def api_signup_district_sub(
                     if sd != sd_name and "".join(sd.split()) != "".join(sd_name.split()):
                         continue
                     if wiw_c != wiw_norm and wiw != wiw_norm:
-                        continue
+                        # 다구(多區) 도시 지원: "성남시분당구"가 "성남시"로 시작하면 매칭
+                        if not wiw_norm.startswith(wiw_c):
+                            continue
                     sub = _extract_sub_from_sgg(
                         it.get("sggName") or it.get("SGG_NAME") or "",
                         wiw,
@@ -970,6 +982,12 @@ def api_admin_update_user_profile(body: UpdateUserProfileBody, request: Request)
         if not row:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
+        ep = (body.election_position or "").strip()
+        rc = (body.region_code or "").strip()
+        rn = (body.region_name or "").strip()
+        dc = (body.district_code or "").strip()
+        dn = (body.district_name or "").strip()
+
         conn.execute(
             """
             UPDATE users
@@ -981,15 +999,35 @@ def api_admin_update_user_profile(body: UpdateUserProfileBody, request: Request)
                 updated_at = datetime('now')
             WHERE id = ?
             """,
-            (
-                (body.election_position or "").strip(),
-                (body.region_code or "").strip(),
-                (body.region_name or "").strip(),
-                (body.district_code or "").strip(),
-                (body.district_name or "").strip(),
-                body.user_id,
-            ),
+            (ep, rc, rn, dc, dn, body.user_id),
         )
+
+        # candidates 테이블도 동기화 (랭킹·지도 등에서 참조)
+        _ep_to_election_type = {
+            "metro_mayor": "metro_mayor", "local_mayor": "local_mayor",
+            "regional_council": "regional_council", "local_council": "local_council",
+        }
+        et = _ep_to_election_type.get(ep, ep)
+        el = "metro" if ep == "metro_mayor" else "local"
+        # district_code에서 세부선거구(:가선거구 등) 포함된 경우 district_name 생성
+        # dc 예: "41:성남시분당구:아선거구" → district_name: "성남시분당구 아선거구"
+        parts = dc.split(":") if dc else []
+        cand_district_name = dn
+        cand_district_code = parts[0] + ":" + parts[1] if len(parts) >= 2 else dc
+        conn.execute(
+            """
+            UPDATE candidates
+            SET district_name = ?,
+                district_code = ?,
+                region_code = ?,
+                election_type = ?,
+                election_level = ?,
+                updated_at = datetime('now')
+            WHERE user_id = ?
+            """,
+            (cand_district_name, cand_district_code, rc, et, el, body.user_id),
+        )
+
         conn.commit()
         return {"ok": True, "message": "수정 완료"}
     except HTTPException:
@@ -1906,11 +1944,11 @@ def admin_list_candidates(
         conn2 = get_connection()
         try:
             p_rows = conn2.execute(
-                f"SELECT candidate_id, title, content FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
+                f"SELECT candidate_id, title, content, total_score FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
                 tuple(candidate_ids),
             ).fetchall()
             for p in p_rows:
-                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"]})
+                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"], "total_score": p["total_score"]})
         finally:
             conn2.close()
 
@@ -2367,26 +2405,29 @@ def get_candidates(
     conn = get_connection()
     try:
         sql = """
-            SELECT id, name, district_name, district_code, region_code, election_type, election_level
-            FROM candidates
-            WHERE region_code = ?
-              AND approval_status = 'APPROVED'
+            SELECT c.id, c.name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.district_code, c.region_code, c.election_type, c.election_level
+            FROM candidates c
+            LEFT JOIN users u ON u.id = c.user_id
+            WHERE c.region_code = ?
+              AND c.approval_status = 'APPROVED'
         """
         params: list[object] = [code]
         if selected_election_type:
-            sql += " AND election_type = ?"
+            sql += " AND c.election_type = ?"
             params.append(selected_election_type)
         sql += """
             ORDER BY
-                CASE election_type
+                CASE c.election_type
                     WHEN 'metro_mayor' THEN 1
                     WHEN 'local_mayor' THEN 2
                     WHEN 'regional_council' THEN 3
                     WHEN 'local_council' THEN 4
                     ELSE 5
                 END,
-                COALESCE(district_name, '') ASC,
-                name ASC
+                COALESCE(c.district_name, '') ASC,
+                c.name ASC
         """
         rows = conn.execute(sql, tuple(params)).fetchall()
     finally:
@@ -2423,9 +2464,12 @@ def get_candidate_detail(candidate_id: int):
     try:
         row = conn.execute(
             """
-            SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status
-            FROM candidates
-            WHERE id = ? AND approval_status = 'APPROVED'
+            SELECT c.id, c.name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status
+            FROM candidates c
+            LEFT JOIN users u ON u.id = c.user_id
+            WHERE c.id = ? AND c.approval_status = 'APPROVED'
             """,
             (candidate_id,),
         ).fetchone()
@@ -2456,7 +2500,12 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT id, name, district_name, district_code, region_code, election_type, election_level FROM candidates WHERE id = ?",
+            """SELECT c.id, c.name,
+                      COALESCE(u.district_name, c.district_name) AS district_name,
+                      c.district_code, c.region_code, c.election_type, c.election_level
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
             (candidate_id,),
         ).fetchone()
     finally:
@@ -2827,6 +2876,14 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
     if not region_code:
         raise HTTPException(status_code=400, detail="회원가입 시 지역을 선택하지 않아 공약을 등록할 수 없습니다.")
 
+    # 분석 안 된 공약 차단: 모든 공약에 imported_score 필수
+    unanalyzed = [p for p in body.pledges if p.imported_score is None]
+    if unanalyzed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"분석되지 않은 공약이 {len(unanalyzed)}개 있습니다. 모든 공약은 분석 기록에서 불러와야 합니다.",
+        )
+
     election_type = ELECTION_POSITION_TO_TYPE.get(election_position, election_position)
     election_level = ELECTION_POSITION_TO_LEVEL.get(election_position, "regional")
     region_name = user.get("region_name") or REGION_NAME_MAP.get(region_code, "")
@@ -2929,6 +2986,26 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
         raise HTTPException(status_code=500, detail=f"저장 중 오류: {str(e)[:200]}")
     finally:
         conn.close()
+
+    # 관리자에게 공약 등록 알림 메일 발송
+    try:
+        from backend.email_sender import send_pledge_registration_notification
+        pledges_summary_lines = []
+        for i, p in enumerate(body.pledges):
+            score_str = f" ({p.imported_score}점)" if p.imported_score is not None else ""
+            pledges_summary_lines.append(f"{i+1}. {p.title.strip()}{score_str}")
+        send_pledge_registration_notification(
+            user_email=user.get("email", ""),
+            name=user.get("name", ""),
+            candidate_name=candidate_name,
+            election_position=election_position,
+            region_name=region_name,
+            district_name=district_name,
+            pledge_count=len(body.pledges),
+            pledges_summary="\n".join(pledges_summary_lines),
+        )
+    except Exception as e:
+        logger.warning("공약 등록 알림 메일 발송 실패 (무시): %s", e)
 
     return {"ok": True, "candidate_id": candidate_id, "pledge_count": len(body.pledges)}
 
@@ -3216,7 +3293,8 @@ def api_leaderboard(
                     """
                     SELECT c.id AS candidate_id, c.name,
                            COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
-                           c.district_name, c.election_type,
+                           COALESCE(u.district_name, c.district_name) AS district_name,
+                           c.election_type,
                            ROUND(AVG(cp.total_score), 1) AS avg_score,
                            COUNT(cp.id) AS cnt
                     FROM candidates c
@@ -3246,10 +3324,17 @@ def api_leaderboard(
                     except Exception:
                         pass
 
-        # ── 챔피언 목록 ──
+        # ── 챔피언 목록 (최신 district_name 반영) ──
         champions = [
             dict(r) for r in conn.execute(
-                "SELECT week_start, candidate_id, candidate_name, region_name, district_name, election_type, avg_score, scored_pledge_count FROM weekly_champions ORDER BY week_start DESC LIMIT 20"
+                """SELECT wc.week_start, wc.candidate_id, wc.candidate_name,
+                          wc.region_name,
+                          COALESCE(u.district_name, wc.district_name) AS district_name,
+                          wc.election_type, wc.avg_score, wc.scored_pledge_count
+                   FROM weekly_champions wc
+                   LEFT JOIN candidates c ON c.id = wc.candidate_id
+                   LEFT JOIN users u ON u.id = c.user_id
+                   ORDER BY wc.week_start DESC LIMIT 20"""
             ).fetchall()
         ]
 
@@ -3257,9 +3342,11 @@ def api_leaderboard(
         sql = """
             SELECT c.id AS candidate_id, c.name,
                    COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
-                   c.district_name, c.election_type,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.election_type,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
-                   COUNT(cp.id) AS scored_pledge_count
+                   COUNT(cp.id) AS scored_pledge_count,
+                   c.updated_at
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
@@ -3274,12 +3361,20 @@ def api_leaderboard(
             sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
             params.extend([target_monday.isoformat(), target_sunday.isoformat()])
         else:
-            # 이번 주: 챔피언 제외
+            # 이번 주: 챔피언 제외 (단, 이번 주에 공약을 업데이트한 챔피언은 다시 포함)
             champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
             if champion_ids:
-                placeholders = ",".join("?" for _ in champion_ids)
-                sql += f" AND c.id NOT IN ({placeholders})"
-                params.extend(champion_ids)
+                updated_champ_ids = {
+                    r["candidate_id"] for r in conn.execute(
+                        f"SELECT id AS candidate_id FROM candidates WHERE id IN ({','.join('?' for _ in champion_ids)}) AND date(updated_at) >= ?",
+                        (*champion_ids, target_monday.isoformat()),
+                    ).fetchall()
+                }
+                exclude_ids = [cid for cid in champion_ids if cid not in updated_champ_ids]
+                if exclude_ids:
+                    placeholders = ",".join("?" for _ in exclude_ids)
+                    sql += f" AND c.id NOT IN ({placeholders})"
+                    params.extend(exclude_ids)
 
         if region_code:
             sql += " AND u.region_code = ?"
@@ -3307,6 +3402,7 @@ def api_leaderboard(
                 "election_type": r["election_type"] or "",
                 "avg_score": float(r["avg_score"]),
                 "scored_pledge_count": int(r["scored_pledge_count"]),
+                "updated_at": r["updated_at"] or "",
             })
 
         # ── 주차 라벨 + 네비게이션 ──

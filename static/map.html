@@ -467,6 +467,7 @@
       color: var(--muted);
       font-weight: 600;
       line-height: 1.3;
+      word-break: keep-all;
     }
     .candidate-name .cand-realname{
       font-size: 1.05rem;
@@ -1269,25 +1270,42 @@
       btn.remove();
     }
 
+    // 시명 중복 제거: "안양시동안구 안양시바선거구" → "안양시동안구 바선거구"
+    function cleanDistrictName(dn) {
+      if (!dn) return '';
+      var parts = dn.trim().split(/\s+/);
+      if (parts.length < 2) return dn;
+      var m = parts[0].match(/^(.+?[시군])/);
+      if (m) {
+        var city = m[1];
+        for (var i = 1; i < parts.length; i++) {
+          if (parts[i].startsWith(city) && parts[i].length > city.length) {
+            parts[i] = parts[i].slice(city.length);
+          }
+        }
+      }
+      return parts.join(' ');
+    }
+
     function buildPositionTitle(electionType, regionCode, districtName) {
       const rn = regionNames[regionCode] || '';
+      const dn = cleanDistrictName(districtName);
       if (electionType === 'metro_mayor' && rn) {
         if (rn.endsWith('시')) return rn + '장';
         if (rn.endsWith('도')) return rn + '지사';
         return rn + ' 단체장';
       }
-      if (electionType === 'local_mayor' && districtName) {
-        const dn = districtName.trim();
+      if (electionType === 'local_mayor' && dn) {
         if (dn.endsWith('구')) return dn + '청장';
         if (dn.endsWith('시')) return dn + '장';
         if (dn.endsWith('군')) return dn + '수';
         return dn + ' 단체장';
       }
       if (electionType === 'regional_council') {
-        return districtName ? districtName + ' 광역의원' : (rn ? rn + ' 광역의원' : '광역의원');
+        return dn ? dn + ' 광역의원' : (rn ? rn + ' 광역의원' : '광역의원');
       }
       if (electionType === 'local_council') {
-        return districtName ? districtName + ' 기초의원' : '기초의원';
+        return dn ? dn + ' 기초의원' : '기초의원';
       }
       return '';
     }
