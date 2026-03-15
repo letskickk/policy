@@ -2087,15 +2087,6 @@ def get_public_person_detail(person_name: str) -> dict:
         if doc["doc_type"] in {"bill", "statement", "press_release", "briefing"}:
             inferred = _infer_related_positions_for_document(doc, approved_positions)
             doc["related_positions"] = inferred
-            for item in inferred[:3]:
-                linked_positions.setdefault(
-                    int(item["position_id"]),
-                    {
-                        "position_id": int(item["position_id"]),
-                        "position_title": item["position_title"],
-                        "position_slug": item["position_slug"],
-                    },
-                )
 
     documents_list = _sort_person_documents(list(documents.values()))
 
