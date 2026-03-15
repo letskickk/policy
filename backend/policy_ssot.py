@@ -1330,13 +1330,10 @@ def _build_bill_timeline(document: dict) -> list[dict]:
             code = str(entry.get("code") or "").strip()
             summary = str(entry.get("summary") or "").strip()
             is_current = bool(entry.get("is_current"))
+            if not at:
+                continue
             if not summary:
-                if is_current:
-                    summary = f"{title} 단계가 현재 진행 중입니다."
-                elif at:
-                    summary = f"{title} 단계가 {at} 기준으로 확인됩니다."
-                else:
-                    summary = f"{title} 단계 이력이 확인됩니다."
+                summary = f"{title} 단계가 {at} 기준으로 확인됩니다."
             normalized.append(
                 {
                     "kind": "bill_event",
@@ -1345,6 +1342,20 @@ def _build_bill_timeline(document: dict) -> list[dict]:
                     "title": title,
                     "summary": summary,
                     "is_current": is_current,
+                }
+            )
+        decision_at = str(metadata.get("decision_at") or "").strip()
+        decision_result = str(metadata.get("decision_result") or "").strip()
+        has_terminal = any(item.get("code") in {"RESULT", "DISPOSED", "PASSED"} for item in normalized)
+        if decision_result and decision_at and not has_terminal:
+            normalized.append(
+                {
+                    "kind": "bill_event",
+                    "code": "RESULT",
+                    "at": decision_at,
+                    "title": "최종 결과",
+                    "summary": decision_result,
+                    "is_current": False,
                 }
             )
         if normalized:

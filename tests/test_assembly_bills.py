@@ -108,4 +108,4 @@ def test_sync_reform_party_bills_imports_documents(monkeypatch):
     assert fetched["metadata"]["committee"] == "정무위원회"
     assert fetched["timeline"]
     assert fetched["timeline"][0]["title"] == "접수"
-    assert any(item["title"] == "위원회 심사" for item in fetched["timeline"])
+    assert all(item["at"] for item in fetched["timeline"])
