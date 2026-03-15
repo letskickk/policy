@@ -165,6 +165,111 @@ def init_db() -> None:
             fetched_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_winner_pledges2022_huboid ON winner_pledges2022(huboid);
+
+        CREATE TABLE IF NOT EXISTS policy_positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            category TEXT NOT NULL DEFAULT 'general',
+            summary TEXT,
+            body TEXT,
+            status TEXT NOT NULL DEFAULT 'draft',
+            owner_scope TEXT NOT NULL DEFAULT 'party',
+            effective_from TEXT,
+            effective_to TEXT,
+            version_label TEXT,
+            created_by INTEGER REFERENCES users(id),
+            updated_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_positions_status ON policy_positions(status);
+        CREATE INDEX IF NOT EXISTS idx_policy_positions_category ON policy_positions(category);
+
+        CREATE TABLE IF NOT EXISTS policy_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            doc_type TEXT NOT NULL,
+            summary TEXT,
+            body TEXT,
+            speaker TEXT,
+            speaker_name TEXT,
+            owner_name TEXT,
+            source_url TEXT,
+            source_ref TEXT,
+            published_at TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_by INTEGER REFERENCES users(id),
+            updated_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_documents_type ON policy_documents(doc_type);
+        CREATE INDEX IF NOT EXISTS idx_policy_documents_status ON policy_documents(status);
+        CREATE INDEX IF NOT EXISTS idx_policy_documents_published_at ON policy_documents(published_at);
+
+        CREATE TABLE IF NOT EXISTS policy_link_suggestions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+            position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,
+            relation_type TEXT NOT NULL DEFAULT 'explains',
+            score REAL NOT NULL DEFAULT 0,
+            reason TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(document_id, position_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_link_suggestions_document
+            ON policy_link_suggestions(document_id, status, score DESC);
+        CREATE INDEX IF NOT EXISTS idx_policy_link_suggestions_position
+            ON policy_link_suggestions(position_id, status, score DESC);
+
+        CREATE TABLE IF NOT EXISTS policy_document_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,
+            document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+            relation_type TEXT NOT NULL DEFAULT 'references',
+            notes TEXT,
+            created_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(position_id, document_id, relation_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_document_links_position ON policy_document_links(position_id);
+        CREATE INDEX IF NOT EXISTS idx_policy_document_links_document ON policy_document_links(document_id);
+
+        CREATE TABLE IF NOT EXISTS policy_document_people (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+            person_name TEXT NOT NULL,
+            person_role TEXT NOT NULL,
+            party_affiliation TEXT,
+            is_reform_party INTEGER NOT NULL DEFAULT 0,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(document_id, person_name, person_role)
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_document_people_document
+            ON policy_document_people(document_id, person_role, is_primary DESC, person_name ASC);
+        CREATE INDEX IF NOT EXISTS idx_policy_document_people_party
+            ON policy_document_people(is_reform_party, person_name ASC);
+
+        CREATE TABLE IF NOT EXISTS policy_ingest_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            imported_count INTEGER NOT NULL DEFAULT 0,
+            updated_count INTEGER NOT NULL DEFAULT 0,
+            skipped_count INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            started_at TEXT NOT NULL DEFAULT (datetime('now')),
+            finished_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_ingest_runs_source_started
+            ON policy_ingest_runs(source_key, started_at DESC);
         """)
         for stmt in [
             "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
@@ -187,6 +292,7 @@ def init_db() -> None:
             "ALTER TABLE candidate_pledges ADD COLUMN analyzed_at TEXT",
             "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
             "ALTER TABLE candidates ADD COLUMN rejection_reason TEXT",
+            "ALTER TABLE policy_documents ADD COLUMN speaker_name TEXT",
         ]:
             try:
                 conn.execute(stmt)

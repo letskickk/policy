@@ -1,4 +1,4 @@
-"""
+﻿"""
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="개혁신당 정책 멘토링",
     description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
-    version="0.1.0",
+    version="1.3.0",
 )
 
 # 서버 시작 시 즉시 출력
@@ -1283,7 +1283,7 @@ def api_info():
 @app.get("/test")
 def test():
     """간단한 테스트 엔드포인트."""
-    return {"status": "ok", "message": "서버 작동 중", "version": "0.1.0"}
+    return {"status": "ok", "message": "서버 작동 중", "version": "1.3.0"}
 
 
 
@@ -3452,3 +3452,7 @@ def api_admin_repair_pledge_scores(request: Request):
         return {"total_null": len(rows), "repaired": repaired, "details": details}
     finally:
         conn.close()
+
+from backend.policy_admin_routes import register_policy_routes
+register_policy_routes(app, require_admin, _ensure_db_ready, _serve_html)
+

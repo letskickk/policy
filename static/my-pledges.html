@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>내 공약 등록 - 정책 멘토링</title>
+  <title>??怨듭빟 ?깅줉 - ?뺤콉 硫섑넗留?/title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -152,7 +152,7 @@
       padding: 0.35rem 0.6rem; border-radius: 6px;
       background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.12);
     }
-    /* 불러오기 모달 */
+    /* 遺덈윭?ㅺ린 紐⑤떖 */
     .modal-overlay {
       position: fixed; inset: 0; z-index: 1000;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
@@ -200,28 +200,28 @@
     <div class="top-bar">
       <div class="brand">
         <a href="/" class="brand-logo">
-          <img src="/static/logo.svg" alt="개혁신당 로고">
+          <img src="/static/logo.svg" alt="媛쒗쁺?좊떦 濡쒓퀬">
           <span class="brand-inner">
-            <span class="brand-title">개혁신당 정책 멘토링</span>
-            <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+            <span class="brand-title">媛쒗쁺?좊떦 ?뺤콉 硫섑넗留?/span>
+            <span class="brand-tag">怨듭빟 ?먭? + 吏???좉굅援??꾨낫 怨듭빟 鍮꾧탳</span>
           </span>
         </a>
       </div>
       <nav class="nav">
-        <a href="/dashboard" class="nav-link">내 기록</a>
-        <a href="/pledge" class="nav-link">공약 분석</a>
-        <a href="/map" class="nav-link">지역 공약</a>
+        <a href="/dashboard" class="nav-link">??湲곕줉</a>
+        <a href="/pledge" class="nav-link">怨듭빟 遺꾩꽍</a>
+        <a href="/map" class="nav-link">吏??怨듭빟</a>
       </nav>
     </div>
-    <h1>내 공약 등록</h1>
-    <p class="subtitle">공약 분석 페이지에서 점검받은 공약을 불러와 등록하세요. 관리자 승인 후 지도 페이지에 공개됩니다.</p>
+    <h1>??怨듭빟 ?깅줉</h1>
+    <p class="subtitle">怨듭빟 遺꾩꽍 ?섏씠吏?먯꽌 ?먭?諛쏆? 怨듭빟??遺덈윭? ?깅줉?섏꽭?? 愿由ъ옄 ?뱀씤 ??吏???섏씠吏??怨듦컻?⑸땲??</p>
 
-    <div id="loading" class="loading">불러오는 중...</div>
+    <div id="loading" class="loading">遺덈윭?ㅻ뒗 以?..</div>
 
     <div id="no-position" style="display:none;" class="card">
       <div class="empty-state">
-        <p>회원가입 시 출마 유형과 지역을 선택하지 않아<br>공약 등록이 불가합니다.</p>
-        <p class="muted" style="margin-top:0.5rem;">관리자에게 문의하거나 재가입 해주세요.</p>
+        <p>?뚯썝媛????異쒕쭏 ?좏삎怨?吏??쓣 ?좏깮?섏? ?딆븘<br>怨듭빟 ?깅줉??遺덇??⑸땲??</p>
+        <p class="muted" style="margin-top:0.5rem;">愿由ъ옄?먭쾶 臾몄쓽?섍굅???ш????댁＜?몄슂.</p>
       </div>
     </div>
 
@@ -234,38 +234,38 @@
 
       <div class="card">
         <div style="background:rgba(255,114,16,0.10);border:1px solid rgba(255,114,16,0.30);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.75rem;font-size:0.88rem;line-height:1.55;color:#ffd6b0;">
-          <strong style="color:#ff9d52;">AI로 생성한 공약을 그대로 붙여넣지 마세요.</strong><br>
-          AI 분석 점수가 높더라도 AI 자동 생성 특유의 패턴이 높게 감지되면 정책위원회 검토 과정에서 반려될 수 있습니다.
-          본인의 지역 현안과 실정에 맞게 꼭 직접 다듬어 주세요.
+          <strong style="color:#ff9d52;">AI濡??앹꽦??怨듭빟??洹몃?濡?遺숈뿬?ｌ? 留덉꽭??</strong><br>
+          AI 遺꾩꽍 ?먯닔媛 ?믩뜑?쇰룄 AI ?먮룞 ?앹꽦 ?뱀쑀???⑦꽩???믨쾶 媛먯??섎㈃ ?뺤콉?꾩썝??寃??怨쇱젙?먯꽌 諛섎젮?????덉뒿?덈떎.
+          蹂몄씤??吏???꾩븞怨??ㅼ젙??留욊쾶 瑗?吏곸젒 ?ㅻ벉??二쇱꽭??
         </div>
         <form id="form">
-          <label>공약 목록</label>
+          <label>怨듭빟 紐⑸줉</label>
           <div id="pledges_container"></div>
-          <button type="button" class="btn-add" id="add_pledge">+ 공약 추가</button>
-          <button type="submit" class="btn-submit" id="submit_btn">저장</button>
+          <button type="button" class="btn-add" id="add_pledge">+ 怨듭빟 異붽?</button>
+          <button type="submit" class="btn-submit" id="submit_btn">???/button>
         </form>
         <div id="msg"></div>
       </div>
     </div>
   </div>
 
-  <!-- 불러오기 모달 -->
+  <!-- 遺덈윭?ㅺ린 紐⑤떖 -->
   <div class="modal-overlay hidden" id="importModal">
     <div class="modal-box">
       <div class="modal-header">
-        <h3>분석 기록에서 불러오기</h3>
+        <h3>遺꾩꽍 湲곕줉?먯꽌 遺덈윭?ㅺ린</h3>
         <button class="modal-close" id="importModalClose">&times;</button>
       </div>
       <div class="modal-body" id="importModalBody">
-        <div class="modal-empty">불러오는 중...</div>
+        <div class="modal-empty">遺덈윭?ㅻ뒗 以?..</div>
       </div>
     </div>
   </div>
 
   <script>
     const ELECTION_TYPE_LABELS = {
-      metro_mayor: '광역단체장', regional_council: '광역의원',
-      local_mayor: '기초단체장', local_council: '기초의원', party_official: '당직자',
+      metro_mayor: '愿묒뿭?⑥껜??, regional_council: '愿묒뿭?섏썝',
+      local_mayor: '湲곗큹?⑥껜??, local_council: '湲곗큹?섏썝', party_official: '?뱀쭅??,
     };
 
     const loadingEl = document.getElementById('loading');
@@ -280,15 +280,15 @@
 
     let pledgeIndex = 0;
     let hasExistingCandidate = false;
-    let importTargetBlock = null; // 불러오기 대상 블록
+    let importTargetBlock = null; // 遺덈윭?ㅺ린 ???釉붾줉
 
     function esc(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     function scoreClass(s) { return s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red'; }
 
-    // ── 공약 행 추가 ──
-    // isFromImport: true면 분석 기록에서 불러온 것 (편집 허용), false면 빈 블록 (불러오기만 가능)
+    // ?? 怨듭빟 ??異붽? ??
+    // isFromImport: true硫?遺꾩꽍 湲곕줉?먯꽌 遺덈윭??寃?(?몄쭛 ?덉슜), false硫?鍮?釉붾줉 (遺덈윭?ㅺ린留?媛??
     function addPledgeRow(title = '', content = '', priority = '', pledgeDbId = null, totalScore = null, analyzedAt = null, analysisResult = null, isFromImport = false) {
       pledgeIndex++;
       const id = 'p' + pledgeIndex;
@@ -296,41 +296,41 @@
       div.className = 'pledge-block';
       div.id = id;
       if (pledgeDbId) div.dataset.pledgeId = pledgeDbId;
-      // 점수/결과 보존 (저장 시 전송용)
+      // ?먯닔/寃곌낵 蹂댁〈 (??????꾩넚??
       if (totalScore != null || analysisResult) {
         div.dataset.savedScore = totalScore ?? '';
         div.dataset.savedResult = analysisResult || '';
         div.dataset.savedAnalyzedAt = analyzedAt || '';
       }
 
-      // 기존 DB 로드(pledgeDbId 있음) 또는 불러오기한 경우만 입력 허용
+      // 湲곗〈 DB 濡쒕뱶(pledgeDbId ?덉쓬) ?먮뒗 遺덈윭?ㅺ린??寃쎌슦留??낅젰 ?덉슜
       const hasData = !!(pledgeDbId || isFromImport || (title && totalScore != null));
       const readonlyAttr = hasData ? '' : 'readonly';
-      const placeholderTitle = hasData ? '공약 제목 (최대 100자)' : '아래 [분석 기록에서 불러오기] 버튼을 눌러주세요';
-      const placeholderContent = hasData ? '공약 세부내용 (배경, 실행방안, 기대효과 등)' : '';
+      const placeholderTitle = hasData ? '怨듭빟 ?쒕ぉ (理쒕? 100??' : '?꾨옒 [遺꾩꽍 湲곕줉?먯꽌 遺덈윭?ㅺ린] 踰꾪듉???뚮윭二쇱꽭??;
+      const placeholderContent = hasData ? '怨듭빟 ?몃??댁슜 (諛곌꼍, ?ㅽ뻾諛⑹븞, 湲곕??④낵 ??' : '';
 
       const titleLen = (title || '').length;
       const contentLen = (content || '').length;
       const hasScore = totalScore != null;
       const scoreHtml = hasScore
-        ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}점</span>`
-        : (analysisResult ? '<span class="muted">분석완료</span>' : '<span class="muted" style="color:#fde047;">분석 필요</span>');
+        ? `<span class="score-badge ${scoreClass(totalScore)}">${totalScore}??/span>`
+        : (analysisResult ? '<span class="muted">遺꾩꽍?꾨즺</span>' : '<span class="muted" style="color:#fde047;">遺꾩꽍 ?꾩슂</span>');
       const dateHtml = analyzedAt ? `<span class="score-date">${analyzedAt.slice(0,10)}</span>` : '';
-      // 데이터가 있으면(불러오기/DB) readonly + locked, 빈 블록도 readonly (불러오기만 가능)
+      // ?곗씠?곌? ?덉쑝硫?遺덈윭?ㅺ린/DB) readonly + locked, 鍮?釉붾줉??readonly (遺덈윭?ㅺ린留?媛??
       const lockedClass = hasData ? ' locked' : '';
       div.innerHTML = `
           <div class="pledge-header">
             <span class="pledge-num">${pledgeIndex}</span>
             <input type="text" name="pledge_title" placeholder="${esc(placeholderTitle)}" value="${esc(title)}" maxlength="100" readonly required class="${lockedClass}" />
             ${scoreHtml}
-            <button type="button" class="btn-remove" data-remove="${id}">삭제</button>
+            <button type="button" class="btn-remove" data-remove="${id}">??젣</button>
           </div>
           <div class="char-count title-count">${titleLen}/100</div>
           <textarea name="pledge_content" placeholder="${esc(placeholderContent)}" rows="4" maxlength="50000" readonly class="${lockedClass}">${esc(content)}</textarea>
           <div class="char-count content-count">${contentLen}/50,000</div>
-          ${hasScore ? '<div class="locked-notice">분석 완료된 공약입니다. 수정하려면 삭제 후 다시 불러오기 하세요.</div>' : ''}
+          ${hasScore ? '<div class="locked-notice">遺꾩꽍 ?꾨즺??怨듭빟?낅땲?? ?섏젙?섎젮硫???젣 ???ㅼ떆 遺덈윭?ㅺ린 ?섏꽭??</div>' : ''}
           <div class="pledge-action-row">
-            <button type="button" class="btn-import-inline">분석 기록에서 불러오기</button>
+            <button type="button" class="btn-import-inline">遺꾩꽍 湲곕줉?먯꽌 遺덈윭?ㅺ린</button>
             ${dateHtml}
           </div>
           ${analysisResult ? buildPreviewHtml(analysisResult) : ''}
@@ -338,7 +338,7 @@
 
       pledgesContainer.appendChild(div);
 
-      // 이벤트 바인딩
+      // ?대깽??諛붿씤??
       const titleInput = div.querySelector('input[name="pledge_title"]');
       const titleCounter = div.querySelector('.title-count');
 
@@ -360,7 +360,7 @@
 
     function buildPreviewHtml(text) {
       return `<div class="analysis-preview collapsed">${esc(text)}</div>
-              <button type="button" class="btn-toggle-preview">분석 결과 더보기 ▼</button>`;
+              <button type="button" class="btn-toggle-preview">遺꾩꽍 寃곌낵 ?붾낫湲???/button>`;
     }
 
     function bindPreviewToggle(block) {
@@ -369,7 +369,7 @@
       if (!toggle || !preview) return;
       toggle.addEventListener('click', () => {
         const isCollapsed = preview.classList.toggle('collapsed');
-        toggle.textContent = isCollapsed ? '분석 결과 더보기 ▼' : '접기 ▲';
+        toggle.textContent = isCollapsed ? '遺꾩꽍 寃곌낵 ?붾낫湲??? : '?묎린 ??;
       });
     }
 
@@ -396,19 +396,19 @@
       msgEl.style.color = ok ? '#86efac' : '#fca5a5';
     }
 
-    // ── 데이터 로드 ──
+    // ?? ?곗씠??濡쒕뱶 ??
     async function loadData() {
       try {
         const res = await fetch('/api/my/candidate', { credentials: 'include' });
         if (res.status === 401) { location.href = '/login?next=/my-pledges'; return; }
         if (res.status === 403) { location.href = '/pending'; return; }
-        if (!res.ok) { showMsg('데이터를 불러올 수 없습니다.', false); return; }
+        if (!res.ok) { showMsg('?곗씠?곕? 遺덈윭?????놁뒿?덈떎.', false); return; }
         const data = await res.json();
         const ui = data.user_info || {};
 
         if (ui.election_position === 'party_official') {
           loadingEl.style.display = 'none';
-          noPosEl.querySelector('p').innerHTML = '당직자 유형으로 가입되어<br>공약 등록 대상이 아닙니다.';
+          noPosEl.querySelector('p').innerHTML = '?뱀쭅???좏삎?쇰줈 媛?낅릺??br>怨듭빟 ?깅줉 ??곸씠 ?꾨떃?덈떎.';
           noPosEl.style.display = 'block'; return;
         }
         if (!ui.election_position || !ui.region_code) {
@@ -416,53 +416,53 @@
         }
 
         let infoHtml = '';
-        infoHtml += `<span class="lbl">이름</span><span class="val">${esc(ui.name)}</span>`;
-        infoHtml += `<span class="lbl">선거 유형</span><span class="val">${esc(ELECTION_TYPE_LABELS[ui.election_type] || ui.election_type || '')}</span>`;
-        infoHtml += `<span class="lbl">지역</span><span class="val">${esc(ui.region_name || ui.region_code || '')}</span>`;
+        infoHtml += `<span class="lbl">?대쫫</span><span class="val">${esc(ui.name)}</span>`;
+        infoHtml += `<span class="lbl">?좉굅 ?좏삎</span><span class="val">${esc(ELECTION_TYPE_LABELS[ui.election_type] || ui.election_type || '')}</span>`;
+        infoHtml += `<span class="lbl">吏??/span><span class="val">${esc(ui.region_name || ui.region_code || '')}</span>`;
         if (ui.district_name && ui.election_type !== 'metro_mayor') {
-          infoHtml += `<span class="lbl">선거구</span><span class="val">${esc(ui.district_name)}</span>`;
+          infoHtml += `<span class="lbl">?좉굅援?/span><span class="val">${esc(ui.district_name)}</span>`;
         }
         userInfoEl.innerHTML = infoHtml;
 
         const approvalInfoEl = document.getElementById('approval-info');
         if (data.candidate) {
           hasExistingCandidate = true;
-          statusBadgeEl.innerHTML = '<span class="badge badge-edit">수정 모드</span>';
-          submitBtn.textContent = '공약 수정 저장';
+          statusBadgeEl.innerHTML = '<span class="badge badge-edit">?섏젙 紐⑤뱶</span>';
+          submitBtn.textContent = '怨듭빟 ?섏젙 ???;
 
           const status = (data.candidate.approval_status || 'PENDING').toUpperCase();
           if (status === 'APPROVED') {
-            statusBadgeEl.innerHTML += ' <span class="badge badge-approved">승인됨</span>';
-            approvalInfoEl.innerHTML = '<div class="approval-info approved">공약이 승인되어 지도에 공개 중입니다. 수정 시 재승인이 필요합니다.</div>';
+            statusBadgeEl.innerHTML += ' <span class="badge badge-approved">?뱀씤??/span>';
+            approvalInfoEl.innerHTML = '<div class="approval-info approved">怨듭빟???뱀씤?섏뼱 吏?꾩뿉 怨듦컻 以묒엯?덈떎. ?섏젙 ???ъ듅?몄씠 ?꾩슂?⑸땲??</div>';
           } else if (status === 'REJECTED') {
-            statusBadgeEl.innerHTML += ' <span class="badge badge-rejected">거절됨</span>';
+            statusBadgeEl.innerHTML += ' <span class="badge badge-rejected">嫄곗젅??/span>';
             const rejReason = data.candidate.rejection_reason || '';
             const rejReasonHtml = rejReason
-              ? `<div style="margin-top:0.5rem;padding:0.5rem 0.7rem;background:rgba(239,68,68,0.08);border-radius:8px;font-size:0.88rem;color:#fca5a5;line-height:1.5;"><strong style="color:#f87171;">거절 사유:</strong> ${esc(rejReason)}</div>`
+              ? `<div style="margin-top:0.5rem;padding:0.5rem 0.7rem;background:rgba(239,68,68,0.08);border-radius:8px;font-size:0.88rem;color:#fca5a5;line-height:1.5;"><strong style="color:#f87171;">嫄곗젅 ?ъ쑀:</strong> ${esc(rejReason)}</div>`
               : '';
-            approvalInfoEl.innerHTML = '<div class="approval-info rejected">공약이 거절되었습니다. 수정 후 다시 저장하면 재심사 요청됩니다.</div>' + rejReasonHtml;
+            approvalInfoEl.innerHTML = '<div class="approval-info rejected">怨듭빟??嫄곗젅?섏뿀?듬땲?? ?섏젙 ???ㅼ떆 ??ν븯硫??ъ떖???붿껌?⑸땲??</div>' + rejReasonHtml;
           } else {
-            statusBadgeEl.innerHTML += ' <span class="badge badge-pending">승인 대기</span>';
-            approvalInfoEl.innerHTML = '<div class="approval-info pending">관리자 승인 대기 중입니다. 승인 후 지도에 공개됩니다.</div>';
+            statusBadgeEl.innerHTML += ' <span class="badge badge-pending">?뱀씤 ?湲?/span>';
+            approvalInfoEl.innerHTML = '<div class="approval-info pending">愿由ъ옄 ?뱀씤 ?湲?以묒엯?덈떎. ?뱀씤 ??吏?꾩뿉 怨듦컻?⑸땲??</div>';
           }
 
           const pledges = data.pledges || [];
           pledges.forEach(p => addPledgeRow(p.title, p.content || '', p.priority, p.id, p.total_score, p.analyzed_at, p.analysis_result));
         } else {
-          statusBadgeEl.innerHTML = '<span class="badge badge-new">신규 등록</span>';
-          approvalInfoEl.innerHTML = '<div class="approval-info pending">공약 등록 후 관리자 승인을 거쳐 지도에 공개됩니다.</div>';
-          submitBtn.textContent = '공약 등록';
+          statusBadgeEl.innerHTML = '<span class="badge badge-new">?좉퇋 ?깅줉</span>';
+          approvalInfoEl.innerHTML = '<div class="approval-info pending">怨듭빟 ?깅줉 ??愿由ъ옄 ?뱀씤??嫄곗퀜 吏?꾩뿉 怨듦컻?⑸땲??</div>';
+          submitBtn.textContent = '怨듭빟 ?깅줉';
         }
 
         loadingEl.style.display = 'none';
         mainEl.style.display = 'block';
       } catch (e) {
         console.error(e);
-        loadingEl.textContent = '데이터를 불러올 수 없습니다.';
+        loadingEl.textContent = '?곗씠?곕? 遺덈윭?????놁뒿?덈떎.';
       }
     }
 
-    // ── 저장 ──
+    // ?? ?????
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       msgEl.style.display = 'none';
@@ -476,9 +476,9 @@
         const content = (block.querySelector('textarea[name="pledge_content"]').value || '').trim();
         const priority = parseInt(block.querySelector('input[name="pledge_priority"]')?.value, 10) || (idx + 1);
         const pledge = { title, content: content || null, priority };
-        // 기존 공약 ID 전달 (삭제-전용 판별용)
+        // 湲곗〈 怨듭빟 ID ?꾨떖 (??젣-?꾩슜 ?먮퀎??
         if (block.dataset.pledgeId) pledge.pledge_id = parseInt(block.dataset.pledgeId, 10);
-        // 점수 보존
+        // ?먯닔 蹂댁〈
         if (block.dataset.savedScore !== undefined && block.dataset.savedScore !== '') {
           const s = parseFloat(block.dataset.savedScore);
           pledge.imported_score = isNaN(s) ? null : s;
@@ -489,14 +489,14 @@
       });
 
       if (pledges.length === 0) {
-        showMsg('최소 1개 이상의 공약 제목을 입력하세요.', false);
+        showMsg('理쒖냼 1媛??댁긽??怨듭빟 ?쒕ぉ???낅젰?섏꽭??', false);
         submitBtn.disabled = false; return;
       }
 
-      // 분석 안 된 공약 차단
+      // 遺꾩꽍 ????怨듭빟 李⑤떒
       const unanalyzed = pledges.filter(p => p.imported_score == null);
       if (unanalyzed.length > 0) {
-        showMsg(`분석되지 않은 공약이 ${unanalyzed.length}개 있습니다. 모든 공약은 [분석 기록에서 불러오기]로 등록해야 합니다.`, false);
+        showMsg(`遺꾩꽍?섏? ?딆? 怨듭빟??${unanalyzed.length}媛??덉뒿?덈떎. 紐⑤뱺 怨듭빟? [遺꾩꽍 湲곕줉?먯꽌 遺덈윭?ㅺ린]濡??깅줉?댁빞 ?⑸땲??`, false);
         submitBtn.disabled = false; return;
       }
 
@@ -508,7 +508,7 @@
         const text = await res.text();
         let data = {}; try { data = JSON.parse(text); } catch (_) {}
         if (!res.ok) {
-          let errMsg = '저장 실패 (' + res.status + ')';
+          let errMsg = '????ㅽ뙣 (' + res.status + ')';
           if (data.detail) {
             if (typeof data.detail === 'string') errMsg = data.detail;
             else if (Array.isArray(data.detail)) errMsg = data.detail.map(e => e.msg || JSON.stringify(e)).join(', ');
@@ -517,15 +517,15 @@
           showMsg(errMsg, false);
           submitBtn.disabled = false; return;
         }
-        showMsg(`공약 ${data.pledge_count || pledges.length}개가 저장되었습니다. 관리자 승인 후 지도에 공개됩니다.`, true);
+        showMsg(`怨듭빟 ${data.pledge_count || pledges.length}媛쒓? ??λ릺?덉뒿?덈떎. 愿由ъ옄 ?뱀씤 ??吏?꾩뿉 怨듦컻?⑸땲??`, true);
         pledgesContainer.innerHTML = '';
         pledgeIndex = 0;
         await loadData();
-      } catch (err) { showMsg('서버 연결 실패', false); }
+      } catch (err) { showMsg('?쒕쾭 ?곌껐 ?ㅽ뙣', false); }
       submitBtn.disabled = false;
     });
 
-    // ── 불러오기 모달 ──
+    // ?? 遺덈윭?ㅺ린 紐⑤떖 ??
     const importModal = document.getElementById('importModal');
     const importModalBody = document.getElementById('importModalBody');
     document.getElementById('importModalClose').addEventListener('click', () => importModal.classList.add('hidden'));
@@ -534,27 +534,27 @@
     function openImportModal(targetBlock) {
       importTargetBlock = targetBlock || null;
       importModal.classList.remove('hidden');
-      importModalBody.innerHTML = '<div class="modal-empty">불러오는 중...</div>';
+      importModalBody.innerHTML = '<div class="modal-empty">遺덈윭?ㅻ뒗 以?..</div>';
       fetch('/api/history?limit=50', { credentials: 'include' })
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
           const items = (data.items || []).filter(it => it.status_code === 200);
           if (items.length === 0) {
-            importModalBody.innerHTML = '<div class="modal-empty">분석 기록이 없습니다.<br><a href="/pledge" style="color:#93c5fd;">공약 분석 페이지</a>에서 먼저 분석해 주세요.</div>';
+            importModalBody.innerHTML = '<div class="modal-empty">遺꾩꽍 湲곕줉???놁뒿?덈떎.<br><a href="/pledge" style="color:#93c5fd;">怨듭빟 遺꾩꽍 ?섏씠吏</a>?먯꽌 癒쇱? 遺꾩꽍??二쇱꽭??</div>';
             return;
           }
           importModalBody.innerHTML = '';
           items.forEach(it => {
-            const scoreText = it.total_score != null ? `${it.total_score}점` : '점수 없음';
+            const scoreText = it.total_score != null ? `${it.total_score}?? : '?먯닔 ?놁쓬';
             const scoreColor = it.total_score != null ? scoreClass(it.total_score) : '';
-            // UTC → KST 변환
+            // UTC ??KST 蹂??
             const rawDate = it.created_at || '';
             let dateText = rawDate.slice(0, 16).replace('T', ' ');
             try {
               const utc = new Date(rawDate.endsWith('Z') ? rawDate : rawDate + 'Z');
               if (!isNaN(utc)) dateText = utc.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\./g, '-').replace(/\s+/g, ' ');
             } catch (_) {}
-            // 첫 줄을 제목으로 표시, 나머지는 내용 미리보기
+            // 泥?以꾩쓣 ?쒕ぉ?쇰줈 ?쒖떆, ?섎㉧吏???댁슜 誘몃━蹂닿린
             const preview = it.input_preview || '';
             const nlIdx = preview.indexOf('\n');
             const title = nlIdx > 0 ? preview.slice(0, nlIdx).trim() : preview.trim();
@@ -573,29 +573,29 @@
             importModalBody.appendChild(el);
           });
         })
-        .catch(() => { importModalBody.innerHTML = '<div class="modal-empty">오류가 발생했습니다.</div>'; });
+        .catch(() => { importModalBody.innerHTML = '<div class="modal-empty">?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.</div>'; });
     }
 
     async function importFromHistory(historyId) {
       try {
         const res = await fetch(`/api/history/${historyId}`, { credentials: 'include' });
-        if (!res.ok) { alert('기록을 불러올 수 없습니다.'); return; }
+        if (!res.ok) { alert('湲곕줉??遺덈윭?????놁뒿?덈떎.'); return; }
         const item = await res.json();
         const inputText = item.input_text || '';
         const resultText = item.result_text || '';
         let score = null;
-        // 백엔드 파서가 추출한 점수 우선 사용 (프론트 정규식보다 정확)
+        // 諛깆뿏???뚯꽌媛 異붿텧???먯닔 ?곗꽑 ?ъ슜 (?꾨줎???뺢퇋?앸낫???뺥솗)
         if (item.total_score != null) {
           score = item.total_score;
         } else {
-          const m = resultText.match(/종합\s*점수[^0-9]*(\d{1,3}(?:\.\d+)?)/);
+          const m = resultText.match(/醫낇빀\s*?먯닔[^0-9]*(\d{1,3}(?:\.\d+)?)/);
           if (m) score = parseFloat(m[1]);
         }
         const now = new Date().toISOString();
 
-        // 첫 줄 = 제목, 전체 텍스트 = 내용 textarea에 표시
+        // 泥?以?= ?쒕ぉ, ?꾩껜 ?띿뒪??= ?댁슜 textarea???쒖떆
         const lines = inputText.split('\n');
-        const title = (lines[0] || '').trim().slice(0, 100) || '불러온 공약';
+        const title = (lines[0] || '').trim().slice(0, 100) || '遺덈윭??怨듭빟';
 
         if (importTargetBlock) {
           const parent = importTargetBlock.parentNode;
@@ -615,15 +615,16 @@
         importTargetBlock = null;
       } catch (e) {
         console.error(e);
-        alert('불러오기 실패');
+        alert('遺덈윭?ㅺ린 ?ㅽ뙣');
       }
     }
 
     loadData();
   </script>
   <p class="footer">
-    <strong>개혁신당 정책국</strong><br>
-    문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
+    <strong>媛쒗쁺?좊떦 ?뺤콉援?/strong><br>
+    臾몄쓽: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
   </p>
 </body>
 </html>
+
