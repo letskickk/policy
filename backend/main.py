@@ -1,4 +1,4 @@
-"""
+﻿"""
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
@@ -3356,3 +3356,7 @@ def api_admin_repair_pledge_scores(request: Request):
         return {"total_null": len(rows), "repaired": repaired, "details": details}
     finally:
         conn.close()
+
+from backend.policy_admin_routes import register_policy_routes
+register_policy_routes(app, require_admin, _ensure_db_ready, _serve_html)
+
