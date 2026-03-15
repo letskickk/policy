@@ -195,6 +195,59 @@ def send_candidate_approval_status_email(
         return False
 
 
+def send_pledge_registration_notification(
+    user_email: str,
+    name: str = "",
+    candidate_name: str = "",
+    election_position: str = "",
+    region_name: str = "",
+    district_name: str = "",
+    pledge_count: int = 0,
+    pledges_summary: str = "",
+) -> bool:
+    """공약 등록/수정 시 관리자에게 알림 메일 발송."""
+    if not SMTP_HOST or not SMTP_USER or not ADMIN_NOTIFY_EMAIL:
+        logger.warning("SMTP 또는 ADMIN_NOTIFY_EMAIL 미설정. 공약 등록 알림 건너뜀.")
+        return False
+
+    pos_label = ELECTION_LABELS.get(election_position, election_position or "미선택")
+    location = region_name or ""
+    if district_name:
+        location = f"{location} {district_name}".strip()
+
+    display = candidate_name or name or user_email
+    subject = f"[정책멘토링] 공약 등록/수정: {display} ({pledge_count}개)"
+    body = f"""공약이 등록/수정되었습니다.
+
+이름: {display}
+이메일: {user_email}
+출마 유형: {pos_label}
+지역: {location or '(미선택)'}
+공약 수: {pledge_count}개
+
+{pledges_summary}
+
+관리자 페이지에서 승인/거절하세요:
+{APP_BASE_URL}/admin/candidates
+"""
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = ADMIN_NOTIFY_EMAIL
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [ADMIN_NOTIFY_EMAIL], msg.as_string())
+        logger.info("공약 등록 알림 메일 발송: %s → %s", user_email, ADMIN_NOTIFY_EMAIL)
+        return True
+    except Exception as e:
+        logger.exception("공약 등록 알림 메일 발송 실패: %s", e)
+        return False
+
+
 def send_signup_notification(
     user_email: str,
     name: str = "",
