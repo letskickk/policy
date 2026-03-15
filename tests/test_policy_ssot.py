@@ -391,6 +391,9 @@ def test_public_person_detail_infers_focus_from_documents(monkeypatch):
     assert "대표발의 법안" in detail["brief"]
     assert "주요 의제" in detail["derived_key_points"]
     assert len(detail["timeline"]) >= 1
+    assert detail["role_labels"]
+    assert detail["focus_positions"]
+    assert detail["featured_bills"]
 
 
 def test_policy_versions_timeline_and_operations(monkeypatch):

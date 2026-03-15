@@ -35,7 +35,15 @@ PUBLIC_PEOPLE_PRIORITY = {
     "천하람": 2,
     "이주영": 3,
 }
-
+PERSON_ROLE_LABELS = {
+    "proposer": "대표발의",
+    "co_proposer": "공동발의",
+    "spokesperson": "대변인",
+    "deputy_spokesperson": "부대변인",
+    "chief_spokesperson": "수석대변인",
+    "member": "국회의원",
+    "policy_owner": "정책 담당",
+}
 
 def _normalize_text(value: Optional[str]) -> str:
     return unicodedata.normalize("NFC", (value or "").strip())
@@ -211,50 +219,72 @@ def _infer_related_positions_for_document(item: dict, approved_positions: list[d
     topic_label = item.get("topic_label") or _classify_commentary_topic(item)
     preferred_categories = {value.lower() for value in _topic_to_categories(topic_label)}
     preferred_keywords = {value.lower() for value in _topic_keywords(topic_label)}
+    doc_type = item.get("doc_type") or ""
+    title_tokens = _tokenize_public_text(item.get("title"))
     doc_tokens = _tokenize_public_text(item.get("title"), item.get("summary"), item.get("body"))
-    ranked: list[tuple[int, int, str, dict]] = []
+    ranked: list[tuple[int, int, int, str, dict]] = []
+
     for position in approved_positions:
         category = (position.get("category") or "").lower()
-        title_tokens = _tokenize_public_text(position.get("title"), position.get("category"))
-        pos_tokens = _tokenize_public_text(position.get("title"), position.get("summary"), position.get("body"), position.get("category"))
-        overlap = doc_tokens & pos_tokens
+        position_title = position.get("title") or ""
+        position_summary = position.get("summary") or ""
+        position_body = position.get("body") or ""
+        pos_title_tokens = _tokenize_public_text(position_title)
+        pos_tokens = _tokenize_public_text(position_title, position_summary, position_body, position.get("category"))
+        overlap_title = title_tokens & pos_title_tokens
+        overlap_all = doc_tokens & pos_tokens
         keyword_overlap = preferred_keywords & pos_tokens
         gate_keywords = TOPIC_TITLE_GATES.get(topic_label, set())
-        if gate_keywords and not (gate_keywords & title_tokens):
+        if gate_keywords and not (gate_keywords & pos_title_tokens):
             continue
+
         score = 0
         if category and category in preferred_categories:
-            score += 2
-        if keyword_overlap:
-            score += 2 + min(len(keyword_overlap), 2)
-        score += min(len(overlap), 4)
-        if position.get("title") and item.get("title") and _normalize_text(position["title"]) in _normalize_text(item["title"]):
             score += 3
-        if score <= 0:
-            continue
-        if len(overlap) < 2 and not keyword_overlap:
-            continue
-        specificity = 1 if category not in {"공통공약", "general", "common"} else 0
-        ranked.append((score, specificity, position.get("title") or "", position))
+        if keyword_overlap:
+            score += 2 + min(len(keyword_overlap), 3)
+        score += min(len(overlap_title) * 3, 9)
+        score += min(len(overlap_all), 5)
+        if position_title and item.get("title") and _normalize_text(position_title) in _normalize_text(item["title"]):
+            score += 4
 
-    ranked.sort(key=lambda entry: entry[2])
+        if doc_type == "bill":
+            if not overlap_title and not keyword_overlap and len(overlap_all) < 2:
+                continue
+            score += min(len(overlap_title), 2)
+        elif doc_type in {"statement", "press_release", "briefing"}:
+            if len(overlap_all) < 2 and not keyword_overlap and not overlap_title:
+                continue
+
+        if score < 4:
+            continue
+
+        specificity = 1 if category not in {"공통공약", "general", "common"} else 0
+        explicit_hint = 1 if overlap_title else 0
+        ranked.append((score, explicit_hint, specificity, position_title, position))
+
+    ranked.sort(key=lambda entry: entry[3])
+    ranked.sort(key=lambda entry: entry[2], reverse=True)
     ranked.sort(key=lambda entry: entry[1], reverse=True)
     ranked.sort(key=lambda entry: entry[0], reverse=True)
+
     results: list[dict] = []
     seen_keys: set[str] = set()
-    for score, _, _, position in ranked:
+    for score, _, _, _, position in ranked:
         key = _canonical_policy_key(position.get("title") or "")
         if key in seen_keys:
             continue
         seen_keys.add(key)
-        results.append({
-            "position_id": int(position["id"]),
-            "position_title": position["title"],
-            "position_slug": position["slug"],
-            "relation_type": "related",
-            "is_inferred": True,
-            "score": score,
-        })
+        results.append(
+            {
+                "position_id": int(position["id"]),
+                "position_title": position["title"],
+                "position_slug": position["slug"],
+                "relation_type": "related",
+                "is_inferred": True,
+                "score": score,
+            }
+        )
         if len(results) >= 3:
             break
     return results
@@ -1462,89 +1492,169 @@ def _build_document_relevance_note(document: dict) -> str:
     return "공개 문서 맥락에서 함께 확인할 가치가 있습니다."
 
 
+def _human_person_role_labels(roles: set[str]) -> list[str]:
+    labels = []
+    for role in sorted(roles):
+        if role == "policy_owner":
+            continue
+        labels.append(PERSON_ROLE_LABELS.get(role, role))
+    return labels
+
+
+def _sort_person_documents(documents_list: list[dict]) -> list[dict]:
+    doc_type_rank = {"bill": 1, "statement": 2, "press_release": 3, "briefing": 4, "pledge": 5}
+    items = list(documents_list)
+    items.sort(key=lambda item: item.get("title") or "")
+    items.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    items.sort(key=lambda item: doc_type_rank.get(item.get("doc_type") or "", 99))
+    return items
+
+
+def _build_person_focus_positions(documents_list: list[dict], linked_positions: list[dict]) -> list[dict]:
+    stats: dict[int, dict] = {}
+    for item in documents_list:
+        for link in (item.get("linked_positions") or item.get("related_positions") or []):
+            position_id = int(link["position_id"])
+            entry = stats.setdefault(
+                position_id,
+                {
+                    "position_id": position_id,
+                    "position_title": link.get("position_title") or "",
+                    "position_slug": link.get("position_slug") or "",
+                    "count": 0,
+                    "latest_at": "",
+                    "explicit": False,
+                },
+            )
+            entry["count"] += 1
+            entry["latest_at"] = max(entry["latest_at"], item.get("published_at") or "")
+            if not link.get("is_inferred"):
+                entry["explicit"] = True
+    for item in linked_positions:
+        position_id = int(item["position_id"])
+        entry = stats.setdefault(
+            position_id,
+            {
+                "position_id": position_id,
+                "position_title": item.get("position_title") or "",
+                "position_slug": item.get("position_slug") or "",
+                "count": 0,
+                "latest_at": "",
+                "explicit": True,
+            },
+        )
+        entry["explicit"] = True
+    results = list(stats.values())
+    results.sort(key=lambda item: item["position_title"])
+    results.sort(key=lambda item: item["latest_at"], reverse=True)
+    results.sort(key=lambda item: item["count"], reverse=True)
+    results.sort(key=lambda item: item["explicit"], reverse=True)
+    return results
+
+
 def _build_person_detail_payload(person_name: str, roles: set[str], documents_list: list[dict], linked_positions: list[dict]) -> dict:
-    bill_docs = [item for item in documents_list if item["doc_type"] == "bill"]
-    statement_docs = [item for item in documents_list if item["doc_type"] == "statement"]
-    pledge_docs = [item for item in documents_list if item["doc_type"] == "pledge"]
+    ordered_documents = _sort_person_documents(documents_list)
+    bill_docs = [item for item in ordered_documents if item["doc_type"] == "bill"]
+    statement_docs = [item for item in ordered_documents if item["doc_type"] == "statement"]
+    press_docs = [item for item in ordered_documents if item["doc_type"] in {"press_release", "briefing"}]
+    pledge_docs = [item for item in ordered_documents if item["doc_type"] == "pledge"]
+    role_labels = _human_person_role_labels(roles)
+    focus_positions = _build_person_focus_positions(ordered_documents, linked_positions)
+    focus_titles = [item["position_title"] for item in focus_positions if item.get("position_title")][:4]
 
-    focus_titles = []
-    for item in linked_positions[:4]:
-        title = item.get("position_title") or ""
-        if title and title not in focus_titles:
-            focus_titles.append(title)
+    active_bill_count = 0
+    ended_bill_count = 0
+    for item in bill_docs:
+        progress = item.get("bill_progress") or _bill_progress_stage(item)
+        if progress.get("is_active"):
+            active_bill_count += 1
+        else:
+            ended_bill_count += 1
 
-    if not focus_titles:
-        for item in bill_docs[:4]:
-            title = item.get("title") or ""
-            if title and title not in focus_titles:
-                focus_titles.append(title)
-
-    summary_parts = []
-    if bill_docs:
-        summary_parts.append(f"대표발의 법안 {len(bill_docs)}건")
-    if statement_docs:
-        summary_parts.append(f"공식 논평 {len(statement_docs)}건")
-    if pledge_docs:
-        summary_parts.append(f"공약 문서 {len(pledge_docs)}건")
-
-    display_roles = [role for role in sorted(roles) if role != "policy_owner"]
-
-    if bill_docs:
-        brief = f"{person_name}의 대표발의 법안과 주요 정책 의제를 한 번에 볼 수 있습니다."
+    if bill_docs and focus_titles:
+        brief = f"{person_name}의 대표발의 법안과 핵심 정책 의제를 한 번에 볼 수 있습니다. 현재 집중 의제는 {", ".join(focus_titles[:2])}입니다."
+    elif bill_docs:
+        brief = f"{person_name}의 대표발의 법안과 최근 국회 활동을 한 화면에서 확인할 수 있습니다."
     elif statement_docs:
-        brief = f"{person_name}의 공식 메시지와 주요 정책 의제를 한 번에 볼 수 있습니다."
+        brief = f"{person_name}이 공식 메시지에서 어떤 정책 의제를 설명하는지 확인할 수 있습니다."
     else:
-        brief = f"{person_name} 관련 공개 문서를 한 번에 볼 수 있습니다."
+        brief = f"{person_name}과 연결된 공개 정책 자료를 한 번에 볼 수 있습니다."
 
     key_points_parts = []
-    if display_roles:
-        key_points_parts.append("역할: " + ", ".join(display_roles))
+    if role_labels:
+        key_points_parts.append("역할: " + ", ".join(role_labels))
+    if bill_docs:
+        key_points_parts.append(f"대표발의 법안 {len(bill_docs)}건")
+    if statement_docs:
+        key_points_parts.append(f"공식 논평 {len(statement_docs)}건")
     if focus_titles:
         key_points_parts.append("주요 의제: " + ", ".join(focus_titles[:3]))
     if bill_docs:
-        latest_bill = bill_docs[0]
-        key_points_parts.append(f"최근 법안: {latest_bill['title']}")
-    if statement_docs:
-        latest_statement = statement_docs[0]
-        key_points_parts.append(f"최근 논평: {latest_statement['title']}")
-
-    if bill_docs:
-        relevance = "실제 대표발의 법안이 있어 정책 입장을 입법으로 옮기고 있는 핵심 인물입니다."
+        key_points_parts.append(f"최근 입법: {bill_docs[0]['title']}")
     elif statement_docs:
-        relevance = "공식 메시지를 통해 당의 입장을 대외적으로 설명하는 역할이 큽니다."
+        key_points_parts.append(f"최근 메시지: {statement_docs[0]['title']}")
+
+    if active_bill_count:
+        relevance = f"현재 국회에서 진행 중인 대표발의 법안이 {active_bill_count}건 있어 정책 입장을 실제 입법으로 이어가는 흐름이 보입니다."
+    elif bill_docs:
+        relevance = f"대표발의 법안 {len(bill_docs)}건의 이력이 남아 있어 주요 정책 의제에 실제로 참여한 흔적을 확인할 수 있습니다."
+    elif statement_docs:
+        relevance = "공식 논평과 브리핑을 통해 당의 정책 메시지를 대외적으로 설명하는 역할이 분명히 드러납니다."
     else:
-        relevance = "공개 문서 기준 활동 이력이 아직 많지 않아 추가 축적이 필요합니다."
+        relevance = "연결된 공개 문서가 아직 많지 않아 추가 데이터가 쌓일수록 활동 맥락이 더 선명해집니다."
 
     timeline = []
-    for item in documents_list[:12]:
-        timeline.append(
-            {
-                "kind": "document",
-                "doc_type": item["doc_type"],
-                "at": item.get("published_at") or "",
-                "title": item.get("title") or "",
-                "summary": item.get("summary") or "",
-            }
-        )
+    for item in ordered_documents[:16]:
+        summary = item.get("summary") or ""
+        if item.get("doc_type") == "bill":
+            progress = item.get("bill_progress") or _bill_progress_stage(item)
+            raw = progress.get("raw") or progress.get("label") or ""
+            if raw:
+                summary = raw
+        timeline.append({"kind": "document", "doc_type": item["doc_type"], "at": item.get("published_at") or "", "title": item.get("title") or "", "summary": summary})
 
     body_sections = []
-    if summary_parts:
-        body_sections.append("활동 개요\n" + " · ".join(summary_parts))
-    if focus_titles:
-        body_sections.append("주요 의제\n" + "\n".join(f"- {title}" for title in focus_titles[:5]))
+    overview_lines = []
+    if role_labels:
+        overview_lines.append("- 역할: " + ", ".join(role_labels))
     if bill_docs:
-        body_sections.append("최근 대표발의 법안\n" + "\n".join(f"- {item['title']}" for item in bill_docs[:5]))
+        overview_lines.append(f"- 대표발의 법안: {len(bill_docs)}건")
+        if active_bill_count or ended_bill_count:
+            overview_lines.append(f"- 진행 중 법안: {active_bill_count}건 / 종료 이력: {ended_bill_count}건")
     if statement_docs:
-        body_sections.append("최근 공식 논평\n" + "\n".join(f"- {item['title']}" for item in statement_docs[:5]))
+        overview_lines.append(f"- 공식 논평: {len(statement_docs)}건")
+    if press_docs:
+        overview_lines.append(f"- 브리핑·보도자료: {len(press_docs)}건")
+    if pledge_docs:
+        overview_lines.append(f"- 공약 문서: {len(pledge_docs)}건")
+    if overview_lines:
+        body_sections.append("활동 개요\n" + "\n".join(overview_lines))
+
+    if focus_positions:
+        body_sections.append("주요 정책 의제\n" + "\n".join(f"- {item['position_title']}" + (f" · 연결 문서 {item['count']}건" if item.get("count") else "") for item in focus_positions[:5]))
+
+    if bill_docs:
+        bill_lines = []
+        for item in bill_docs[:5]:
+            progress = item.get("bill_progress") or _bill_progress_stage(item)
+            raw = progress.get("raw") or ""
+            bill_lines.append(f"- {item['title']}" + (f" · {raw}" if raw else ""))
+        body_sections.append("대표 법안\n" + "\n".join(bill_lines))
+
+    if statement_docs:
+        body_sections.append("최근 공식 논평\n" + "\n".join(f"- {item['title']}" + (f" · {item.get('topic_label')}" if item.get("topic_label") else "") for item in statement_docs[:5]))
 
     return {
         "brief": brief,
+        "role_labels": role_labels,
+        "focus_positions": focus_positions[:6],
+        "featured_bills": bill_docs[:5],
+        "featured_commentary": statement_docs[:5],
         "derived_key_points": " · ".join(key_points_parts) if key_points_parts else "핵심 쟁점 정보가 아직 없습니다.",
         "derived_relevance_note": relevance,
         "timeline": timeline,
         "body": "\n\n".join(body_sections).strip(),
     }
-
 
 def _policy_execution_stage(documents: list[dict]) -> dict:
     bill_documents = [entry for entry in documents if entry.get("doc_type") == "bill"]
@@ -1677,7 +1787,11 @@ def list_public_commentary(*, q: Optional[str] = None, speaker_name: Optional[st
     for item in decorated:
         item["topic_label"] = _classify_commentary_topic(item)
         explicit = item.get("linked_positions") or []
-        item["related_positions"] = explicit or _infer_related_positions_for_document(item, approved_positions)
+        related = explicit or _infer_related_positions_for_document(item, approved_positions)
+        if explicit:
+            for link in related:
+                link["is_inferred"] = False
+        item["related_positions"] = related
     return decorated
 
 
@@ -1688,91 +1802,7 @@ def get_public_commentary_overview(*, limit: int = 120) -> dict:
     speaker_counts: dict[str, int] = {}
     linked = []
     for item in items:
-        topic = item.get("topic_label") or "湲고? ?꾩븞"
-        topic_counts[topic] = topic_counts.get(topic, 0) + 1
-
-        speaker = _normalize_text(item.get("speaker_name") or item.get("speaker"))
-        if speaker:
-            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
-
-        if item.get("related_positions"):
-            linked.append(item)
-
-    topic_items = [
-        {"topic_label": topic, "count": count}
-        for topic, count in sorted(topic_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:8]
-    ]
-    speaker_items = [
-        {"speaker_name": speaker, "count": count}
-        for speaker, count in sorted(speaker_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:6]
-    ]
-    linked.sort(
-        key=lambda item: (
-            -len(item.get("linked_positions") or []),
-            item.get("published_at") or "",
-            item.get("title") or "",
-        ),
-        reverse=False,
-    )
-    linked.sort(key=lambda item: item.get("published_at") or "", reverse=True)
-    linked.sort(key=lambda item: len(item.get("linked_positions") or []), reverse=True)
-
-    return {
-        "counts": {
-            "commentary": len(items),
-            "topics": len(topic_counts),
-            "speakers": len(speaker_counts),
-            "linked_commentary": len(linked),
-        },
-        "topics": topic_items,
-        "speakers": speaker_items,
-        "featured": items[:3],
-        "linked": linked[:6],
-    }
-
-
-def auto_link_public_commentary(*, actor_id: Optional[int], limit: int = 300, min_score: int = 4) -> dict:
-    items = list_public_commentary(limit=max(1, min(limit, 500)))
-    created = 0
-    skipped = 0
-
-    for item in items:
-        if item.get("linked_positions"):
-            skipped += 1
-            continue
-        related = item.get("related_positions") or []
-        if not related:
-            skipped += 1
-            continue
-        top = related[0]
-        if int(top.get("score") or 0) < min_score:
-            skipped += 1
-            continue
-        link_policy_document(
-            position_id=int(top["position_id"]),
-            document_id=int(item["id"]),
-            relation_type="explains",
-            notes="?쇳룊 二쇱젣 湲곕컲 ?먮룞 ?곌껐",
-            actor_id=actor_id,
-        )
-        created += 1
-
-    return {
-        "created": created,
-        "skipped": skipped,
-        "limit": limit,
-        "min_score": min_score,
-    }
-
-
-def get_public_commentary_overview(*, limit: int = 120) -> dict:
-    items = list_public_commentary(limit=limit)
-
-    topic_counts: dict[str, int] = {}
-    speaker_counts: dict[str, int] = {}
-    linked = []
-    for item in items:
-        topic = item.get("topic_label") or "湲고? ?꾩븞"
+        topic = item.get("topic_label") or "기타 현안"
         topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
         speaker = _normalize_text(item.get("speaker_name") or item.get("speaker"))
@@ -1822,16 +1852,17 @@ def auto_link_public_commentary(*, actor_id: Optional[int], limit: int = 300, mi
             skipped += 1
             continue
         top = related[0]
-        top_score = int(top.get("score") or 0)
-        second_score = int(related[1].get("score") or 0) if len(related) > 1 else 0
-        if top_score < min_score or (second_score and top_score - second_score < 2):
+        if int(top.get("score") or 0) < min_score:
+            skipped += 1
+            continue
+        if len((item.get("body") or "").strip()) < 40 and len((item.get("summary") or "").strip()) < 20:
             skipped += 1
             continue
         link_policy_document(
             position_id=int(top["position_id"]),
             document_id=int(item["id"]),
             relation_type="explains",
-            notes="?쇳룊 二쇱젣 湲곕컲 ?먮룞 ?곌껐",
+            notes="논평 주제 기반 자동 연결",
             actor_id=actor_id,
         )
         created += 1
@@ -1983,7 +2014,13 @@ def get_public_person_detail(person_name: str) -> dict:
             }
 
     for doc in documents.values():
+        if doc["doc_type"] == "bill":
+            doc["bill_progress"] = _bill_progress_stage(doc)
+        if doc["doc_type"] in {"statement", "press_release", "briefing"}:
+            doc["topic_label"] = _classify_commentary_topic(doc)
         if doc["linked_positions"]:
+            for link in doc["linked_positions"]:
+                link["is_inferred"] = False
             doc["related_positions"] = doc["linked_positions"]
             continue
         if doc["doc_type"] in {"bill", "statement", "press_release", "briefing"}:
@@ -1999,11 +2036,7 @@ def get_public_person_detail(person_name: str) -> dict:
                     },
                 )
 
-    doc_type_rank = {"bill": 1, "statement": 2, "press_release": 3, "briefing": 4}
-    documents_list = list(documents.values())
-    documents_list.sort(key=lambda item: item["title"])
-    documents_list.sort(key=lambda item: item.get("published_at") or "", reverse=True)
-    documents_list.sort(key=lambda item: doc_type_rank.get(item["doc_type"], 99))
+    documents_list = _sort_person_documents(list(documents.values()))
 
     payload = {
         "person_name": target,

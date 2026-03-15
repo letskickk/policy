@@ -1,0 +1,1 @@
+0 */6 * * * cd /home/ubuntu/Policy && ./.venv/bin/python scripts/run_ssot_sync.py --auto-link --min-score 5 >> /home/ubuntu/Policy/ssot-sync.log 2>&1
