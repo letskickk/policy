@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "role": "대변인",
+      "name": "",
+      "effective_from": "",
+      "effective_to": ""
+    },
+    {
+      "role": "부대변인",
+      "name": "",
+      "effective_from": "",
+      "effective_to": ""
+    },
+    {
+      "role": "수석대변인",
+      "name": "",
+      "effective_from": "",
+      "effective_to": ""
+    }
+  ]
+}

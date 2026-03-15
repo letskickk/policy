@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>정책 SSOT 관리</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --panel: #fffaf3;
+      --line: #d8cbb9;
+      --text: #1f1a17;
+      --muted: #6b6259;
+      --accent: #d95d19;
+      --accent-dark: #9f3f10;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+      background: linear-gradient(180deg, #f7f1e9 0%, #efe6d8 100%);
+      color: var(--text);
+    }
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .card, .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(88, 55, 30, 0.08);
+    }
+    .card { padding: 18px; }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .stat { padding: 16px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 34px; }
+    h2 { font-size: 20px; margin-bottom: 12px; }
+    .muted { color: var(--muted); }
+    .layout {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .stack { display: grid; gap: 16px; }
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    input, select, textarea, button {
+      width: 100%;
+      font: inherit;
+      border-radius: 12px;
+    }
+    input, select, textarea {
+      margin-top: 6px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      padding: 11px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #efe4d5;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .actions button {
+      width: auto;
+      min-width: 120px;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+      max-height: 320px;
+      overflow: auto;
+    }
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+    }
+    .item-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f5e4d8;
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tiny { font-size: 12px; }
+    .mono { font-family: Consolas, monospace; }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .log {
+      white-space: pre-wrap;
+      background: #211b17;
+      color: #f5ede3;
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 120px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+    .hidden { display: none; }
+    @media (max-width: 980px) {
+      .hero, .layout, .split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="card">
+        <p class="pill">Policy SSOT</p>
+        <h1>정책 원문, 논평, 법안을 한 화면에서 운용</h1>
+        <p class="muted" style="margin-top:10px;">정책 항목을 SSOT로 두고, 대변인 논평과 개혁신당 의원 법안을 연결해 검수하는 운영 화면입니다.</p>
+      </div>
+      <div class="stat-grid" id="summaryCards">
+        <div class="stat"><p class="muted tiny">정책 항목</p><h2 id="sumPositions">-</h2></div>
+        <div class="stat"><p class="muted tiny">문서 수</p><h2 id="sumDocuments">-</h2></div>
+        <div class="stat"><p class="muted tiny">연결 수</p><h2 id="sumLinks">-</h2></div>
+        <div class="stat"><p class="muted tiny">대기 추천</p><h2 id="sumSuggestions">-</h2></div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="stack">
+        <div class="card">
+          <h2>정책 항목 등록</h2>
+          <label>제목<input id="positionTitle"></label>
+          <label>분야<input id="positionCategory" placeholder="예: 경제, 연금, 교육"></label>
+          <label>상태
+            <select id="positionStatus">
+              <option value="draft">draft</option>
+              <option value="review">review</option>
+              <option value="approved" selected>approved</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <label>소유 범위
+            <select id="positionOwnerScope">
+              <option value="party" selected>party</option>
+              <option value="parliamentary_group">parliamentary_group</option>
+              <option value="spokesperson">spokesperson</option>
+              <option value="member">member</option>
+              <option value="campaign">campaign</option>
+              <option value="other">other</option>
+            </select>
+          </label>
+          <label>버전 라벨<input id="positionVersion" placeholder="예: 2026-03 정책위 의결"></label>
+          <label>요약<textarea id="positionSummary"></textarea></label>
+          <label>본문<textarea id="positionBody"></textarea></label>
+          <div class="actions">
+            <button id="savePositionBtn">정책 저장</button>
+            <button class="secondary" id="refreshPositionsBtn" type="button">목록 새로고침</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>자동 수집</h2>
+          <div class="actions" style="margin-bottom:10px;">
+            <button id="syncCommentaryBtn" type="button">논평 동기화</button>
+            <button id="syncBillsBtn" type="button">법안 동기화</button>
+            <button class="secondary" id="rebuildSuggestionsBtn" type="button">추천 재생성</button>
+          </div>
+          <div class="split">
+            <label>논평 건수<input id="commentaryLimit" type="number" value="20" min="1" max="100"></label>
+            <label>의안대수<input id="billAge" type="number" value="22" min="1" max="99"></label>
+          </div>
+          <label style="margin-top:10px;"><input id="includeBody" type="checkbox" checked style="width:auto;margin-right:8px;">논평 본문까지 수집</label>
+          <div class="log" id="syncLog">동기화 로그가 여기에 표시됩니다.</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <h2>정책 항목</h2>
+          <div class="list" id="positionsList"></div>
+        </div>
+
+        <div class="card">
+          <h2>문서 등록</h2>
+          <div class="split">
+            <label>제목<input id="documentTitle"></label>
+            <label>문서 유형
+              <select id="documentType">
+                <option value="policy">policy</option>
+                <option value="bill">bill</option>
+                <option value="statement" selected>statement</option>
+                <option value="press_release">press_release</option>
+                <option value="briefing">briefing</option>
+                <option value="pledge">pledge</option>
+                <option value="meeting_note">meeting_note</option>
+                <option value="research">research</option>
+                <option value="other">other</option>
+              </select>
+            </label>
+          </div>
+          <div class="split">
+            <label>발화 역할<input id="documentSpeaker" placeholder="예: 수석대변인"></label>
+            <label>발화자 이름<input id="documentSpeakerName" placeholder="예: 홍길동"></label>
+          </div>
+          <div class="split">
+            <label>소유 주체<input id="documentOwner" value="개혁신당"></label>
+            <label>발행일<input id="documentPublishedAt" type="date"></label>
+          </div>
+          <div class="split">
+            <label>원문 URL<input id="documentSourceUrl"></label>
+            <label>원문 참조키<input id="documentSourceRef"></label>
+          </div>
+          <label>요약<textarea id="documentSummary"></textarea></label>
+          <label>본문<textarea id="documentBody"></textarea></label>
+          <label>메타데이터 JSON<textarea id="documentMetadata" class="mono" placeholder='{"bill_id":"..."}'></textarea></label>
+          <div class="actions">
+            <button id="saveDocumentBtn">문서 저장</button>
+            <button class="secondary" id="refreshDocumentsBtn" type="button">문서 새로고침</button>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="card">
+            <h2>문서 목록</h2>
+            <div class="list" id="documentsList"></div>
+          </div>
+          <div class="card">
+            <h2>자동 연결 추천</h2>
+            <div class="list" id="suggestionsList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    async function api(url, options) {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || ("HTTP " + res.status));
+      }
+      return res.json();
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function prettyDate(value) {
+      return value ? escapeHtml(value) : "-";
+    }
+
+    function setLog(value) {
+      document.getElementById("syncLog").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    }
+
+    async function loadSummary() {
+      const data = await api("/api/admin/policy/summary");
+      document.getElementById("sumPositions").textContent = data.positions_count ?? data.position_count ?? "-";
+      document.getElementById("sumDocuments").textContent = data.documents_count ?? data.document_count ?? "-";
+      document.getElementById("sumLinks").textContent = data.links_count ?? data.link_count ?? "-";
+      document.getElementById("sumSuggestions").textContent = data.pending_suggestions ?? "-";
+    }
+
+    async function loadPositions() {
+      const data = await api("/api/admin/policy/positions?status=approved");
+      const root = document.getElementById("positionsList");
+      root.innerHTML = "";
+      for (const item of data.items || []) {
+        const el = document.createElement("article");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <div class="tiny muted">${escapeHtml(item.category || "general")} · ${escapeHtml(item.owner_scope || "")}</div>
+            </div>
+            <span class="pill">${escapeHtml(item.status)}</span>
+          </div>
+          <div class="tiny muted">${escapeHtml(item.version_label || "-")} · ${prettyDate(item.effective_from)} ~ ${prettyDate(item.effective_to)}</div>
+          <p class="tiny" style="margin-top:8px;">${escapeHtml(item.summary || item.body || "").slice(0, 180)}</p>
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="item muted">등록된 정책 항목이 없습니다.</div>';
+      }
+    }
+
+    async function loadDocuments() {
+      const data = await api("/api/admin/policy/documents?status=active");
+      const root = document.getElementById("documentsList");
+      root.innerHTML = "";
+      for (const item of data.items || []) {
+        const meta = [];
+        if (item.speaker) meta.push(item.speaker);
+        if (item.speaker_name) meta.push(item.speaker_name);
+        if (item.published_at) meta.push(item.published_at);
+        const el = document.createElement("article");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <div class="tiny muted">${escapeHtml(item.doc_type)} · ${escapeHtml(meta.join(" · "))}</div>
+            </div>
+            <span class="pill">${escapeHtml(item.status)}</span>
+          </div>
+          <p class="tiny">${escapeHtml(item.summary || item.body || "").slice(0, 180)}</p>
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="item muted">등록된 문서가 없습니다.</div>';
+      }
+    }
+
+    async function loadSuggestions() {
+      const data = await api("/api/admin/policy/suggestions?status=pending&limit=50");
+      const root = document.getElementById("suggestionsList");
+      root.innerHTML = "";
+      for (const item of data.items || []) {
+        const el = document.createElement("article");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.document_title)}</strong>
+              <div class="tiny muted">${escapeHtml(item.document_type)} → ${escapeHtml(item.position_title)}</div>
+            </div>
+            <span class="pill">${item.score}</span>
+          </div>
+          <p class="tiny muted">${escapeHtml(item.reason || "")}</p>
+          <div class="actions" style="margin-top:10px;">
+            <button type="button" data-action="accept" data-id="${item.id}">승인</button>
+            <button type="button" class="secondary" data-action="reject" data-id="${item.id}">거절</button>
+          </div>
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="item muted">대기 중인 추천이 없습니다.</div>';
+      }
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadSummary(), loadPositions(), loadDocuments(), loadSuggestions()]);
+    }
+
+    document.getElementById("savePositionBtn").addEventListener("click", async () => {
+      const body = {
+        title: document.getElementById("positionTitle").value.trim(),
+        category: document.getElementById("positionCategory").value.trim(),
+        summary: document.getElementById("positionSummary").value.trim(),
+        body: document.getElementById("positionBody").value.trim(),
+        status: document.getElementById("positionStatus").value,
+        owner_scope: document.getElementById("positionOwnerScope").value,
+        effective_from: null,
+        effective_to: null,
+        version_label: document.getElementById("positionVersion").value.trim() || null
+      };
+      await api("/api/admin/policy/positions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      await refreshAll();
+    });
+
+    document.getElementById("saveDocumentBtn").addEventListener("click", async () => {
+      let metadata = {};
+      const metadataRaw = document.getElementById("documentMetadata").value.trim();
+      if (metadataRaw) metadata = JSON.parse(metadataRaw);
+      const body = {
+        title: document.getElementById("documentTitle").value.trim(),
+        doc_type: document.getElementById("documentType").value,
+        summary: document.getElementById("documentSummary").value.trim(),
+        body: document.getElementById("documentBody").value.trim(),
+        speaker: document.getElementById("documentSpeaker").value.trim() || null,
+        speaker_name: document.getElementById("documentSpeakerName").value.trim() || null,
+        owner_name: document.getElementById("documentOwner").value.trim() || null,
+        source_url: document.getElementById("documentSourceUrl").value.trim() || null,
+        source_ref: document.getElementById("documentSourceRef").value.trim() || null,
+        published_at: document.getElementById("documentPublishedAt").value || null,
+        status: "active",
+        metadata
+      };
+      await api("/api/admin/policy/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      await refreshAll();
+    });
+
+    document.getElementById("syncCommentaryBtn").addEventListener("click", async () => {
+      const limit = Number(document.getElementById("commentaryLimit").value || "20");
+      const includeBody = document.getElementById("includeBody").checked;
+      const data = await api(`/api/admin/policy/import/rallypoint-commentary?limit=${limit}&include_body=${includeBody}`, { method: "POST" });
+      setLog(data);
+      await refreshAll();
+    });
+
+    document.getElementById("syncBillsBtn").addEventListener("click", async () => {
+      const age = document.getElementById("billAge").value || "22";
+      const data = await api(`/api/admin/policy/import/assembly-bills?age_from=${age}&age_to=${age}`, { method: "POST" });
+      setLog(data);
+      await refreshAll();
+    });
+
+    document.getElementById("rebuildSuggestionsBtn").addEventListener("click", async () => {
+      const data = await api("/api/admin/policy/suggestions/rebuild", { method: "POST" });
+      setLog(data);
+      await refreshAll();
+    });
+
+    document.getElementById("refreshPositionsBtn").addEventListener("click", loadPositions);
+    document.getElementById("refreshDocumentsBtn").addEventListener("click", loadDocuments);
+
+    document.getElementById("suggestionsList").addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const id = button.dataset.id;
+      const action = button.dataset.action;
+      await api(`/api/admin/policy/suggestions/${id}/${action}`, { method: "POST" });
+      await refreshAll();
+    });
+
+    refreshAll().catch((error) => setLog(error.message));
+  </script>
+</body>
+</html>
