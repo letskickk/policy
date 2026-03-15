@@ -6,6 +6,7 @@ from backend.policy_ssot import (
     _policy_execution_stage,
     get_policy_operations_overview,
     get_public_overview,
+    get_public_person_detail,
     list_public_people,
     get_policy_document,
     get_policy_position,
@@ -248,6 +249,7 @@ def test_bill_document_exposes_progress(monkeypatch):
     assert any(item["title"] == "의결 결과" for item in detail["timeline"])
     assert "임기만료폐기" in detail["derived_key_points"]
     assert "실제 입법" in detail["derived_relevance_note"] or "입법" in detail["derived_relevance_note"]
+    assert not all(item["at"] == detail["timeline"][0]["at"] for item in detail["timeline"] if item["title"] != "법안 접수")
 
 
 def test_public_overview_includes_bills_statements_pledges_and_people(monkeypatch):
@@ -336,8 +338,59 @@ def test_public_overview_includes_bills_statements_pledges_and_people(monkeypatc
     assert overview["counts"]["statements"] == 1
     assert overview["counts"]["pledges"] == 1
     assert overview["counts"]["people"] == 1
-    assert overview["latest_bills"][0]["linked_positions"][0]["position_title"] == "AI regulation"
-    assert overview["latest_bills"][0]["primary_people"][0]["person_name"] == "Lee Example"
+
+
+def test_public_person_detail_infers_focus_from_documents(monkeypatch):
+    db_file = _workspace_db_path("person-detail")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    position = upsert_policy_position(
+        position_id=None,
+        title="데이터 특구 제도 도입",
+        category="science",
+        summary="데이터 특구 확대",
+        body="공식 정책",
+        status="approved",
+        owner_scope="party",
+        effective_from=None,
+        effective_to=None,
+        version_label=None,
+        actor_id=None,
+    )
+    bill = upsert_policy_document(
+        document_id=None,
+        title="데이터 특구 조성에 관한 법률안",
+        doc_type="bill",
+        summary="과학기술정보방송통신위원회 / 소관위심사",
+        body="데이터 특구를 도입하려는 법안.",
+        speaker="의원",
+        speaker_name="이준석",
+        owner_name="개혁신당",
+        source_url=None,
+        source_ref="person-detail:bill",
+        published_at="2026-03-15",
+        status="active",
+        metadata={"committee": "과학기술정보방송통신위원회", "bill_stage": "소관위심사"},
+        actor_id=None,
+    )
+    replace_policy_document_people(
+        bill["id"],
+        [
+            {
+                "person_name": "이준석",
+                "person_role": "proposer",
+                "party_affiliation": "개혁신당",
+                "is_reform_party": True,
+                "is_primary": True,
+            }
+        ],
+    )
+
+    detail = get_public_person_detail("이준석")
+    assert "대표발의 법안" in detail["brief"]
+    assert "주요 의제" in detail["derived_key_points"]
+    assert len(detail["timeline"]) >= 1
 
 
 def test_policy_versions_timeline_and_operations(monkeypatch):

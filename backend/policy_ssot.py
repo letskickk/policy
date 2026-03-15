@@ -1304,7 +1304,7 @@ def _build_bill_timeline(document: dict) -> list[dict]:
         timeline.append(
             {
                 "kind": "bill_event",
-                "at": proposed_at or "",
+                "at": "",
                 "title": "상임위 회부",
                 "summary": f"{committee}에서 다루는 법안입니다.",
             }
@@ -1312,7 +1312,7 @@ def _build_bill_timeline(document: dict) -> list[dict]:
 
     stage_events: list[tuple[str, str]] = []
     if stage_text:
-        if "접수" in stage_text:
+        if "접수" in stage_text and not committee:
             stage_events.append(("접수 완료", stage_text))
         if any(keyword in stage_text for keyword in ("회부", "위원회")) and committee:
             stage_events.append(("상임위 심사", f"{committee} 기준 단계: {stage_text}"))
@@ -1333,17 +1333,17 @@ def _build_bill_timeline(document: dict) -> list[dict]:
         timeline.append(
             {
                 "kind": "bill_event",
-                "at": decision_at or proposed_at or "",
+                "at": decision_at or "",
                 "title": title,
                 "summary": summary,
             }
         )
 
-    if progress.get("raw") and progress["label"] not in seen_titles:
+    if progress.get("raw") and progress["label"] not in seen_titles and progress["label"] not in {"입법 추진", "법안 발의"}:
         timeline.append(
             {
                 "kind": "bill_event",
-                "at": decision_at or proposed_at or "",
+                "at": decision_at or "",
                 "title": progress["label"],
                 "summary": progress["raw"],
             }
@@ -1427,6 +1427,90 @@ def _build_document_relevance_note(document: dict) -> str:
         return "당의 현재 메시지 방향을 보여주는 공식 발화라서 중요합니다."
 
     return "공개 문서 맥락에서 함께 확인할 가치가 있습니다."
+
+
+def _build_person_detail_payload(person_name: str, roles: set[str], documents_list: list[dict], linked_positions: list[dict]) -> dict:
+    bill_docs = [item for item in documents_list if item["doc_type"] == "bill"]
+    statement_docs = [item for item in documents_list if item["doc_type"] == "statement"]
+    pledge_docs = [item for item in documents_list if item["doc_type"] == "pledge"]
+
+    focus_titles = []
+    for item in linked_positions[:4]:
+        title = item.get("position_title") or ""
+        if title and title not in focus_titles:
+            focus_titles.append(title)
+
+    if not focus_titles:
+        for item in bill_docs[:4]:
+            title = item.get("title") or ""
+            if title and title not in focus_titles:
+                focus_titles.append(title)
+
+    summary_parts = []
+    if bill_docs:
+        summary_parts.append(f"대표발의 법안 {len(bill_docs)}건")
+    if statement_docs:
+        summary_parts.append(f"공식 논평 {len(statement_docs)}건")
+    if pledge_docs:
+        summary_parts.append(f"공약 문서 {len(pledge_docs)}건")
+
+    display_roles = [role for role in sorted(roles) if role != "policy_owner"]
+
+    if bill_docs:
+        brief = f"{person_name}의 대표발의 법안과 주요 정책 의제를 한 번에 볼 수 있습니다."
+    elif statement_docs:
+        brief = f"{person_name}의 공식 메시지와 주요 정책 의제를 한 번에 볼 수 있습니다."
+    else:
+        brief = f"{person_name} 관련 공개 문서를 한 번에 볼 수 있습니다."
+
+    key_points_parts = []
+    if display_roles:
+        key_points_parts.append("역할: " + ", ".join(display_roles))
+    if focus_titles:
+        key_points_parts.append("주요 의제: " + ", ".join(focus_titles[:3]))
+    if bill_docs:
+        latest_bill = bill_docs[0]
+        key_points_parts.append(f"최근 법안: {latest_bill['title']}")
+    if statement_docs:
+        latest_statement = statement_docs[0]
+        key_points_parts.append(f"최근 논평: {latest_statement['title']}")
+
+    if bill_docs:
+        relevance = "실제 대표발의 법안이 있어 정책 입장을 입법으로 옮기고 있는 핵심 인물입니다."
+    elif statement_docs:
+        relevance = "공식 메시지를 통해 당의 입장을 대외적으로 설명하는 역할이 큽니다."
+    else:
+        relevance = "공개 문서 기준 활동 이력이 아직 많지 않아 추가 축적이 필요합니다."
+
+    timeline = []
+    for item in documents_list[:12]:
+        timeline.append(
+            {
+                "kind": "document",
+                "doc_type": item["doc_type"],
+                "at": item.get("published_at") or "",
+                "title": item.get("title") or "",
+                "summary": item.get("summary") or "",
+            }
+        )
+
+    body_sections = []
+    if summary_parts:
+        body_sections.append("활동 개요\n" + " · ".join(summary_parts))
+    if focus_titles:
+        body_sections.append("주요 의제\n" + "\n".join(f"- {title}" for title in focus_titles[:5]))
+    if bill_docs:
+        body_sections.append("최근 대표발의 법안\n" + "\n".join(f"- {item['title']}" for item in bill_docs[:5]))
+    if statement_docs:
+        body_sections.append("최근 공식 논평\n" + "\n".join(f"- {item['title']}" for item in statement_docs[:5]))
+
+    return {
+        "brief": brief,
+        "derived_key_points": " · ".join(key_points_parts) if key_points_parts else "핵심 쟁점 정보가 아직 없습니다.",
+        "derived_relevance_note": relevance,
+        "timeline": timeline,
+        "body": "\n\n".join(body_sections).strip(),
+    }
 
 
 def _policy_execution_stage(documents: list[dict]) -> dict:
@@ -1818,6 +1902,7 @@ def get_public_person_detail(person_name: str) -> dict:
     if not rows:
         raise HTTPException(status_code=404, detail="?몃Ъ??李얠쓣 ???놁뒿?덈떎.")
 
+    approved_positions = list_policy_positions(status="approved")
     documents: dict[int, dict] = {}
     linked_positions: dict[int, dict] = {}
     roles: set[str] = set()
@@ -1846,6 +1931,7 @@ def get_public_person_detail(person_name: str) -> dict:
                 "published_at": row["published_at"],
                 "person_role": row["person_role"],
                 "linked_positions": [],
+                "related_positions": [],
             },
         )
         if row["position_id"] is not None:
@@ -1863,13 +1949,30 @@ def get_public_person_detail(person_name: str) -> dict:
                 "position_slug": row["position_slug"],
             }
 
+    for doc in documents.values():
+        if doc["linked_positions"]:
+            doc["related_positions"] = doc["linked_positions"]
+            continue
+        if doc["doc_type"] in {"bill", "statement", "press_release", "briefing"}:
+            inferred = _infer_related_positions_for_document(doc, approved_positions)
+            doc["related_positions"] = inferred
+            for item in inferred[:3]:
+                linked_positions.setdefault(
+                    int(item["position_id"]),
+                    {
+                        "position_id": int(item["position_id"]),
+                        "position_title": item["position_title"],
+                        "position_slug": item["position_slug"],
+                    },
+                )
+
     doc_type_rank = {"bill": 1, "statement": 2, "press_release": 3, "briefing": 4}
     documents_list = list(documents.values())
     documents_list.sort(key=lambda item: item["title"])
     documents_list.sort(key=lambda item: item.get("published_at") or "", reverse=True)
     documents_list.sort(key=lambda item: doc_type_rank.get(item["doc_type"], 99))
 
-    return {
+    payload = {
         "person_name": target,
         "roles": sorted(roles),
         "documents": documents_list,
@@ -1878,3 +1981,5 @@ def get_public_person_detail(person_name: str) -> dict:
         "statement_count": sum(1 for item in documents_list if item["doc_type"] == "statement"),
         "pledge_count": sum(1 for item in documents_list if item["doc_type"] == "pledge"),
     }
+    payload.update(_build_person_detail_payload(target, roles, documents_list, payload["linked_positions"]))
+    return payload
