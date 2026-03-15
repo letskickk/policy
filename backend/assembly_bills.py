@@ -19,6 +19,7 @@ BASE_URL = "https://likms.assembly.go.kr/bill"
 MEMBER_ID_URL = f"{BASE_URL}/bi/bill/sch/checkSameNm.do"
 BILL_SEARCH_URL = f"{BASE_URL}/bi/bill/sch/findSchPaging.do"
 BILL_DETAIL_URL = f"{BASE_URL}/bi/billDetailPage.do"
+BILL_INFO_URL = f"{BASE_URL}/bi/bill/detail/billInfo.do"
 SUMMARY_POPUP_URL = f"{BASE_URL}/bi/popup/billSummary.do"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -43,6 +44,17 @@ COMMITTEE_RE = re.compile(r"<strong>소관위원회</strong>\s*<div>\s*(?P<value
 PROPOSE_DATE_RE = re.compile(r"<strong>제안일자</strong>\s*<div>\s*(?P<value>.*?)\s*</div>", re.S)
 DECISION_DATE_RE = re.compile(r"<strong>의결일자</strong>\s*<div>\s*(?P<value>.*?)\s*</div>", re.S)
 DECISION_RESULT_RE = re.compile(r"<strong>의결결과</strong>\s*<div>\s*(?P<value>.*?)\s*</div>", re.S)
+
+HIDDEN_INPUT_RE = re.compile(
+    r'<input[^>]*type="hidden"[^>]*name="(?P<name>[^"]+)"[^>]*value="(?P<value>[^"]*)"[^>]*>',
+    re.I,
+)
+STEP_NODE_RE = re.compile(
+    r'<div\s+class="(?P<class_name>[^"]*(?:proc|on)[^"]*)"\s+[^>]*data-gbn="(?P<code>[^"]+)"[^>]*>'
+    r'\s*<div class="title">(?P<title>.*?)</div>\s*'
+    r'<div class="stepdate">(?P<date>.*?)</div>\s*</div>',
+    re.S,
+)
 
 
 @dataclass
@@ -276,6 +288,7 @@ def fetch_bill_detail(bill_id: str) -> dict:
     decision_date_match = DECISION_DATE_RE.search(html)
     decision_result_match = DECISION_RESULT_RE.search(html)
     return {
+        "detail_html": html,
         "bill_no": title_match.group("bill_no").strip() if title_match else "",
         "title": _strip_html(title_match.group("title")) if title_match else "",
         "proposer_name": _strip_html(proposer_match.group("name")) if proposer_match else "",
@@ -284,6 +297,45 @@ def fetch_bill_detail(bill_id: str) -> dict:
         "decision_at": _normalize_date(_strip_html(decision_date_match.group("value"))) if decision_date_match else None,
         "decision_result": _strip_html(decision_result_match.group("value")) if decision_result_match else "",
     }
+
+
+def extract_bill_info_payload(detail_html: str) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    for match in HIDDEN_INPUT_RE.finditer(detail_html):
+        name = match.group("name").strip()
+        if not name:
+            continue
+        payload[name] = unescape(match.group("value") or "").strip()
+    if not {"billId", "billNo", "billKindCd"}.issubset(payload):
+        return {}
+    return payload
+
+
+def parse_bill_info_timeline(html: str) -> list[dict]:
+    timeline: list[dict] = []
+    for match in STEP_NODE_RE.finditer(html):
+        title = _strip_html(match.group("title"))
+        if not title:
+            continue
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "code": match.group("code").strip(),
+                "title": title,
+                "at": _normalize_date(_strip_html(match.group("date"))) or "",
+                "summary": "",
+                "is_current": "on" in (match.group("class_name") or "").split(),
+            }
+        )
+    return timeline
+
+
+def fetch_bill_timeline(detail_html: str) -> list[dict]:
+    payload = extract_bill_info_payload(detail_html)
+    if not payload:
+        return []
+    fragment = _post_text(BILL_INFO_URL, payload)
+    return parse_bill_info_timeline(fragment)
 
 
 def parse_bill_summary_popup(html: str) -> str:
@@ -343,6 +395,7 @@ def sync_reform_party_bills(
             )
             for bill in bill_items:
                 detail = fetch_bill_detail(bill.bill_id)
+                bill_timeline = fetch_bill_timeline(detail.get("detail_html") or "")
                 summary_body = fetch_bill_summary(bill.bill_id)
                 processed += 1
                 title = detail["title"] or bill.title
@@ -357,6 +410,7 @@ def sync_reform_party_bills(
                     "decision_at": detail["decision_at"] or bill.decision_at,
                     "decision_result": detail["decision_result"] or bill.decision_result or "",
                     "bill_stage": bill.stage or "",
+                    "bill_timeline": bill_timeline,
                     "status_badge": bill.status_badge or "",
                     "proposer_kind": bill.proposer_kind or "",
                     "representative_member_name": member_name,

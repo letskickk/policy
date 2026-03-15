@@ -1287,6 +1287,39 @@ def _bill_progress_stage(document: dict) -> dict:
 def _build_bill_timeline(document: dict) -> list[dict]:
     metadata = document.get("metadata") or {}
     progress = _bill_progress_stage(document)
+    stored_timeline = metadata.get("bill_timeline") or []
+    if isinstance(stored_timeline, list) and stored_timeline:
+        normalized: list[dict] = []
+        for entry in stored_timeline:
+            if not isinstance(entry, dict):
+                continue
+            title = str(entry.get("title") or "").strip()
+            if not title:
+                continue
+            at = str(entry.get("at") or "").strip()
+            code = str(entry.get("code") or "").strip()
+            summary = str(entry.get("summary") or "").strip()
+            is_current = bool(entry.get("is_current"))
+            if not summary:
+                if is_current:
+                    summary = f"{title} 단계가 현재 진행 중입니다."
+                elif at:
+                    summary = f"{title} 단계가 {at} 기준으로 확인됩니다."
+                else:
+                    summary = f"{title} 단계 이력이 확인됩니다."
+            normalized.append(
+                {
+                    "kind": "bill_event",
+                    "code": code,
+                    "at": at,
+                    "title": title,
+                    "summary": summary,
+                    "is_current": is_current,
+                }
+            )
+        if normalized:
+            return normalized
+
     timeline: list[dict] = []
     proposed_at = metadata.get("proposed_at") or document.get("published_at")
     decision_at = metadata.get("decision_at")
