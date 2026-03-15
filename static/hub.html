@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개혁신당 SSOT 허브</title>
+  <style>
+    :root {
+      --bg1: #04162b;
+      --bg2: #073053;
+      --bg3: #0a3b69;
+      --text: #e2e8f0;
+      --text-strong: #f8fafc;
+      --muted: #cbd5e1;
+      --brand: #ff7210;
+      --brand-soft: rgba(255, 114, 16, 0.14);
+      --card: rgba(255, 255, 255, 0.08);
+      --card-soft: rgba(255, 255, 255, 0.05);
+      --border: rgba(148, 163, 184, 0.18);
+      --shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      background:
+        radial-gradient(1000px 500px at 20% 10%, rgba(255, 114, 16, 0.12), transparent 60%),
+        radial-gradient(900px 600px at 90% 20%, rgba(56, 189, 248, 0.10), transparent 60%),
+        linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      color: var(--text);
+      padding: 28px 16px 40px;
+    }
+
+    main { max-width: 1480px; margin: 0 auto; }
+    a { color: inherit; text-decoration: none; }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar { margin-bottom: 18px; padding: 14px 18px; }
+
+    .brand strong {
+      display: block;
+      font-size: 18px;
+      color: var(--text-strong);
+    }
+
+    .brand span {
+      font-size: 12px;
+      color: #ffb37a;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.55fr);
+      gap: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: #ffb37a;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid rgba(255, 114, 16, 0.18);
+    }
+
+    h1 {
+      margin: 12px 0 0;
+      font-size: 31px;
+      line-height: 1.12;
+      color: var(--text-strong);
+    }
+
+    .muted { color: var(--muted); }
+    .hero p { margin: 12px 0 0; line-height: 1.8; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-content: start;
+    }
+
+    .stat {
+      padding: 14px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--card-soft);
+    }
+
+    .stat .k {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 30px;
+      color: var(--text-strong);
+    }
+
+    .curation {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .sidebar, .detail { padding: 18px; }
+    .sidebar { position: sticky; top: 16px; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .tab.active {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+
+    .search {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .search::placeholder { color: var(--muted); }
+
+    .list,
+    .mini-list,
+    .timeline { display: grid; gap: 10px; }
+
+    .list {
+      max-height: calc(100vh - 210px);
+      overflow: auto;
+      padding-right: 4px;
+      margin-top: 14px;
+    }
+
+    .item,
+    .mini-item {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .item { cursor: pointer; }
+
+    .item.selected {
+      border-color: var(--brand);
+      background: rgba(255, 114, 16, 0.12);
+    }
+
+    .item strong,
+    .mini-item strong {
+      display: block;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .meta {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .detail-grid { display: grid; gap: 16px; min-width: 0; }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
+      gap: 14px;
+    }
+
+    .box {
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--card-soft);
+    }
+
+    .box h3 {
+      font-size: 16px;
+      margin: 0 0 10px;
+      color: var(--text-strong);
+    }
+
+    .detail-title {
+      font-size: 30px;
+      line-height: 1.15;
+      color: var(--text-strong);
+      margin: 10px 0 0;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .body {
+      white-space: pre-wrap;
+      line-height: 1.75;
+      max-height: none;
+      min-height: 360px;
+      overflow: auto;
+    }
+
+    .links,
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip,
+    .link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 13px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .chip.subtle { background: rgba(56, 189, 248, 0.10); }
+
+    .empty {
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px dashed var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      color: var(--text-strong);
+      font-size: 18px;
+    }
+
+    @media (max-width: 1080px) {
+      .summary,
+      .curation,
+      .shell,
+      .split { grid-template-columns: 1fr; }
+      .hero { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .list { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="panel topbar">
+      <div class="brand">
+        <strong>개혁신당 SSOT 허브</strong>
+        <span>정책, 논평, 인물, 법안을 한 화면에서 탐색하는 통합 화면</span>
+      </div>
+    </div>
+
+    <section class="panel hero">
+      <div>
+        <span class="eyebrow">정책 SSOT</span>
+        <h1>정책, 논평, 법안, 인물을 한 화면에서 바로 읽는 허브</h1>
+        <p class="muted">탭을 바꾸며 목록을 탐색하고, 오른쪽 패널에서 본문과 연결 정보를 바로 확인할 수 있습니다.</p>
+      </div>
+      <div class="summary" id="summaryGrid"></div>
+    </section>
+
+    <section class="curation">
+      <div class="panel detail">
+        <h2 class="section-title">지금 봐야 할 정책</h2>
+        <div class="mini-list" id="curatedPositions"></div>
+      </div>
+      <div class="panel detail">
+        <h2 class="section-title">이번 허브의 법안</h2>
+        <div class="mini-list" id="curatedBills"></div>
+      </div>
+      <div class="panel detail">
+        <h2 class="section-title">지금 읽을 논평</h2>
+        <div class="mini-list" id="curatedCommentary"></div>
+      </div>
+    </section>
+
+    <section class="shell">
+      <div class="panel sidebar">
+        <div class="tabs">
+          <button class="tab active" data-tab="positions">정책</button>
+          <button class="tab" data-tab="commentary">논평</button>
+          <button class="tab" data-tab="people">인물</button>
+          <button class="tab" data-tab="bills">법안</button>
+        </div>
+        <input id="searchInput" class="search" placeholder="제목, 요약, 발화자, 인물 이름 검색" />
+        <div class="list" id="listPanel"></div>
+      </div>
+
+      <div class="detail-grid">
+        <div class="panel detail">
+          <div class="split">
+            <div class="box">
+              <span class="eyebrow" id="detailType">허브</span>
+              <div class="detail-title" id="detailTitle">항목을 선택해 주세요</div>
+              <p id="detailSummary" class="muted">왼쪽 목록에서 정책, 논평, 인물, 법안을 고르면 여기에서 바로 핵심 정보를 볼 수 있습니다.</p>
+            </div>
+            <div class="box">
+              <h3>핵심 정보</h3>
+              <div class="links" id="detailMeta"></div>
+            </div>
+            <div class="box">
+              <h3>실행 단계</h3>
+              <div id="detailStageLabel" style="font-weight:800;color:var(--text-strong);">-</div>
+              <div id="detailStageDesc" class="muted" style="margin-top:6px;line-height:1.6;">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel detail">
+          <div class="split">
+            <div class="box">
+              <h3>핵심 요약</h3>
+              <div id="detailBrief" class="muted" style="line-height:1.7;">선택된 항목의 핵심 요약이 여기에 표시됩니다.</div>
+            </div>
+            <div class="box">
+              <h3>핵심 쟁점</h3>
+              <div id="detailKeyPoints" class="muted" style="line-height:1.7;">선택된 항목의 핵심 쟁점이 여기에 표시됩니다.</div>
+            </div>
+            <div class="box">
+              <h3>왜 지금 중요한가</h3>
+              <div id="detailRelevance" class="muted" style="line-height:1.7;">선택된 항목의 현재 중요도가 여기에 표시됩니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel detail">
+          <h2 class="section-title">본문</h2>
+          <div class="body" id="detailBody">선택된 항목의 본문이 여기에 표시됩니다.</div>
+        </div>
+
+        <div class="panel detail">
+          <h2 class="section-title">연결 정보</h2>
+          <div class="chips" id="detailLinks"></div>
+        </div>
+
+        <div class="panel detail">
+          <h2 class="section-title">타임라인</h2>
+          <div class="timeline" id="detailTimeline"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const safe = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const number = (value) => Number(value || 0).toLocaleString("ko-KR");
+
+    const DOC_TYPE_LABELS = {
+      bill: "의원실 법안",
+      statement: "대변인 논평",
+      pledge: "공식 공약",
+      policy: "정책 문서",
+      press_release: "보도자료",
+      briefing: "브리핑",
+      meeting_note: "회의 문서",
+      research: "연구 자료",
+      other: "기타 문서",
+    };
+
+    const STATUS_LABELS = {
+      approved: "승인",
+      review: "검토중",
+      draft: "초안",
+      active: "공개중",
+      archived: "보관",
+      superseded: "대체됨",
+    };
+
+    const state = {
+      tab: "positions",
+      search: "",
+      datasets: { positions: [], commentary: [], people: [], bills: [] },
+      selected: { positions: null, commentary: null, people: null, bills: null },
+    };
+
+    function hubUrl(tab, key) {
+      const url = new URL("/hub", location.origin);
+      url.searchParams.set("tab", tab);
+      url.searchParams.set("key", key);
+      return url.pathname + url.search;
+    }
+
+    function docTypeLabel(value) {
+      return DOC_TYPE_LABELS[value] || "문서";
+    }
+
+    function statusLabel(value) {
+      return STATUS_LABELS[value] || value || "";
+    }
+
+    function itemKeyForTab(tab, item) {
+      if (tab === "positions") return String(item.slug || item.id);
+      if (tab === "people") return String(item.person_name || "");
+      return String(item.id);
+    }
+
+    function itemKey(item) {
+      return itemKeyForTab(state.tab, item);
+    }
+
+    function syncUrl() {
+      const key = state.selected[state.tab];
+      const url = new URL(location.href);
+      url.searchParams.set("tab", state.tab);
+      if (key) url.searchParams.set("key", key);
+      else url.searchParams.delete("key");
+      history.replaceState({}, "", url);
+    }
+
+    function readInitialState() {
+      const params = new URLSearchParams(location.search);
+      const tab = params.get("tab");
+      const key = params.get("key");
+      if (tab && state.datasets[tab]) state.tab = tab;
+      if (key) state.selected[state.tab] = key;
+      document.querySelectorAll(".tab").forEach((node) => {
+        node.classList.toggle("active", node.dataset.tab === state.tab);
+      });
+    }
+
+    function renderSummary(data) {
+      const overview = data.overview || {};
+      const commentary = data.commentary || {};
+      const counts = overview.counts || {};
+      const commentaryCounts = commentary.counts || {};
+      const items = [
+        ["공식 정책", counts.positions],
+        ["의원실 법안", counts.bills],
+        ["대변인 논평", counts.statements],
+        ["공식 공약", counts.pledges],
+        ["논평 이슈", commentaryCounts.topics],
+      ];
+      document.getElementById("summaryGrid").innerHTML = items.map(([label, value]) => `
+        <div class="stat">
+          <div class="k">${safe(label)}</div>
+          <strong>${number(value)}</strong>
+        </div>
+      `).join("");
+
+      const curatedPositions = (overview.curated_positions || []).slice(0, 4);
+      const curatedBills = (overview.latest_bills || []).slice(0, 4);
+      const curatedCommentary = (overview.latest_statements || []).slice(0, 4);
+
+      document.getElementById("curatedPositions").innerHTML = curatedPositions.map((item) => `
+        <a class="mini-item" href="${hubUrl("positions", item.slug)}">
+          <div class="meta">${safe(item.category || "정책")}</div>
+          <strong>${safe(item.title)}</strong>
+          <div class="meta">${safe(item.official_summary || item.brief?.summary || item.summary || "")}</div>
+        </a>
+      `).join("") || '<div class="empty">지금 보여줄 정책이 없습니다.</div>';
+
+      document.getElementById("curatedBills").innerHTML = curatedBills.map((item) => `
+        <a class="mini-item" href="${hubUrl("bills", item.id)}">
+          <div class="meta">의원실 법안</div>
+          <strong>${safe(item.title)}</strong>
+          <div class="meta">${safe((item.primary_people || []).map((person) => person.person_name).join(", ") || item.published_at || "")}</div>
+        </a>
+      `).join("") || '<div class="empty">지금 보여줄 법안이 없습니다.</div>';
+
+      document.getElementById("curatedCommentary").innerHTML = curatedCommentary.map((item) => `
+        <a class="mini-item" href="${hubUrl("commentary", item.id)}">
+          <div class="meta">${safe(item.topic_label || "논평")}</div>
+          <strong>${safe(item.title)}</strong>
+          <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(" · "))}</div>
+        </a>
+      `).join("") || '<div class="empty">지금 보여줄 논평이 없습니다.</div>';
+    }
+
+    function currentItems() {
+      const query = state.search.trim().toLowerCase();
+      return (state.datasets[state.tab] || []).filter((item) => {
+        if (!query) return true;
+        return JSON.stringify(item).toLowerCase().includes(query);
+      });
+    }
+
+    function itemMeta(item) {
+      if (state.tab === "positions") {
+        return [item.category, item.official_summary || item.summary].filter(Boolean).join(" · ");
+      }
+      if (state.tab === "commentary") {
+        const speakerLabel = item.speaker_name && item.speaker
+          ? `${item.speaker} ${item.speaker_name}`
+          : item.speaker_name || item.speaker;
+        return [item.published_at, speakerLabel, item.topic_label].filter(Boolean).join(" · ");
+      }
+      if (state.tab === "people") {
+        return [`대표발의 ${number(item.proposer_count)}건`, `전체 문서 ${number(item.document_count)}건`].join(" · ");
+      }
+      return [
+        item.published_at,
+        (item.primary_people || []).map((person) => person.person_name).join(", "),
+        (item.linked_positions || item.related_positions || []).map((link) => link.position_title).slice(0, 1).join(", "),
+      ].filter(Boolean).join(" · ");
+    }
+
+    function renderList() {
+      const root = document.getElementById("listPanel");
+      const items = currentItems();
+      if (!items.length) {
+        root.innerHTML = '<div class="empty">표시할 항목이 없습니다.</div>';
+        renderDetail(null);
+        return;
+      }
+
+      if (!items.some((item) => itemKey(item) === String(state.selected[state.tab]))) {
+        state.selected[state.tab] = itemKey(items[0]);
+      }
+
+      root.innerHTML = items.map((item) => `
+        <div class="item${itemKey(item) === String(state.selected[state.tab]) ? " selected" : ""}" data-key="${safe(itemKey(item))}">
+          <strong>${safe(item.title || item.person_name || "")}</strong>
+          <div class="meta">${safe(itemMeta(item))}</div>
+        </div>
+      `).join("");
+
+      root.querySelectorAll(".item").forEach((node) => {
+        node.addEventListener("click", () => {
+          state.selected[state.tab] = node.dataset.key;
+          syncUrl();
+          renderList();
+          loadDetail();
+        });
+      });
+
+      syncUrl();
+      loadDetail();
+    }
+
+    async function api(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`request failed: ${url}`);
+      return response.json();
+    }
+
+    async function loadDetail() {
+      const key = state.selected[state.tab];
+      if (!key) {
+        renderDetail(null);
+        return;
+      }
+
+      let data = null;
+      if (state.tab === "positions") {
+        data = await api(`/api/policy/positions/${encodeURIComponent(key)}`);
+      } else if (state.tab === "commentary" || state.tab === "bills") {
+        data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
+      } else if (state.tab === "people") {
+        data = await api(`/api/policy/people/${encodeURIComponent(key)}`);
+      }
+      renderDetail(data);
+    }
+
+    function renderPolicyLinks(items, labelPrefix = "") {
+      if (!items || !items.length) return "";
+      return items.map((item) => `
+        <a class="chip${item.is_inferred ? " subtle" : ""}" href="${hubUrl("positions", item.position_slug || item.position_id)}">
+          ${safe(labelPrefix)}${safe(item.position_title)}
+        </a>
+      `).join("");
+    }
+
+    function renderDocLinks(items) {
+      if (!items || !items.length) return "";
+      return items.map((item) => `
+        <a class="chip" href="${safe(item.href)}">${safe(item.label)}</a>
+      `).join("");
+    }
+
+    function renderTimeline(items) {
+      const root = document.getElementById("detailTimeline");
+      root.innerHTML = "";
+      for (const item of items || []) {
+        const label =
+          item.kind === "version" ? "정책 버전" :
+          item.kind === "bill_event" ? "법안 진행" :
+          docTypeLabel(item.doc_type || "other");
+        const el = document.createElement("article");
+        el.className = "mini-item";
+        el.style.borderLeft = "3px solid var(--brand)";
+        el.innerHTML = `
+          <div class="meta">${safe(item.at || "-")} · ${safe(label)}</div>
+          <strong>${safe(item.title || "-")}</strong>
+          <div class="meta">${safe(item.summary || item.status || item.relation_type || "")}</div>
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">표시할 타임라인이 없습니다.</div>';
+      }
+    }
+
+    function renderDetail(data) {
+      const typeEl = document.getElementById("detailType");
+      const titleEl = document.getElementById("detailTitle");
+      const summaryEl = document.getElementById("detailSummary");
+      const bodyEl = document.getElementById("detailBody");
+      const metaEl = document.getElementById("detailMeta");
+      const linksEl = document.getElementById("detailLinks");
+      const briefEl = document.getElementById("detailBrief");
+      const keyPointsEl = document.getElementById("detailKeyPoints");
+      const stageLabelEl = document.getElementById("detailStageLabel");
+      const stageDescEl = document.getElementById("detailStageDesc");
+      const relevanceEl = document.getElementById("detailRelevance");
+
+      function buildBillBody(detail, metadata, billProgress) {
+        const sections = [];
+        if (detail.body) sections.push(detail.body.trim());
+        if (detail.summary) sections.push(`법안 개요\n${detail.summary}`);
+        const infoLines = [
+          metadata.bill_no ? `의안번호: ${metadata.bill_no}` : "",
+          metadata.representative_member_name ? `대표발의: ${metadata.representative_member_name}` : "",
+          metadata.committee ? `소관 상임위: ${metadata.committee}` : "",
+          billProgress?.raw ? `현재 단계: ${billProgress.raw}` : "",
+          metadata.proposer_kind ? `발의 형태: ${metadata.proposer_kind}` : "",
+          metadata.decision_result ? `의결 결과: ${metadata.decision_result}` : "",
+        ].filter(Boolean);
+        if (infoLines.length) sections.push(`핵심 정보\n${infoLines.join("\n")}`);
+        return sections.join("\n\n").trim();
+      }
+
+      if (!data) {
+        typeEl.textContent = "허브";
+        titleEl.textContent = "항목을 선택해 주세요";
+        summaryEl.textContent = "왼쪽 목록에서 정책, 논평, 인물, 법안을 고르면 여기에서 바로 핵심 정보를 볼 수 있습니다.";
+        briefEl.textContent = "선택된 항목의 핵심 요약이 여기에 표시됩니다.";
+        keyPointsEl.textContent = "선택된 항목의 핵심 쟁점이 여기에 표시됩니다.";
+        relevanceEl.textContent = "선택된 항목의 현재 중요도가 여기에 표시됩니다.";
+        stageLabelEl.textContent = "-";
+        stageDescEl.textContent = "-";
+        bodyEl.textContent = "선택된 항목의 본문이 여기에 표시됩니다.";
+        metaEl.innerHTML = "";
+        linksEl.innerHTML = '<div class="empty">연결 정보가 없습니다.</div>';
+        renderTimeline([]);
+        return;
+      }
+
+      if (state.tab === "positions") {
+        typeEl.textContent = "정책";
+        titleEl.textContent = data.title || "";
+        summaryEl.textContent = data.summary || "공식 정책 항목입니다.";
+        briefEl.textContent = data.official_summary || data.brief?.summary || data.summary || "핵심 요약이 아직 없습니다.";
+        keyPointsEl.textContent = data.key_points || "핵심 쟁점이 아직 정리되지 않았습니다.";
+        relevanceEl.textContent = data.relevance_note || "현재 중요도 설명이 아직 없습니다.";
+        stageLabelEl.textContent = data.execution_stage?.label || "정책 정리 단계";
+        stageDescEl.textContent = data.execution_stage?.description || "연결 문서를 함께 보며 정책의 실행 정도를 확인할 수 있습니다.";
+        bodyEl.textContent = data.body || data.summary || "";
+        metaEl.innerHTML = [
+          data.category ? `<span class="link">${safe(data.category)}</span>` : "",
+          data.status ? `<span class="link">${safe(statusLabel(data.status))}</span>` : "",
+          data.version_label ? `<span class="link">${safe(data.version_label)}</span>` : "",
+        ].join("");
+        const documents = (data.documents || []).map((item) => ({
+          href: hubUrl(item.doc_type === "bill" ? "bills" : item.doc_type === "statement" ? "commentary" : "positions", item.doc_type === "policy" ? data.slug : item.id),
+          label: `${docTypeLabel(item.doc_type)} · ${item.title}`,
+        }));
+        linksEl.innerHTML = renderDocLinks(documents) || '<div class="empty">연결 문서가 없습니다.</div>';
+        renderTimeline(data.timeline || []);
+        return;
+      }
+
+      if (state.tab === "commentary") {
+        typeEl.textContent = "논평";
+        titleEl.textContent = data.title || "";
+        summaryEl.textContent = data.summary || "공식 대변인 논평입니다.";
+        briefEl.textContent = data.summary || `${data.speaker_name || data.speaker || "대변인"}의 공식 논평입니다.`;
+        keyPointsEl.textContent = data.derived_key_points || "논평 핵심 쟁점";
+        relevanceEl.textContent = data.derived_relevance_note || "정책 연결 후보를 함께 검토할 수 있는 공식 메시지입니다.";
+        stageLabelEl.textContent = (data.linked_positions || []).length ? "정책 연결 확인" : "메시지 공개 단계";
+        stageDescEl.textContent = data.source_url ? "원문 사이트와 함께 공식 메시지를 확인할 수 있습니다." : "본문 중심으로 메시지를 확인할 수 있습니다.";
+        bodyEl.textContent = data.body || data.summary || "";
+        metaEl.innerHTML = [
+          data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "",
+          (data.speaker_name || data.speaker) ? `<a class="link" href="${hubUrl("people", data.speaker_name || "")}">${safe(data.speaker_name || data.speaker)}</a>` : "",
+          data.topic_label ? `<span class="link">${safe(data.topic_label)}</span>` : "",
+          data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>` : "",
+        ].join("");
+        const official = renderPolicyLinks(data.linked_positions || [], "공식 연결 · ");
+        const inferred = renderPolicyLinks((data.related_positions || []).filter((item) => !(data.linked_positions || []).some((linked) => linked.position_id === item.position_id)), "추천 연결 · ");
+        linksEl.innerHTML = `${official}${inferred}` || '<div class="empty">연결된 정책이 없습니다.</div>';
+        renderTimeline(data.timeline || []);
+        return;
+      }
+
+      if (state.tab === "people") {
+        typeEl.textContent = "인물";
+        titleEl.textContent = data.person_name || "";
+        summaryEl.textContent = `대표발의 ${number(data.bill_count)}건 · 논평 ${number(data.statement_count)}건 · 연결 정책 ${number((data.linked_positions || []).length)}건`;
+        briefEl.textContent = `${data.person_name || "인물"} 관련 활동을 정책, 법안, 논평 기준으로 묶어 보여줍니다.`;
+        keyPointsEl.textContent = (data.roles || []).join(", ") || "직책 정보가 없습니다.";
+        relevanceEl.textContent = data.bill_count ? "대표발의 법안이 있어 입법 추진 흔적이 보입니다." : "논평과 정책 연결 중심으로 활동이 보입니다.";
+        stageLabelEl.textContent = data.bill_count ? "입법 활동 확인" : "메시지 활동 중심";
+        stageDescEl.textContent = data.statement_count ? "공개 메시지와 입법 활동을 함께 확인할 수 있습니다." : "관련 문서가 더 쌓이면 활동상이 더 선명해집니다.";
+        bodyEl.textContent = (data.documents || []).map((item) => `${docTypeLabel(item.doc_type)}: ${item.title}\n${item.summary || ""}`).join("\n\n");
+        metaEl.innerHTML = (data.roles || []).map((role) => `<span class="link">${safe(role)}</span>`).join("");
+        const docLinks = (data.documents || []).slice(0, 16).map((item) => ({
+          href: hubUrl(item.doc_type === "bill" ? "bills" : item.doc_type === "statement" ? "commentary" : "positions", item.doc_type === "policy" ? item.slug : item.id),
+          label: `${docTypeLabel(item.doc_type)} · ${item.title}`,
+        }));
+        const policyLinks = renderPolicyLinks(data.linked_positions || [], "연결 정책 · ");
+        linksEl.innerHTML = `${renderDocLinks(docLinks)}${policyLinks}` || '<div class="empty">연결 정보가 없습니다.</div>';
+        renderTimeline([]);
+        return;
+      }
+
+      const metadata = data.metadata || {};
+      const billProgress = data.bill_progress || null;
+      typeEl.textContent = "법안";
+      titleEl.textContent = data.title || "";
+      summaryEl.textContent = [
+        data.summary || "",
+        metadata.committee ? `소관 상임위 ${metadata.committee}` : "",
+        billProgress?.raw ? `진행상태 ${billProgress.raw}` : "",
+      ].filter(Boolean).join(" · ") || "의원실 법안입니다.";
+      briefEl.textContent = data.summary || `${metadata.representative_member_name || "개혁신당 의원"}의 대표발의 법안입니다.`;
+      keyPointsEl.textContent = data.derived_key_points || "법안 핵심 쟁점 정보가 없습니다.";
+      relevanceEl.textContent = data.derived_relevance_note || (data.source_url ? "국회 원문과 함께 입법 진행 상황을 확인할 수 있습니다." : "법안 요약과 진행 상황을 함께 볼 수 있습니다.");
+      stageLabelEl.textContent = billProgress?.label || "법안 발의";
+      stageDescEl.textContent = billProgress?.description || (metadata.committee ? `${metadata.committee} 소관으로 접수된 법안입니다.` : "진행 단계 정보가 추가되면 더 자세히 보여집니다.");
+      bodyEl.textContent = buildBillBody(data, metadata, billProgress) || "법안 본문 요약이 아직 정리되지 않았습니다.";
+      metaEl.innerHTML = [
+        data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "",
+        metadata.bill_no ? `<span class="link">의안번호 ${safe(metadata.bill_no)}</span>` : "",
+        metadata.committee ? `<span class="link">${safe(metadata.committee)}</span>` : "",
+        billProgress?.raw ? `<span class="link">${safe(billProgress.raw)}</span>` : "",
+        metadata.representative_member_name ? `<a class="link" href="${hubUrl("people", metadata.representative_member_name)}">${safe(metadata.representative_member_name)}</a>` : "",
+        data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">국회 원문 보기</a>` : "",
+      ].join("");
+      const official = renderPolicyLinks(data.linked_positions || [], "공식 연결 · ");
+      const inferred = renderPolicyLinks((data.related_positions || []).filter((item) => !(data.linked_positions || []).some((linked) => linked.position_id === item.position_id)), "추천 연결 · ");
+      linksEl.innerHTML = `${official}${inferred}` || '<div class="empty">연결 정책이 없습니다.</div>';
+      renderTimeline(data.timeline || []);
+    }
+
+    async function init() {
+      const [hub, positions, commentary, people, bills] = await Promise.all([
+        api("/api/policy/hub"),
+        api("/api/policy/positions"),
+        api("/api/policy/commentary?limit=150"),
+        api("/api/policy/people"),
+        api("/api/policy/documents?doc_type=bill&status=active"),
+      ]);
+
+      renderSummary(hub);
+      state.datasets.positions = positions.items || [];
+      state.datasets.commentary = commentary.items || [];
+      state.datasets.people = people.items || [];
+      state.datasets.bills = bills.items || [];
+      readInitialState();
+      renderList();
+    }
+
+    document.querySelectorAll(".tab").forEach((node) => {
+      node.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+        node.classList.add("active");
+        state.tab = node.dataset.tab;
+        state.selected[state.tab] = null;
+        renderList();
+      });
+    });
+
+    document.getElementById("searchInput").addEventListener("input", (event) => {
+      state.search = event.target.value || "";
+      renderList();
+    });
+
+    init().catch((error) => {
+      console.error("hub init error", error);
+      document.getElementById("listPanel").innerHTML = '<div class="empty">허브 데이터를 불러오지 못했습니다.</div>';
+    });
+  </script>
+</body>
+</html>

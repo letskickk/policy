@@ -1,21 +1,27 @@
-{
+﻿{
   "items": [
     {
       "role": "대변인",
-      "name": "",
-      "effective_from": "",
+      "name": "문성호",
+      "effective_from": "2026-03-01",
       "effective_to": ""
     },
     {
       "role": "부대변인",
-      "name": "",
-      "effective_from": "",
+      "name": "신정욱",
+      "effective_from": "2026-03-01",
+      "effective_to": "2026-03-10"
+    },
+    {
+      "role": "부대변인",
+      "name": "남경수",
+      "effective_from": "2026-03-09",
       "effective_to": ""
     },
     {
       "role": "수석대변인",
-      "name": "",
-      "effective_from": "",
+      "name": "이동훈",
+      "effective_from": "2026-03-01",
       "effective_to": ""
     }
   ]

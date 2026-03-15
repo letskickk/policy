@@ -5,10 +5,20 @@ from pydantic import BaseModel, Field
 
 
 def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
+    class FeaturedIssueUpsertBody(BaseModel):
+        position_id: int = Field(..., ge=1)
+        reason: Optional[str] = Field(default=None, max_length=500)
+        start_at: Optional[str] = Field(default=None, max_length=10)
+        end_at: Optional[str] = Field(default=None, max_length=10)
+        manual_weight: int = Field(default=0, ge=-50, le=50)
+
     class PolicyPositionUpsertBody(BaseModel):
         title: str = Field(..., min_length=1, max_length=200)
         category: str = Field(default="general", min_length=1, max_length=80)
         summary: Optional[str] = Field(default=None, max_length=5000)
+        official_summary: Optional[str] = Field(default=None, max_length=2000)
+        key_points: Optional[str] = Field(default=None, max_length=4000)
+        relevance_note: Optional[str] = Field(default=None, max_length=2000)
         body: Optional[str] = Field(default=None, max_length=50000)
         status: str = Field(default="draft", min_length=1, max_length=40)
         owner_scope: str = Field(default="party", min_length=1, max_length=40)
@@ -45,11 +55,44 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="admin/policy-ssot.html not found")
 
+    @app.api_route("/policies", methods=["GET", "HEAD"])
+    def public_policy_hub_page():
+        res = serve_html("policies.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="policies.html not found")
+
+    @app.api_route("/people", methods=["GET", "HEAD"])
+    def public_people_hub_page():
+        res = serve_html("people.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="people.html not found")
+
+    @app.api_route("/commentary", methods=["GET", "HEAD"])
+    def public_commentary_page():
+        res = serve_html("commentary.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="commentary.html not found")
+
+    @app.api_route("/hub", methods=["GET", "HEAD"])
+    def public_ssot_hub_page():
+        res = serve_html("hub.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="hub.html not found")
+
     @app.get("/api/admin/policy/summary", tags=["admin", "policy"])
     def api_admin_policy_summary(request: Request):
         require_admin(request)
         ensure_db_ready()
         from backend.policy_ssot import get_policy_ssot_summary
+        from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
         from backend.policy_suggestions import list_link_suggestions
         from backend.rallypoint_commentary import list_ingest_runs
         from backend.assembly_bills import list_ingest_runs as list_bill_ingest_runs
@@ -60,7 +103,44 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         summary["last_commentary_sync"] = runs[0] if runs else None
         summary["last_bill_sync"] = bill_runs[0] if bill_runs else None
         summary["pending_suggestions"] = len(list_link_suggestions(status="pending", limit=300))
+        summary["current_featured_issue"] = get_current_featured_issue()
+        summary["featured_candidates"] = recommend_featured_issues(limit=5)
         return summary
+
+    @app.get("/api/admin/policy/operations", tags=["admin", "policy"])
+    def api_admin_policy_operations(request: Request):
+        require_admin(request)
+        ensure_db_ready()
+        from backend.policy_ssot import get_policy_operations_overview
+        return get_policy_operations_overview()
+
+    @app.get("/api/admin/policy/featured-issues", tags=["admin", "policy"])
+    def api_admin_policy_featured_issues(request: Request, limit: int = Query(default=20, ge=1, le=100)):
+        require_admin(request)
+        ensure_db_ready()
+        from backend.policy_featured import get_current_featured_issue, list_featured_issues
+        return {"current": get_current_featured_issue(), "items": list_featured_issues(limit=limit)}
+
+    @app.get("/api/admin/policy/featured-issues/recommendations", tags=["admin", "policy"])
+    def api_admin_policy_featured_issue_recommendations(request: Request, limit: int = Query(default=5, ge=1, le=20)):
+        require_admin(request)
+        ensure_db_ready()
+        from backend.policy_featured import recommend_featured_issues
+        return {"items": recommend_featured_issues(limit=limit)}
+
+    @app.post("/api/admin/policy/featured-issues", tags=["admin", "policy"])
+    def api_admin_policy_featured_issues_set(body: FeaturedIssueUpsertBody, request: Request):
+        user = require_admin(request)
+        ensure_db_ready()
+        from backend.policy_featured import set_featured_issue
+        return set_featured_issue(
+            position_id=body.position_id,
+            reason=body.reason,
+            start_at=body.start_at,
+            end_at=body.end_at,
+            manual_weight=body.manual_weight,
+            actor_id=user["id"],
+        )
 
     @app.get("/api/admin/policy/positions", tags=["admin", "policy"])
     def api_admin_policy_positions(request: Request, status: Optional[str] = Query(default=None), category: Optional[str] = Query(default=None)):
@@ -80,6 +160,9 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             title=body.title,
             category=body.category,
             summary=body.summary,
+            official_summary=body.official_summary,
+            key_points=body.key_points,
+            relevance_note=body.relevance_note,
             body=body.body,
             status=body.status,
             owner_scope=body.owner_scope,
@@ -102,6 +185,9 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             title=body.title,
             category=body.category,
             summary=body.summary,
+            official_summary=body.official_summary,
+            key_points=body.key_points,
+            relevance_note=body.relevance_note,
             body=body.body,
             status=body.status,
             owner_scope=body.owner_scope,
@@ -155,6 +241,27 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         ensure_db_ready()
         from backend.assembly_bills import sync_reform_party_bills
         return sync_reform_party_bills(actor_id=user["id"], age_from=age_from, age_to=age_to)
+
+    @app.get("/api/admin/policy/import/pdf-pledges/runs", tags=["admin", "policy"])
+    def api_admin_policy_pdf_pledge_runs(request: Request, limit: int = Query(default=10, ge=1, le=100)):
+        require_admin(request)
+        ensure_db_ready()
+        from backend.pdf_pledges_import import list_ingest_runs
+        return {"items": list_ingest_runs(limit=limit)}
+
+    @app.post("/api/admin/policy/import/pdf-pledges", tags=["admin", "policy"])
+    def api_admin_policy_import_pdf_pledges(request: Request):
+        user = require_admin(request)
+        ensure_db_ready()
+        from backend.pdf_pledges_import import sync_pdf_pledges
+        return sync_pdf_pledges(actor_id=user["id"])
+
+    @app.post("/api/admin/policy/commentary/auto-link", tags=["admin", "policy"])
+    def api_admin_policy_commentary_auto_link(request: Request, limit: int = Query(default=300, ge=1, le=500), min_score: int = Query(default=4, ge=1, le=10)):
+        user = require_admin(request)
+        ensure_db_ready()
+        from backend.policy_ssot import auto_link_public_commentary
+        return auto_link_public_commentary(actor_id=user["id"], limit=limit, min_score=min_score)
 
     @app.get("/api/admin/policy/suggestions", tags=["admin", "policy"])
     def api_admin_policy_suggestions(request: Request, status: Optional[str] = Query(default="pending"), limit: int = Query(default=100, ge=1, le=300)):
@@ -276,8 +383,77 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_ssot import list_policy_positions
         return {"items": list_policy_positions(status=status, category=category)}
 
+    @app.get("/api/policy/positions/{slug_or_id}", tags=["policy"])
+    def api_policy_position_detail(slug_or_id: str):
+        ensure_db_ready()
+        from backend.policy_ssot import get_policy_position_detail
+        return get_policy_position_detail(slug_or_id)
+
+    @app.get("/api/policy/positions/{slug_or_id}/timeline", tags=["policy"])
+    def api_policy_position_timeline(slug_or_id: str):
+        ensure_db_ready()
+        from backend.policy_ssot import get_policy_position_by_slug, get_policy_position_timeline
+        item = get_policy_position_by_slug(slug_or_id)
+        return {"items": get_policy_position_timeline(item["id"])}
+
     @app.get("/api/policy/documents", tags=["policy"])
     def api_policy_documents(doc_type: Optional[str] = Query(default=None), status: Optional[str] = Query(default="active")):
         ensure_db_ready()
         from backend.policy_ssot import list_policy_documents
         return {"items": list_policy_documents(doc_type=doc_type, status=status)}
+
+    @app.get("/api/policy/documents/{document_id}", tags=["policy"])
+    def api_policy_document_detail(document_id: int):
+        ensure_db_ready()
+        from backend.policy_ssot import get_policy_document
+        return get_policy_document(document_id)
+
+    @app.get("/api/policy/featured-issues", tags=["policy"])
+    def api_policy_featured_issues():
+        ensure_db_ready()
+        from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
+        return {"current": get_current_featured_issue(), "recommendations": recommend_featured_issues(limit=5)}
+
+    @app.get("/api/policy/overview", tags=["policy"])
+    def api_policy_overview():
+        ensure_db_ready()
+        from backend.policy_ssot import get_public_overview
+        return get_public_overview()
+
+    @app.get("/api/policy/people", tags=["policy"])
+    def api_policy_people():
+        ensure_db_ready()
+        from backend.policy_ssot import list_public_people
+        return {"items": list_public_people()}
+
+    @app.get("/api/policy/people/{person_name}", tags=["policy"])
+    def api_policy_person_detail(person_name: str):
+        ensure_db_ready()
+        from backend.policy_ssot import get_public_person_detail
+        return get_public_person_detail(person_name)
+
+    @app.get("/api/policy/commentary", tags=["policy"])
+    def api_policy_commentary(q: Optional[str] = Query(default=None), speaker_name: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import list_public_commentary
+        return {"items": list_public_commentary(q=q, speaker_name=speaker_name, limit=limit)}
+
+    @app.get("/api/policy/commentary/overview", tags=["policy"])
+    def api_policy_commentary_overview(limit: int = Query(default=120, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import get_public_commentary_overview
+        return get_public_commentary_overview(limit=limit)
+
+    @app.get("/api/policy/hub", tags=["policy"])
+    def api_policy_hub():
+        ensure_db_ready()
+        from backend.policy_ssot import get_public_overview, get_public_commentary_overview
+        from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
+        return {
+            "overview": get_public_overview(),
+            "commentary": get_public_commentary_overview(limit=60),
+            "featured": {
+                "current": get_current_featured_issue(),
+                "recommendations": recommend_featured_issues(limit=5),
+            },
+        }

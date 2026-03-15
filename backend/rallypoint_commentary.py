@@ -1,20 +1,23 @@
-import json
+﻿import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
+from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from backend.config import ROOT_DIR
-from backend.database import get_connection
-from backend.policy_ssot import find_policy_document_by_source, upsert_policy_document
-from backend.policy_suggestions import rebuild_link_suggestions
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 SOURCE_KEY = "rallypoint_commentary"
+API_BASE_URL = "https://api-main.rallypoint.kr/v1/document"
 LIST_URL = "https://rallypoint.kr/board/commentary"
 DETAIL_URL_TEMPLATE = "https://rallypoint.kr/board/commentary/{doc_id}"
+OFFICIAL_BRIEFING_URL = "https://www.reformparty.kr/briefing"
+OFFICIAL_BRIEFING_MAX_PAGES = 5
+COMMENTARY_PAGE_SIZE = 20
+COMMENTARY_MAX_PAGES = 200
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
@@ -29,16 +32,33 @@ ROW_RE = re.compile(
     re.S,
 )
 TAG_RE = re.compile(r"<[^>]+>")
+MOBILE_META_RE = re.compile(r'<div[^>]*class="mob-view"[^>]*>.*?</div>', re.S)
 TITLE_PREFIX_RE = re.compile(
-    r"^\[(?P<ref_date>\d{6})_(?P<party>.+?)\s+(?P<role>수석대변인|부대변인|대변인)\s+논평\]\s*(?P<title>.*)$"
+    r"^\[(?P<ref_date>\d{6,8})[\s_.-]*(?P<party>.+?)\s+"
+    r"(?P<role>수석대변인|부대변인|대변인)\s+논평\]\s*(?P<title>.*)$"
 )
 STATE_RE = re.compile(
     r'<script id="serverApp-state" type="application/json">\s*(?P<state>.*?)\s*</script>',
     re.S,
 )
+OFFICIAL_BRIEFING_ROW_RE = re.compile(
+    r'<a href="(?P<url>https://www\.reformparty\.kr/briefing/\d+(?:\?page=\d+)?)">\s*(?P<label>.*?)\s*</a>.*?'
+    r'<span class="date">(?P<published_at>\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}</span>',
+    re.S,
+)
+OFFICIAL_BRIEFING_LABEL_RE = re.compile(
+    r"^(?P<title>.+?)ㅣ(?P<name>[가-힣]{2,10})\s+(?P<role>수석대변인|부대변인|대변인)$"
+)
 BODY_SPEAKER_PATTERNS = [
-    re.compile(r"개혁신당\s+(?P<role>수석대변인|부대변인|대변인)\s+(?P<name>[가-힣]{2,10})"),
-    re.compile(r"(?P<name>[가-힣]{2,10})\s+(?P<role>수석대변인|부대변인|대변인)"),
+    re.compile(
+        r"개혁신당(?:\s+[가-힣A-Za-z]+){0,4}\s+(?P<role>수석대변인|부대변인|대변인)\s+"
+        r"(?P<name>[가-힣]{2,10})"
+    ),
+    re.compile(
+        r"개혁신당(?:\s+[가-힣A-Za-z]+){0,4}\s+(?P<role>수석대변인|부대변인|대변인)\s+"
+        r"(?P<name>[가-힣](?:\s*[가-힣]){1,9})"
+    ),
+    re.compile(r"(?P<name>[가-힣](?:\s*[가-힣]){1,9})\s+(?P<role>수석대변인|부대변인|대변인)"),
 ]
 
 
@@ -70,12 +90,34 @@ def _fetch_text(url: str, timeout: int = 15) -> str:
         return response.read().decode(charset, errors="replace")
 
 
+def _fetch_json(url: str, timeout: int = 15) -> dict:
+    req = Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json,text/plain,*/*",
+            "Referer": LIST_URL,
+        },
+    )
+    with urlopen(req, timeout=timeout) as response:
+        charset = response.headers.get_content_charset() or "utf-8"
+        raw = response.read().decode(charset, errors="replace")
+    return json.loads(raw)
+
+
 def _strip_html(value: str) -> str:
     text = TAG_RE.sub(" ", value)
     text = unescape(text)
     text = text.replace("\xa0", " ")
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def _clean_title_cell_html(value: str) -> str:
+    cleaned = MOBILE_META_RE.sub(" ", value or "")
+    cleaned = _strip_html(cleaned)
+    cleaned = re.sub(r"^\s*■\s*", "", cleaned)
+    return cleaned.strip()
 
 
 def _normalize_date(value: Optional[str]) -> Optional[str]:
@@ -91,6 +133,26 @@ def _normalize_date(value: Optional[str]) -> Optional[str]:
 
 def _extract_summary(title: str) -> str:
     return title.replace("■", "").strip()[:300]
+
+
+def _normalize_match_title(value: Optional[str]) -> str:
+    text = (value or "").strip()
+    text = text.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+    text = re.sub(r"[\W_]+", "", text, flags=re.UNICODE)
+    return text.lower()
+
+
+def _normalize_person_name(value: Optional[str]) -> Optional[str]:
+    text = _normalize_optional_space(value)
+    if not text:
+        return None
+    collapsed = re.sub(r"(?<=[가-힣])\s+(?=[가-힣])", "", text)
+    return collapsed or None
+
+
+def _normalize_optional_space(value: Optional[str]) -> str:
+    text = (value or "").strip()
+    return re.sub(r"\s+", " ", text)
 
 
 def _load_spokesperson_registry() -> list[dict]:
@@ -133,14 +195,74 @@ def _extract_speaker_name_from_body(body: Optional[str], role: Optional[str]) ->
             continue
         if role and match.group("role") != role:
             continue
-        name = match.group("name").strip()
+        name = _normalize_person_name(match.group("name"))
         if name:
             return name
     return None
 
 
+def _decode_api_payload(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+    raw = payload.get("data")
+    if isinstance(raw, str):
+        try:
+            decoded = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _fetch_official_briefing_lookup() -> dict[str, dict]:
+    lookup: dict[str, dict] = {}
+    for page in range(1, OFFICIAL_BRIEFING_MAX_PAGES + 1):
+        url = OFFICIAL_BRIEFING_URL if page == 1 else f"{OFFICIAL_BRIEFING_URL}?page={page}"
+        try:
+            html = _fetch_text(url)
+        except (HTTPError, URLError, TimeoutError, OSError):
+            break
+
+        page_matches = 0
+        for match in OFFICIAL_BRIEFING_ROW_RE.finditer(html):
+            page_matches += 1
+            label = _strip_html(match.group("label"))
+            parsed = OFFICIAL_BRIEFING_LABEL_RE.match(label)
+            if not parsed:
+                continue
+            title = parsed.group("title").strip()
+            key = _normalize_match_title(title)
+            if not key or key in lookup:
+                continue
+            lookup[key] = {
+                "title": title,
+                "speaker_name": parsed.group("name").strip(),
+                "speaker_role": parsed.group("role").strip(),
+                "published_at": match.group("published_at").strip(),
+                "briefing_url": match.group("url").strip(),
+                "source": "official_briefing",
+            }
+        if page_matches == 0:
+            break
+    return lookup
+
+
+def _resolve_speaker_from_briefing_lookup(
+    title: str,
+    role: Optional[str],
+    published_at: Optional[str],
+    briefing_lookup: dict[str, dict],
+) -> tuple[Optional[str], Optional[dict]]:
+    item = briefing_lookup.get(_normalize_match_title(title))
+    if not item:
+        return None, None
+    if role and item.get("speaker_role") and item["speaker_role"] != role:
+        return None, None
+    return item.get("speaker_name") or None, item
+
+
 def _parse_title_metadata(raw_title: str, published_at: Optional[str]) -> tuple[str, str, Optional[str], dict]:
-    cleaned = _strip_html(raw_title)
+    cleaned = _clean_title_cell_html(raw_title)
     match = TITLE_PREFIX_RE.match(cleaned)
     if not match:
         return cleaned, "논평", None, {"speaker_role": "", "title_prefix_date": ""}
@@ -186,6 +308,90 @@ def parse_commentary_list(html: str, limit: Optional[int] = None) -> list[Commen
     return items
 
 
+def parse_commentary_api_list(payload: dict, limit: Optional[int] = None) -> list[CommentaryItem]:
+    decoded = _decode_api_payload(payload)
+    doc_list = decoded.get("docList")
+    if not isinstance(doc_list, list):
+        return []
+
+    items: list[CommentaryItem] = []
+    for doc in doc_list:
+        if not isinstance(doc, dict):
+            continue
+        document_srl = str(doc.get("document_srl", "")).strip()
+        raw_title = str(doc.get("title", "")).strip()
+        if not document_srl or not raw_title:
+            continue
+        published_at = _normalize_date(str(doc.get("regdate", "")).strip()[:10].replace(".", "-")) or _normalize_date(
+            str(doc.get("regdate", "")).strip()[:8].replace(".", "-")
+        )
+        if published_at is None:
+            regdate = str(doc.get("regdate", "")).strip()
+            if len(regdate) >= 8 and regdate[:8].isdigit():
+                published_at = f"{regdate[:4]}-{regdate[4:6]}-{regdate[6:8]}"
+        title_text, speaker, speaker_name, metadata = _parse_title_metadata(raw_title, published_at)
+        items.append(
+            CommentaryItem(
+                row_no=document_srl,
+                title=title_text,
+                published_at=published_at,
+                source_url=DETAIL_URL_TEMPLATE.format(doc_id=document_srl),
+                source_ref=f"{SOURCE_KEY}:{document_srl}",
+                speaker=speaker,
+                speaker_name=speaker_name,
+                body=None,
+                summary=_extract_summary(title_text),
+                metadata={
+                    **metadata,
+                    "source_key": SOURCE_KEY,
+                    "board_url": LIST_URL,
+                    "document_srl": document_srl,
+                    "module_srl": str(doc.get("module_srl", "")).strip(),
+                    "comment_count": str(doc.get("comment_count", "")).strip(),
+                    "readed_count": str(doc.get("readed_count", "")).strip(),
+                    "board_row_no": str(doc.get("list_order", "")).strip(),
+                },
+            )
+        )
+        if limit is not None and len(items) >= limit:
+            break
+    return items
+
+
+def _fetch_commentary_list_items(limit: int) -> list[CommentaryItem]:
+    items: list[CommentaryItem] = []
+    seen_refs: set[str] = set()
+
+    max_items = limit if limit > 0 else COMMENTARY_MAX_PAGES * COMMENTARY_PAGE_SIZE
+    for page in range(COMMENTARY_MAX_PAGES):
+        skip = page * COMMENTARY_PAGE_SIZE
+        url = (
+            f"{API_BASE_URL}?mid=commentary&skip={skip}&take={COMMENTARY_PAGE_SIZE}"
+            "&keyword=&searchType=-1"
+        )
+        payload = _fetch_json(url)
+        page_items = parse_commentary_api_list(payload)
+        if not page_items:
+            break
+
+        added_on_page = 0
+        for item in page_items:
+            if item.source_ref in seen_refs:
+                continue
+            seen_refs.add(item.source_ref)
+            items.append(item)
+            added_on_page += 1
+            if len(items) >= max_items:
+                return items
+
+        if added_on_page == 0:
+            break
+        if len(page_items) < COMMENTARY_PAGE_SIZE:
+            break
+
+    return items
+
+
 def _extract_detail_payload(html: str) -> Optional[dict]:
     match = STATE_RE.search(html)
     if not match:
@@ -226,15 +432,101 @@ def _extract_body_from_detail(html: str, expected_title: str) -> tuple[Optional[
     return _strip_html(body_html) or None, detail_meta
 
 
+def _extract_body_from_detail_payload(detail: dict, expected_title: str) -> tuple[Optional[str], dict]:
+    if not detail:
+        return None, {"detail_status": "missing"}
+
+    detail_title = _strip_html(str(detail.get("title", "")))
+    body_html = detail.get("content")
+    detail_meta = {
+        "detail_document_srl": str(detail.get("document_srl", "")).strip(),
+        "detail_title": detail_title,
+        "detail_regdate": str(detail.get("regdate", "")).strip(),
+    }
+    if expected_title and detail_title and expected_title not in detail_title and detail_title not in expected_title:
+        detail_meta["detail_status"] = "title_mismatch"
+        return None, detail_meta
+    if not isinstance(body_html, str) or not body_html.strip():
+        detail_meta["detail_status"] = "empty_content"
+        return None, detail_meta
+
+    detail_meta["detail_status"] = "matched"
+    return _strip_html(body_html) or None, detail_meta
+
+
+def _fetch_detail_payload_by_document_srl(document_srl: str) -> Optional[dict]:
+    payload = _fetch_json(f"{API_BASE_URL}/detail?documentSrl={document_srl}")
+    decoded = _decode_api_payload(payload)
+    detail = decoded.get("docDetail")
+    return detail if isinstance(detail, dict) else None
+
+
+def _find_existing_commentary_document(item: CommentaryItem) -> Optional[dict]:
+    from backend.database import get_connection
+    from backend.policy_ssot import find_policy_document_by_source
+
+    existing = find_policy_document_by_source(source_ref=item.source_ref, source_url=item.source_url)
+    if existing is not None:
+        return existing
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM policy_documents
+            WHERE doc_type = 'statement'
+              AND title = ?
+              AND COALESCE(published_at, '') = COALESCE(?, '')
+              AND (
+                    source_ref LIKE ? OR
+                    source_url LIKE ?
+                  )
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (item.title, item.published_at, f"{SOURCE_KEY}:%", f"{LIST_URL}%"),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return None
+
+    from backend.policy_ssot import get_policy_document
+
+    return get_policy_document(int(row["id"]))
+
+
 def fetch_commentary_items(limit: int = 20, include_body: bool = True) -> list[CommentaryItem]:
-    html = _fetch_text(LIST_URL)
-    items = parse_commentary_list(html, limit=limit)
+    items = _fetch_commentary_list_items(limit)
+    briefing_lookup = _fetch_official_briefing_lookup()
+
+    for item in items:
+        if item.speaker_name:
+            continue
+        matched_name, briefing_item = _resolve_speaker_from_briefing_lookup(
+            item.title,
+            item.speaker,
+            item.published_at,
+            briefing_lookup,
+        )
+        if matched_name:
+            item.speaker_name = matched_name
+            item.metadata["speaker_name_source"] = "official_briefing"
+            item.metadata["official_briefing_url"] = briefing_item.get("briefing_url", "")
+
     if not include_body:
         return items
 
     for item in items:
         try:
-            body, detail_meta = _extract_body_from_detail(_fetch_text(item.source_url), item.title)
+            document_srl = str(item.metadata.get("document_srl", "")).strip()
+            detail = _fetch_detail_payload_by_document_srl(document_srl) if document_srl else None
+            if detail is not None:
+                body, detail_meta = _extract_body_from_detail_payload(detail, item.title)
+            else:
+                body, detail_meta = _extract_body_from_detail(_fetch_text(item.source_url), item.title)
         except (HTTPError, URLError, TimeoutError, OSError):
             body, detail_meta = None, {"detail_status": "fetch_error"}
         item.body = body
@@ -248,6 +540,8 @@ def fetch_commentary_items(limit: int = 20, include_body: bool = True) -> list[C
 
 
 def _create_ingest_run() -> int:
+    from backend.database import get_connection
+
     conn = get_connection()
     try:
         cur = conn.execute(
@@ -269,6 +563,8 @@ def _finish_ingest_run(
     skipped_count: int,
     error_message: Optional[str] = None,
 ) -> None:
+    from backend.database import get_connection
+
     conn = get_connection()
     try:
         conn.execute(
@@ -286,6 +582,8 @@ def _finish_ingest_run(
 
 
 def list_ingest_runs(limit: int = 20) -> list[dict]:
+    from backend.database import get_connection
+
     conn = get_connection()
     try:
         rows = conn.execute(
@@ -318,6 +616,9 @@ def list_ingest_runs(limit: int = 20) -> list[dict]:
 
 
 def sync_commentary(*, actor_id: Optional[int], limit: int = 20, include_body: bool = True) -> dict:
+    from backend.policy_ssot import upsert_policy_document
+    from backend.policy_suggestions import rebuild_link_suggestions
+
     run_id = _create_ingest_run()
     imported_count = 0
     updated_count = 0
@@ -328,7 +629,7 @@ def sync_commentary(*, actor_id: Optional[int], limit: int = 20, include_body: b
         touched_document_ids: list[int] = []
 
         for item in items:
-            existing = find_policy_document_by_source(source_ref=item.source_ref, source_url=item.source_url)
+            existing = _find_existing_commentary_document(item)
             if existing is None:
                 created = upsert_policy_document(
                     document_id=None,

@@ -29,6 +29,12 @@ RELATION_TYPES = {
     "updates",
     "conflicts",
 }
+EXCLUDED_PUBLIC_PEOPLE = {"양향자"}
+PUBLIC_PEOPLE_PRIORITY = {
+    "이준석": 1,
+    "천하람": 2,
+    "이주영": 3,
+}
 
 
 def _normalize_text(value: Optional[str]) -> str:
@@ -43,8 +49,215 @@ def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
 def _normalize_enum(value: Optional[str], allowed: set[str], field_name: str, default: str) -> str:
     text = (_normalize_text(value) or default).lower()
     if text not in allowed:
-        raise HTTPException(status_code=400, detail=f"{field_name} 값이 올바르지 않습니다.")
+        raise HTTPException(status_code=400, detail=f"invalid {field_name}")
     return text
+
+
+def _is_verified_public_pledge(document: dict) -> bool:
+    if document.get("doc_type") != "pledge":
+        return True
+    metadata = document.get("metadata") or {}
+    return bool(metadata.get("verified_public_source"))
+
+
+def _decorate_public_documents(items: list[dict]) -> list[dict]:
+    if not items:
+        return []
+    link_map: dict[int, list[dict]] = {int(item["id"]): [] for item in items}
+    for link in list_policy_links():
+        document_id = int(link["document_id"])
+        if document_id not in link_map:
+            continue
+        link_map[document_id].append(
+            {
+                "position_id": link["position_id"],
+                "position_title": link["position_title"],
+                "position_slug": link["position_slug"],
+                "relation_type": link["relation_type"],
+            }
+        )
+
+    decorated: list[dict] = []
+    for item in items:
+        cloned = dict(item)
+        cloned["linked_positions"] = link_map.get(int(item["id"]), [])[:3]
+        cloned["primary_people"] = [
+            {
+                "person_name": person["person_name"],
+                "person_role": person["person_role"],
+            }
+            for person in (item.get("people") or [])
+            if person.get("is_primary")
+        ][:3]
+        decorated.append(cloned)
+    return decorated
+
+
+TOPIC_RULES = [
+    {
+        "key": "judicial",
+        "label": "사법·검찰",
+        "categories": {"사법", "정치개혁", "judicial", "politics", "reform", "치안·사법"},
+        "keywords": {"사법", "검찰", "재판", "공소", "법원", "헌법", "탄핵", "수사", "형사"},
+    },
+    {
+        "key": "political_reform",
+        "label": "정치개혁",
+        "categories": {"정치개혁", "정치", "politics", "reform"},
+        "keywords": {"정치개혁", "개헌", "선거", "국회", "정당", "공천", "권력구조", "헌법개정"},
+    },
+    {
+        "key": "economy",
+        "label": "경제",
+        "categories": {"경제", "economy", "industry", "startup"},
+        "keywords": {"경제", "세금", "법인세", "규제", "투자", "노동", "기업", "창업", "벤처"},
+    },
+    {
+        "key": "welfare",
+        "label": "복지",
+        "categories": {"복지", "welfare", "housing"},
+        "keywords": {"복지", "연금", "청년", "주거", "주택", "출산", "돌봄", "아동"},
+    },
+    {
+        "key": "education",
+        "label": "교육",
+        "categories": {"교육", "education"},
+        "keywords": {"교육", "학교", "교사", "대학", "입시", "학습"},
+    },
+    {
+        "key": "science",
+        "label": "과학기술",
+        "categories": {"과학기술", "science", "technology", "ai", "digital"},
+        "keywords": {"과학", "기술", "ai", "인공지능", "디지털", "데이터", "연구개발", "반도체"},
+    },
+    {
+        "key": "safety",
+        "label": "안전·치안",
+        "categories": {"안전", "치안", "safety", "transport", "치안·사법"},
+        "keywords": {"치안", "안전", "범죄", "응급", "재난", "교통", "재해", "경찰", "교정"},
+    },
+    {
+        "key": "defense",
+        "label": "국방",
+        "categories": {"국방", "defense", "security"},
+        "keywords": {"국방", "병역", "안보", "군", "장병"},
+    },
+    {
+        "key": "healthcare",
+        "label": "의료",
+        "categories": {"의료", "보건", "healthcare", "보건의료"},
+        "keywords": {"의료", "보건", "응급", "건강보험", "건보", "병원", "의사"},
+    },
+]
+
+TOPIC_TITLE_GATES = {
+    "사법·검찰": {"사법", "검찰", "재판", "공소", "법원", "치안", "경찰", "교정"},
+    "정치개혁": {"정치", "개혁", "개헌", "선거", "국회", "정당"},
+    "의료": {"의료", "보건", "응급", "건보", "건강보험"},
+}
+
+PUBLIC_TEXT_STOPWORDS = {
+    "개혁신당", "대통령", "대통령의", "대한민국", "정부", "정치", "국민", "문제", "문제가",
+    "이번", "이미", "대한", "위한", "중심", "중심으로", "대해", "요구", "사건", "제도",
+    "제도를", "것", "것은", "되는", "입니다", "있습니다", "아닌", "아니라", "그러나",
+    "매우", "만든", "두고", "곳바로", "개인", "내부", "심각한", "보여주는", "운영하는",
+}
+
+
+def _classify_commentary_topic(item: dict) -> str:
+    haystack = " ".join([item.get("title") or "", item.get("summary") or "", item.get("body") or ""]).lower()
+    for rule in TOPIC_RULES:
+        if any(keyword.lower() in haystack for keyword in rule["keywords"]):
+            return rule["label"]
+    return "기타 현안"
+
+
+def _topic_to_categories(topic_label: str) -> set[str]:
+    for rule in TOPIC_RULES:
+        if rule["label"] == topic_label:
+            return set(rule["categories"])
+    return set()
+
+
+def _topic_keywords(topic_label: str) -> set[str]:
+    for rule in TOPIC_RULES:
+        if rule["label"] == topic_label:
+            return set(rule["keywords"])
+    return set()
+
+
+def _canonical_policy_key(title: str) -> str:
+    text = _normalize_text(title)
+    text = re.sub(r"^개혁신당\s*", "", text)
+    text = re.sub(r"^대선\s*공약\s*", "", text)
+    text = re.sub(r"^공약\s*", "", text)
+    text = re.sub(r"[^0-9a-zA-Z가-힣]+", "", text.lower())
+    return text
+
+
+def _tokenize_public_text(*values: Optional[str]) -> set[str]:
+    tokens: set[str] = set()
+    for value in values:
+        if not value:
+            continue
+        for token in re.findall(r"[0-9A-Za-z가-힣]{2,}", value.lower()):
+            if token in PUBLIC_TEXT_STOPWORDS or token.isdigit():
+                continue
+            tokens.add(token)
+    return tokens
+
+
+def _infer_related_positions_for_document(item: dict, approved_positions: list[dict]) -> list[dict]:
+    topic_label = item.get("topic_label") or _classify_commentary_topic(item)
+    preferred_categories = {value.lower() for value in _topic_to_categories(topic_label)}
+    preferred_keywords = {value.lower() for value in _topic_keywords(topic_label)}
+    doc_tokens = _tokenize_public_text(item.get("title"), item.get("summary"), item.get("body"))
+    ranked: list[tuple[int, int, str, dict]] = []
+    for position in approved_positions:
+        category = (position.get("category") or "").lower()
+        title_tokens = _tokenize_public_text(position.get("title"), position.get("category"))
+        pos_tokens = _tokenize_public_text(position.get("title"), position.get("summary"), position.get("body"), position.get("category"))
+        overlap = doc_tokens & pos_tokens
+        keyword_overlap = preferred_keywords & pos_tokens
+        gate_keywords = TOPIC_TITLE_GATES.get(topic_label, set())
+        if gate_keywords and not (gate_keywords & title_tokens):
+            continue
+        score = 0
+        if category and category in preferred_categories:
+            score += 2
+        if keyword_overlap:
+            score += 2 + min(len(keyword_overlap), 2)
+        score += min(len(overlap), 4)
+        if position.get("title") and item.get("title") and _normalize_text(position["title"]) in _normalize_text(item["title"]):
+            score += 3
+        if score <= 0:
+            continue
+        if len(overlap) < 2 and not keyword_overlap:
+            continue
+        specificity = 1 if category not in {"공통공약", "general", "common"} else 0
+        ranked.append((score, specificity, position.get("title") or "", position))
+
+    ranked.sort(key=lambda entry: entry[2])
+    ranked.sort(key=lambda entry: entry[1], reverse=True)
+    ranked.sort(key=lambda entry: entry[0], reverse=True)
+    results: list[dict] = []
+    seen_keys: set[str] = set()
+    for score, _, _, position in ranked:
+        key = _canonical_policy_key(position.get("title") or "")
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        results.append({
+            "position_id": int(position["id"]),
+            "position_title": position["title"],
+            "position_slug": position["slug"],
+            "relation_type": "related",
+            "is_inferred": True,
+            "score": score,
+        })
+        if len(results) >= 3:
+            break
+    return results
 
 
 def _validate_date(value: Optional[str], field_name: str) -> Optional[str]:
@@ -52,17 +265,20 @@ def _validate_date(value: Optional[str], field_name: str) -> Optional[str]:
     if text is None:
         return None
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
-        raise HTTPException(status_code=400, detail=f"{field_name} 형식은 YYYY-MM-DD 이어야 합니다.")
+        raise HTTPException(status_code=400, detail=f"{field_name} must use YYYY-MM-DD format")
     return text
 
 
 def slugify(value: str) -> str:
     text = _normalize_text(value).lower()
     text = re.sub(r"\s+", "-", text)
-    text = re.sub(r"[^0-9a-z가-힣_-]", "", text)
+    text = "".join(
+        ch for ch in text
+        if (ch.isascii() and (ch.isalnum() or ch == "-")) or (0xAC00 <= ord(ch) <= 0xD7A3)
+    )
     text = re.sub(r"-{2,}", "-", text).strip("-")
     if not text:
-        raise HTTPException(status_code=400, detail="slug를 생성할 수 없습니다.")
+        raise HTTPException(status_code=400, detail="slug is empty after normalization")
     return text[:120]
 
 
@@ -99,22 +315,28 @@ def upsert_policy_position(
     effective_from: Optional[str],
     effective_to: Optional[str],
     version_label: Optional[str],
+    official_summary: Optional[str] = None,
+    key_points: Optional[str] = None,
+    relevance_note: Optional[str] = None,
     actor_id: Optional[int],
 ) -> dict:
     title_clean = _normalize_text(title)
     if not title_clean:
-        raise HTTPException(status_code=400, detail="title은 필수입니다.")
+        raise HTTPException(status_code=400, detail="title? ?꾩닔?낅땲??")
     if len(title_clean) > 200:
-        raise HTTPException(status_code=400, detail="title 길이가 너무 깁니다.")
+        raise HTTPException(status_code=400, detail="title 湲몄씠媛 ?덈Т 源곷땲??")
     category_clean = _normalize_text(category) or "general"
     status_clean = _normalize_enum(status, POLICY_STATUS, "status", "draft")
     scope_clean = _normalize_enum(owner_scope, POLICY_OWNER_SCOPE, "owner_scope", "party")
     summary_clean = _normalize_optional_text(summary)
+    official_summary_clean = _normalize_optional_text(official_summary)
+    key_points_clean = _normalize_optional_text(key_points)
+    relevance_note_clean = _normalize_optional_text(relevance_note)
     body_clean = _normalize_optional_text(body)
     effective_from_clean = _validate_date(effective_from, "effective_from")
     effective_to_clean = _validate_date(effective_to, "effective_to")
     if effective_from_clean and effective_to_clean and effective_from_clean > effective_to_clean:
-        raise HTTPException(status_code=400, detail="effective_from은 effective_to보다 늦을 수 없습니다.")
+        raise HTTPException(status_code=400, detail="effective_from? effective_to蹂대떎 ??쓣 ???놁뒿?덈떎.")
     version_clean = _normalize_optional_text(version_label)
     base_slug = slugify(title_clean)
     slug = _ensure_slug_unique("policy_positions", base_slug, position_id)
@@ -125,16 +347,19 @@ def upsert_policy_position(
             cur = conn.execute(
                 """
                 INSERT INTO policy_positions (
-                    title, slug, category, summary, body, status, owner_scope,
+                    title, slug, category, summary, official_summary, key_points, relevance_note, body, status, owner_scope,
                     effective_from, effective_to, version_label, created_by, updated_by, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """,
                 (
                     title_clean,
                     slug,
                     category_clean,
                     summary_clean,
+                    official_summary_clean,
+                    key_points_clean,
+                    relevance_note_clean,
                     body_clean,
                     status_clean,
                     scope_clean,
@@ -146,14 +371,33 @@ def upsert_policy_position(
                 ),
             )
             position_id = int(cur.lastrowid)
+            _insert_position_version(
+                conn,
+                position_id=position_id,
+                version_label=version_clean,
+                title=title_clean,
+                category=category_clean,
+                summary=summary_clean,
+                official_summary=official_summary_clean,
+                key_points=key_points_clean,
+                relevance_note=relevance_note_clean,
+                body=body_clean,
+                status=status_clean,
+                owner_scope=scope_clean,
+                effective_from=effective_from_clean,
+                effective_to=effective_to_clean,
+                snapshot_type="create",
+                actor_id=actor_id,
+            )
         else:
-            row = conn.execute("SELECT id FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
+            row = conn.execute("SELECT * FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
             if row is None:
-                raise HTTPException(status_code=404, detail="정책 항목을 찾을 수 없습니다.")
+                raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
+            previous = _row_to_position(row)
             conn.execute(
                 """
                 UPDATE policy_positions
-                SET title = ?, slug = ?, category = ?, summary = ?, body = ?, status = ?, owner_scope = ?,
+                SET title = ?, slug = ?, category = ?, summary = ?, official_summary = ?, key_points = ?, relevance_note = ?, body = ?, status = ?, owner_scope = ?,
                     effective_from = ?, effective_to = ?, version_label = ?, updated_by = ?, updated_at = datetime('now')
                 WHERE id = ?
                 """,
@@ -162,6 +406,9 @@ def upsert_policy_position(
                     slug,
                     category_clean,
                     summary_clean,
+                    official_summary_clean,
+                    key_points_clean,
+                    relevance_note_clean,
                     body_clean,
                     status_clean,
                     scope_clean,
@@ -172,6 +419,41 @@ def upsert_policy_position(
                     position_id,
                 ),
             )
+            changed = any(
+                [
+                    previous["title"] != title_clean,
+                    previous["category"] != category_clean,
+                    previous["summary"] != (summary_clean or ""),
+                    previous["official_summary"] != (official_summary_clean or ""),
+                    previous["key_points"] != (key_points_clean or ""),
+                    previous["relevance_note"] != (relevance_note_clean or ""),
+                    previous["body"] != (body_clean or ""),
+                    previous["status"] != status_clean,
+                    previous["owner_scope"] != scope_clean,
+                    (previous["effective_from"] or "") != (effective_from_clean or ""),
+                    (previous["effective_to"] or "") != (effective_to_clean or ""),
+                    previous["version_label"] != (version_clean or ""),
+                ]
+            )
+            if changed:
+                _insert_position_version(
+                    conn,
+                    position_id=position_id,
+                    version_label=version_clean,
+                    title=title_clean,
+                    category=category_clean,
+                    summary=summary_clean,
+                    official_summary=official_summary_clean,
+                    key_points=key_points_clean,
+                    relevance_note=relevance_note_clean,
+                    body=body_clean,
+                    status=status_clean,
+                    owner_scope=scope_clean,
+                    effective_from=effective_from_clean,
+                    effective_to=effective_to_clean,
+                    snapshot_type="update",
+                    actor_id=actor_id,
+                )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -200,9 +482,9 @@ def upsert_policy_document(
 ) -> dict:
     title_clean = _normalize_text(title)
     if not title_clean:
-        raise HTTPException(status_code=400, detail="title은 필수입니다.")
+        raise HTTPException(status_code=400, detail="title? ?꾩닔?낅땲??")
     if len(title_clean) > 200:
-        raise HTTPException(status_code=400, detail="title 길이가 너무 깁니다.")
+        raise HTTPException(status_code=400, detail="title 湲몄씠媛 ?덈Т 源곷땲??")
     doc_type_clean = _normalize_enum(doc_type, DOC_TYPES, "doc_type", "other")
     status_clean = _normalize_enum(status, DOC_STATUS, "status", "active")
     summary_clean = _normalize_optional_text(summary)
@@ -250,7 +532,7 @@ def upsert_policy_document(
         else:
             row = conn.execute("SELECT id FROM policy_documents WHERE id = ?", (document_id,)).fetchone()
             if row is None:
-                raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+                raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
             conn.execute(
                 """
                 UPDATE policy_documents
@@ -327,10 +609,10 @@ def link_policy_document(
     try:
         position = conn.execute("SELECT id FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
         if position is None:
-            raise HTTPException(status_code=404, detail="정책 항목을 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
         document = conn.execute("SELECT id FROM policy_documents WHERE id = ?", (document_id,)).fetchone()
         if document is None:
-            raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
         conn.execute(
             """
             INSERT INTO policy_document_links (position_id, document_id, relation_type, notes, created_by)
@@ -350,7 +632,7 @@ def link_policy_document(
     for item in links:
         if item["document_id"] == document_id and item["relation_type"] == rel_clean:
             return item
-    raise HTTPException(status_code=500, detail="연결 저장 후 조회에 실패했습니다.")
+    raise HTTPException(status_code=500, detail="?곌껐 ?????議고쉶???ㅽ뙣?덉뒿?덈떎.")
 
 
 def delete_policy_position(position_id: int) -> None:
@@ -358,7 +640,7 @@ def delete_policy_position(position_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_positions WHERE id = ?", (position_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="정책 항목을 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -372,7 +654,7 @@ def delete_policy_document(document_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_documents WHERE id = ?", (document_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -403,7 +685,7 @@ def replace_policy_document_people(document_id: int, people: list[dict]) -> list
     try:
         exists = conn.execute("SELECT id FROM policy_documents WHERE id = ?", (document_id,)).fetchone()
         if exists is None:
-            raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="?얜챷苑뚨몴?筌≪뼚??????곷뮸??덈뼄.")
         conn.execute("DELETE FROM policy_document_people WHERE document_id = ?", (document_id,))
         for person in normalized_people:
             conn.execute(
@@ -478,7 +760,7 @@ def unlink_policy_document(link_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_document_links WHERE id = ?", (link_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="연결을 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail="?곌껐??李얠쓣 ???놁뒿?덈떎.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -494,6 +776,9 @@ def _row_to_position(row) -> dict:
         "slug": row["slug"],
         "category": row["category"],
         "summary": row["summary"] or "",
+        "official_summary": row["official_summary"] or "",
+        "key_points": row["key_points"] or "",
+        "relevance_note": row["relevance_note"] or "",
         "body": row["body"] or "",
         "status": row["status"],
         "owner_scope": row["owner_scope"],
@@ -538,11 +823,146 @@ def get_policy_position(position_id: int) -> dict:
     finally:
         conn.close()
     if row is None:
-        raise HTTPException(status_code=404, detail="정책 항목을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="policy position not found")
     item = _row_to_position(row)
     item["links"] = list_policy_links(position_id=position_id)
+    item["versions"] = list_policy_position_versions(position_id)
     return item
 
+
+def list_policy_position_versions(position_id: int) -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, position_id, version_label, title, category, summary, official_summary, key_points, relevance_note, body, status, owner_scope,
+                   effective_from, effective_to, snapshot_type, created_by, created_at
+            FROM policy_position_versions
+            WHERE position_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (position_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "id": int(row["id"]),
+            "position_id": int(row["position_id"]),
+            "version_label": row["version_label"] or "",
+            "title": row["title"],
+            "category": row["category"],
+            "summary": row["summary"] or "",
+            "official_summary": row["official_summary"] or "",
+            "key_points": row["key_points"] or "",
+            "relevance_note": row["relevance_note"] or "",
+            "body": row["body"] or "",
+            "status": row["status"],
+            "owner_scope": row["owner_scope"],
+            "effective_from": row["effective_from"],
+            "effective_to": row["effective_to"],
+            "snapshot_type": row["snapshot_type"],
+            "created_by": row["created_by"],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def get_policy_position_timeline(position_id: int) -> list[dict]:
+    position = get_policy_position(position_id)
+    entries: list[dict] = []
+    for version in position.get("versions", []):
+        entries.append(
+            {
+                "kind": "version",
+                "title": version.get("version_label") or position["title"],
+                "summary": version.get("summary") or "",
+                "at": version.get("created_at") or "",
+                "status": version.get("status") or "",
+                "snapshot_type": version.get("snapshot_type") or "update",
+            }
+        )
+    for document in list_documents_for_position(position_id):
+        entries.append(
+            {
+                "kind": "document",
+                "title": document["title"],
+                "summary": document.get("summary") or "",
+                "at": document.get("published_at") or document.get("created_at") or "",
+                "doc_type": document.get("doc_type") or "",
+                "relation_type": (document.get("link") or {}).get("relation_type") or "",
+            }
+        )
+    entries.sort(key=lambda item: (item.get("at") or "", item.get("title") or ""), reverse=True)
+    return entries
+
+
+def get_policy_position_by_slug(slug_or_id: str) -> dict:
+    key = _normalize_text(slug_or_id)
+    if not key:
+        raise HTTPException(status_code=404, detail="policy position not found")
+    conn = get_connection()
+    try:
+        if key.isdigit():
+            row = conn.execute("SELECT * FROM policy_positions WHERE id = ?", (int(key),)).fetchone()
+        else:
+            row = conn.execute("SELECT * FROM policy_positions WHERE slug = ?", (key,)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="policy position not found")
+    item = _row_to_position(row)
+    item["links"] = list_policy_links(position_id=item["id"])
+    item["versions"] = list_policy_position_versions(item["id"])
+    return item
+
+
+def _insert_position_version(
+    conn,
+    *,
+    position_id: int,
+    version_label: Optional[str],
+    title: str,
+    category: str,
+    summary: Optional[str],
+    official_summary: Optional[str],
+    key_points: Optional[str],
+    relevance_note: Optional[str],
+    body: Optional[str],
+    status: str,
+    owner_scope: str,
+    effective_from: Optional[str],
+    effective_to: Optional[str],
+    snapshot_type: str,
+    actor_id: Optional[int],
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO policy_position_versions (
+            position_id, version_label, title, category, summary, official_summary, key_points, relevance_note,
+            body, status, owner_scope, effective_from, effective_to, snapshot_type, created_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            position_id,
+            version_label,
+            title,
+            category,
+            summary,
+            official_summary,
+            key_points,
+            relevance_note,
+            body,
+            status,
+            owner_scope,
+            effective_from,
+            effective_to,
+            snapshot_type,
+            actor_id,
+        ),
+    )
 
 def get_policy_document(document_id: int) -> dict:
     conn = get_connection()
@@ -551,10 +971,23 @@ def get_policy_document(document_id: int) -> dict:
     finally:
         conn.close()
     if row is None:
-        raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="policy document not found")
     item = _row_to_document(row)
     item["people"] = list_policy_document_people(document_id=document_id)
     item["linked_positions"] = list_policy_links(document_id=document_id)
+    if item["doc_type"] == "bill":
+        item["bill_progress"] = _bill_progress_stage(item)
+        item["timeline"] = _build_bill_timeline(item)
+    if item["doc_type"] in {"statement", "bill", "press_release", "briefing"}:
+        item["topic_label"] = _classify_commentary_topic(item)
+        approved_positions = list_policy_positions(status="approved")
+        item["related_positions"] = item["linked_positions"] or _infer_related_positions_for_document(item, approved_positions)
+    else:
+        item["related_positions"] = item["linked_positions"]
+    if "timeline" not in item:
+        item["timeline"] = []
+    item["derived_key_points"] = _build_document_key_points(item)
+    item["derived_relevance_note"] = _build_document_relevance_note(item)
     return item
 
 
@@ -665,4 +1098,783 @@ def get_policy_ssot_summary() -> dict:
         "links": int(link_count),
         "document_types": {row["doc_type"]: int(row["n"]) for row in doc_rows},
         "position_statuses": {row["status"]: int(row["n"]) for row in status_rows},
+    }
+
+
+def get_policy_operations_overview() -> dict:
+    conn = get_connection()
+    try:
+        suggestion_rows = conn.execute(
+            "SELECT status, COUNT(*) AS n FROM policy_link_suggestions GROUP BY status"
+        ).fetchall()
+        source_rows = conn.execute(
+            """
+            SELECT source_key, status, imported_count, updated_count, skipped_count, error_message, started_at, finished_at
+            FROM policy_ingest_runs
+            ORDER BY started_at DESC, id DESC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    latest_by_source: dict[str, dict] = {}
+    for row in source_rows:
+        source_key = row["source_key"]
+        if source_key in latest_by_source:
+            continue
+        latest_by_source[source_key] = {
+            "source_key": source_key,
+            "status": row["status"],
+            "imported_count": int(row["imported_count"] or 0),
+            "updated_count": int(row["updated_count"] or 0),
+            "skipped_count": int(row["skipped_count"] or 0),
+            "error_message": row["error_message"] or "",
+            "started_at": row["started_at"],
+            "finished_at": row["finished_at"],
+        }
+
+    return {
+        "suggestions": {row["status"]: int(row["n"]) for row in suggestion_rows},
+        "ingest_sources": list(latest_by_source.values()),
+    }
+
+
+def list_documents_for_position(position_id: int) -> list[dict]:
+    links = list_policy_links(position_id=position_id)
+    if not links:
+        return []
+    document_ids = [item["document_id"] for item in links]
+    relation_by_document_id = {
+        item["document_id"]: {
+            "relation_type": item["relation_type"],
+            "notes": item["notes"],
+            "link_id": item["id"],
+        }
+        for item in links
+    }
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" for _ in document_ids)
+        rows = conn.execute(
+            f"SELECT * FROM policy_documents WHERE id IN ({placeholders})",
+            tuple(document_ids),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    people_map: dict[int, list[dict]] = {}
+    for person in list_policy_document_people():
+        people_map.setdefault(person["document_id"], []).append(person)
+
+    doc_type_rank = {
+        "bill": 1,
+        "statement": 2,
+        "policy": 3,
+        "press_release": 4,
+        "briefing": 5,
+    }
+    items = []
+    for row in rows:
+        item = _row_to_document(row)
+        item["people"] = people_map.get(item["id"], [])
+        item["link"] = relation_by_document_id.get(item["id"], {})
+        items.append(item)
+    items.sort(
+        key=lambda item: (
+            doc_type_rank.get(item["doc_type"], 99),
+            item.get("published_at") or "",
+            item["title"],
+        ),
+        reverse=False,
+    )
+    items.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    items.sort(key=lambda item: doc_type_rank.get(item["doc_type"], 99))
+    return items
+
+
+def _build_policy_brief(item: dict, documents: list[dict]) -> dict:
+    bill_count = sum(1 for entry in documents if entry.get("doc_type") == "bill")
+    statement_count = sum(1 for entry in documents if entry.get("doc_type") == "statement")
+    pledge_count = sum(1 for entry in documents if entry.get("doc_type") == "pledge")
+    summary = item.get("official_summary") or item.get("summary") or item.get("body") or ""
+    body = item.get("body") or ""
+    summary_lines: list[str] = []
+    if summary:
+        summary_lines.append(summary.strip()[:160])
+    if item.get("relevance_note"):
+        summary_lines.append(item["relevance_note"].strip()[:120])
+    if bill_count:
+        summary_lines.append(f"관련 의원실 법안 {bill_count}건이 연결돼 있습니다.")
+    elif statement_count:
+        summary_lines.append(f"관련 대변인 논평 {statement_count}건으로 입장이 확인됩니다.")
+    elif pledge_count:
+        summary_lines.append(f"대선공약 원문 {pledge_count}건이 근거 문서입니다.")
+    if not summary_lines and body:
+        summary_lines.append(body.strip()[:160])
+    return {
+        "headline": item.get("title") or "",
+        "summary": " ".join(summary_lines[:2]).strip(),
+        "official_summary": item.get("official_summary") or "",
+        "key_points": item.get("key_points") or "",
+        "relevance_note": item.get("relevance_note") or "",
+        "bill_count": bill_count,
+        "statement_count": statement_count,
+        "pledge_count": pledge_count,
+    }
+
+
+def _bill_progress_stage(document: dict) -> dict:
+    metadata = document.get("metadata") or {}
+    raw_values = [
+        str(metadata.get("bill_stage") or "").strip(),
+        str(metadata.get("decision_result") or "").strip(),
+        str(metadata.get("status_badge") or "").strip(),
+    ]
+    raw = " / ".join([value for value in raw_values if value])
+
+    ended_keywords = ("폐기", "철회", "임기만료", "대안반영")
+    passed_keywords = ("가결", "이송", "공포", "통과")
+    in_progress_keywords = (
+        "접수",
+        "회부",
+        "상정",
+        "심사",
+        "소위",
+        "위원회",
+        "법사위",
+        "본회의부의",
+        "계류",
+        "보류",
+        "제안설명",
+    )
+
+    if any(keyword in raw for keyword in ended_keywords):
+        return {
+            "code": "disposed",
+            "label": "입법 종료",
+            "description": "이 법안은 현재 폐기·철회 또는 임기만료 상태입니다.",
+            "raw": raw,
+            "is_active": False,
+        }
+
+    if any(keyword in raw for keyword in passed_keywords):
+        return {
+            "code": "passed",
+            "label": "입법 반영",
+            "description": "이 법안은 가결 또는 후속 이송 단계까지 진행된 이력이 확인됩니다.",
+            "raw": raw,
+            "is_active": False,
+        }
+
+    if any(keyword in raw for keyword in in_progress_keywords):
+        return {
+            "code": "in_progress",
+            "label": "입법 추진",
+            "description": "이 법안은 현재 심사·회부·상정 등 진행 단계에 있습니다.",
+            "raw": raw,
+            "is_active": True,
+        }
+
+    return {
+        "code": "filed",
+        "label": "법안 발의",
+        "description": "대표발의 이력은 확인되지만 세부 진행 상태는 추가 확인이 필요합니다.",
+        "raw": raw,
+        "is_active": True,
+    }
+
+
+def _build_bill_timeline(document: dict) -> list[dict]:
+    metadata = document.get("metadata") or {}
+    progress = _bill_progress_stage(document)
+    timeline: list[dict] = []
+    proposed_at = metadata.get("proposed_at") or document.get("published_at")
+    decision_at = metadata.get("decision_at")
+    representative_name = metadata.get("representative_member_name") or document.get("speaker_name") or ""
+    stage_text = str(metadata.get("bill_stage") or "").strip()
+    committee = str(metadata.get("committee") or "").strip()
+
+    if proposed_at:
+        summary = "대표발의 법안이 국회에 접수됐습니다."
+        if representative_name:
+            summary = f"{representative_name} 의원 대표발의 법안이 국회에 접수됐습니다."
+        timeline.append({"kind": "bill_event", "at": proposed_at, "title": "법안 접수", "summary": summary})
+
+    if committee:
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "at": proposed_at or "",
+                "title": "상임위 회부",
+                "summary": f"{committee}에서 다루는 법안입니다.",
+            }
+        )
+
+    stage_events: list[tuple[str, str]] = []
+    if stage_text:
+        if "접수" in stage_text:
+            stage_events.append(("접수 완료", stage_text))
+        if any(keyword in stage_text for keyword in ("회부", "위원회")) and committee:
+            stage_events.append(("상임위 심사", f"{committee} 기준 단계: {stage_text}"))
+        elif any(keyword in stage_text for keyword in ("회부", "위원회", "심사", "소위", "법사위")):
+            stage_events.append(("상임위 심사", stage_text))
+        if any(keyword in stage_text for keyword in ("상정", "제안설명")):
+            stage_events.append(("안건 상정", stage_text))
+        if any(keyword in stage_text for keyword in ("본회의", "부의")):
+            stage_events.append(("본회의 단계", stage_text))
+        if any(keyword in stage_text for keyword in ("보류", "계류")):
+            stage_events.append(("계류·보류", stage_text))
+
+    seen_titles: set[str] = set()
+    for title, summary in stage_events:
+        if title in seen_titles:
+            continue
+        seen_titles.add(title)
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "at": decision_at or proposed_at or "",
+                "title": title,
+                "summary": summary,
+            }
+        )
+
+    if progress.get("raw") and progress["label"] not in seen_titles:
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "at": decision_at or proposed_at or "",
+                "title": progress["label"],
+                "summary": progress["raw"],
+            }
+        )
+
+    if metadata.get("decision_result") or decision_at:
+        timeline.append(
+            {
+                "kind": "bill_event",
+                "at": decision_at or proposed_at or "",
+                "title": "의결 결과",
+                "summary": metadata.get("decision_result") or progress.get("raw") or "최종 처리 결과가 확인됐습니다.",
+            }
+        )
+
+    timeline.sort(key=lambda item: ((item.get("at") or "9999-99-99"), item.get("title") or ""))
+    return timeline
+
+
+def _build_document_key_points(document: dict) -> str:
+    metadata = document.get("metadata") or {}
+    linked_positions = document.get("linked_positions") or []
+    related_positions = document.get("related_positions") or []
+
+    if document.get("doc_type") == "bill":
+        parts = []
+        committee = str(metadata.get("committee") or "").strip()
+        if committee:
+            parts.append(f"소관 상임위는 {committee}입니다.")
+        progress = document.get("bill_progress") or _bill_progress_stage(document)
+        if progress.get("raw"):
+            parts.append(f"현재 국회 처리 단계는 {progress['raw']}입니다.")
+        representative = str(metadata.get("representative_member_name") or document.get("speaker_name") or "").strip()
+        if representative:
+            parts.append(f"대표발의 의원은 {representative}입니다.")
+        if linked_positions:
+            titles = ", ".join(link.get("position_title") or "" for link in linked_positions[:2] if link.get("position_title"))
+            if titles:
+                parts.append(f"연결 정책은 {titles}입니다.")
+        return " · ".join([part for part in parts if part]) or "법안 핵심 쟁점 정보가 아직 정리되지 않았습니다."
+
+    if document.get("doc_type") in {"statement", "press_release", "briefing"}:
+        parts = []
+        topic = document.get("topic_label")
+        if topic:
+            parts.append(topic)
+        speaker = " ".join([value for value in [document.get("speaker"), document.get("speaker_name")] if value]).strip()
+        if speaker:
+            parts.append(f"발화 주체 {speaker}")
+        links = linked_positions or related_positions
+        if links:
+            parts.append("연결 정책 " + ", ".join(link.get("position_title") or "" for link in links[:2] if link.get("position_title")))
+        return " · ".join([part for part in parts if part]) or "논평 핵심 쟁점 정보가 아직 정리되지 않았습니다."
+
+    return document.get("summary") or "핵심 쟁점 정보가 아직 정리되지 않았습니다."
+
+
+def _build_document_relevance_note(document: dict) -> str:
+    metadata = document.get("metadata") or {}
+    linked_positions = document.get("linked_positions") or []
+    related_positions = document.get("related_positions") or []
+
+    if document.get("doc_type") == "bill":
+        progress = document.get("bill_progress") or _bill_progress_stage(document)
+        if linked_positions:
+            return f"연결된 정책 {len(linked_positions)}건을 실제 제도화하려는 입법 시도라서 중요합니다."
+        if progress.get("code") == "disposed":
+            return "법안은 종료됐지만, 이 의제가 실제 국회 입법으로 시도된 이력을 보여주기 때문에 중요합니다."
+        if progress.get("code") == "passed":
+            return "정책이 실제 입법 반영 단계까지 이어진 사례라서 중요합니다."
+        committee = str(metadata.get("committee") or "").strip()
+        if committee:
+            return f"{committee} 소관 현안으로 실제 국회 심사 흐름에 올라온 법안이라 지금 확인할 가치가 있습니다."
+        return "공식 정책과 연결 가능한 실제 입법 자료라서 중요합니다."
+
+    if document.get("doc_type") in {"statement", "press_release", "briefing"}:
+        if linked_positions:
+            return f"공식 연결 정책 {len(linked_positions)}건과 직접 이어지는 메시지입니다."
+        if related_positions:
+            return "정책과 함께 읽어야 맥락이 보이는 공식 메시지입니다."
+        return "당의 현재 메시지 방향을 보여주는 공식 발화라서 중요합니다."
+
+    return "공개 문서 맥락에서 함께 확인할 가치가 있습니다."
+
+
+def _policy_execution_stage(documents: list[dict]) -> dict:
+    bill_documents = [entry for entry in documents if entry.get("doc_type") == "bill"]
+    has_statement = any(entry.get("doc_type") == "statement" for entry in documents)
+    has_pledge = any(entry.get("doc_type") == "pledge" for entry in documents)
+    if bill_documents:
+        bill_states = [_bill_progress_stage(entry) for entry in bill_documents]
+        if any(state["code"] == "passed" for state in bill_states):
+            return {
+                "code": "legislation_passed",
+                "label": "입법 반영 단계",
+                "description": "관련 법안이 가결 또는 후속 이송 단계까지 진행된 이력이 확인됩니다.",
+            }
+        if any(state["is_active"] for state in bill_states):
+            return {
+                "code": "legislation",
+                "label": "입법 추진 단계",
+                "description": "관련 법안이 현재 진행 중이어서 실제 제도화 시도가 이어지고 있습니다.",
+            }
+        return {
+            "code": "legislation_history",
+            "label": "입법 이력 확인",
+            "description": "관련 법안 발의 이력은 있지만 현재는 폐기·철회 등으로 진행이 종료된 상태입니다.",
+        }
+    if has_statement:
+        return {
+            "code": "public_message",
+            "label": "공식 메시지 단계",
+            "description": "대변인 논평 등 공식 메시지로 입장이 반복 확인됩니다.",
+        }
+    if has_pledge:
+        return {
+            "code": "campaign_commitment",
+            "label": "공약 제시 단계",
+            "description": "대선공약 원문에 담긴 공식 약속입니다.",
+        }
+    return {
+        "code": "policy_only",
+        "label": "정책 정리 단계",
+        "description": "정책 원문은 있으나 연결 문서는 아직 많지 않습니다.",
+    }
+
+
+def get_policy_position_detail(slug_or_id: str) -> dict:
+    item = get_policy_position_by_slug(slug_or_id)
+    item["documents"] = list_documents_for_position(item["id"])
+    item["timeline"] = get_policy_position_timeline(item["id"])
+    item["brief"] = _build_policy_brief(item, item["documents"])
+    item["execution_stage"] = _policy_execution_stage(item["documents"])
+    return item
+
+
+def get_public_overview() -> dict:
+    approved_positions = list_policy_positions(status="approved")
+    active_documents = list_policy_documents(status="active")
+    public_documents = [item for item in active_documents if _is_verified_public_pledge(item)]
+    public_people = list_public_people()
+
+    latest_positions = sorted(
+        approved_positions,
+        key=lambda item: ((item.get("updated_at") or ""), item["title"]),
+        reverse=True,
+    )[:6]
+    latest_bills = [item for item in public_documents if item["doc_type"] == "bill"][:6]
+    latest_statements = list_public_commentary(limit=6)
+    latest_pledges = [item for item in public_documents if item["doc_type"] == "pledge"][:6]
+
+    curated_positions = []
+    for position in approved_positions[:20]:
+        docs = list_documents_for_position(position["id"])
+        brief = _build_policy_brief(position, docs)
+        stage = _policy_execution_stage(docs)
+        curated_positions.append(
+            {
+                "id": position["id"],
+                "slug": position["slug"],
+                "title": position["title"],
+                "category": position["category"],
+                "summary": position["summary"] or "",
+                "brief": brief,
+                "execution_stage": stage,
+                "bill_count": brief["bill_count"],
+                "statement_count": brief["statement_count"],
+                "pledge_count": brief["pledge_count"],
+                "updated_at": position.get("updated_at") or "",
+            }
+        )
+    curated_positions.sort(key=lambda entry: entry["title"])
+    curated_positions.sort(key=lambda entry: entry["updated_at"], reverse=True)
+    curated_positions.sort(key=lambda entry: entry["statement_count"], reverse=True)
+    curated_positions.sort(key=lambda entry: entry["bill_count"], reverse=True)
+
+    return {
+        "counts": {
+            "positions": len(approved_positions),
+            "bills": sum(1 for item in public_documents if item["doc_type"] == "bill"),
+            "statements": sum(1 for item in public_documents if item["doc_type"] == "statement"),
+            "pledges": sum(1 for item in public_documents if item["doc_type"] == "pledge"),
+            "people": len(public_people),
+        },
+        "latest_positions": latest_positions,
+        "latest_bills": _decorate_public_documents(latest_bills),
+        "latest_statements": latest_statements,
+        "latest_pledges": _decorate_public_documents(latest_pledges),
+        "top_people": public_people[:8],
+        "curated_positions": curated_positions[:6],
+    }
+
+
+def list_public_commentary(*, q: Optional[str] = None, speaker_name: Optional[str] = None, limit: int = 60) -> list[dict]:
+    query = _normalize_text(q).lower()
+    speaker_filter = _normalize_text(speaker_name)
+    items = [item for item in list_policy_documents(doc_type="statement", status="active") if _is_verified_public_pledge(item)]
+    approved_positions = list_policy_positions(status="approved")
+
+    if speaker_filter:
+        items = [item for item in items if (item.get("speaker_name") or "") == speaker_filter]
+    if query:
+        items = [
+            item
+            for item in items
+            if query in (item.get("title") or "").lower()
+            or query in (item.get("summary") or "").lower()
+            or query in (item.get("body") or "").lower()
+            or query in (item.get("speaker_name") or "").lower()
+        ]
+
+    items = items[: max(1, min(limit, 200))]
+    decorated = _decorate_public_documents(items)
+    for item in decorated:
+        item["topic_label"] = _classify_commentary_topic(item)
+        explicit = item.get("linked_positions") or []
+        item["related_positions"] = explicit or _infer_related_positions_for_document(item, approved_positions)
+    return decorated
+
+
+def get_public_commentary_overview(*, limit: int = 120) -> dict:
+    items = list_public_commentary(limit=limit)
+
+    topic_counts: dict[str, int] = {}
+    speaker_counts: dict[str, int] = {}
+    linked = []
+    for item in items:
+        topic = item.get("topic_label") or "湲고? ?꾩븞"
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+        speaker = _normalize_text(item.get("speaker_name") or item.get("speaker"))
+        if speaker:
+            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
+
+        if item.get("related_positions"):
+            linked.append(item)
+
+    topic_items = [
+        {"topic_label": topic, "count": count}
+        for topic, count in sorted(topic_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:8]
+    ]
+    speaker_items = [
+        {"speaker_name": speaker, "count": count}
+        for speaker, count in sorted(speaker_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:6]
+    ]
+    linked.sort(
+        key=lambda item: (
+            -len(item.get("linked_positions") or []),
+            item.get("published_at") or "",
+            item.get("title") or "",
+        ),
+        reverse=False,
+    )
+    linked.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    linked.sort(key=lambda item: len(item.get("linked_positions") or []), reverse=True)
+
+    return {
+        "counts": {
+            "commentary": len(items),
+            "topics": len(topic_counts),
+            "speakers": len(speaker_counts),
+            "linked_commentary": len(linked),
+        },
+        "topics": topic_items,
+        "speakers": speaker_items,
+        "featured": items[:3],
+        "linked": linked[:6],
+    }
+
+
+def auto_link_public_commentary(*, actor_id: Optional[int], limit: int = 300, min_score: int = 4) -> dict:
+    items = list_public_commentary(limit=max(1, min(limit, 500)))
+    created = 0
+    skipped = 0
+
+    for item in items:
+        if item.get("linked_positions"):
+            skipped += 1
+            continue
+        related = item.get("related_positions") or []
+        if not related:
+            skipped += 1
+            continue
+        top = related[0]
+        if int(top.get("score") or 0) < min_score:
+            skipped += 1
+            continue
+        link_policy_document(
+            position_id=int(top["position_id"]),
+            document_id=int(item["id"]),
+            relation_type="explains",
+            notes="?쇳룊 二쇱젣 湲곕컲 ?먮룞 ?곌껐",
+            actor_id=actor_id,
+        )
+        created += 1
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "limit": limit,
+        "min_score": min_score,
+    }
+
+
+def get_public_commentary_overview(*, limit: int = 120) -> dict:
+    items = list_public_commentary(limit=limit)
+
+    topic_counts: dict[str, int] = {}
+    speaker_counts: dict[str, int] = {}
+    linked = []
+    for item in items:
+        topic = item.get("topic_label") or "湲고? ?꾩븞"
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+        speaker = _normalize_text(item.get("speaker_name") or item.get("speaker"))
+        if speaker:
+            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
+
+        if item.get("related_positions"):
+            linked.append(item)
+
+    topic_items = [
+        {"topic_label": topic, "count": count}
+        for topic, count in sorted(topic_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:8]
+    ]
+    speaker_items = [
+        {"speaker_name": speaker, "count": count}
+        for speaker, count in sorted(speaker_counts.items(), key=lambda pair: (-pair[1], pair[0]))[:6]
+    ]
+    linked.sort(key=lambda item: item.get("title") or "")
+    linked.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    linked.sort(key=lambda item: len(item.get("linked_positions") or item.get("related_positions") or []), reverse=True)
+
+    return {
+        "counts": {
+            "commentary": len(items),
+            "topics": len(topic_counts),
+            "speakers": len(speaker_counts),
+            "linked_commentary": len(linked),
+        },
+        "topics": topic_items,
+        "speakers": speaker_items,
+        "featured": items[:3],
+        "linked": linked[:6],
+    }
+
+
+def auto_link_public_commentary(*, actor_id: Optional[int], limit: int = 300, min_score: int = 4) -> dict:
+    items = list_public_commentary(limit=max(1, min(limit, 500)))
+    created = 0
+    skipped = 0
+
+    for item in items:
+        if item.get("linked_positions"):
+            skipped += 1
+            continue
+        related = item.get("related_positions") or []
+        if not related:
+            skipped += 1
+            continue
+        top = related[0]
+        top_score = int(top.get("score") or 0)
+        second_score = int(related[1].get("score") or 0) if len(related) > 1 else 0
+        if top_score < min_score or (second_score and top_score - second_score < 2):
+            skipped += 1
+            continue
+        link_policy_document(
+            position_id=int(top["position_id"]),
+            document_id=int(item["id"]),
+            relation_type="explains",
+            notes="?쇳룊 二쇱젣 湲곕컲 ?먮룞 ?곌껐",
+            actor_id=actor_id,
+        )
+        created += 1
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "limit": limit,
+        "min_score": min_score,
+    }
+
+
+def list_public_people() -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT pp.person_name, pp.person_role, pp.is_reform_party, pp.document_id,
+                   d.doc_type, d.published_at, d.metadata_json
+            FROM policy_document_people pp
+            JOIN policy_documents d ON d.id = pp.document_id
+            ORDER BY pp.person_name ASC
+            """,
+        ).fetchall()
+    finally:
+        conn.close()
+
+    stats: dict[str, dict] = {}
+    for row in rows:
+        person_name = row["person_name"]
+        if not person_name or person_name in EXCLUDED_PUBLIC_PEOPLE or not int(row["is_reform_party"] or 0):
+            continue
+        metadata = {}
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        if row["doc_type"] == "pledge" and not metadata.get("verified_public_source"):
+            continue
+
+        item = stats.setdefault(
+            person_name,
+            {
+                "person_name": person_name,
+                "document_ids": set(),
+                "proposer_count": 0,
+                "co_proposer_count": 0,
+                "latest_published_at": "",
+            },
+        )
+        item["document_ids"].add(int(row["document_id"]))
+        if row["person_role"] == "proposer":
+            item["proposer_count"] += 1
+        if row["person_role"] == "co_proposer":
+            item["co_proposer_count"] += 1
+        item["latest_published_at"] = max(item["latest_published_at"], row["published_at"] or "")
+
+    items = [
+        {
+            "person_name": person_name,
+            "document_count": len(item["document_ids"]),
+            "proposer_count": item["proposer_count"],
+            "co_proposer_count": item["co_proposer_count"],
+            "latest_published_at": item["latest_published_at"],
+            "display_priority": PUBLIC_PEOPLE_PRIORITY.get(person_name, 999),
+        }
+        for person_name, item in stats.items()
+    ]
+    items.sort(key=lambda item: item["person_name"])
+    items.sort(key=lambda item: item["document_count"], reverse=True)
+    items.sort(key=lambda item: item["proposer_count"], reverse=True)
+    items.sort(key=lambda item: item["display_priority"])
+    return items
+
+
+def get_public_person_detail(person_name: str) -> dict:
+    target = _normalize_text(person_name)
+    if not target or target in EXCLUDED_PUBLIC_PEOPLE:
+        raise HTTPException(status_code=404, detail="?몃Ъ??李얠쓣 ???놁뒿?덈떎.")
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT pp.person_name, pp.person_role, pp.party_affiliation, pp.is_primary,
+                   d.id AS document_id, d.title, d.slug, d.doc_type, d.summary, d.body,
+                   d.speaker, d.speaker_name, d.owner_name, d.source_url, d.published_at, d.metadata_json,
+                   p.id AS position_id, p.title AS position_title, p.slug AS position_slug,
+                   l.relation_type
+            FROM policy_document_people pp
+            JOIN policy_documents d ON d.id = pp.document_id
+            LEFT JOIN policy_document_links l ON l.document_id = d.id
+            LEFT JOIN policy_positions p ON p.id = l.position_id
+            WHERE pp.person_name = ?
+              AND pp.is_reform_party = 1
+            ORDER BY COALESCE(d.published_at, '0000-00-00') DESC, d.doc_type ASC, d.title ASC
+            """,
+            (target,),
+        ).fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        raise HTTPException(status_code=404, detail="?몃Ъ??李얠쓣 ???놁뒿?덈떎.")
+
+    documents: dict[int, dict] = {}
+    linked_positions: dict[int, dict] = {}
+    roles: set[str] = set()
+    for row in rows:
+        metadata = {}
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        if row["doc_type"] == "pledge" and not metadata.get("verified_public_source"):
+            continue
+        roles.add(row["person_role"])
+        doc = documents.setdefault(
+            int(row["document_id"]),
+            {
+                "id": int(row["document_id"]),
+                "title": row["title"],
+                "slug": row["slug"],
+                "doc_type": row["doc_type"],
+                "summary": row["summary"] or "",
+                "body": row["body"] or "",
+                "speaker": row["speaker"] or "",
+                "speaker_name": row["speaker_name"] or "",
+                "owner_name": row["owner_name"] or "",
+                "source_url": row["source_url"] or "",
+                "published_at": row["published_at"],
+                "person_role": row["person_role"],
+                "linked_positions": [],
+            },
+        )
+        if row["position_id"] is not None:
+            link_item = {
+                "position_id": int(row["position_id"]),
+                "position_title": row["position_title"],
+                "position_slug": row["position_slug"],
+                "relation_type": row["relation_type"] or "",
+            }
+            if link_item not in doc["linked_positions"]:
+                doc["linked_positions"].append(link_item)
+            linked_positions[int(row["position_id"])] = {
+                "position_id": int(row["position_id"]),
+                "position_title": row["position_title"],
+                "position_slug": row["position_slug"],
+            }
+
+    doc_type_rank = {"bill": 1, "statement": 2, "press_release": 3, "briefing": 4}
+    documents_list = list(documents.values())
+    documents_list.sort(key=lambda item: item["title"])
+    documents_list.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    documents_list.sort(key=lambda item: doc_type_rank.get(item["doc_type"], 99))
+
+    return {
+        "person_name": target,
+        "roles": sorted(roles),
+        "documents": documents_list,
+        "linked_positions": list(linked_positions.values()),
+        "bill_count": sum(1 for item in documents_list if item["doc_type"] == "bill"),
+        "statement_count": sum(1 for item in documents_list if item["doc_type"] == "statement"),
+        "pledge_count": sum(1 for item in documents_list if item["doc_type"] == "pledge"),
     }

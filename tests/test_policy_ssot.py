@@ -3,9 +3,15 @@ from uuid import uuid4
 
 from backend import database
 from backend.policy_ssot import (
+    _policy_execution_stage,
+    get_policy_operations_overview,
+    get_public_overview,
+    list_public_people,
     get_policy_document,
     get_policy_position,
+    get_policy_position_timeline,
     get_policy_ssot_summary,
+    list_policy_position_versions,
     link_policy_document,
     list_policy_document_people,
     list_policy_documents,
@@ -166,3 +172,268 @@ def test_policy_ssot_listing_filters(monkeypatch):
     listed_people = list_policy_document_people(document_id=doc["id"])
     assert listed_people[0]["person_role"] == "spokesperson"
     assert list_policy_links() == []
+
+
+def test_policy_execution_stage_uses_bill_status(monkeypatch):
+    db_file = _workspace_db_path("policy-stage")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    disposed_bill = upsert_policy_document(
+        document_id=None,
+        title="Disposed bill",
+        doc_type="bill",
+        summary="Disposed",
+        body=None,
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="disposed-bill",
+        published_at="2026-03-15",
+        status="active",
+        metadata={"bill_stage": "임기만료폐기"},
+        actor_id=None,
+    )
+    active_bill = upsert_policy_document(
+        document_id=None,
+        title="Active bill",
+        doc_type="bill",
+        summary="Active",
+        body=None,
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="active-bill",
+        published_at="2026-03-15",
+        status="active",
+        metadata={"bill_stage": "소관위 심사중"},
+        actor_id=None,
+    )
+
+    disposed_stage = _policy_execution_stage([get_policy_document(disposed_bill["id"])])
+    active_stage = _policy_execution_stage([get_policy_document(active_bill["id"])])
+
+    assert disposed_stage["code"] == "legislation_history"
+    assert active_stage["code"] == "legislation"
+
+
+def test_bill_document_exposes_progress(monkeypatch):
+    db_file = _workspace_db_path("bill-progress")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    document = upsert_policy_document(
+        document_id=None,
+        title="Disposed bill",
+        doc_type="bill",
+        summary="Disposed",
+        body=None,
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="bill-progress",
+        published_at="2026-03-15",
+        status="active",
+        metadata={"bill_stage": "임기만료폐기", "decision_result": "폐기"},
+        actor_id=None,
+    )
+
+    detail = get_policy_document(document["id"])
+    assert detail["bill_progress"]["code"] == "disposed"
+    assert detail["bill_progress"]["label"] == "입법 종료"
+    assert any(item["title"] == "법안 접수" for item in detail["timeline"])
+    assert any(item["title"] == "의결 결과" for item in detail["timeline"])
+    assert "임기만료폐기" in detail["derived_key_points"]
+    assert "실제 입법" in detail["derived_relevance_note"] or "입법" in detail["derived_relevance_note"]
+
+
+def test_public_overview_includes_bills_statements_pledges_and_people(monkeypatch):
+    db_file = _workspace_db_path("policy-public-overview")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    position = upsert_policy_position(
+        position_id=None,
+        title="AI regulation",
+        category="science",
+        summary="AI governance baseline",
+        body="Official AI policy.",
+        status="approved",
+        owner_scope="party",
+        effective_from=None,
+        effective_to=None,
+        version_label=None,
+        actor_id=None,
+    )
+    bill = upsert_policy_document(
+        document_id=None,
+        title="AI bill",
+        doc_type="bill",
+        summary="Bill summary",
+        body="Bill body",
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url="https://example.com/bill",
+        source_ref="overview:bill",
+        published_at="2026-03-15",
+        status="active",
+        metadata={},
+        actor_id=None,
+    )
+    statement = upsert_policy_document(
+        document_id=None,
+        title="AI statement",
+        doc_type="statement",
+        summary="Statement summary",
+        body="Statement body",
+        speaker="spokesperson",
+        speaker_name="Kim Example",
+        owner_name="Reform Party",
+        source_url="https://example.com/statement",
+        source_ref="overview:statement",
+        published_at="2026-03-14",
+        status="active",
+        metadata={},
+        actor_id=None,
+    )
+    pledge = upsert_policy_document(
+        document_id=None,
+        title="AI pledge",
+        doc_type="pledge",
+        summary="Pledge summary",
+        body="Pledge body",
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party campaign",
+        source_url="https://example.com/pledge",
+        source_ref="overview:pledge",
+        published_at="2026-03-13",
+        status="active",
+        metadata={"verified_public_source": True},
+        actor_id=None,
+    )
+    link_policy_document(position_id=position["id"], document_id=bill["id"], relation_type="implements", notes=None, actor_id=None)
+    replace_policy_document_people(
+        bill["id"],
+        [
+            {
+                "person_name": "Lee Example",
+                "person_role": "proposer",
+                "party_affiliation": "Reform Party",
+                "is_reform_party": True,
+                "is_primary": True,
+            }
+        ],
+    )
+
+    overview = get_public_overview()
+    assert overview["counts"]["positions"] == 1
+    assert overview["counts"]["bills"] == 1
+    assert overview["counts"]["statements"] == 1
+    assert overview["counts"]["pledges"] == 1
+    assert overview["counts"]["people"] == 1
+    assert overview["latest_bills"][0]["linked_positions"][0]["position_title"] == "AI regulation"
+    assert overview["latest_bills"][0]["primary_people"][0]["person_name"] == "Lee Example"
+
+
+def test_policy_versions_timeline_and_operations(monkeypatch):
+    db_file = _workspace_db_path("policy-versions")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    position = upsert_policy_position(
+        position_id=None,
+        title="Judicial reform",
+        category="politics",
+        summary="First version",
+        body="Version one body",
+        status="approved",
+        owner_scope="party",
+        effective_from=None,
+        effective_to=None,
+        version_label="v1",
+        actor_id=None,
+    )
+    position = upsert_policy_position(
+        position_id=position["id"],
+        title="Judicial reform",
+        category="politics",
+        summary="Second version",
+        body="Version two body",
+        status="approved",
+        owner_scope="party",
+        effective_from=None,
+        effective_to=None,
+        version_label="v2",
+        actor_id=None,
+    )
+    document = upsert_policy_document(
+        document_id=None,
+        title="Judicial statement",
+        doc_type="statement",
+        summary="Statement summary",
+        body="Statement body",
+        speaker="spokesperson",
+        speaker_name="Kim Example",
+        owner_name="Reform Party",
+        source_url="https://example.com/statement",
+        source_ref="timeline:statement",
+        published_at="2026-03-15",
+        status="active",
+        metadata={},
+        actor_id=None,
+    )
+    link_policy_document(position_id=position["id"], document_id=document["id"], relation_type="explains", notes=None, actor_id=None)
+
+    versions = list_policy_position_versions(position["id"])
+    assert len(versions) == 2
+    assert versions[0]["version_label"] == "v2"
+
+    timeline = get_policy_position_timeline(position["id"])
+    assert any(item["kind"] == "version" for item in timeline)
+    assert any(item["kind"] == "document" for item in timeline)
+
+    operations = get_policy_operations_overview()
+    assert "suggestions" in operations
+    assert "ingest_sources" in operations
+
+
+def test_public_people_excludes_former_members(monkeypatch):
+    db_file = _workspace_db_path("policy-public-people-filter")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    doc = upsert_policy_document(
+        document_id=None,
+        title="Legacy pledge owner",
+        doc_type="pledge",
+        summary="Legacy data",
+        body="Legacy body",
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party campaign",
+        source_url=None,
+        source_ref="overview:legacy",
+        published_at="2026-03-01",
+        status="active",
+        metadata={},
+        actor_id=None,
+    )
+    replace_policy_document_people(
+        doc["id"],
+        [
+            {
+                "person_name": "양향자",
+                "person_role": "policy_owner",
+                "party_affiliation": "Reform Party",
+                "is_reform_party": True,
+                "is_primary": True,
+            }
+        ],
+    )
+
+    assert list_public_people() == []

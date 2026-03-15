@@ -1,0 +1,126 @@
+:root{
+  --brand-bg:#f8f2e9;
+  --brand-panel:#fffaf3;
+  --brand-panel-strong:#ffffff;
+  --brand-line:#d8cab7;
+  --brand-text:#1f1915;
+  --brand-muted:#6d6258;
+  --brand-accent:#da5d18;
+  --brand-accent-soft:#fae2d0;
+  --brand-accent-deep:#9b3c0d;
+  --brand-shadow:0 18px 40px rgba(71,43,22,0.08);
+}
+
+body{
+  color:var(--brand-text);
+  background:
+    radial-gradient(circle at top right, rgba(218,93,24,0.12), transparent 26%),
+    linear-gradient(180deg, #fbf6ef 0%, var(--brand-bg) 100%);
+}
+
+.brandbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  margin-bottom:18px;
+  padding:14px 18px;
+  border:1px solid var(--brand-line);
+  border-radius:22px;
+  background:rgba(255,250,243,0.92);
+  box-shadow:var(--brand-shadow);
+  backdrop-filter:blur(14px);
+}
+
+.brandbar-title{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.brandbar-title strong{
+  font-size:18px;
+  line-height:1.1;
+}
+
+.brandbar-title span{
+  font-size:12px;
+  color:var(--brand-muted);
+}
+
+.brandnav{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.brandnav a{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid var(--brand-line);
+  background:var(--brand-panel-strong);
+  color:var(--brand-text);
+  font-weight:700;
+}
+
+.brandnav a.active{
+  background:var(--brand-accent);
+  border-color:var(--brand-accent);
+  color:#fff;
+}
+
+.hero,
+.card{
+  background:var(--brand-panel);
+  border:1px solid var(--brand-line);
+  box-shadow:var(--brand-shadow);
+}
+
+.pill,
+.chip{
+  background:var(--brand-accent-soft);
+  color:var(--brand-accent-deep);
+}
+
+.chip.active{
+  background:var(--brand-accent);
+  color:#fff;
+}
+
+.hero-link{
+  border-color:var(--brand-line);
+  background:var(--brand-panel-strong);
+}
+
+.summary-card,
+.stat,
+.doc-card,
+.item,
+.feature-item,
+.link-item{
+  background:var(--brand-panel-strong);
+}
+
+.item.selected{
+  border-color:var(--brand-accent);
+  background:#fff4ea;
+}
+
+.hero h1{
+  letter-spacing:-0.02em;
+}
+
+.muted{
+  color:var(--brand-muted);
+}
+
+@media (max-width: 960px){
+  .brandbar{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+}

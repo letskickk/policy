@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -6,52 +6,69 @@
   <title>정책 SSOT 관리</title>
   <style>
     :root {
-      --bg: #f4efe7;
-      --panel: #fffaf3;
+      --bg: #f3efe8;
+      --panel: #fffaf4;
+      --panel-strong: #ffffff;
       --line: #d8cbb9;
-      --text: #1f1a17;
+      --text: #1d1916;
       --muted: #6b6259;
       --accent: #d95d19;
       --accent-dark: #9f3f10;
+      --accent-soft: #f8e1d2;
+      --shadow: 0 16px 36px rgba(88, 55, 30, 0.08);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", "Noto Sans KR", sans-serif;
-      background: linear-gradient(180deg, #f7f1e9 0%, #efe6d8 100%);
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(217, 93, 25, 0.10), transparent 28%),
+        linear-gradient(180deg, #f8f2e9 0%, #efe5d7 100%);
       color: var(--text);
     }
     main {
-      max-width: 1320px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 28px;
     }
+    h1, h2, h3, p { margin: 0; }
     .hero {
       display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
+      grid-template-columns: 1.1fr 0.9fr;
       gap: 16px;
       margin-bottom: 20px;
     }
     .card, .stat {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 18px;
-      box-shadow: 0 12px 30px rgba(88, 55, 30, 0.08);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
     }
-    .card { padding: 18px; }
+    .card { padding: 20px; }
     .stat-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 12px;
     }
-    .stat { padding: 16px; }
-    h1, h2, h3, p { margin: 0; }
-    h1 { font-size: 34px; }
-    h2 { font-size: 20px; margin-bottom: 12px; }
+    .stat { padding: 18px; }
+    h1 { font-size: 34px; line-height: 1.15; }
+    h2 { font-size: 20px; margin-bottom: 14px; }
     .muted { color: var(--muted); }
+    .tiny { font-size: 12px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
     .layout {
       display: grid;
-      grid-template-columns: 400px 1fr;
+      grid-template-columns: 420px minmax(0, 1fr);
       gap: 16px;
       align-items: start;
     }
@@ -65,13 +82,13 @@
     input, select, textarea, button {
       width: 100%;
       font: inherit;
-      border-radius: 12px;
+      border-radius: 14px;
     }
     input, select, textarea {
       margin-top: 6px;
-      padding: 11px 12px;
+      padding: 12px 13px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--panel-strong);
       color: var(--text);
     }
     textarea { min-height: 110px; resize: vertical; }
@@ -79,7 +96,7 @@
       border: 0;
       background: var(--accent);
       color: #fff;
-      padding: 11px 14px;
+      padding: 12px 16px;
       font-weight: 700;
       cursor: pointer;
     }
@@ -97,17 +114,35 @@
       width: auto;
       min-width: 120px;
     }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
     .list {
       display: grid;
       gap: 10px;
-      max-height: 320px;
+      max-height: 360px;
       overflow: auto;
+      padding-right: 4px;
     }
     .item {
       border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px;
-      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      background: var(--panel-strong);
+      transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+    .item.clickable { cursor: pointer; }
+    .item.clickable:hover {
+      transform: translateY(-1px);
+      border-color: rgba(217, 93, 25, 0.5);
+      box-shadow: 0 10px 20px rgba(88, 55, 30, 0.06);
+    }
+    .item.selected {
+      border-color: var(--accent);
+      background: #fff4ea;
+      box-shadow: 0 12px 26px rgba(217, 93, 25, 0.12);
     }
     .item-head {
       display: flex;
@@ -116,35 +151,62 @@
       align-items: start;
       margin-bottom: 8px;
     }
-    .pill {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: #f5e4d8;
-      color: var(--accent-dark);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .tiny { font-size: 12px; }
-    .mono { font-family: Consolas, monospace; }
-    .split {
+    .detail-shell {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 380px minmax(0, 1fr);
       gap: 16px;
+      align-items: start;
+    }
+    .detail-panel {
+      min-height: 360px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,250,244,0.96));
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .meta-box {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.82);
+    }
+    .body-box {
+      white-space: pre-wrap;
+      line-height: 1.65;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      margin-top: 14px;
+      max-height: 420px;
+      overflow: auto;
     }
     .log {
       white-space: pre-wrap;
       background: #211b17;
       color: #f5ede3;
-      border-radius: 14px;
-      padding: 12px;
-      min-height: 120px;
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 130px;
       font-family: Consolas, monospace;
       font-size: 12px;
     }
-    .hidden { display: none; }
-    @media (max-width: 980px) {
-      .hero, .layout, .split { grid-template-columns: 1fr; }
+    .mono { font-family: Consolas, monospace; }
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.55);
+    }
+    a.inline-link {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    @media (max-width: 1080px) {
+      .hero, .layout, .detail-shell, .split { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -153,10 +215,12 @@
     <section class="hero">
       <div class="card">
         <p class="pill">Policy SSOT</p>
-        <h1>정책 원문, 논평, 법안을 한 화면에서 운용</h1>
-        <p class="muted" style="margin-top:10px;">정책 항목을 SSOT로 두고, 대변인 논평과 개혁신당 의원 법안을 연결해 검수하는 운영 화면입니다.</p>
+        <h1 style="margin-top:10px;">정책 원문, 논평, 법안을 한 화면에서 관리</h1>
+        <p class="muted" style="margin-top:10px; line-height:1.6;">
+          정책 항목을 SSOT로 두고, 대변인 논평과 개혁신당 의원 발의 법안을 연결해 운영하는 관리자 화면입니다.
+        </p>
       </div>
-      <div class="stat-grid" id="summaryCards">
+      <div class="stat-grid">
         <div class="stat"><p class="muted tiny">정책 항목</p><h2 id="sumPositions">-</h2></div>
         <div class="stat"><p class="muted tiny">문서 수</p><h2 id="sumDocuments">-</h2></div>
         <div class="stat"><p class="muted tiny">연결 수</p><h2 id="sumLinks">-</h2></div>
@@ -166,6 +230,29 @@
 
     <section class="layout">
       <div class="stack">
+        <div class="card">
+          <h2>오늘의 메인 이슈</h2>
+          <div id="featuredCurrent" class="empty">현재 지정된 메인 이슈가 없습니다.</div>
+          <div class="split" style="margin-top:14px;">
+            <label>정책 ID<input id="featuredPositionId" type="number" min="1" placeholder="예: 12"></label>
+            <label>수동 가중치<input id="featuredManualWeight" type="number" min="-50" max="50" value="0"></label>
+          </div>
+          <div class="split">
+            <label>시작일<input id="featuredStartAt" type="date"></label>
+            <label>종료일<input id="featuredEndAt" type="date"></label>
+          </div>
+          <label>선정 사유<input id="featuredReason" placeholder="예: 최근 7일 법안·논평 집중"></label>
+          <div class="actions">
+            <button id="saveFeaturedBtn" type="button">메인 이슈 지정</button>
+            <button class="secondary" id="refreshFeaturedBtn" type="button">추천 새로고침</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>메인 이슈 추천</h2>
+          <div class="list" id="featuredRecommendations"></div>
+        </div>
+
         <div class="card">
           <h2>정책 항목 등록</h2>
           <label>제목<input id="positionTitle"></label>
@@ -190,6 +277,9 @@
           </label>
           <label>버전 라벨<input id="positionVersion" placeholder="예: 2026-03 정책위 의결"></label>
           <label>요약<textarea id="positionSummary"></textarea></label>
+          <label>공식 한줄 결론<textarea id="positionOfficialSummary" placeholder="유저가 가장 먼저 보게 될 공식 결론"></textarea></label>
+          <label>핵심 쟁점<textarea id="positionKeyPoints" placeholder="핵심 포인트를 문장이나 불릿 텍스트로 정리"></textarea></label>
+          <label>왜 지금 중요한가<textarea id="positionRelevanceNote" placeholder="현재 시점에서 중요한 이유"></textarea></label>
           <label>본문<textarea id="positionBody"></textarea></label>
           <div class="actions">
             <button id="savePositionBtn">정책 저장</button>
@@ -202,14 +292,25 @@
           <div class="actions" style="margin-bottom:10px;">
             <button id="syncCommentaryBtn" type="button">논평 동기화</button>
             <button id="syncBillsBtn" type="button">법안 동기화</button>
+            <button id="syncPdfPledgesBtn" type="button">대선공약 PDF 동기화</button>
+            <button id="autoLinkCommentaryBtn" type="button">논평 자동 연결</button>
             <button class="secondary" id="rebuildSuggestionsBtn" type="button">추천 재생성</button>
           </div>
           <div class="split">
             <label>논평 건수<input id="commentaryLimit" type="number" value="20" min="1" max="100"></label>
-            <label>의안대수<input id="billAge" type="number" value="22" min="1" max="99"></label>
+            <label>의안 대수<input id="billAge" type="number" value="22" min="1" max="99"></label>
+          </div>
+          <div class="split">
+            <label>자동 연결 건수<input id="autoLinkLimit" type="number" value="300" min="1" max="500"></label>
+            <label>자동 연결 최소 점수<input id="autoLinkScore" type="number" value="4" min="1" max="10"></label>
           </div>
           <label style="margin-top:10px;"><input id="includeBody" type="checkbox" checked style="width:auto;margin-right:8px;">논평 본문까지 수집</label>
           <div class="log" id="syncLog">동기화 로그가 여기에 표시됩니다.</div>
+        </div>
+
+        <div class="card">
+          <h2>운영 상태</h2>
+          <div class="list" id="operationsList"></div>
         </div>
       </div>
 
@@ -239,7 +340,7 @@
           </div>
           <div class="split">
             <label>발화 역할<input id="documentSpeaker" placeholder="예: 수석대변인"></label>
-            <label>발화자 이름<input id="documentSpeakerName" placeholder="예: 홍길동"></label>
+            <label>발화자 이름<input id="documentSpeakerName" placeholder="예: 이동훈"></label>
           </div>
           <div class="split">
             <label>소유 주체<input id="documentOwner" value="개혁신당"></label>
@@ -258,21 +359,30 @@
           </div>
         </div>
 
-        <div class="split">
+        <div class="detail-shell">
           <div class="card">
             <h2>문서 목록</h2>
             <div class="list" id="documentsList"></div>
           </div>
-          <div class="card">
-            <h2>자동 연결 추천</h2>
-            <div class="list" id="suggestionsList"></div>
+          <div class="card detail-panel">
+            <h2>문서 상세</h2>
+            <div id="documentDetail" class="empty">문서를 선택하면 상세 정보가 여기에 표시됩니다.</div>
           </div>
+        </div>
+
+        <div class="card">
+          <h2>자동 연결 추천</h2>
+          <div class="list" id="suggestionsList"></div>
         </div>
       </div>
     </section>
   </main>
 
   <script>
+    let selectedDocumentId = null;
+    let documentItems = [];
+    let featuredRecommendationItems = [];
+
     async function api(url, options) {
       const res = await fetch(url, options);
       if (!res.ok) {
@@ -298,12 +408,160 @@
       document.getElementById("syncLog").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
     }
 
+    function renderFeaturedCurrent(item) {
+      const root = document.getElementById("featuredCurrent");
+      if (!item) {
+        root.className = "empty";
+        root.textContent = "현재 지정된 메인 이슈가 없습니다.";
+        return;
+      }
+      root.className = "item";
+      root.innerHTML = `
+        <div class="item-head">
+          <div>
+            <strong>${escapeHtml(item.position_title)}</strong>
+            <div class="tiny muted">${escapeHtml(item.position_category || "general")}</div>
+          </div>
+          <span class="pill">${escapeHtml(String(item.priority_score ?? 0))}</span>
+        </div>
+        <p class="tiny" style="line-height:1.6;">${escapeHtml(item.position_summary || item.reason || "설명 없음")}</p>
+        <div class="tiny muted" style="margin-top:8px;">${prettyDate(item.start_at)} ~ ${prettyDate(item.end_at)} / ${escapeHtml(item.reason || "사유 없음")}</div>
+      `;
+    }
+
+    function renderFeaturedRecommendations() {
+      const root = document.getElementById("featuredRecommendations");
+      root.innerHTML = "";
+      for (const item of featuredRecommendationItems) {
+        const el = document.createElement("article");
+        el.className = "item clickable";
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.position_title)}</strong>
+              <div class="tiny muted">${escapeHtml(item.position_category || "general")} · ID ${item.position_id}</div>
+            </div>
+            <span class="pill">${escapeHtml(String(item.score ?? 0))}</span>
+          </div>
+          <p class="tiny" style="line-height:1.55;">${escapeHtml(item.reason || "")}</p>
+        `;
+        el.addEventListener("click", () => {
+          document.getElementById("featuredPositionId").value = item.position_id;
+          document.getElementById("featuredReason").value = item.reason || "";
+        });
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">추천 후보가 없습니다.</div>';
+      }
+    }
+
+    function selectDocument(documentId) {
+      selectedDocumentId = documentId;
+      renderDocumentList();
+      renderDocumentDetail();
+    }
+
+    function fillDocumentForm(item) {
+      document.getElementById("documentTitle").value = item.title || "";
+      document.getElementById("documentType").value = item.doc_type || "other";
+      document.getElementById("documentSpeaker").value = item.speaker || "";
+      document.getElementById("documentSpeakerName").value = item.speaker_name || "";
+      document.getElementById("documentOwner").value = item.owner_name || "개혁신당";
+      document.getElementById("documentPublishedAt").value = item.published_at || "";
+      document.getElementById("documentSourceUrl").value = item.source_url || "";
+      document.getElementById("documentSourceRef").value = item.source_ref || "";
+      document.getElementById("documentSummary").value = item.summary || "";
+      document.getElementById("documentBody").value = item.body || "";
+      document.getElementById("documentMetadata").value = JSON.stringify(item.metadata || {}, null, 2);
+    }
+
+    function renderDocumentDetail() {
+      const root = document.getElementById("documentDetail");
+      const item = documentItems.find((entry) => entry.id === selectedDocumentId);
+      if (!item) {
+        root.className = "empty";
+        root.textContent = "문서를 선택하면 상세 정보가 여기에 표시됩니다.";
+        return;
+      }
+      root.className = "";
+      const speakerLine = [item.speaker, item.speaker_name].filter(Boolean).join(" · ") || "-";
+      const links = (item.linked_positions || []).map((link) => `<span class="pill">${escapeHtml(link.position_title)} / ${escapeHtml(link.relation_type)}</span>`).join(" ");
+      const people = (item.people || []).map((person) => `${person.person_name} (${person.person_role})`).join(", ");
+      const briefingUrl = item.metadata?.official_briefing_url;
+      root.innerHTML = `
+        <div class="item-head">
+          <div>
+            <span class="pill">${escapeHtml(item.doc_type)}</span>
+            <h3 style="margin-top:10px; font-size:24px; line-height:1.35;">${escapeHtml(item.title)}</h3>
+          </div>
+          <span class="pill">${escapeHtml(item.status)}</span>
+        </div>
+        <div class="meta-grid">
+          <div class="meta-box"><div class="tiny muted">발화자</div><div>${escapeHtml(speakerLine)}</div></div>
+          <div class="meta-box"><div class="tiny muted">발행일</div><div>${prettyDate(item.published_at)}</div></div>
+          <div class="meta-box"><div class="tiny muted">소유 주체</div><div>${escapeHtml(item.owner_name || "-")}</div></div>
+          <div class="meta-box"><div class="tiny muted">원문 참조</div><div class="mono tiny">${escapeHtml(item.source_ref || "-")}</div></div>
+        </div>
+        <div class="tiny muted">요약</div>
+        <p style="margin-top:8px; line-height:1.6;">${escapeHtml(item.summary || "요약 없음")}</p>
+        ${links ? `<div style="margin-top:14px;"><div class="tiny muted" style="margin-bottom:8px;">연결 정책</div>${links}</div>` : ""}
+        ${people ? `<div style="margin-top:14px;"><div class="tiny muted" style="margin-bottom:6px;">관련 인물</div><div>${escapeHtml(people)}</div></div>` : ""}
+        ${(item.source_url || briefingUrl) ? `<div style="margin-top:14px;"><a class="inline-link" href="${escapeHtml(item.source_url || briefingUrl)}" target="_blank" rel="noreferrer">원문 열기</a></div>` : ""}
+        <div class="body-box">${escapeHtml(item.body || "본문이 아직 없습니다.")}</div>
+      `;
+    }
+
+    function renderDocumentList() {
+      const root = document.getElementById("documentsList");
+      root.innerHTML = "";
+      for (const item of documentItems) {
+        const meta = [];
+        if (item.speaker) meta.push(item.speaker);
+        if (item.speaker_name) meta.push(item.speaker_name);
+        if (item.published_at) meta.push(item.published_at);
+        const el = document.createElement("article");
+        el.className = `item clickable${item.id === selectedDocumentId ? " selected" : ""}`;
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <div class="tiny muted" style="margin-top:6px;">${escapeHtml(item.doc_type)} · ${escapeHtml(meta.join(" · ") || "메타 없음")}</div>
+            </div>
+            <span class="pill">${escapeHtml(item.status)}</span>
+          </div>
+          <p class="tiny" style="line-height:1.55;">${escapeHtml(item.summary || item.body || "내용 없음").slice(0, 180)}</p>
+        `;
+        el.addEventListener("click", () => {
+          selectDocument(item.id);
+          fillDocumentForm(item);
+        });
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">등록된 문서가 없습니다.</div>';
+      }
+    }
+
     async function loadSummary() {
       const data = await api("/api/admin/policy/summary");
-      document.getElementById("sumPositions").textContent = data.positions_count ?? data.position_count ?? "-";
-      document.getElementById("sumDocuments").textContent = data.documents_count ?? data.document_count ?? "-";
-      document.getElementById("sumLinks").textContent = data.links_count ?? data.link_count ?? "-";
+      document.getElementById("sumPositions").textContent = data.positions ?? "-";
+      document.getElementById("sumDocuments").textContent = data.documents ?? "-";
+      document.getElementById("sumLinks").textContent = data.links ?? "-";
       document.getElementById("sumSuggestions").textContent = data.pending_suggestions ?? "-";
+      renderFeaturedCurrent(data.current_featured_issue || null);
+      featuredRecommendationItems = data.featured_candidates || [];
+      renderFeaturedRecommendations();
+    }
+
+    async function loadFeaturedIssues() {
+      const [currentData, recommendationData] = await Promise.all([
+        api("/api/admin/policy/featured-issues?limit=10"),
+        api("/api/admin/policy/featured-issues/recommendations?limit=5")
+      ]);
+      renderFeaturedCurrent(currentData.current || null);
+      featuredRecommendationItems = recommendationData.items || [];
+      renderFeaturedRecommendations();
     }
 
     async function loadPositions() {
@@ -322,41 +580,23 @@
             <span class="pill">${escapeHtml(item.status)}</span>
           </div>
           <div class="tiny muted">${escapeHtml(item.version_label || "-")} · ${prettyDate(item.effective_from)} ~ ${prettyDate(item.effective_to)}</div>
-          <p class="tiny" style="margin-top:8px;">${escapeHtml(item.summary || item.body || "").slice(0, 180)}</p>
+          <p class="tiny" style="margin-top:8px; line-height:1.55;">${escapeHtml(item.summary || item.body || "").slice(0, 180)}</p>
         `;
         root.appendChild(el);
       }
       if (!root.children.length) {
-        root.innerHTML = '<div class="item muted">등록된 정책 항목이 없습니다.</div>';
+        root.innerHTML = '<div class="empty">등록된 정책 항목이 없습니다.</div>';
       }
     }
 
     async function loadDocuments() {
       const data = await api("/api/admin/policy/documents?status=active");
-      const root = document.getElementById("documentsList");
-      root.innerHTML = "";
-      for (const item of data.items || []) {
-        const meta = [];
-        if (item.speaker) meta.push(item.speaker);
-        if (item.speaker_name) meta.push(item.speaker_name);
-        if (item.published_at) meta.push(item.published_at);
-        const el = document.createElement("article");
-        el.className = "item";
-        el.innerHTML = `
-          <div class="item-head">
-            <div>
-              <strong>${escapeHtml(item.title)}</strong>
-              <div class="tiny muted">${escapeHtml(item.doc_type)} · ${escapeHtml(meta.join(" · "))}</div>
-            </div>
-            <span class="pill">${escapeHtml(item.status)}</span>
-          </div>
-          <p class="tiny">${escapeHtml(item.summary || item.body || "").slice(0, 180)}</p>
-        `;
-        root.appendChild(el);
+      documentItems = data.items || [];
+      if (documentItems.length && !documentItems.find((item) => item.id === selectedDocumentId)) {
+        selectedDocumentId = documentItems[0].id;
       }
-      if (!root.children.length) {
-        root.innerHTML = '<div class="item muted">등록된 문서가 없습니다.</div>';
-      }
+      renderDocumentList();
+      renderDocumentDetail();
     }
 
     async function loadSuggestions() {
@@ -372,7 +612,7 @@
               <strong>${escapeHtml(item.document_title)}</strong>
               <div class="tiny muted">${escapeHtml(item.document_type)} → ${escapeHtml(item.position_title)}</div>
             </div>
-            <span class="pill">${item.score}</span>
+            <span class="pill">${escapeHtml(item.score)}</span>
           </div>
           <p class="tiny muted">${escapeHtml(item.reason || "")}</p>
           <div class="actions" style="margin-top:10px;">
@@ -383,12 +623,46 @@
         root.appendChild(el);
       }
       if (!root.children.length) {
-        root.innerHTML = '<div class="item muted">대기 중인 추천이 없습니다.</div>';
+        root.innerHTML = '<div class="empty">대기 중인 추천이 없습니다.</div>';
+      }
+    }
+
+    async function loadOperations() {
+      const data = await api("/api/admin/policy/operations");
+      const root = document.getElementById("operationsList");
+      const suggestions = data.suggestions || {};
+      const sources = data.ingest_sources || [];
+      root.innerHTML = `
+        <article class="item">
+          <div class="item-head">
+            <div>
+              <strong>추천 큐</strong>
+              <div class="tiny muted">pending ${suggestions.pending || 0} · accepted ${suggestions.accepted || 0} · rejected ${suggestions.rejected || 0}</div>
+            </div>
+            <span class="pill">queue</span>
+          </div>
+        </article>
+      `;
+      for (const item of sources) {
+        const el = document.createElement("article");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="item-head">
+            <div>
+              <strong>${escapeHtml(item.source_key)}</strong>
+              <div class="tiny muted">${escapeHtml(item.status || "-")} · 시작 ${prettyDate(item.started_at)} · 종료 ${prettyDate(item.finished_at)}</div>
+            </div>
+            <span class="pill">${escapeHtml(String((item.imported_count || 0) + (item.updated_count || 0)))}</span>
+          </div>
+          <div class="tiny muted">imported ${item.imported_count || 0} · updated ${item.updated_count || 0} · skipped ${item.skipped_count || 0}</div>
+          ${item.error_message ? `<p class="tiny" style="margin-top:8px;line-height:1.55;">${escapeHtml(item.error_message)}</p>` : ""}
+        `;
+        root.appendChild(el);
       }
     }
 
     async function refreshAll() {
-      await Promise.all([loadSummary(), loadPositions(), loadDocuments(), loadSuggestions()]);
+      await Promise.all([loadSummary(), loadPositions(), loadDocuments(), loadSuggestions(), loadOperations()]);
     }
 
     document.getElementById("savePositionBtn").addEventListener("click", async () => {
@@ -396,6 +670,9 @@
         title: document.getElementById("positionTitle").value.trim(),
         category: document.getElementById("positionCategory").value.trim(),
         summary: document.getElementById("positionSummary").value.trim(),
+        official_summary: document.getElementById("positionOfficialSummary").value.trim(),
+        key_points: document.getElementById("positionKeyPoints").value.trim(),
+        relevance_note: document.getElementById("positionRelevanceNote").value.trim(),
         body: document.getElementById("positionBody").value.trim(),
         status: document.getElementById("positionStatus").value,
         owner_scope: document.getElementById("positionOwnerScope").value,
@@ -452,6 +729,20 @@
       await refreshAll();
     });
 
+    document.getElementById("syncPdfPledgesBtn").addEventListener("click", async () => {
+      const data = await api("/api/admin/policy/import/pdf-pledges", { method: "POST" });
+      setLog(data);
+      await refreshAll();
+    });
+
+    document.getElementById("autoLinkCommentaryBtn").addEventListener("click", async () => {
+      const limit = Number(document.getElementById("autoLinkLimit").value || "300");
+      const minScore = Number(document.getElementById("autoLinkScore").value || "4");
+      const data = await api(`/api/admin/policy/commentary/auto-link?limit=${limit}&min_score=${minScore}`, { method: "POST" });
+      setLog(data);
+      await refreshAll();
+    });
+
     document.getElementById("rebuildSuggestionsBtn").addEventListener("click", async () => {
       const data = await api("/api/admin/policy/suggestions/rebuild", { method: "POST" });
       setLog(data);
@@ -460,6 +751,24 @@
 
     document.getElementById("refreshPositionsBtn").addEventListener("click", loadPositions);
     document.getElementById("refreshDocumentsBtn").addEventListener("click", loadDocuments);
+    document.getElementById("refreshFeaturedBtn").addEventListener("click", loadFeaturedIssues);
+
+    document.getElementById("saveFeaturedBtn").addEventListener("click", async () => {
+      const body = {
+        position_id: Number(document.getElementById("featuredPositionId").value || "0"),
+        reason: document.getElementById("featuredReason").value.trim() || null,
+        start_at: document.getElementById("featuredStartAt").value || null,
+        end_at: document.getElementById("featuredEndAt").value || null,
+        manual_weight: Number(document.getElementById("featuredManualWeight").value || "0")
+      };
+      await api("/api/admin/policy/featured-issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      await loadFeaturedIssues();
+      await loadSummary();
+    });
 
     document.getElementById("suggestionsList").addEventListener("click", async (event) => {
       const button = event.target.closest("button[data-action]");

@@ -19,6 +19,7 @@ BASE_URL = "https://likms.assembly.go.kr/bill"
 MEMBER_ID_URL = f"{BASE_URL}/bi/bill/sch/checkSameNm.do"
 BILL_SEARCH_URL = f"{BASE_URL}/bi/bill/sch/findSchPaging.do"
 BILL_DETAIL_URL = f"{BASE_URL}/bi/billDetailPage.do"
+SUMMARY_POPUP_URL = f"{BASE_URL}/bi/popup/billSummary.do"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
@@ -285,6 +286,35 @@ def fetch_bill_detail(bill_id: str) -> dict:
     }
 
 
+def parse_bill_summary_popup(html: str) -> str:
+    text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", "\n", text)
+    lines = [re.sub(r"\s+", " ", unescape(line)).strip() for line in text.splitlines()]
+    lines = [line for line in lines if line]
+
+    heading_indexes = [idx for idx, line in enumerate(lines) if line == "제안이유 및 주요내용"]
+    start_index = heading_indexes[-1] + 1 if heading_indexes else None
+    if start_index is None:
+        return ""
+
+    body_lines: list[str] = []
+    for line in lines[start_index:]:
+        if line in {"의안 상세정보", "인쇄", "창닫기"}:
+            break
+        if line.startswith("[") and "]" in line:
+            continue
+        if re.search(r"의원 등 \d+인$", line):
+            continue
+        body_lines.append(line)
+    return "\n".join(body_lines).strip()
+
+
+def fetch_bill_summary(bill_id: str) -> str:
+    html = _fetch_text(SUMMARY_POPUP_URL, params={"billId": bill_id})
+    return parse_bill_summary_popup(html)
+
+
 def sync_reform_party_bills(
     *,
     actor_id: Optional[int],
@@ -313,6 +343,7 @@ def sync_reform_party_bills(
             )
             for bill in bill_items:
                 detail = fetch_bill_detail(bill.bill_id)
+                summary_body = fetch_bill_summary(bill.bill_id)
                 processed += 1
                 title = detail["title"] or bill.title
                 source_url = f"{BILL_DETAIL_URL}?billId={bill.bill_id}"
@@ -340,7 +371,7 @@ def sync_reform_party_bills(
                         title=title,
                         doc_type="bill",
                         summary=summary,
-                        body=None,
+                        body=summary_body or None,
                         speaker="의원",
                         speaker_name=member_name,
                         owner_name="개혁신당",
@@ -375,6 +406,7 @@ def sync_reform_party_bills(
                     [
                         title != existing["title"],
                         summary != (existing.get("summary") or None),
+                        (summary_body or None) != (existing.get("body") or None),
                         member_name != (existing.get("speaker_name") or None),
                         published_at != existing.get("published_at"),
                         new_metadata != (existing.get("metadata") or {}),
@@ -403,7 +435,7 @@ def sync_reform_party_bills(
                     title=title,
                     doc_type=existing["doc_type"],
                     summary=summary,
-                    body=existing.get("body") or None,
+                    body=summary_body or existing.get("body") or None,
                     speaker=existing.get("speaker") or "의원",
                     speaker_name=member_name,
                     owner_name=existing.get("owner_name") or "개혁신당",

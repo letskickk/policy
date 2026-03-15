@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인물 허브</title>
+  <link rel="stylesheet" href="/policy-hub.css" />
+  <style>
+    :root{
+      --bg:#f4efe6;
+      --panel:#fffaf3;
+      --panel-strong:#ffffff;
+      --line:#d8cab7;
+      --text:#1f1915;
+      --muted:#6d6258;
+      --accent:#da5d18;
+      --accent-soft:#fae2d0;
+      --shadow:0 18px 40px rgba(71,43,22,0.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Pretendard","Noto Sans KR",sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(218,93,24,0.10), transparent 28%),
+        linear-gradient(180deg, #f8f2e9 0%, #efe5d7 100%);
+      color:var(--text);
+    }
+    main{max-width:1360px;margin:0 auto;padding:28px}
+    .hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow)}
+    .hero{padding:22px;margin-bottom:18px}
+    .hero h1{margin:10px 0 0;font-size:36px;line-height:1.12}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:var(--accent-soft);color:#9b3c0d;font-size:12px;font-weight:800}
+    .muted{color:var(--muted)}
+    .layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+    .card{padding:20px}
+    .list{display:grid;gap:10px;max-height:72vh;overflow:auto;padding-right:4px}
+    .item{border:1px solid var(--line);border-radius:18px;background:var(--panel-strong);padding:14px;cursor:pointer}
+    .item.selected{border-color:var(--accent);background:#fff4ea}
+    .item h3,.doc h4{margin:0}
+    .item h3,.doc h4{overflow-wrap:anywhere;word-break:break-word;line-height:1.45}
+    .tiny{font-size:12px}
+    input{width:100%;margin-top:6px;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:var(--panel-strong);font:inherit}
+    .detail-top{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .stat{border:1px solid var(--line);border-radius:18px;background:var(--panel-strong);padding:14px}
+    .doc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .doc{border:1px solid var(--line);border-radius:18px;background:var(--panel-strong);padding:14px}
+    .doc.bill{background:linear-gradient(180deg,#fff8f0,#fffefb);border-color:#efc7a6}
+    .doc-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .empty{border:1px dashed var(--line);border-radius:18px;padding:18px;background:rgba(255,255,255,.55);color:var(--muted)}
+    .link-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .link-row a{font-weight:800;color:#9b3c0d;text-decoration:none}
+    @media (max-width:1100px){.layout,.detail-top,.doc-grid,.stats{grid-template-columns:1fr}.list{max-height:none}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brandbar">
+      <div class="brandbar-title">
+        <strong>개혁신당 인물 허브</strong>
+        <span>policy.reformparty.kr 톤에 맞춘 의원·대변인 활동 공개 뷰</span>
+      </div>
+      <nav class="brandnav">
+        <a href="/">메인</a>
+        <a href="/policies">정책</a>
+        <a href="/commentary">논평</a>
+        <a href="/people" class="active">인물</a>
+      </nav>
+    </div>
+    <section class="hero">
+      <span class="pill">인물 허브</span>
+      <h1>의원과 대변인의 정책·법안·논평 활동을 인물 단위로 보기</h1>
+      <p class="muted" style="margin-top:12px;line-height:1.7;">
+        대표발의 법안, 연결 정책, 발표 논평을 한 사람 기준으로 묶었습니다.
+      </p>
+      <p style="margin-top:12px;">
+        <a href="/policies" style="font-weight:800;color:#9b3c0d;">정책 허브로 이동</a>
+        <span class="muted" style="margin:0 8px;">·</span>
+        <a href="/commentary" style="font-weight:800;color:#9b3c0d;">논평 허브로 이동</a>
+      </p>
+    </section>
+
+    <section class="layout">
+      <div class="card">
+        <h2 style="margin:0 0 14px;">인물 목록</h2>
+        <label>검색<input id="searchInput" placeholder="이름 검색"></label>
+        <div class="list" id="peopleList" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="detail-top">
+          <div>
+            <span class="pill" id="detailRoles">-</span>
+            <h2 style="margin:12px 0 0;font-size:32px;" id="detailName">인물을 선택하세요</h2>
+            <p style="margin-top:10px;"><a id="detailPersonLink" href="/people" style="font-weight:800;color:#9b3c0d;">?? ?? ??? ??</a></p>
+            <p class="muted" style="margin-top:12px;line-height:1.7;">좌측 목록에서 인물을 선택하면 대표발의 법안과 관련 정책이 보입니다.</p>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="tiny muted">법안</div><h3 id="billCount" style="margin-top:8px;">0건</h3></div>
+            <div class="stat"><div class="tiny muted">논평·공약</div><h3 id="statementCount" style="margin-top:8px;">0건</h3></div>
+            <div class="stat"><div class="tiny muted">연결 정책</div><h3 id="positionCount" style="margin-top:8px;">0건</h3></div>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <h2 style="margin:0 0 12px;">연결 정책</h2>
+          <div class="link-row" id="positionLinks"></div>
+        </div>
+        <div style="margin-top:16px;">
+          <h2 style="margin:0 0 12px;">활동 문서</h2>
+          <div class="doc-grid" id="documentGrid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let people = [];
+    let selectedName = null;
+    const DOC_TYPE_LABELS = {
+      bill: "의원실 법안",
+      statement: "대변인 논평",
+      pledge: "공식 공약",
+      policy: "정책 원문",
+      press_release: "보도자료",
+      briefing: "브리핑",
+      meeting_note: "회의 문서",
+      research: "연구 자료",
+      other: "기타 문서",
+    };
+
+    function escapeHtml(value) {
+      return String(value || "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+    }
+    async function api(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+    function docTypeLabel(value) {
+      return DOC_TYPE_LABELS[value] || "기타 문서";
+    }
+    function setPerson(name) {
+      const url = new URL(location.href);
+      url.searchParams.set("name", name);
+      history.replaceState({}, "", url);
+    }
+    function currentPersonFromUrl() {
+      return new URLSearchParams(location.search).get("name");
+    }
+    function renderPeopleList() {
+      const root = document.getElementById("peopleList");
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const items = people.filter((item) => !q || item.person_name.toLowerCase().includes(q));
+      root.innerHTML = "";
+      for (const item of items) {
+        const el = document.createElement("article");
+        el.className = `item${item.person_name === selectedName ? " selected" : ""}`;
+        el.innerHTML = `
+          <div class="tiny muted">대표발의 ${item.proposer_count} · 문서 ${item.document_count}</div>
+          <h3 style="margin-top:6px;">${escapeHtml(item.person_name)}</h3>
+          <div class="tiny muted" style="margin-top:8px;">최근 활동 ${escapeHtml(item.latest_published_at || "-")}</div>
+        `;
+        el.addEventListener("click", () => loadPersonDetail(item.person_name));
+        root.appendChild(el);
+      }
+      if (!root.children.length) root.innerHTML = '<div class="empty">조건에 맞는 인물이 없습니다.</div>';
+    }
+    async function loadPersonDetail(name) {
+      const data = await api(`/api/policy/people/${encodeURIComponent(name)}`);
+      selectedName = data.person_name;
+      setPerson(data.person_name);
+      renderPeopleList();
+      document.getElementById("detailName").textContent = data.person_name;
+      const detailPersonLink = document.getElementById("detailPersonLink");
+      if (detailPersonLink) detailPersonLink.href = `/people?name=${encodeURIComponent(data.person_name)}`;
+      document.getElementById("detailRoles").textContent = (data.roles || []).join(" · ") || "-";
+      document.getElementById("billCount").textContent = `${data.bill_count || 0}건`;
+      document.getElementById("statementCount").textContent = `${data.pledge_count || 0}건 공약 / ${data.statement_count || 0}건 논평`;
+      document.getElementById("positionCount").textContent = `${(data.linked_positions || []).length}건`;
+      const positionRoot = document.getElementById("positionLinks");
+      positionRoot.innerHTML = "";
+      for (const item of data.linked_positions || []) {
+        const a = document.createElement("a");
+        a.href = `/policies?slug=${encodeURIComponent(item.position_slug)}`;
+        a.className = "pill";
+        a.textContent = item.position_title;
+        positionRoot.appendChild(a);
+      }
+      if (!positionRoot.children.length) positionRoot.innerHTML = '<div class="empty">연결 정책이 없습니다.</div>';
+
+      const docRoot = document.getElementById("documentGrid");
+      docRoot.innerHTML = "";
+      for (const item of data.documents || []) {
+        const el = document.createElement("article");
+        el.className = `doc ${item.doc_type === "bill" ? "bill" : ""}`;
+        el.innerHTML = `
+          <div class="doc-head">
+            <div>
+              <span class="pill">${escapeHtml(docTypeLabel(item.doc_type))}</span>
+              <h4 style="margin-top:8px;">${escapeHtml(item.title)}</h4>
+            </div>
+            <span class="tiny muted">${escapeHtml(item.person_role || "")}</span>
+          </div>
+          <div class="tiny muted">${escapeHtml(item.published_at || "-")}</div>
+          <p style="margin:10px 0 0;line-height:1.65;">${escapeHtml((item.summary || item.body || "").slice(0, 220))}</p>
+          <div class="link-row">
+            ${(item.linked_positions || []).map((link) => `<a href="/policies?slug=${encodeURIComponent(link.position_slug)}">${escapeHtml(link.position_title)}</a>`).join("")}
+            ${item.doc_type === "statement" ? `<a href="/commentary?id=${item.id}">논평 자세히 보기</a>` : ""}
+            ${item.source_url ? `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>` : ""}
+          </div>
+        `;
+        docRoot.appendChild(el);
+      }
+      if (!docRoot.children.length) docRoot.innerHTML = '<div class="empty">활동 문서가 없습니다.</div>';
+    }
+    async function init() {
+      const data = await api("/api/policy/people");
+      people = data.items || [];
+      renderPeopleList();
+      const name = currentPersonFromUrl() || people[0]?.person_name;
+      if (name) await loadPersonDetail(name);
+    }
+    document.getElementById("searchInput").addEventListener("input", renderPeopleList);
+    init().catch((error) => {
+      document.getElementById("documentGrid").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+    });
+  </script>
+</body>
+</html>

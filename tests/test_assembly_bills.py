@@ -23,6 +23,24 @@ def test_parse_bill_list_extracts_rows():
     assert items[0].stage == "소관위접수"
 
 
+def test_parse_bill_summary_popup_extracts_body():
+    html = """
+    <html><body>
+      <h1>제안이유 및 주요내용</h1>
+      <div>[2217044] 전자상거래 등에서의 소비자보호에 관한 법률 일부개정법률안</div>
+      <div>이준석의원 등 10인</div>
+      <div>제안이유 및 주요내용</div>
+      <p>온라인 플랫폼을 통한 거래에서 후기 조작 피해가 발생하고 있음.</p>
+      <p>이에 후기 정보 보존과 공정한 관리체계를 마련하려는 것임.</p>
+      <button>의안 상세정보</button>
+    </body></html>
+    """
+
+    parsed = assembly_bills.parse_bill_summary_popup(html)
+    assert "후기 조작 피해" in parsed
+    assert "공정한 관리체계" in parsed
+
+
 def test_sync_reform_party_bills_imports_documents(monkeypatch):
     db_file = _workspace_db_path("assembly-sync")
     monkeypatch.setattr(database, "DB_PATH", db_file)

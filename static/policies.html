@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정책 허브</title>
+  <link rel="stylesheet" href="/policy-hub.css" />
+  <style>
+    :root{
+      --bg:#f4efe6;
+      --panel:#fffaf3;
+      --panel-strong:#ffffff;
+      --line:#d8cab7;
+      --text:#1f1915;
+      --muted:#6d6258;
+      --accent:#da5d18;
+      --accent-soft:#fae2d0;
+      --shadow:0 18px 40px rgba(71,43,22,0.08);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:"Pretendard","Noto Sans KR",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(218,93,24,0.10), transparent 28%),
+        linear-gradient(180deg, #f8f2e9 0%, #efe5d7 100%);
+    }
+    main{ max-width:1380px; margin:0 auto; padding:28px; }
+    a{ color:inherit; text-decoration:none; }
+    .hero{
+      display:grid;
+      grid-template-columns:1.1fr 0.9fr;
+      gap:16px;
+      margin-bottom:18px;
+    }
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      padding:22px;
+    }
+    .hero h1{
+      margin:10px 0 0;
+      font-size:36px;
+      line-height:1.12;
+    }
+    .muted{ color:var(--muted); }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 11px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      color:#9b3c0d;
+      font-size:12px;
+      font-weight:800;
+    }
+    .hero-stats{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+    }
+    .stat{
+      border:1px solid var(--line);
+      background:var(--panel-strong);
+      border-radius:20px;
+      padding:18px;
+    }
+    .stat strong{
+      display:block;
+      font-size:28px;
+      margin-top:8px;
+    }
+    .layout{
+      display:grid;
+      grid-template-columns:360px minmax(0, 1fr);
+      gap:16px;
+      align-items:start;
+    }
+    .section-title{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:14px;
+    }
+    .section-title h2{
+      margin:0;
+      font-size:20px;
+    }
+    .controls{
+      display:grid;
+      gap:12px;
+    }
+    input, select{
+      width:100%;
+      margin-top:6px;
+      padding:12px 13px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--panel-strong);
+      font:inherit;
+      color:var(--text);
+    }
+    .list{
+      display:grid;
+      gap:10px;
+      max-height:70vh;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .item{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:var(--panel-strong);
+      padding:14px;
+      cursor:pointer;
+      transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .item:hover{
+      transform:translateY(-1px);
+      border-color:rgba(218,93,24,0.45);
+      box-shadow:0 12px 24px rgba(71,43,22,0.06);
+    }
+    .item.selected{
+      border-color:var(--accent);
+      background:#fff4ea;
+      box-shadow:0 14px 28px rgba(218,93,24,0.10);
+    }
+    .item h3{
+      margin:0;
+      font-size:16px;
+      line-height:1.45;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+    .tiny{ font-size:12px; }
+    .detail-shell{
+      display:grid;
+      gap:16px;
+    }
+    .detail-top{
+      display:grid;
+      grid-template-columns:1.1fr 0.9fr;
+      gap:16px;
+    }
+    .detail-title{
+      margin:10px 0 0;
+      font-size:30px;
+      line-height:1.22;
+      word-break:keep-all;
+      overflow-wrap:anywhere;
+    }
+    .body-box{
+      white-space:pre-wrap;
+      line-height:1.72;
+      font-size:15px;
+      max-height:360px;
+      overflow:auto;
+    }
+    .doc-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+    .doc-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:var(--panel-strong);
+      padding:14px;
+    }
+    .doc-card.bill{
+      background:linear-gradient(180deg, #fff8f0, #fffefb);
+      border-color:#efc7a6;
+    }
+    .doc-card .doc-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      margin-bottom:8px;
+    }
+    .doc-card h4{
+      margin:0;
+      font-size:16px;
+      line-height:1.45;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+    .empty{
+      border:1px dashed var(--line);
+      border-radius:18px;
+      padding:18px;
+      color:var(--muted);
+      background:rgba(255,255,255,0.55);
+    }
+    .link-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:10px;
+      color:#9b3c0d;
+      font-weight:800;
+    }
+    @media (max-width: 1100px){
+      .hero, .layout, .detail-top, .doc-grid{ grid-template-columns:1fr; }
+      .list{ max-height:none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brandbar">
+      <div class="brandbar-title">
+        <strong>개혁신당 정책 허브</strong>
+        <span>policy.reformparty.kr 톤에 맞춘 정책·법안·논평 공개 뷰</span>
+      </div>
+      <nav class="brandnav">
+        <a href="/">메인</a>
+        <a href="/policies" class="active">정책</a>
+        <a href="/commentary">논평</a>
+        <a href="/people">인물</a>
+      </nav>
+    </div>
+    <section class="hero">
+      <div class="card">
+        <span class="pill">정책 허브</span>
+        <h1>정책, 법안, 논평을 한 이슈 단위로 읽는 공개 허브</h1>
+        <p class="muted" style="margin-top:12px; line-height:1.7;">
+          개혁신당의 공식 정책을 기준으로, 연결된 의원 발의 법안과 대변인 논평을 함께 보여줍니다.
+          법안이 논평보다 먼저 보이도록 구성했습니다.
+        </p>
+        <p style="margin-top:12px;">
+          <a href="/people" style="font-weight:800;color:#9b3c0d;">인물 허브로 이동</a>
+          <span class="muted" style="margin:0 8px;">·</span>
+          <a href="/commentary" style="font-weight:800;color:#9b3c0d;">논평 허브로 이동</a>
+        </p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="muted tiny">현재 메인 이슈</div>
+          <strong id="featuredTitle">-</strong>
+        </div>
+        <div class="stat">
+          <div class="muted tiny">승인 정책 수</div>
+          <strong id="positionCount">-</strong>
+        </div>
+        <div class="stat">
+          <div class="muted tiny">연결 법안</div>
+          <strong id="billCount">-</strong>
+        </div>
+        <div class="stat">
+          <div class="muted tiny">연결 논평</div>
+          <strong id="statementCount">-</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card">
+        <div class="section-title">
+          <h2>정책 목록</h2>
+          <span class="pill" id="listCount">0건</span>
+        </div>
+        <div class="controls">
+          <label>검색<input id="searchInput" placeholder="정책 제목, 요약, 분야"></label>
+          <label>분야 필터<input id="categoryInput" placeholder="예: 경제, 사법, 연금"></label>
+        </div>
+        <div class="list" id="positionList" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="detail-shell">
+        <div class="detail-top">
+          <div class="card">
+            <span class="pill" id="detailCategory">정책 분야</span>
+            <h2 class="detail-title" id="detailTitle">정책을 선택하세요</h2>
+            <p class="muted" id="detailSummary" style="margin-top:12px; line-height:1.7;">좌측 목록에서 정책을 선택하면 상세 설명과 연결 문서를 볼 수 있습니다.</p>
+            <div class="doc-card" style="margin-top:16px;">
+              <div class="tiny muted">핵심 요약</div>
+              <div id="detailBrief" style="margin-top:8px;line-height:1.7;">이 정책의 핵심 요약이 여기에 표시됩니다.</div>
+            </div>
+            <div class="doc-card" style="margin-top:12px;">
+              <div class="tiny muted">핵심 쟁점</div>
+              <div id="detailKeyPoints" style="margin-top:8px;line-height:1.7;">핵심 쟁점이 여기에 표시됩니다.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 style="margin:0 0 14px;">핵심 지표</h2>
+            <div class="doc-card" style="margin-bottom:12px;">
+              <div class="tiny muted">실행 단계</div>
+              <div id="detailStageLabel" style="margin-top:8px;font-weight:800;">-</div>
+              <div id="detailStageDesc" class="muted" style="margin-top:6px;line-height:1.6;">-</div>
+            </div>
+            <div class="doc-grid">
+              <div class="doc-card"><div class="tiny muted">관련 법안</div><h4 id="detailBillCount">0건</h4></div>
+              <div class="doc-card"><div class="tiny muted">관련 논평</div><h4 id="detailStatementCount">0건</h4></div>
+              <div class="doc-card"><div class="tiny muted">정책 버전</div><h4 id="detailVersion">-</h4></div>
+              <div class="doc-card"><div class="tiny muted">유효기간</div><h4 id="detailEffective">-</h4></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <h2>정책 원문</h2>
+            <a class="link-btn" id="shareLink" href="#">링크 복사형 주소</a>
+          </div>
+          <div class="body-box" id="detailBody">정책 본문이 여기에 표시됩니다.</div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <h2>관련 문서</h2>
+            <span class="pill">법안 우선</span>
+          </div>
+          <div class="doc-grid" id="documentGrid"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <h2>정책 타임라인</h2>
+            <span class="pill">입장 변화와 실행 흔적</span>
+          </div>
+          <div id="timelineGrid" style="display:grid;gap:10px;"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let positions = [];
+    let selectedSlug = null;
+    const DOC_TYPE_LABELS = {
+      bill: "의원실 법안",
+      statement: "대변인 논평",
+      pledge: "공식 공약",
+      policy: "정책 원문",
+      press_release: "보도자료",
+      briefing: "브리핑",
+      meeting_note: "회의 문서",
+      research: "연구 자료",
+      other: "기타 문서",
+    };
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    async function api(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    function docTypeLabel(value) {
+      return DOC_TYPE_LABELS[value] || "기타 문서";
+    }
+
+    function pickSlugFromUrl() {
+      const params = new URLSearchParams(location.search);
+      return params.get("slug");
+    }
+
+    function setSlug(slug) {
+      const url = new URL(location.href);
+      url.searchParams.set("slug", slug);
+      history.replaceState({}, "", url);
+    }
+
+    function renderPositionList() {
+      const root = document.getElementById("positionList");
+      const search = document.getElementById("searchInput").value.trim().toLowerCase();
+      const category = document.getElementById("categoryInput").value.trim().toLowerCase();
+      const items = positions.filter((item) => {
+        const hay = [item.title, item.summary, item.category].join(" ").toLowerCase();
+        if (search && !hay.includes(search)) return false;
+        if (category && !(item.category || "").toLowerCase().includes(category)) return false;
+        return true;
+      });
+      document.getElementById("listCount").textContent = `${items.length}건`;
+      root.innerHTML = "";
+      for (const item of items) {
+        const el = document.createElement("article");
+        el.className = `item${item.slug === selectedSlug ? " selected" : ""}`;
+        el.innerHTML = `
+          <div class="tiny muted">${escapeHtml(item.category || "정책 분야")}</div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p class="muted tiny" style="margin-top:8px; line-height:1.55;">${escapeHtml((item.summary || item.body || "").slice(0, 140))}</p>
+        `;
+        el.addEventListener("click", () => loadPositionDetail(item.slug));
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">조건에 맞는 정책이 없습니다.</div>';
+      }
+    }
+
+    function renderDocuments(documents) {
+      const root = document.getElementById("documentGrid");
+      root.innerHTML = "";
+      for (const item of documents) {
+        const people = (item.people || []).map((person) => `${person.person_name} (${person.person_role})`).join(", ");
+        const meta = [item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(" · ");
+        const primaryPerson = (item.people || []).find((person) => person.is_primary)?.person_name
+          || item.speaker_name
+          || item.metadata?.representative_member_name
+          || "";
+        const el = document.createElement("article");
+        el.className = `doc-card ${item.doc_type === "bill" ? "bill" : ""}`;
+        el.innerHTML = `
+          <div class="doc-head">
+            <div>
+              <span class="pill">${escapeHtml(docTypeLabel(item.doc_type))}</span>
+              <h4 style="margin-top:8px;">${escapeHtml(item.title)}</h4>
+            </div>
+            <span class="tiny muted">${escapeHtml(item.link?.relation_type || "")}</span>
+          </div>
+          <div class="tiny muted">${escapeHtml(meta || "-")}</div>
+          ${people ? `<div class="tiny muted" style="margin-top:6px;">${escapeHtml(people)}</div>` : ""}
+          <p style="margin:10px 0 0; line-height:1.65;">${escapeHtml(item.summary || item.body || "").slice(0, 220)}</p>
+          ${primaryPerson ? `<a class="link-btn" href="/people?name=${encodeURIComponent(primaryPerson)}">인물 상세 보기</a>` : ""}
+          ${item.doc_type === "statement" ? `<a class="link-btn" href="/commentary?id=${item.id}">논평 자세히 보기</a>` : ""}
+          ${item.source_url ? `<a class="link-btn" href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">${item.doc_type === "statement" ? "원문 사이트 보기" : "원문 보기"}</a>` : ""}
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">연결된 문서가 없습니다.</div>';
+      }
+    }
+
+    function timelineLabel(item) {
+      if (item.kind === "version") return "?? ??";
+      if (item.doc_type === "bill") return "??? ??";
+      if (item.doc_type === "statement") return "??? ??";
+      if (item.doc_type === "pledge") return "????";
+      return "?? ??";
+    }
+
+    function renderTimeline(items) {
+      const root = document.getElementById("timelineGrid");
+      root.innerHTML = "";
+      for (const item of items || []) {
+        const el = document.createElement("article");
+        el.className = "doc-card";
+        el.style.borderLeft = "3px solid #da5d18";
+        el.innerHTML = `
+          <div class="tiny muted">${escapeHtml(item.at || "-")} ? ${escapeHtml(timelineLabel(item))}</div>
+          <div style="margin-top:6px;font-weight:800;">${escapeHtml(item.title || "-")}</div>
+          <div class="muted tiny" style="margin-top:6px;line-height:1.6;">${escapeHtml(item.summary || item.status || item.relation_type || "")}</div>
+        `;
+        root.appendChild(el);
+      }
+      if (!root.children.length) {
+        root.innerHTML = '<div class="empty">?? ??? ????? ????.</div>';
+      }
+    }
+
+    async function loadPositionDetail(slug) {
+      const data = await api(`/api/policy/positions/${encodeURIComponent(slug)}`);
+      selectedSlug = data.slug;
+      setSlug(data.slug);
+      renderPositionList();
+      const documents = data.documents || [];
+      const billCount = documents.filter((item) => item.doc_type === "bill").length;
+      const statementCount = documents.filter((item) => item.doc_type === "statement").length;
+      const pledgeCount = documents.filter((item) => item.doc_type === "pledge").length;
+      document.getElementById("detailCategory").textContent = data.category || "정책 분야";
+      document.getElementById("detailTitle").textContent = data.title;
+      document.getElementById("detailSummary").textContent = data.summary || "요약이 없습니다.";
+      const detailBrief = document.getElementById("detailBrief");
+      const detailKeyPoints = document.getElementById("detailKeyPoints");
+      const detailStageLabel = document.getElementById("detailStageLabel");
+      const detailStageDesc = document.getElementById("detailStageDesc");
+      if (detailBrief) detailBrief.textContent = data.official_summary || data.brief?.summary || data.summary || "이 정책의 핵심 요약이 아직 없습니다.";
+      if (detailKeyPoints) detailKeyPoints.textContent = data.key_points || "핵심 쟁점이 아직 정리되지 않았습니다.";
+      if (detailStageLabel) detailStageLabel.textContent = data.execution_stage?.label || "-";
+      if (detailStageDesc) detailStageDesc.textContent = data.relevance_note || data.execution_stage?.description || "-";
+      document.getElementById("detailBody").textContent = data.body || "본문이 없습니다.";
+      document.getElementById("detailBillCount").textContent = `${billCount}건`;
+      document.getElementById("detailStatementCount").textContent = `${statementCount}건`;
+      document.getElementById("detailVersion").textContent = pledgeCount ? `공약 ${pledgeCount}건` : (data.version_label || "-");
+      document.getElementById("detailEffective").textContent = [data.effective_from, data.effective_to].filter(Boolean).join(" ~ ") || "-";
+      document.getElementById("shareLink").href = `/policies?slug=${encodeURIComponent(data.slug)}`;
+      renderDocuments(documents);
+      if (typeof renderTimeline === "function") renderTimeline(data.timeline || []);
+      renderTimeline(data.timeline || []);
+    }
+
+    async function loadFeaturedSummary() {
+      const [featured, docs] = await Promise.all([
+        api("/api/policy/featured-issues"),
+        api("/api/policy/documents?status=active"),
+      ]);
+      document.getElementById("featuredTitle").textContent = featured.current?.position_title || featured.recommendations?.[0]?.position_title || "-";
+      const docItems = docs.items || [];
+      document.getElementById("billCount").textContent = `${docItems.filter((item) => item.doc_type === "bill").length}건`;
+      document.getElementById("statementCount").textContent = `${docItems.filter((item) => item.doc_type === "statement").length}건`;
+    }
+
+    async function init() {
+      const response = await api("/api/policy/positions?status=approved");
+      positions = response.items || [];
+      document.getElementById("positionCount").textContent = `${positions.length}건`;
+      renderPositionList();
+      await loadFeaturedSummary();
+      const slug = pickSlugFromUrl() || positions[0]?.slug;
+      if (slug) {
+        await loadPositionDetail(slug);
+      }
+    }
+
+    document.getElementById("searchInput").addEventListener("input", renderPositionList);
+    document.getElementById("categoryInput").addEventListener("input", renderPositionList);
+
+    init().catch((error) => {
+      document.getElementById("documentGrid").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+    });
+  </script>
+</body>
+</html>

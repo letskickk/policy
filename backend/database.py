@@ -172,6 +172,9 @@ def init_db() -> None:
             slug TEXT UNIQUE NOT NULL,
             category TEXT NOT NULL DEFAULT 'general',
             summary TEXT,
+            official_summary TEXT,
+            key_points TEXT,
+            relevance_note TEXT,
             body TEXT,
             status TEXT NOT NULL DEFAULT 'draft',
             owner_scope TEXT NOT NULL DEFAULT 'party',
@@ -185,6 +188,28 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_policy_positions_status ON policy_positions(status);
         CREATE INDEX IF NOT EXISTS idx_policy_positions_category ON policy_positions(category);
+
+        CREATE TABLE IF NOT EXISTS policy_position_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,
+            version_label TEXT,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            summary TEXT,
+            official_summary TEXT,
+            key_points TEXT,
+            relevance_note TEXT,
+            body TEXT,
+            status TEXT NOT NULL,
+            owner_scope TEXT NOT NULL,
+            effective_from TEXT,
+            effective_to TEXT,
+            snapshot_type TEXT NOT NULL DEFAULT 'update',
+            created_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_position_versions_position
+            ON policy_position_versions(position_id, created_at DESC);
 
         CREATE TABLE IF NOT EXISTS policy_documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,6 +295,23 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_policy_ingest_runs_source_started
             ON policy_ingest_runs(source_key, started_at DESC);
+
+        CREATE TABLE IF NOT EXISTS policy_featured_issues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,
+            reason TEXT,
+            priority_score REAL NOT NULL DEFAULT 0,
+            manual_weight INTEGER NOT NULL DEFAULT 0,
+            start_at TEXT,
+            end_at TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_by INTEGER REFERENCES users(id),
+            updated_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_policy_featured_issues_status_dates
+            ON policy_featured_issues(status, start_at DESC, end_at DESC);
         """)
         for stmt in [
             "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
@@ -293,6 +335,12 @@ def init_db() -> None:
             "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
             "ALTER TABLE candidates ADD COLUMN rejection_reason TEXT",
             "ALTER TABLE policy_documents ADD COLUMN speaker_name TEXT",
+            "ALTER TABLE policy_positions ADD COLUMN official_summary TEXT",
+            "ALTER TABLE policy_positions ADD COLUMN key_points TEXT",
+            "ALTER TABLE policy_positions ADD COLUMN relevance_note TEXT",
+            "ALTER TABLE policy_position_versions ADD COLUMN official_summary TEXT",
+            "ALTER TABLE policy_position_versions ADD COLUMN key_points TEXT",
+            "ALTER TABLE policy_position_versions ADD COLUMN relevance_note TEXT",
         ]:
             try:
                 conn.execute(stmt)

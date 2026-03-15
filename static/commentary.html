@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>논평 허브</title>
+  <link rel="stylesheet" href="/policy-hub.css" />
+  <style>
+    :root{
+      --bg:#f4efe6;
+      --panel:#fffaf3;
+      --panel-strong:#ffffff;
+      --line:#d8cab7;
+      --text:#1f1915;
+      --muted:#6d6258;
+      --accent:#da5d18;
+      --accent-soft:#fae2d0;
+      --shadow:0 18px 40px rgba(71,43,22,0.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Pretendard","Noto Sans KR",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(218,93,24,0.10), transparent 28%),
+        linear-gradient(180deg, #f8f2e9 0%, #efe5d7 100%);
+    }
+    main{max-width:1440px;margin:0 auto;padding:28px}
+    a{color:inherit;text-decoration:none}
+    .hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow)}
+    .hero{padding:22px;margin-bottom:18px}
+    .hero h1{margin:10px 0 0;font-size:36px;line-height:1.12}
+    .pill,.chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 11px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      color:#9b3c0d;
+      font-size:12px;
+      font-weight:800;
+      border:0;
+    }
+    .chip{cursor:pointer}
+    .chip.active{background:#da5d18;color:#fff}
+    .muted{color:var(--muted)}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .hero-link{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700}
+    .summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+    .summary-card{border:1px solid var(--line);background:var(--panel-strong);border-radius:18px;padding:16px}
+    .summary-card strong{display:block;font-size:28px;margin-top:6px}
+    .top-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-bottom:18px}
+    .stack{display:grid;gap:16px}
+    .feature-list,.link-list,.topic-list{display:grid;gap:10px}
+    .feature-item,.link-item{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:var(--panel-strong);
+      padding:14px;
+    }
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .layout{display:grid;grid-template-columns:380px minmax(0,1fr);gap:16px;align-items:start}
+    .card{padding:20px}
+    .controls{display:grid;gap:12px}
+    input{
+      width:100%;
+      margin-top:6px;
+      padding:12px 13px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--panel-strong);
+      font:inherit;
+    }
+    .list{display:grid;gap:10px;max-height:76vh;overflow:auto;padding-right:4px}
+    .item{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:var(--panel-strong);
+      padding:14px;
+      cursor:pointer;
+    }
+    .item.selected{border-color:var(--accent);background:#fff4ea}
+    .item h3,.doc-card h4{margin:0}
+    .tiny{font-size:12px}
+    .detail-shell{display:grid;gap:16px}
+    .detail-top{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    .detail-title{margin:10px 0 0;font-size:30px;line-height:1.24;word-break:keep-all}
+    .body-box{white-space:pre-wrap;line-height:1.72;font-size:15px;max-height:420px;overflow:auto}
+    .doc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .doc-card{border:1px solid var(--line);border-radius:18px;background:var(--panel-strong);padding:14px}
+    .empty{border:1px dashed var(--line);border-radius:18px;padding:18px;color:var(--muted);background:rgba(255,255,255,0.55)}
+    @media (max-width: 1180px){
+      .summary-grid,.top-grid,.layout,.detail-top,.doc-grid{grid-template-columns:1fr}
+      .list{max-height:none}
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brandbar">
+      <div class="brandbar-title">
+        <strong>개혁신당 논평 허브</strong>
+        <span>policy.reformparty.kr 톤에 맞춘 공식 논평·메시지 공개 뷰</span>
+      </div>
+      <nav class="brandnav">
+        <a href="/">메인</a>
+        <a href="/policies">정책</a>
+        <a href="/commentary" class="active">논평</a>
+        <a href="/people">인물</a>
+      </nav>
+    </div>
+    <section class="hero">
+      <span class="pill">공식 논평 허브</span>
+      <h1>대변인 논평을 이슈, 발화자, 연결 정책 기준으로 읽는 공개 페이지</h1>
+      <p class="muted" style="margin-top:12px;line-height:1.7;">
+        최근 논평을 시간순으로만 나열하지 않고, 어떤 이슈가 반복되고 누가 메시지를 내고 있는지 함께 보여줍니다.
+      </p>
+      <div class="hero-actions">
+        <a class="hero-link" href="/">메인으로</a>
+        <a class="hero-link" href="/policies">정책 허브</a>
+        <a class="hero-link" href="/people">인물 허브</a>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="tiny muted">공개 논평</div><strong id="commentaryCount">0</strong></div>
+        <div class="summary-card"><div class="tiny muted">주요 이슈</div><strong id="topicCount">0</strong></div>
+        <div class="summary-card"><div class="tiny muted">발화자</div><strong id="speakerCount">0</strong></div>
+        <div class="summary-card"><div class="tiny muted">정책 연결 논평</div><strong id="linkedCount">0</strong></div>
+      </div>
+    </section>
+
+    <section class="top-grid">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+          <h2 style="margin:0;font-size:22px;">지금 많이 나오는 이슈</h2>
+          <span class="pill" id="activeTopicLabel">전체 논평</span>
+        </div>
+        <div class="chips" id="topicChips"></div>
+        <div class="chips" id="speakerChips" style="margin-top:10px;"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <h2 style="margin:0 0 12px 0;font-size:22px;">지금 읽을 논평</h2>
+          <div class="feature-list" id="featuredList"></div>
+        </div>
+        <div class="card">
+          <h2 style="margin:0 0 12px 0;font-size:22px;">정책과 연결된 논평</h2>
+          <div class="link-list" id="linkedList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
+          <h2 style="margin:0;font-size:20px;">최근 논평 목록</h2>
+          <span class="pill" id="listCount">0건</span>
+        </div>
+        <div class="controls">
+          <label>검색<input id="searchInput" placeholder="제목, 본문, 대변인 이름"></label>
+        </div>
+        <div class="list" id="commentaryList" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="detail-shell">
+        <div class="detail-top">
+          <div class="card">
+            <span class="pill" id="detailSpeakerRole">대변인 논평</span>
+            <h2 class="detail-title" id="detailTitle">논평을 선택해 주세요</h2>
+            <p class="muted" id="detailSummary" style="margin-top:12px;line-height:1.7;">좌측 목록에서 논평을 선택하면 발화자, 관련 정책, 원문 내용을 함께 보여줍니다.</p>
+          </div>
+          <div class="card">
+            <div class="doc-grid">
+              <div class="doc-card"><div class="tiny muted">발표일</div><h4 id="detailPublishedAt">-</h4></div>
+              <div class="doc-card"><div class="tiny muted">발화자</div><h4 id="detailSpeakerName">-</h4></div>
+              <div class="doc-card"><div class="tiny muted">이슈 분류</div><h4 id="detailTopic">-</h4></div>
+              <div class="doc-card"><div class="tiny muted">연결 정책</div><h4 id="detailPolicyCount">0건</h4></div>
+            </div>
+            <div style="margin-top:12px;" id="detailSourceState">-</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0;">논평 원문</h3>
+          <div class="body-box" id="detailBody">표시할 논평이 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0;">연결된 정책</h3>
+          <div class="link-list" id="detailLinks">
+            <div class="empty">아직 연결된 정책이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const safe = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const params = new URLSearchParams(location.search);
+    const initialId = Number(params.get('id') || 0) || null;
+    const state = {
+      items: [],
+      filtered: [],
+      selectedId: null,
+      activeTopic: '',
+      activeSpeaker: '',
+      overview: null,
+    };
+
+    function filterItems() {
+      const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      state.filtered = state.items.filter((item) => {
+        if (state.activeTopic && item.topic_label !== state.activeTopic) return false;
+        if (state.activeSpeaker && (item.speaker_name || item.speaker) !== state.activeSpeaker) return false;
+        if (!q) return true;
+        return [item.title, item.summary, item.body, item.speaker_name, item.speaker, item.topic_label]
+          .some((value) => String(value || '').toLowerCase().includes(q));
+      });
+      renderList();
+    }
+
+    function renderTopicChips() {
+      const root = document.getElementById('topicChips');
+      const topics = state.overview?.topics || [];
+      const chips = [{ topic_label: '', count: state.items.length, label: '전체' }].concat(
+        topics.map((item) => ({ ...item, label: item.topic_label }))
+      );
+      root.innerHTML = chips.map((item) => {
+        const active = item.topic_label === state.activeTopic ? ' active' : '';
+        return `<button class="chip${active}" data-topic="${safe(item.topic_label)}">${safe(item.label)} ${Number(item.count || 0)}</button>`;
+      }).join('');
+      root.querySelectorAll('.chip').forEach((node) => {
+        node.addEventListener('click', () => {
+          state.activeTopic = node.dataset.topic || '';
+          document.getElementById('activeTopicLabel').textContent = state.activeTopic || '전체 논평';
+          filterItems();
+          renderTopicChips();
+        });
+      });
+    }
+
+    function renderSpeakerChips() {
+      const root = document.getElementById('speakerChips');
+      const speakers = state.overview?.speakers || [];
+      const chips = [{ speaker_name: '', count: state.items.length, label: '전체 발화자' }].concat(
+        speakers.map((item) => ({ ...item, label: item.speaker_name }))
+      );
+      root.innerHTML = chips.map((item) => {
+        const active = item.speaker_name === state.activeSpeaker ? ' active' : '';
+        return `<button class="chip${active}" data-speaker="${safe(item.speaker_name)}">${safe(item.label)} ${Number(item.count || 0)}</button>`;
+      }).join('');
+      root.querySelectorAll('.chip').forEach((node) => {
+        node.addEventListener('click', () => {
+          state.activeSpeaker = node.dataset.speaker || '';
+          filterItems();
+          renderSpeakerChips();
+        });
+      });
+    }
+
+    function renderFeaturedPanels() {
+      const featuredRoot = document.getElementById('featuredList');
+      const linkedRoot = document.getElementById('linkedList');
+      const featured = state.overview?.featured || [];
+      const linked = state.overview?.linked || [];
+
+      featuredRoot.innerHTML = featured.length ? featured.map((item) => `
+        <a class="feature-item" href="/commentary?id=${item.id}">
+          <strong>${safe(item.title)}</strong>
+          <div class="tiny muted" style="margin-top:8px;">${safe([item.published_at, item.speaker_name || item.speaker, item.topic_label].filter(Boolean).join(' · '))}</div>
+          <div style="margin-top:8px;line-height:1.6;">${safe(item.summary || (item.body || '').slice(0, 120))}</div>
+        </a>
+      `).join('') : '<div class="empty">표시할 논평이 없습니다.</div>';
+
+      linkedRoot.innerHTML = linked.length ? linked.map((item) => `
+        <a class="link-item" href="/commentary?id=${item.id}">
+          <strong>${safe(item.title)}</strong>
+          <div class="tiny muted" style="margin-top:8px;">${safe((item.related_positions || []).map((link) => link.position_title).slice(0, 2).join(', '))}</div>
+        </a>
+      `).join('') : '<div class="empty">정책과 연결된 논평이 아직 없습니다.</div>';
+    }
+
+    function renderList() {
+      const root = document.getElementById('commentaryList');
+      document.getElementById('listCount').textContent = `${state.filtered.length}건`;
+      if (!state.filtered.length) {
+        root.innerHTML = '<div class="empty">표시할 논평이 없습니다.</div>';
+        renderDetail(null);
+        return;
+      }
+      root.innerHTML = state.filtered.map((item) => {
+        const selected = item.id === state.selectedId ? ' selected' : '';
+        const policyHint = (item.related_positions || []).map((link) => link.position_title).slice(0, 1).join(', ');
+        const meta = [item.published_at, item.speaker_name || item.speaker, item.topic_label, policyHint].filter(Boolean).join(' · ');
+        return `
+          <div class="item${selected}" data-id="${item.id}">
+            <h3>${safe(item.title)}</h3>
+            <div class="tiny muted" style="margin-top:8px;">${safe(meta)}</div>
+            <div class="tiny" style="margin-top:8px;line-height:1.6;color:#564d45;">${safe(item.summary || (item.body || '').slice(0, 110))}</div>
+          </div>
+        `;
+      }).join('');
+      root.querySelectorAll('.item').forEach((node) => {
+        node.addEventListener('click', () => {
+          state.selectedId = Number(node.dataset.id);
+          history.replaceState(null, '', `/commentary?id=${state.selectedId}`);
+          renderList();
+          renderDetail(state.filtered.find((item) => item.id === state.selectedId) || null);
+        });
+      });
+      if (!state.filtered.some((item) => item.id === state.selectedId)) {
+        state.selectedId = state.filtered[0].id;
+      }
+      renderDetail(state.filtered.find((item) => item.id === state.selectedId) || null);
+    }
+
+    function renderDetail(item) {
+      document.getElementById('detailSpeakerRole').textContent = item ? (item.speaker || '대변인 논평') : '대변인 논평';
+      document.getElementById('detailTitle').textContent = item ? item.title : '논평을 선택해 주세요';
+      document.getElementById('detailSummary').textContent = item ? (item.summary || '공식 논평 원문을 확인할 수 있습니다.') : '좌측 목록에서 논평을 선택하면 발화자, 관련 정책, 원문 내용을 함께 보여줍니다.';
+      document.getElementById('detailPublishedAt').textContent = item?.published_at || '-';
+      document.getElementById('detailSpeakerName').innerHTML = item?.speaker_name
+        ? `<a class="hero-link" href="/people?name=${encodeURIComponent(item.speaker_name)}">${safe(item.speaker_name)}</a>`
+        : safe(item?.speaker || '-');
+      document.getElementById('detailTopic').textContent = item?.topic_label || '-';
+      document.getElementById('detailPolicyCount').textContent = `${(item?.related_positions || []).length}건`;
+      document.getElementById('detailSourceState').innerHTML = item?.source_url
+        ? `<a class="hero-link" href="${item.source_url}" target="_blank" rel="noreferrer">원문 사이트 보기</a>`
+        : '-';
+      document.getElementById('detailBody').textContent = item?.body || item?.summary || '표시할 논평이 없습니다.';
+
+      const linksRoot = document.getElementById('detailLinks');
+      if (!item?.related_positions?.length) {
+        linksRoot.innerHTML = '<div class="empty">아직 연결된 정책이 없습니다.</div>';
+        return;
+      }
+      linksRoot.innerHTML = item.related_positions.map((link) => `
+        <a class="link-item" href="/policies?slug=${encodeURIComponent(link.position_slug || '')}">
+          <strong>${safe(link.position_title)}</strong>
+          <div class="tiny muted" style="margin-top:6px;">연결 방식 · ${safe(link.relation_type === 'related' ? '주제 기반 추천' : (link.relation_type || 'references'))}</div>
+        </a>
+      `).join('');
+    }
+
+    Promise.all([
+      fetch('/api/policy/commentary?limit=120').then((r) => r.ok ? r.json() : null),
+      fetch('/api/policy/commentary/overview?limit=120').then((r) => r.ok ? r.json() : null),
+    ])
+      .then(([listData, overviewData]) => {
+        state.items = listData?.items || [];
+        state.overview = overviewData || {};
+        state.filtered = state.items.slice();
+        state.selectedId = state.filtered.some((item) => item.id === initialId) ? initialId : (state.filtered[0]?.id || null);
+
+        document.getElementById('commentaryCount').textContent = Number(state.overview?.counts?.commentary || 0);
+        document.getElementById('topicCount').textContent = Number(state.overview?.counts?.topics || 0);
+        document.getElementById('speakerCount').textContent = Number(state.overview?.counts?.speakers || 0);
+        document.getElementById('linkedCount').textContent = Number(state.overview?.counts?.linked_commentary || 0);
+
+        renderTopicChips();
+        renderSpeakerChips();
+        renderFeaturedPanels();
+        renderList();
+      })
+      .catch((error) => {
+        console.error('commentary fetch error:', error);
+        document.getElementById('commentaryList').innerHTML = '<div class="empty">논평을 불러오지 못했습니다.</div>';
+      });
+
+    document.getElementById('searchInput').addEventListener('input', filterItems);
+  </script>
+</body>
+</html>
