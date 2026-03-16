@@ -96,12 +96,15 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_suggestions import list_link_suggestions
         from backend.rallypoint_commentary import list_ingest_runs
         from backend.assembly_bills import list_ingest_runs as list_bill_ingest_runs
+        from backend.nesdc_polls import list_ingest_runs as list_poll_ingest_runs
 
         summary = get_policy_ssot_summary()
         runs = list_ingest_runs(limit=1)
         bill_runs = list_bill_ingest_runs(limit=1)
+        poll_runs = list_poll_ingest_runs(limit=1)
         summary["last_commentary_sync"] = runs[0] if runs else None
         summary["last_bill_sync"] = bill_runs[0] if bill_runs else None
+        summary["last_poll_sync"] = poll_runs[0] if poll_runs else None
         summary["pending_suggestions"] = len(list_link_suggestions(status="pending", limit=300))
         summary["current_featured_issue"] = get_current_featured_issue()
         summary["featured_candidates"] = recommend_featured_issues(limit=5)
@@ -241,6 +244,24 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         ensure_db_ready()
         from backend.assembly_bills import sync_reform_party_bills
         return sync_reform_party_bills(actor_id=user["id"], age_from=age_from, age_to=age_to)
+
+    @app.get("/api/admin/policy/import/nesdc-polls/runs", tags=["admin", "policy"])
+    def api_admin_policy_nesdc_poll_runs(request: Request, limit: int = Query(default=10, ge=1, le=100)):
+        require_admin(request)
+        ensure_db_ready()
+        from backend.nesdc_polls import list_ingest_runs
+        return {"items": list_ingest_runs(limit=limit)}
+
+    @app.post("/api/admin/policy/import/nesdc-polls", tags=["admin", "policy"])
+    def api_admin_policy_import_nesdc_polls(
+        request: Request,
+        since: str = Query(default="2024-02-01"),
+        max_pages: int = Query(default=30, ge=1, le=200),
+    ):
+        user = require_admin(request)
+        ensure_db_ready()
+        from backend.nesdc_polls import sync_reform_party_polls
+        return sync_reform_party_polls(actor_id=user["id"], since=since, max_pages_per_term=max_pages)
 
     @app.get("/api/admin/policy/import/pdf-pledges/runs", tags=["admin", "policy"])
     def api_admin_policy_pdf_pledge_runs(request: Request, limit: int = Query(default=10, ge=1, le=100)):
@@ -467,6 +488,22 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         ensure_db_ready()
         from backend.policy_ssot import list_public_rules
         return {"items": list_public_rules(q=q, limit=limit)}
+
+    @app.get("/api/policy/polls", tags=["policy"])
+    def api_policy_polls(q: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import list_policy_documents
+        items = list_policy_documents(doc_type="poll_result", status="active")
+        if q:
+            needle = q.strip().lower()
+            items = [
+                item
+                for item in items
+                if needle in (item.get("title") or "").lower()
+                or needle in (item.get("summary") or "").lower()
+                or needle in (item.get("body") or "").lower()
+            ]
+        return {"items": items[:limit]}
 
     @app.get("/api/policy/hub", tags=["policy"])
     def api_policy_hub():

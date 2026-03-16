@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import sys
 import time
@@ -25,6 +26,7 @@ DEFAULT_ROOT_FOLDER = "전자문서함"
 DEFAULT_OWNER_FOLDER = "개혁신당"
 DEFAULT_TARGET_FOLDER = "최고위원회의"
 DEFAULT_RULES_FOLDER = "당헌당규"
+DEFAULT_DOCUMENT_URL = "#/UQ/UQA/UQA0000?specialLnb=Y&moduleCode=UQ&menuCode=UQA&pageCode=UQA0500"
 
 
 @dataclass
@@ -61,7 +63,26 @@ def _click_first_visible(locator, *, timeout: int = 30000) -> None:
     candidate = _first_visible(locator)
     if candidate is None:
         raise RuntimeError("no visible clickable element matched")
-    candidate.click(timeout=timeout)
+    _click_locator(candidate, timeout=timeout)
+
+
+def _click_locator(locator, *, timeout: int = 30000) -> None:
+    last_error: Optional[Exception] = None
+    try:
+        locator.scroll_into_view_if_needed(timeout=timeout)
+    except Exception:
+        pass
+    for click_action in (
+        lambda: locator.click(timeout=timeout),
+        lambda: locator.click(timeout=timeout, force=True),
+        lambda: locator.evaluate("(el) => el.click()"),
+    ):
+        try:
+            click_action()
+            return
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError("failed to click locator") from last_error
 
 
 def _click_text(page, text: str, *, exact: bool = True, timeout: int = 30000) -> None:
@@ -79,6 +100,15 @@ def _click_text(page, text: str, *, exact: bool = True, timeout: int = 30000) ->
         except Exception as exc:
             last_error = exc
     raise RuntimeError(f"could not click text: {text}") from last_error
+
+
+def _resolve_storage_state_path(storage_state: str) -> Path:
+    raw = (storage_state or "").strip()
+    if not raw:
+        return ROOT / "data" / "amaranth-storage-state.json"
+    if platform.system() != "Windows" and re.match(r"^[A-Za-z]:\\", raw):
+        return ROOT / "data" / Path(raw).name
+    return Path(raw)
 
 
 def _dump_debug_state(page, *, storage_state_path: Path, stage: str) -> None:
@@ -114,21 +144,136 @@ def _dump_debug_state(page, *, storage_state_path: Path, stage: str) -> None:
     )
 
 
+def _dismiss_company_selection_modal(page, *, company_name: str, timeout: int = 15000) -> None:
+    modal_hint = page.get_by_text("회사를 선택해 주세요", exact=False)
+    if modal_hint.count() == 0:
+        return
+    try:
+        modal_hint.first.wait_for(state="visible", timeout=5000)
+    except Exception:
+        return
+
+    modal_root = page.locator(
+        "div.commonPopup.userInfoPop, div:has(.companySelectWrap):has-text('회사를 선택해 주세요')"
+    ).first
+    if modal_root.count():
+        close_button = modal_root.locator(".cls, .btnClose, .close").first
+        if close_button.count():
+            try:
+                _click_locator(close_button, timeout=3000)
+                modal_hint.first.wait_for(state="hidden", timeout=3000)
+                return
+            except Exception:
+                pass
+
+    preferred_rows = []
+    if company_name:
+        preferred_rows.extend(
+            [
+                modal_root.locator("tr", has_text=company_name).first if modal_root.count() else page.locator("tr", has_text=company_name).first,
+                modal_root.locator("li", has_text=company_name).first if modal_root.count() else page.locator("li", has_text=company_name).first,
+                modal_root.locator("div", has_text=company_name).first if modal_root.count() else page.locator("div", has_text=company_name).first,
+            ]
+        )
+    preferred_rows.extend(
+        [
+            modal_root.locator("tbody tr").first if modal_root.count() else page.locator("tbody tr").first,
+            modal_root.locator("tr").nth(1) if modal_root.count() else page.locator("tr").nth(1),
+            modal_root.locator("li[role='option']").first if modal_root.count() else page.locator("li[role='option']").first,
+        ]
+    )
+
+    for row in preferred_rows:
+        try:
+            if row.count() and row.is_visible():
+                _click_locator(row, timeout=3000)
+                break
+        except Exception:
+            try:
+                row.evaluate("(el) => el.click()")
+                break
+            except Exception:
+                continue
+
+    try:
+        if modal_root.count():
+            confirm_button = modal_root.locator("button", has_text="확인").first
+            if confirm_button.count():
+                _click_locator(confirm_button, timeout=5000)
+            else:
+                _click_text(page, "확인", exact=True, timeout=5000)
+        else:
+            _click_text(page, "확인", exact=True, timeout=5000)
+    except Exception:
+        confirm_button = modal_root.locator("button", has_text="확인").first if modal_root.count() else page.locator("button", has_text="확인").first
+        if confirm_button.count():
+            try:
+                _click_locator(confirm_button, timeout=3000)
+            except Exception:
+                confirm_button.evaluate("(el) => el.click()")
+
+    try:
+        modal_hint.first.wait_for(state="hidden", timeout=timeout)
+    except Exception:
+        try:
+            page.keyboard.press("Escape")
+            modal_hint.first.wait_for(state="hidden", timeout=3000)
+        except Exception:
+            pass
+
+
+def _ensure_document_view(page, *, base_url: str, module_name: str, timeout: int = 30000) -> None:
+    document_url = f"{base_url.rstrip('/')}/{DEFAULT_DOCUMENT_URL}"
+    if "pageCode=UQA0500" in page.url:
+        return
+    try:
+        page.goto(document_url, wait_until="networkidle")
+        page.wait_for_timeout(3000)
+    except Exception:
+        pass
+    if "pageCode=UQA0500" in page.url or page.locator("#UQA_UQA0500").count():
+        return
+    try:
+        _click_text(page, module_name, timeout=timeout)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(2000)
+    except Exception:
+        pass
+    if "pageCode=UQA0500" in page.url or page.locator("#UQA_UQA0500").count():
+        return
+    page.goto(document_url, wait_until="networkidle")
+    page.wait_for_timeout(3000)
+
+
 def _expand_named_folder(page, folder_name: str, *, timeout: int = 10000) -> None:
     folder_row = page.locator(".subTit", has=page.locator(".folderName", has_text=folder_name)).first
     if folder_row.count() == 0:
-        raise RuntimeError(f"folder row not found: {folder_name}")
+        fallback_targets = [
+            page.locator(".sideLnbMenu, .onechamberSide, .ofONECHAMBERMenuLnb").get_by_text(folder_name, exact=True).first,
+            page.get_by_text(folder_name, exact=True).first,
+            page.get_by_text(folder_name, exact=False).first,
+        ]
+        last_error: Optional[Exception] = None
+        for target in fallback_targets:
+            try:
+                if target.count() and target.is_visible():
+                    _click_locator(target, timeout=timeout)
+                    page.wait_for_timeout(1500)
+                    return
+            except Exception as exc:
+                last_error = exc
+        raise RuntimeError(f"folder row not found: {folder_name}") from last_error
     expand_button = folder_row.locator(".arr1, .arr").first
     child_menu = folder_row.locator("xpath=ancestor::div[contains(@class,'folderAll')][1]//ul[1]").first
     before = child_menu.locator("> *").count() if child_menu.count() else 0
     if expand_button.count():
         try:
-            expand_button.click(timeout=timeout)
+            _click_locator(expand_button, timeout=timeout)
         except Exception:
             expand_button.evaluate("(el) => el.click()")
     else:
         try:
-            folder_row.click(timeout=timeout)
+            _click_locator(folder_row, timeout=timeout)
         except Exception:
             folder_row.evaluate("(el) => el.click()")
     deadline = time.time() + (timeout / 1000)
@@ -145,9 +290,23 @@ def _expand_named_folder(page, folder_name: str, *, timeout: int = 10000) -> Non
 def _click_named_folder(page, folder_name: str, *, timeout: int = 10000) -> None:
     folder_row = page.locator(".subTit", has=page.locator(".folderName", has_text=folder_name)).first
     if folder_row.count() == 0:
-        raise RuntimeError(f"folder row not found: {folder_name}")
+        fallback_targets = [
+            page.locator(".sideLnbMenu, .onechamberSide, .ofONECHAMBERMenuLnb").get_by_text(folder_name, exact=True).first,
+            page.get_by_text(folder_name, exact=True).first,
+            page.get_by_text(folder_name, exact=False).first,
+        ]
+        last_error: Optional[Exception] = None
+        for target in fallback_targets:
+            try:
+                if target.count() and target.is_visible():
+                    _click_locator(target, timeout=timeout)
+                    page.wait_for_timeout(1500)
+                    return
+            except Exception as exc:
+                last_error = exc
+        raise RuntimeError(f"folder row not found: {folder_name}") from last_error
     try:
-        folder_row.click(timeout=timeout)
+        _click_locator(folder_row, timeout=timeout)
     except Exception:
         folder_row.evaluate("(el) => el.click()")
 
@@ -190,6 +349,24 @@ def _extract_title(text: str) -> str:
     return "Untitled Amaranth document"
 
 
+def _looks_like_metadata_only(text: str) -> bool:
+    lines = _clean_lines(text)
+    if not lines:
+        return True
+    joined = "\n".join(lines[:12])
+    has_file_ext = any(line.lower() in {".hwp", ".hwpx", ".pdf", ".doc", ".docx"} for line in lines[:6])
+    has_size = bool(re.search(r"\b\d+(?:\.\d+)?\s*(KB|MB|GB)\b", joined, re.IGNORECASE))
+    has_date = bool(re.search(r"\b20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\b", joined))
+    has_meeting_markers = any(token in joined for token in ("회의록", "개 요", "일  시", "장  소", "참  석", "안건"))
+    if has_meeting_markers:
+        return False
+    if len(lines) <= 8 and has_file_ext and (has_size or has_date):
+        return True
+    if len(joined) < 120 and has_file_ext:
+        return True
+    return False
+
+
 def _viewer_abs_url(base_url: str, viewer_url: str) -> str:
     if viewer_url.startswith("http://") or viewer_url.startswith("https://"):
         return viewer_url
@@ -198,16 +375,31 @@ def _viewer_abs_url(base_url: str, viewer_url: str) -> str:
 
 def _request_viewer_url(page, *, row) -> Optional[str]:
     title_locator = row.locator(".tooltipname").first
-    try:
-        with page.expect_response(lambda response: response.url.endswith("/ecm/ecm017A03"), timeout=10000) as response_info:
-            title_locator.dblclick(timeout=5000)
-        payload = response_info.value.json()
-    except Exception:
-        return None
-    if not isinstance(payload, dict) or payload.get("resultCode") != 0:
-        return None
-    viewer_url = payload.get("resultData")
-    return viewer_url if isinstance(viewer_url, str) and viewer_url.strip() else None
+    click_targets = [
+        title_locator,
+        row.locator(".nameClass").first,
+        row,
+    ]
+    click_actions = [
+        lambda locator: locator.dblclick(timeout=5000),
+        lambda locator: _click_locator(locator, timeout=5000),
+    ]
+    for target in click_targets:
+        if target.count() == 0:
+            continue
+        for click_action in click_actions:
+            try:
+                with page.expect_response(lambda response: response.url.endswith("/ecm/ecm017A03"), timeout=12000) as response_info:
+                    click_action(target)
+                payload = response_info.value.json()
+            except Exception:
+                continue
+            if not isinstance(payload, dict) or payload.get("resultCode") != 0:
+                continue
+            viewer_url = payload.get("resultData")
+            if isinstance(viewer_url, str) and viewer_url.strip():
+                return viewer_url
+    return None
 
 
 def _reconstruct_viewer_text(spans: list[dict]) -> str:
@@ -248,23 +440,41 @@ def _extract_viewer_text(context, *, base_url: str, viewer_url: str) -> str:
     try:
         viewer_page.goto(_viewer_abs_url(base_url, viewer_url), wait_until="load")
         viewer_page.wait_for_timeout(4000)
-        viewer_page.locator(".textLayer .text").first.wait_for(timeout=15000)
-        spans = viewer_page.evaluate(
-            """() => Array.from(document.querySelectorAll('.textLayer .text')).map((node) => {
-                const style = window.getComputedStyle(node);
-                const layer = node.closest('.textLayer');
-                const pageMatch = layer?.id ? layer.id.match(/(\\d+)$/) : null;
-                return {
-                    page: pageMatch ? Number(pageMatch[1]) : 0,
-                    top: parseFloat(style.top || '0') || 0,
-                    left: parseFloat(style.left || '0') || 0,
-                    char: node.getAttribute('data-char') || node.textContent || '',
-                };
-            })"""
-        )
-        if not isinstance(spans, list):
-            return ""
-        return _reconstruct_viewer_text(spans)
+        text_layer = viewer_page.locator(".textLayer .text").first
+        try:
+            text_layer.wait_for(timeout=15000)
+            spans = viewer_page.evaluate(
+                """() => Array.from(document.querySelectorAll('.textLayer .text')).map((node) => {
+                    const style = window.getComputedStyle(node);
+                    const layer = node.closest('.textLayer');
+                    const pageMatch = layer?.id ? layer.id.match(/(\\d+)$/) : null;
+                    return {
+                        page: pageMatch ? Number(pageMatch[1]) : 0,
+                        top: parseFloat(style.top || '0') || 0,
+                        left: parseFloat(style.left || '0') || 0,
+                        char: node.getAttribute('data-char') || node.textContent || '',
+                    };
+                })"""
+            )
+            if isinstance(spans, list):
+                reconstructed = _reconstruct_viewer_text(spans)
+                if reconstructed.strip():
+                    return reconstructed
+        except Exception:
+            pass
+
+        body_text = ""
+        try:
+            body_text = viewer_page.locator("body").inner_text(timeout=5000)
+        except Exception:
+            body_text = ""
+        lines = [
+            line.strip()
+            for line in body_text.splitlines()
+            if line.strip()
+            and line.strip() not in {"로딩중입니다.", "Loading", "정보보기", "링크복사", "원커넥트공유"}
+        ]
+        return "\n".join(lines[:4000]).strip()
     finally:
         viewer_page.close()
 
@@ -308,6 +518,7 @@ def _build_metadata(*, target_folder: str, title: str, published_at: Optional[st
         "original_title": title,
         "folder_name": target_folder,
         "source_file_date": title_date,
+        "extraction_quality": "metadata_only" if _looks_like_metadata_only(detail_text) else "full_text",
     }
     if doc_kind == "meeting":
         metadata.update(
@@ -377,6 +588,20 @@ def _build_source_ref(*, target_folder: str, title: str, row_text: str) -> str:
 
 def _save_document(document: AmaranthDocument, *, owner_name: str, dry_run: bool) -> dict:
     existing = find_policy_document_by_source(source_ref=document.source_ref)
+    if existing:
+        existing_body = existing.get("body") or ""
+        new_body_is_metadata_only = _looks_like_metadata_only(document.body)
+        existing_body_is_metadata_only = _looks_like_metadata_only(existing_body)
+        if new_body_is_metadata_only and not existing_body_is_metadata_only:
+            document.body = existing_body
+            document.summary = existing.get("summary") or document.summary
+            if not document.published_at:
+                document.published_at = existing.get("published_at")
+            document.metadata = {
+                **(existing.get("metadata") or {}),
+                **document.metadata,
+                "extraction_quality": "preserved_existing_full_text",
+            }
     payload = {
         "document_id": existing["id"] if existing else None,
         "title": document.title,
@@ -398,7 +623,7 @@ def _save_document(document: AmaranthDocument, *, owner_name: str, dry_run: bool
     return upsert_policy_document(**payload)
 
 
-def _login_amaranth(page, *, company_code: str, login_id: str, login_password: str) -> None:
+def _login_amaranth(page, *, company_code: str, company_name: str, login_id: str, login_password: str) -> None:
     company = page.locator("#reqCompCd")
     if company.count():
         company_field = company.nth(0)
@@ -422,6 +647,9 @@ def _login_amaranth(page, *, company_code: str, login_id: str, login_password: s
             candidate.fill(login_password)
             _click_first_visible(page.locator("button"))
             page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+
+    _dismiss_company_selection_modal(page, company_name=company_name)
 
 
 def sync_amaranth_documents(
@@ -445,11 +673,12 @@ def sync_amaranth_documents(
     company_code = _env_required("AMARANTH_COMPANY_CODE")
     login_id = _env_required("AMARANTH_LOGIN_ID")
     login_password = _env_required("AMARANTH_LOGIN_PASSWORD")
+    company_name = os.getenv("AMARANTH_OWNER_NAME", DEFAULT_OWNER_FOLDER).strip()
 
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     from playwright.sync_api import sync_playwright
 
-    storage_state_path = Path(storage_state)
+    storage_state_path = _resolve_storage_state_path(storage_state)
     storage_state_path.parent.mkdir(parents=True, exist_ok=True)
 
     results = {
@@ -477,6 +706,7 @@ def sync_amaranth_documents(
                 _login_amaranth(
                     page,
                     company_code=company_code,
+                    company_name=company_name,
                     login_id=login_id,
                     login_password=login_password,
                 )
@@ -484,12 +714,10 @@ def sync_amaranth_documents(
             context.storage_state(path=str(storage_state_path))
 
             page.wait_for_timeout(3000)
-            if not page.locator("#UQA_UQA0500").count():
-                _click_text(page, module_name)
-                page.wait_for_load_state("networkidle")
-                page.wait_for_timeout(3000)
+            _dismiss_company_selection_modal(page, company_name=company_name)
+            _ensure_document_view(page, base_url=base_url, module_name=module_name)
 
-            page.locator("#UQA_UQA0500").click()
+            _click_locator(page.locator("#UQA_UQA0500"), timeout=30000)
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(3000)
 
