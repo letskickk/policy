@@ -19,6 +19,15 @@ def _truncate(s: str, limit: int) -> str:
     return s if len(s) <= limit else (s[:limit] + "\n\n[...truncated...]")
 
 
+def _coerce_history_score(row: dict) -> dict:
+    """Backfill missing score values from stored result text for older rows."""
+    if row.get("total_score") is None and int(row.get("status_code") or 0) == 200:
+      score = parse_total_score_any(row.get("result_text") or "", row.get("result_format") or "text")
+      if score is not None:
+          row["total_score"] = score
+    return row
+
+
 def add_history(
     *,
     user_id: int,
@@ -110,7 +119,14 @@ def list_history(user_id: int, limit: int = 20) -> list[dict]:
             """,
             (user_id, int(limit)),
         )
-        return [dict(r) for r in cur.fetchall()]
+        rows = []
+        for raw in cur.fetchall():
+            row = dict(raw)
+            # result_preview is truncated, but this still recovers many legacy rows.
+            row["result_text"] = row.get("result_preview") or ""
+            rows.append(_coerce_history_score(row))
+            row.pop("result_text", None)
+        return rows
     finally:
         conn.close()
 
@@ -131,6 +147,7 @@ def get_history_item(user_id: int, history_id: int) -> Optional[dict]:
         if not row:
             return None
         d = dict(row)
+        d = _coerce_history_score(d)
         # parse options_json lazily
         if d.get("options_json"):
             try:
