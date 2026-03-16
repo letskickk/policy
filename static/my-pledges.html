@@ -65,6 +65,7 @@
     const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const fdate=v=>{if(!v)return'';const d=new Date(String(v).replace(' ','T'));return Number.isNaN(d.getTime())?v:d.toLocaleString('ko-KR')};
     const badgeClass=s=>{s=String(s||'NEW').toUpperCase();if(s==='APPROVED')return['bapp','\uC2B9\uC778 \uC644\uB8CC'];if(s==='REJECTED')return['brej','\uBC18\uB824'];if(s==='PENDING')return['bpen','\uAC80\uC218 \uB300\uAE30'];return['bnew','\uC2E0\uADDC \uB4F1\uB85D']};
+    const parseScoreValue=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return Number.isFinite(n)?n:null};
     const scoreClass=n=>!Number.isFinite(Number(n))?'mid':Number(n)>=80?'good':Number(n)>=60?'mid':'low';
     const titleFromText=t=>{t=String(t||'').replace(/\s+/g,' ').trim();if(!t)return'\uBD88\uB7EC\uC628 \uACF5\uC57D';return t.length>48?`${t.slice(0,48)}...`:t};
     const infoItem=(l,v)=>`<div class="item"><em>${esc(l)}</em><b>${esc(v||'-')}</b></div>`;
@@ -76,10 +77,11 @@
     function addRow(data={}){
       idx+=1;
       const row=document.createElement('div');
-      const imported=data.total_score!==null&&data.total_score!==undefined;
+      const parsedInitialScore=parseScoreValue(data.total_score);
+      const imported=parsedInitialScore!==null;
       row.className='row';
       row.dataset.pledgeId=data.id||'';
-      row.dataset.importedScore=data.total_score??'';
+      row.dataset.importedScore=parsedInitialScore===null?'':String(parsedInitialScore);
       row.dataset.importedResult=data.analysis_result||'';
       row.dataset.importedAnalyzedAt=data.analyzed_at||'';
       row.innerHTML=`<div class="rowtop"><div class="ord"><span class="n">0</span><span>공약</span></div><div class="acts"><button type="button" class="btn2 import">분석 기록 불러오기</button><button type="button" class="btn3 remove">삭제</button></div></div><label>공약 제목</label><input type="text" class="title ${imported?'locked':''}" value="${esc(data.title||'')}" placeholder="분석 기록에서 불러오면 자동으로 채워집니다." ${imported?'readonly':''}><label style="margin-top:12px">공약 내용</label><textarea class="content ${imported?'locked':''}" placeholder="불러온 공약 내용이 여기에 표시됩니다." ${imported?'readonly':''}>${esc(data.content||'')}</textarea><div class="${imported?'lockednote':'hint'}">${imported?'이 공약은 분석 기록에서 불러온 항목입니다. 내용을 바꾸려면 새로 분석한 뒤 다시 불러와 주세요.':'직접 입력한 공약은 저장되지 않습니다. 반드시 분석 기록에서 불러온 뒤 저장해 주세요.'}</div><div class="meta"></div><div class="preview"></div>`;
@@ -87,7 +89,7 @@
       els.list.appendChild(row);
       const meta=row.querySelector('.meta'),preview=row.querySelector('.preview');
       if(imported){
-        meta.innerHTML=`<span class="score ${scoreClass(data.total_score)}">총점 ${Number(data.total_score).toFixed(1)}</span><span class="date">${esc(fdate(data.analyzed_at))}</span>`;
+        meta.innerHTML=`<span class="score ${scoreClass(parsedInitialScore)}">총점 ${parsedInitialScore.toFixed(1)}</span><span class="date">${esc(fdate(data.analyzed_at))}</span>`;
         if(data.analysis_result){preview.style.display='block';preview.textContent=data.analysis_result}
       }
       row.querySelector('.import').addEventListener('click',()=>openModal(row));
@@ -95,7 +97,7 @@
       renumber();
       return row;
     }
-    function serialize(){return [...els.list.querySelectorAll('.row')].map((row,i)=>{const score=row.dataset.importedScore===''?null:Number(row.dataset.importedScore);return{pledge_id:row.dataset.pledgeId?Number(row.dataset.pledgeId):null,title:(row.querySelector('.title').value||'').trim(),content:(row.querySelector('.content').value||'').trim(),priority:i+1,imported_score:Number.isFinite(score)?score:null,imported_result:row.dataset.importedResult||null,imported_analyzed_at:row.dataset.importedAnalyzedAt||null}})}
+    function serialize(){return [...els.list.querySelectorAll('.row')].map((row,i)=>{const score=parseScoreValue(row.dataset.importedScore);return{pledge_id:row.dataset.pledgeId?Number(row.dataset.pledgeId):null,title:(row.querySelector('.title').value||'').trim(),content:(row.querySelector('.content').value||'').trim(),priority:i+1,imported_score:score,imported_result:row.dataset.importedResult||null,imported_analyzed_at:row.dataset.importedAnalyzedAt||null}})}
     async function load(){
       clearMsg();
       try{
@@ -146,7 +148,7 @@
       try{
         const items=await getHistory();
         if(!items.length){els.mbody.innerHTML='<div class="empty">\uC800\uC7A5 \uAC00\uB2A5\uD55C \uBD84\uC11D \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.<br><a href="/pledge" style="color:#93c5fd;">\uACF5\uC57D \uBD84\uC11D \uD398\uC774\uC9C0</a>\uC5D0\uC11C \uBA3C\uC800 \uACF5\uC57D\uC744 \uBD84\uC11D\uD574 \uC8FC\uC138\uC694.</div>';return}
-        els.mbody.innerHTML=`<div class="hist">${items.map(it=>{const score=Number(it.total_score),scoreHtml=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span>`:'';return`<button type="button" class="hitem" data-id="${it.id}"><div class="htop"><div class="htitle">${esc(titleFromText(it.input_preview||''))}</div><div>${scoreHtml}</div></div><div class="hmeta">${esc(fdate(it.created_at))}</div><div class="hprev">${esc(it.input_preview||'')}</div></button>`}).join('')}</div>`;
+        els.mbody.innerHTML=`<div class="hist">${items.map(it=>{const score=parseScoreValue(it.total_score),scoreHtml=score!==null?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span>`:'';return`<button type="button" class="hitem" data-id="${it.id}"><div class="htop"><div class="htitle">${esc(titleFromText(it.input_preview||''))}</div><div>${scoreHtml}</div></div><div class="hmeta">${esc(fdate(it.created_at))}</div><div class="hprev">${esc(it.input_preview||'')}</div></button>`}).join('')}</div>`;
         els.mbody.querySelectorAll('.hitem').forEach(btn=>btn.addEventListener('click',()=>importHistory(btn.dataset.id)));
       }catch(e){els.mbody.innerHTML=`<div class="empty">${esc(e.message||'\uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.')}</div>`}
     }
@@ -155,14 +157,14 @@
       try{
         const res=await fetch(`/api/history/${id}`,{credentials:'include'});
         if(!res.ok)throw new Error('\uC120\uD0DD\uD55C \uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
-        const item=await res.json(),input=String(item.input_text||'').trim(),result=String(item.result_text||'').trim(),score=Number(item.total_score),title=titleFromText((input.split('\n').find(l=>l.trim())||input));
-        importTarget.dataset.importedScore=Number.isFinite(score)?String(score):'';
+        const item=await res.json(),input=String(item.input_text||'').trim(),result=String(item.result_text||'').trim(),score=parseScoreValue(item.total_score),title=titleFromText((input.split('\n').find(l=>l.trim())||input));
+        importTarget.dataset.importedScore=score!==null?String(score):'';
         importTarget.dataset.importedResult=result;
         importTarget.dataset.importedAnalyzedAt=item.created_at||'';
         const titleEl=importTarget.querySelector('.title'),contentEl=importTarget.querySelector('.content');
         titleEl.value=title;contentEl.value=input;titleEl.readOnly=true;contentEl.readOnly=true;titleEl.classList.add('locked');contentEl.classList.add('locked');
         const note=importTarget.querySelector('.hint,.lockednote');note.className='lockednote';note.textContent='\uC774 \uACF5\uC57D\uC740 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC628 \uD56D\uBAA9\uC785\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uBC14\uAFB8\uB824\uBA74 \uC0C8\uB85C \uBD84\uC11D\uD55C \uB4A4 \uB2E4\uC2DC \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.';
-        importTarget.querySelector('.meta').innerHTML=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span><span class="date">${esc(fdate(item.created_at))}</span>`:'<span class="date">\uC810\uC218 \uC815\uBCF4 \uC5C6\uC74C</span>';
+        importTarget.querySelector('.meta').innerHTML=score!==null?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span><span class="date">${esc(fdate(item.created_at))}</span>`:'<span class="date">\uC810\uC218 \uC815\uBCF4 \uC5C6\uC74C</span>';
         const preview=importTarget.querySelector('.preview');if(result){preview.style.display='block';preview.textContent=result}else{preview.style.display='none';preview.textContent=''}
         closeModal();
       }catch(e){alert(e.message||'\uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.')}
