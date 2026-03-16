@@ -3286,6 +3286,7 @@ def api_leaderboard(
 
         target_sunday = target_monday + _dt.timedelta(days=6)
         is_current_week = (target_monday == current_monday)
+        ranking_end = today if is_current_week else target_sunday
 
         # ── 주간 챔피언 lazy snapshot (이번 주 조회 시만) ──
         if is_current_week:
@@ -3363,11 +3364,10 @@ def api_leaderboard(
         """
         params: list = []
 
-        if not is_current_week:
-            # 과거 주: 해당 주에 분석된 공약만 (챔피언 제외 없음)
-            sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
-            params.extend([target_monday.isoformat(), target_sunday.isoformat()])
-        else:
+        sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
+        params.extend([target_monday.isoformat(), ranking_end.isoformat()])
+
+        if is_current_week:
             # 이번 주: 챔피언 제외 (단, 이번 주에 공약을 업데이트한 챔피언은 다시 포함)
             champion_ids = [r["candidate_id"] for r in conn.execute("SELECT candidate_id FROM weekly_champions").fetchall()]
             if champion_ids:

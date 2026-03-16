@@ -405,7 +405,10 @@
     .champion-week { color: var(--muted); font-size: 0.72rem; min-width: 5.5em; flex-shrink: 0; }
     .champion-name { font-weight: 700; min-width: 3.5em; }
     .champion-region { color: var(--muted); font-size: 0.75rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .champion-score { font-weight: 800; color: #fde047; margin-left: auto; flex-shrink: 0; }
+    .champion-score { font-weight: 800; margin-left: auto; flex-shrink: 0; }
+    .champion-score.green { color: #4ade80; }
+    .champion-score.yellow { color: #facc15; }
+    .champion-score.red { color: #f87171; }
     .rank-empty { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.9rem; }
 
     /* ===== 공약 상세 모달 (map.html 동일) ===== */
@@ -747,7 +750,7 @@
           <span class="champion-week">${safe(wLabel)}</span>
           <span class="champion-name">${safe(c.candidate_name)}</span>
           <span class="champion-region">${safe(regionText)}</span>
-          <span class="champion-score">${c.avg_score}</span>
+          <span class="champion-score ${scoreClass(c.avg_score)}">${c.avg_score}</span>
         </div>`;
       });
       html += '</div>';
