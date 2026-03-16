@@ -22,9 +22,9 @@ def _truncate(s: str, limit: int) -> str:
 def _coerce_history_score(row: dict) -> dict:
     """Backfill missing score values from stored result text for older rows."""
     if row.get("total_score") is None and int(row.get("status_code") or 0) == 200:
-      score = parse_total_score_any(row.get("result_text") or "", row.get("result_format") or "text")
-      if score is not None:
-          row["total_score"] = score
+        score = parse_total_score_any(row.get("result_text") or "", row.get("result_format") or "text")
+        if score is not None:
+            row["total_score"] = score
     return row
 
 
@@ -111,7 +111,7 @@ def list_history(user_id: int, limit: int = 20) -> list[dict]:
             SELECT id, kind, created_at, status_code, from_cache,
                    substr(input_text, 1, 160) AS input_preview,
                    substr(result_text, 1, 220) AS result_preview,
-                   result_format, total_score
+                   result_text, result_format, total_score
             FROM analysis_history
             WHERE user_id = ? AND kind != 'verify'
             ORDER BY created_at DESC, id DESC
@@ -122,10 +122,7 @@ def list_history(user_id: int, limit: int = 20) -> list[dict]:
         rows = []
         for raw in cur.fetchall():
             row = dict(raw)
-            # result_preview is truncated, but this still recovers many legacy rows.
-            row["result_text"] = row.get("result_preview") or ""
             rows.append(_coerce_history_score(row))
-            row.pop("result_text", None)
         return rows
     finally:
         conn.close()
