@@ -128,7 +128,9 @@
         if(res.status===403){location.href='/pending';return}
         const text=await res.text();let data={};try{data=JSON.parse(text)}catch(_){}
         if(!res.ok)throw new Error(data.detail||'\uACF5\uC57D \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
-        setMsg('\uACF5\uC57D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uAC80\uC218 \uD6C4 \uACF5\uAC1C\uB429\uB2C8\uB2E4.',true);historyCache=null;await load();
+        setMsg('\uACF5\uC57D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uC9C0\uB3C4 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.',true);
+        historyCache=null;
+        setTimeout(()=>{location.href='/map';},1200);
       }catch(e2){setMsg(e2.message||'\uACF5\uC57D \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',false)}finally{els.save.disabled=false}
     }
     async function removeAll(){
