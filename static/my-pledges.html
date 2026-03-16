@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>내 공약 등록</title>
+  <title>내 공약 등록 - 정책 메이트</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;min-height:100vh;color:#e2e8f0;padding:20px 16px 40px;background:radial-gradient(1000px 500px at 20% 10%,rgba(255,114,16,.10),transparent 60%),radial-gradient(900px 600px at 90% 20%,rgba(56,189,248,.10),transparent 60%),linear-gradient(160deg,#04162b 0%,#073053 55%,#0a3b69 100%);background-attachment:fixed}.wrap{max-width:980px;margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;color:inherit}.brand img{height:30px}.brand b{display:block;font-size:17px;color:#fff}.brand span{display:block;font-size:13px;color:#ffb37a;font-weight:700}.nav{display:flex;gap:8px;flex-wrap:wrap}.btn,.btn2,.btn3,.nav a,.nav button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;cursor:pointer}.nav a,.nav button,.btn2{color:#e2e8f0;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.18)}.btn{color:#0f172a;background:#fff;border:1px solid rgba(255,255,255,.6)}.btn3{color:#fecaca;background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.22)}h1{font-size:32px;font-weight:950;color:#fff;margin-bottom:12px}.sub{font-size:16px;line-height:1.7;margin-bottom:16px}.card{background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:22px;box-shadow:0 18px 40px rgba(0,0,0,.28);backdrop-filter:blur(10px);margin-bottom:16px}.note{background:rgba(255,114,16,.10);border:1px solid rgba(255,114,16,.26);color:#ffd6b0;border-radius:14px;padding:14px 16px;line-height:1.65;font-size:14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.item{background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.12);border-radius:14px;padding:14px 16px}.item em{display:block;font-style:normal;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:700}.item b{display:block;color:#fff;line-height:1.5}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:800}.bnew{background:rgba(59,130,246,.16);color:#bfdbfe}.bpen{background:rgba(250,204,21,.16);color:#fde68a}.bapp{background:rgba(34,197,94,.16);color:#bbf7d0}.brej{background:rgba(239,68,68,.16);color:#fecaca}.ainfo{margin-top:12px;padding:13px 15px;border-radius:12px;line-height:1.6;font-size:14px;border:1px solid rgba(148,163,184,.18)}.pending{background:rgba(250,204,21,.08);border-color:rgba(250,204,21,.22);color:#fde68a}.approved{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.22);color:#bbf7d0}.rejected{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.22);color:#fecaca}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.head h2{font-size:22px;color:#fff}.help{font-size:14px;color:#94a3b8;line-height:1.6}.list{display:grid;gap:14px}.empty,.loading{text-align:center;padding:32px 16px;color:#94a3b8;line-height:1.7}.row{background:rgba(2,6,23,.24);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:16px}.rowtop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.ord{display:inline-flex;align-items:center;gap:10px;font-weight:900;color:#fff}.ord .n{width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:13px}.acts{display:flex;gap:8px;flex-wrap:wrap}label{display:block;margin-bottom:6px;color:#fff;font-size:14px;font-weight:800}input[type=text],textarea{width:100%;border-radius:12px;border:1px solid rgba(148,163,184,.24);background:rgba(2,6,23,.32);color:#fff;font:inherit;padding:13px 14px;outline:none}textarea{min-height:160px;resize:vertical;line-height:1.65}.locked{background:rgba(15,23,42,.56);color:#dbeafe;cursor:not-allowed}.hint,.lockednote{margin-top:8px;font-size:13px;line-height:1.55}.hint{color:#94a3b8}.lockednote{color:#fde68a;background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.14);border-radius:10px;padding:10px 12px}.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.score{display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:800}.good{background:rgba(34,197,94,.14);color:#bbf7d0}.mid{background:rgba(250,204,21,.14);color:#fde68a}.low{background:rgba(239,68,68,.14);color:#fecaca}.date{font-size:12px;color:#94a3b8}.preview{display:none;margin-top:12px;background:rgba(0,0,0,.18);border:1px solid rgba(148,163,184,.1);border-radius:12px;padding:14px 16px;white-space:pre-wrap;word-break:break-word;line-height:1.65;color:#cbd5e1;max-height:220px;overflow:auto;font-size:13px}.actions{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px}#msg{display:none;margin-top:16px;padding:13px 15px;border-radius:12px;line-height:1.6;font-size:14px;border:1px solid transparent}.ok{display:block!important;background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.20);color:#bbf7d0}.error{display:block!important;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.20);color:#fecaca}.modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px}.modal.open{display:flex}.mbox{width:100%;max-width:820px;max-height:84vh;display:flex;flex-direction:column;background:linear-gradient(180deg,#10213a 0%,#081425 100%);border:1px solid rgba(148,163,184,.22);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden}.mhead,.mfoot{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}.mhead{border-bottom:1px solid rgba(148,163,184,.12)}.mfoot{border-top:1px solid rgba(148,163,184,.12);background:rgba(2,6,23,.24);justify-content:flex-end}.mhead b{font-size:17px;color:#fff}.mbody{padding:16px 18px;overflow:auto}.hist{display:grid;gap:12px}.hitem{padding:14px 16px;border-radius:14px;border:1px solid rgba(148,163,184,.14);background:rgba(255,255,255,.04);cursor:pointer}.hitem:hover{background:rgba(255,255,255,.08);border-color:rgba(147,197,253,.24)}.htop{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}.htitle{color:#fff;font-weight:800;line-height:1.45}.hmeta{color:#94a3b8;font-size:12px}.hprev{color:#cbd5e1;font-size:13px;line-height:1.6;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}@media (max-width:720px){.grid{grid-template-columns:1fr}.actions{flex-direction:column}}
   </style>
@@ -13,19 +13,19 @@
     <div class="top">
       <a href="/" class="brand">
         <img src="/static/logo.svg" alt="개혁신당 로고">
-        <span><b>개혁신당 정책 메이트</b><span>후보자 공약 등록 작업 공간</span></span>
+        <span><b>개혁신당 정책 메이트</b><span>공약 분석 기록을 등록하고 관리하는 공간</span></span>
       </a>
       <nav class="nav">
         <a href="/dashboard">내 기록</a>
         <a href="/pledge">공약 분석</a>
-        <a href="/map">지도 보기</a>
+        <a href="/map">지역 공약</a>
         <form action="/api/auth/logout" method="POST"><button type="submit">로그아웃</button></form>
       </nav>
     </div>
     <h1>내 공약 등록</h1>
     <p class="sub">공약 분석 페이지에서 만든 분석 기록을 불러와 후보자 공약으로 등록하는 페이지입니다. 저장 후에는 관리자 검수를 거쳐 공개 화면에 반영됩니다.</p>
     <div id="loading" class="card loading">후보자 정보를 불러오는 중입니다.</div>
-    <div id="no-position" class="card empty" style="display:none;">출마 유형 또는 지역 정보가 없어 공약을 등록할 수 없습니다.<br>회원가입 정보가 누락된 경우 관리자에게 문의해 주세요.</div>
+    <div id="no-position" class="card empty" style="display:none;">회원가입 시 출마 유형 또는 지역 정보가 설정되지 않아 공약을 등록할 수 없습니다.<br>관리자에게 문의해 주세요.</div>
     <div id="main" style="display:none;">
       <div class="card">
         <div class="note"><strong>중요:</strong> 공약은 직접 확인한 실제 내용 기준으로 검토됩니다. 분석 기록을 불러와 등록하되, 지역과 출마 의사에 맞는 내용인지 꼭 다시 확인해 주세요.</div>
@@ -37,9 +37,9 @@
         <div class="head">
           <div>
             <h2>공약 목록</h2>
-            <p class="help">직접 붙여넣은 공약은 저장되지 않습니다. 각 공약은 반드시 분석 기록에서 불러와 주세요.</p>
+            <p class="help">공약은 분석 기록에서 불러와 등록해 주세요. 저장 후 관리자 확인 뒤 공개 화면에 반영됩니다.</p>
           </div>
-          <button type="button" class="btn2" id="add">공약 칸 추가</button>
+          <button type="button" class="btn2" id="add">+ 공약 추가</button>
         </div>
         <form id="form">
           <div id="list" class="list"></div>
@@ -64,15 +64,15 @@
     let idx=0,hasCandidate=false,importTarget=null,historyCache=null;
     const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const fdate=v=>{if(!v)return'';const d=new Date(String(v).replace(' ','T'));return Number.isNaN(d.getTime())?v:d.toLocaleString('ko-KR')};
-    const badgeClass=s=>{s=String(s||'NEW').toUpperCase();if(s==='APPROVED')return['bapp','Approved'];if(s==='REJECTED')return['brej','Rejected'];if(s==='PENDING')return['bpen','Pending'];return['bnew','New']};
+    const badgeClass=s=>{s=String(s||'NEW').toUpperCase();if(s==='APPROVED')return['bapp','\uC2B9\uC778 \uC644\uB8CC'];if(s==='REJECTED')return['brej','\uBC18\uB824'];if(s==='PENDING')return['bpen','\uAC80\uC218 \uB300\uAE30'];return['bnew','\uC2E0\uADDC \uB4F1\uB85D']};
     const scoreClass=n=>!Number.isFinite(Number(n))?'mid':Number(n)>=80?'good':Number(n)>=60?'mid':'low';
-    const titleFromText=t=>{t=String(t||'').replace(/\s+/g,' ').trim();if(!t)return'Imported pledge';return t.length>48?`${t.slice(0,48)}...`:t};
+    const titleFromText=t=>{t=String(t||'').replace(/\s+/g,' ').trim();if(!t)return'\uBD88\uB7EC\uC628 \uACF5\uC57D';return t.length>48?`${t.slice(0,48)}...`:t};
     const infoItem=(l,v)=>`<div class="item"><em>${esc(l)}</em><b>${esc(v||'-')}</b></div>`;
     function setMsg(text,ok){els.msg.className=ok?'ok':'error';els.msg.textContent=text}
     function clearMsg(){els.msg.className='';els.msg.textContent=''}
-    function approvalHtml(candidate){if(!candidate)return'<div class="ainfo pending">No pledges are registered yet. Import analyzed pledges and save them to enter review.</div>';const s=String(candidate.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return'<div class="ainfo approved">These pledges are currently approved. Saving changes may move them back into review.</div>';if(s==='REJECTED')return `<div class="ainfo rejected">The previous submission was rejected. Please revise and save again.${candidate.rejection_reason?`<br><strong>Reason:</strong> ${esc(candidate.rejection_reason)}`:''}</div>`;return'<div class="ainfo pending">Saved pledges are published after admin review. Please confirm they match the actual campaign pledges.</div>'}
+    function approvalHtml(candidate){if(!candidate)return'<div class="ainfo pending">\uC544\uC9C1 \uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uACF5\uC57D\uC744 \uBD88\uB7EC\uC640 \uC800\uC7A5\uD558\uBA74 \uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4.</div>';const s=String(candidate.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return'<div class="ainfo approved">\uD604\uC7AC \uB4F1\uB85D\uB41C \uACF5\uC57D\uC740 \uC2B9\uC778\uB41C \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uC5EC \uB2E4\uC2DC \uC800\uC7A5\uD558\uBA74 \uC7AC\uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uC804\uD658\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</div>';if(s==='REJECTED')return `<div class="ainfo rejected">\uC774\uC804\uC5D0 \uB4F1\uB85D\uD55C \uACF5\uC57D\uC774 \uBC18\uB824\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uBCF4\uC644\uD574 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.${candidate.rejection_reason?`<br><strong>\uBC18\uB824 \uC0AC\uC720:</strong> ${esc(candidate.rejection_reason)}`:''}</div>`;return'<div class="ainfo pending">\uC800\uC7A5\uB41C \uACF5\uC57D\uC740 \uAD00\uB9AC\uC790 \uAC80\uC218 \uD6C4 \uACF5\uAC1C\uB429\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uACFC \uC2E4\uC81C \uACF5\uC57D\uC774 \uC77C\uCE58\uD558\uB294\uC9C0 \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694.</div>'}
     function renumber(){[...els.list.querySelectorAll('.row')].forEach((row,i)=>{const n=row.querySelector('.n');if(n)n.textContent=String(i+1)})}
-    function ensureEmpty(){if(els.list.querySelector('.row'))return;els.list.innerHTML='<div class="empty">No pledges yet. Add a row and import from analysis history.</div>'}
+    function ensureEmpty(){if(els.list.querySelector('.row'))return;els.list.innerHTML='<div class="empty">\uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uACF5\uC57D\uC744 \uCD94\uAC00\uD55C \uB4A4 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.</div>'}
     function addRow(data={}){
       idx+=1;
       const row=document.createElement('div');
@@ -82,12 +82,12 @@
       row.dataset.importedScore=data.total_score??'';
       row.dataset.importedResult=data.analysis_result||'';
       row.dataset.importedAnalyzedAt=data.analyzed_at||'';
-      row.innerHTML=`<div class="rowtop"><div class="ord"><span class="n">0</span><span>Pledge</span></div><div class="acts"><button type="button" class="btn2 import">Import analysis</button><button type="button" class="btn3 remove">Remove</button></div></div><label>Pledge title</label><input type="text" class="title ${imported?'locked':''}" value="${esc(data.title||'')}" placeholder="Filled automatically after import." ${imported?'readonly':''}><label style="margin-top:12px">Pledge content</label><textarea class="content ${imported?'locked':''}" placeholder="Imported pledge text will appear here." ${imported?'readonly':''}>${esc(data.content||'')}</textarea><div class="${imported?'lockednote':'hint'}">${imported?'This pledge was imported from analysis history. Re-run analysis if you need a different version.':'Manually typed pledges cannot be saved. Import each pledge from analysis history first.'}</div><div class="meta"></div><div class="preview"></div>`;
+      row.innerHTML=`<div class="rowtop"><div class="ord"><span class="n">0</span><span>공약</span></div><div class="acts"><button type="button" class="btn2 import">분석 기록 불러오기</button><button type="button" class="btn3 remove">삭제</button></div></div><label>공약 제목</label><input type="text" class="title ${imported?'locked':''}" value="${esc(data.title||'')}" placeholder="분석 기록에서 불러오면 자동으로 채워집니다." ${imported?'readonly':''}><label style="margin-top:12px">공약 내용</label><textarea class="content ${imported?'locked':''}" placeholder="불러온 공약 내용이 여기에 표시됩니다." ${imported?'readonly':''}>${esc(data.content||'')}</textarea><div class="${imported?'lockednote':'hint'}">${imported?'이 공약은 분석 기록에서 불러온 항목입니다. 내용을 바꾸려면 새로 분석한 뒤 다시 불러와 주세요.':'직접 입력한 공약은 저장되지 않습니다. 반드시 분석 기록에서 불러온 뒤 저장해 주세요.'}</div><div class="meta"></div><div class="preview"></div>`;
       const empty=els.list.querySelector('.empty');if(empty)empty.remove();
       els.list.appendChild(row);
       const meta=row.querySelector('.meta'),preview=row.querySelector('.preview');
       if(imported){
-        meta.innerHTML=`<span class="score ${scoreClass(data.total_score)}">Score ${Number(data.total_score).toFixed(1)}</span><span class="date">${esc(fdate(data.analyzed_at))}</span>`;
+        meta.innerHTML=`<span class="score ${scoreClass(data.total_score)}">총점 ${Number(data.total_score).toFixed(1)}</span><span class="date">${esc(fdate(data.analyzed_at))}</span>`;
         if(data.analysis_result){preview.style.display='block';preview.textContent=data.analysis_result}
       }
       row.querySelector('.import').addEventListener('click',()=>openModal(row));
@@ -102,70 +102,70 @@
         const res=await fetch('/api/my/candidate',{credentials:'include'});
         if(res.status===401){location.href='/login?next=/my-pledges';return}
         if(res.status===403){location.href='/pending';return}
-        if(!res.ok)throw new Error('Failed to load candidate data.');
+        if(!res.ok)throw new Error('\uD6C4\uBCF4\uC790 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
         const data=await res.json(),ui=data.user_info||{},candidate=data.candidate||null,pledges=Array.isArray(data.pledges)?data.pledges:[];
         if(!ui.election_position||!ui.region_code){els.loading.style.display='none';els.noPos.style.display='block';return}
-        els.info.innerHTML=[infoItem('Candidate',ui.name||candidate?.name||'-'),infoItem('Election type',ui.election_position||ui.election_type||'-'),infoItem('Region',ui.region_name||'-'),infoItem('District',ui.district_name||'-')].join('');
+        els.info.innerHTML=[infoItem('\uD6C4\uBCF4\uC790\uBA85',ui.name||candidate?.name||'-'),infoItem('\uCD9C\uB9C8 \uC720\uD615',ui.election_position||ui.election_type||'-'),infoItem('\uC9C0\uC5ED',ui.region_name||'-'),infoItem('\uC120\uAC70\uAD6C',ui.district_name||'-')].join('');
         const [bc,bt]=badgeClass(candidate?candidate.approval_status:'NEW');els.badge.innerHTML=`<span class="badge ${bc}">${bt}</span>`;els.approval.innerHTML=approvalHtml(candidate);
-        hasCandidate=Boolean(candidate);els.del.style.display=hasCandidate?'inline-flex':'none';els.save.textContent=hasCandidate?'Save changes':'Save pledges';
+        hasCandidate=Boolean(candidate);els.del.style.display=hasCandidate?'inline-flex':'none';els.save.textContent=hasCandidate?'\uACF5\uC57D \uB2E4\uC2DC \uC800\uC7A5':'\uACF5\uC57D \uC800\uC7A5';
         els.list.innerHTML='';if(pledges.length){pledges.forEach(p=>addRow(p))}else ensureEmpty();
         els.loading.style.display='none';els.main.style.display='block';
-      }catch(e){els.loading.style.display='none';setMsg(e.message||'Failed to load the page.',false)}
+      }catch(e){els.loading.style.display='none';setMsg(e.message||'\uD398\uC774\uC9C0\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.',false)}
     }
     async function save(e){
       e.preventDefault();clearMsg();
       const pledges=serialize();
-      if(!pledges.length){setMsg('At least one pledge is required.',false);return}
-      if(pledges.some(p=>!p.title)){setMsg('A pledge title is empty. Please import it again from history.',false);return}
+      if(!pledges.length){setMsg('\uCD5C\uC18C 1\uAC1C\uC758 \uACF5\uC57D\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.',false);return}
+      if(pledges.some(p=>!p.title)){setMsg('\uACF5\uC57D \uC81C\uBAA9\uC774 \uBE44\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uB2E4\uC2DC \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.',false);return}
       const unanalyzed=pledges.filter(p=>p.imported_score==null);
-      if(unanalyzed.length){setMsg(`${unanalyzed.length} pledge(s) were not imported from analysis history. Import every pledge before saving.`,false);return}
+      if(unanalyzed.length){setMsg(`\uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC624\uC9C0 \uC54A\uC740 \uACF5\uC57D\uC774 ${unanalyzed.length}\uAC1C \uC788\uC2B5\uB2C8\uB2E4. \uBAA8\uB4E0 \uACF5\uC57D\uC740 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC628 \uB4A4 \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.`,false);return}
       els.save.disabled=true;
       try{
         const res=await fetch('/api/my/candidate',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({pledges})});
         if(res.status===401){location.href='/login?next=/my-pledges';return}
         if(res.status===403){location.href='/pending';return}
         const text=await res.text();let data={};try{data=JSON.parse(text)}catch(_){}
-        if(!res.ok)throw new Error(data.detail||'Failed to save pledges.');
-        setMsg('Pledges saved. They will be published after review.',true);historyCache=null;await load();
-      }catch(e2){setMsg(e2.message||'Failed to save pledges.',false)}finally{els.save.disabled=false}
+        if(!res.ok)throw new Error(data.detail||'\uACF5\uC57D \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
+        setMsg('\uACF5\uC57D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uAC80\uC218 \uD6C4 \uACF5\uAC1C\uB429\uB2C8\uB2E4.',true);historyCache=null;await load();
+      }catch(e2){setMsg(e2.message||'\uACF5\uC57D \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',false)}finally{els.save.disabled=false}
     }
     async function removeAll(){
-      if(!confirm('Delete all registered pledges?'))return;
+      if(!confirm('\uB4F1\uB85D\uB41C \uACF5\uC57D \uC804\uCCB4\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?'))return;
       els.del.disabled=true;clearMsg();
       try{
         const res=await fetch('/api/my/candidate',{method:'DELETE',credentials:'include'});
-        if(!res.ok){const t=await res.text();let d={};try{d=JSON.parse(t)}catch(_){}throw new Error(d.detail||'Failed to delete pledges.')}
-        setMsg('All pledges were deleted.',true);await load();
-      }catch(e){setMsg(e.message||'Failed to delete pledges.',false)}finally{els.del.disabled=false}
+        if(!res.ok){const t=await res.text();let d={};try{d=JSON.parse(t)}catch(_){}throw new Error(d.detail||'\uC0AD\uC81C \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.')}
+        setMsg('\uB4F1\uB85D\uB41C \uACF5\uC57D\uC744 \uBAA8\uB450 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.',true);await load();
+      }catch(e){setMsg(e.message||'\uC0AD\uC81C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',false)}finally{els.del.disabled=false}
     }
     function openModal(target){importTarget=target;els.modal.classList.add('open');els.modal.setAttribute('aria-hidden','false');renderHistory()}
     function closeModal(){els.modal.classList.remove('open');els.modal.setAttribute('aria-hidden','true');importTarget=null}
-    async function getHistory(){if(historyCache)return historyCache;const res=await fetch('/api/history?limit=50',{credentials:'include'});if(!res.ok)throw new Error('Failed to load analysis history.');const data=await res.json();historyCache=(data.items||[]).filter(it=>Number(it.status_code)===200);return historyCache}
+    async function getHistory(){if(historyCache)return historyCache;const res=await fetch('/api/history?limit=50',{credentials:'include'});if(!res.ok)throw new Error('\uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');const data=await res.json();historyCache=(data.items||[]).filter(it=>Number(it.status_code)===200);return historyCache}
     async function renderHistory(){
-      els.mbody.innerHTML='<div class="empty">Loading analysis history.</div>';
+      els.mbody.innerHTML='<div class="empty">\uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.</div>';
       try{
         const items=await getHistory();
-        if(!items.length){els.mbody.innerHTML='<div class="empty">No reusable analysis history was found.<br><a href="/pledge" style="color:#93c5fd;">Open the analysis page</a> and analyze a pledge first.</div>';return}
-        els.mbody.innerHTML=`<div class="hist">${items.map(it=>{const score=Number(it.total_score),scoreHtml=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">Score ${score.toFixed(1)}</span>`:'';return`<button type="button" class="hitem" data-id="${it.id}"><div class="htop"><div class="htitle">${esc(titleFromText(it.input_preview||''))}</div><div>${scoreHtml}</div></div><div class="hmeta">${esc(fdate(it.created_at))}</div><div class="hprev">${esc(it.input_preview||'')}</div></button>`}).join('')}</div>`;
+        if(!items.length){els.mbody.innerHTML='<div class="empty">\uC800\uC7A5 \uAC00\uB2A5\uD55C \uBD84\uC11D \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.<br><a href="/pledge" style="color:#93c5fd;">\uACF5\uC57D \uBD84\uC11D \uD398\uC774\uC9C0</a>\uC5D0\uC11C \uBA3C\uC800 \uACF5\uC57D\uC744 \uBD84\uC11D\uD574 \uC8FC\uC138\uC694.</div>';return}
+        els.mbody.innerHTML=`<div class="hist">${items.map(it=>{const score=Number(it.total_score),scoreHtml=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span>`:'';return`<button type="button" class="hitem" data-id="${it.id}"><div class="htop"><div class="htitle">${esc(titleFromText(it.input_preview||''))}</div><div>${scoreHtml}</div></div><div class="hmeta">${esc(fdate(it.created_at))}</div><div class="hprev">${esc(it.input_preview||'')}</div></button>`}).join('')}</div>`;
         els.mbody.querySelectorAll('.hitem').forEach(btn=>btn.addEventListener('click',()=>importHistory(btn.dataset.id)));
-      }catch(e){els.mbody.innerHTML=`<div class="empty">${esc(e.message||'Failed to load analysis history.')}</div>`}
+      }catch(e){els.mbody.innerHTML=`<div class="empty">${esc(e.message||'\uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.')}</div>`}
     }
     async function importHistory(id){
       if(!importTarget)return;
       try{
         const res=await fetch(`/api/history/${id}`,{credentials:'include'});
-        if(!res.ok)throw new Error('Failed to load the selected history item.');
+        if(!res.ok)throw new Error('\uC120\uD0DD\uD55C \uBD84\uC11D \uAE30\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
         const item=await res.json(),input=String(item.input_text||'').trim(),result=String(item.result_text||'').trim(),score=Number(item.total_score),title=titleFromText((input.split('\n').find(l=>l.trim())||input));
         importTarget.dataset.importedScore=Number.isFinite(score)?String(score):'';
         importTarget.dataset.importedResult=result;
         importTarget.dataset.importedAnalyzedAt=item.created_at||'';
         const titleEl=importTarget.querySelector('.title'),contentEl=importTarget.querySelector('.content');
         titleEl.value=title;contentEl.value=input;titleEl.readOnly=true;contentEl.readOnly=true;titleEl.classList.add('locked');contentEl.classList.add('locked');
-        const note=importTarget.querySelector('.hint,.lockednote');note.className='lockednote';note.textContent='This pledge was imported from analysis history. Re-run analysis if you need a different version.';
-        importTarget.querySelector('.meta').innerHTML=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">Score ${score.toFixed(1)}</span><span class="date">${esc(fdate(item.created_at))}</span>`:'<span class="date">No score available</span>';
+        const note=importTarget.querySelector('.hint,.lockednote');note.className='lockednote';note.textContent='\uC774 \uACF5\uC57D\uC740 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC628 \uD56D\uBAA9\uC785\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uBC14\uAFB8\uB824\uBA74 \uC0C8\uB85C \uBD84\uC11D\uD55C \uB4A4 \uB2E4\uC2DC \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.';
+        importTarget.querySelector('.meta').innerHTML=Number.isFinite(score)?`<span class="score ${scoreClass(score)}">\uCD1D\uC810 ${score.toFixed(1)}</span><span class="date">${esc(fdate(item.created_at))}</span>`:'<span class="date">\uC810\uC218 \uC815\uBCF4 \uC5C6\uC74C</span>';
         const preview=importTarget.querySelector('.preview');if(result){preview.style.display='block';preview.textContent=result}else{preview.style.display='none';preview.textContent=''}
         closeModal();
-      }catch(e){alert(e.message||'Import failed.')}
+      }catch(e){alert(e.message||'\uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.')}
     }
     els.add.addEventListener('click',()=>addRow());
     els.form.addEventListener('submit',save);
