@@ -2807,7 +2807,13 @@ def api_my_candidate_get(request: Request):
 
         candidate_id = int(row["id"])
         pledges = conn.execute(
-            "SELECT id, title, content, priority, total_score, analysis_result, analyzed_at FROM candidate_pledges WHERE candidate_id = ? ORDER BY priority ASC, id ASC",
+            """
+            SELECT id, title, content, priority, total_score, analysis_result, analyzed_at,
+                   approval_status, rejection_reason
+            FROM candidate_pledges
+            WHERE candidate_id = ?
+            ORDER BY priority ASC, id ASC
+            """,
             (candidate_id,),
         ).fetchall()
 
@@ -2826,7 +2832,8 @@ def api_my_candidate_get(request: Request):
             },
             "pledges": [
                 {"id": p["id"], "title": p["title"], "content": p["content"], "priority": p["priority"],
-                 "total_score": p["total_score"], "analysis_result": p["analysis_result"], "analyzed_at": p["analyzed_at"]}
+                 "total_score": p["total_score"], "analysis_result": p["analysis_result"], "analyzed_at": p["analyzed_at"],
+                 "approval_status": p["approval_status"] or "PENDING", "rejection_reason": p["rejection_reason"] or ""}
                 for p in pledges
             ],
             "user_info": {

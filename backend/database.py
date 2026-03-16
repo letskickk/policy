@@ -332,6 +332,8 @@ def init_db() -> None:
             "ALTER TABLE candidate_pledges ADD COLUMN total_score REAL",
             "ALTER TABLE candidate_pledges ADD COLUMN analysis_result TEXT",
             "ALTER TABLE candidate_pledges ADD COLUMN analyzed_at TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'PENDING'",
+            "ALTER TABLE candidate_pledges ADD COLUMN rejection_reason TEXT",
             "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
             "ALTER TABLE candidates ADD COLUMN rejection_reason TEXT",
             "ALTER TABLE policy_documents ADD COLUMN speaker_name TEXT",
@@ -348,6 +350,7 @@ def init_db() -> None:
                 if "duplicate column" not in str(e).lower():
                     raise
         conn.execute("CREATE INDEX IF NOT EXISTS idx_cp_score ON candidate_pledges(total_score)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cp_approval ON candidate_pledges(candidate_id, approval_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_hist_score ON analysis_history(total_score, created_at)")
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS weekly_champions (
