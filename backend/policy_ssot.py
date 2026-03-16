@@ -18,6 +18,7 @@ DOC_TYPES = {
     "briefing",
     "pledge",
     "meeting_note",
+    "party_rule",
     "research",
     "other",
 }
@@ -44,6 +45,8 @@ PERSON_ROLE_LABELS = {
     "member": "국회의원",
     "policy_owner": "정책 담당",
 }
+PUBLIC_MESSAGE_DOC_TYPES = {"statement", "press_release", "briefing"}
+
 
 def _normalize_text(value: Optional[str]) -> str:
     return unicodedata.normalize("NFC", (value or "").strip())
@@ -99,6 +102,105 @@ def _decorate_public_documents(items: list[dict]) -> list[dict]:
         ][:3]
         decorated.append(cloned)
     return decorated
+
+
+def _string_list(value: object) -> list[str]:
+    items: list[str] = []
+    if isinstance(value, list):
+        for entry in value:
+            text = _normalize_text(str(entry))
+            if text:
+                items.append(text)
+    return items
+
+
+def _meeting_participants(document: dict) -> list[str]:
+    metadata = document.get("metadata") or {}
+    participants = _string_list(metadata.get("participants"))
+    if participants:
+        return participants
+    seen: set[str] = set()
+    names: list[str] = []
+    for person in document.get("people") or []:
+        name = _normalize_text(person.get("person_name"))
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
+
+
+def _meeting_agenda_items(document: dict) -> list[str]:
+    metadata = document.get("metadata") or {}
+    agenda = _string_list(metadata.get("agenda_items"))
+    if agenda:
+        return agenda
+    topic = _normalize_text(metadata.get("topic"))
+    return [topic] if topic else []
+
+
+def _meeting_decisions(document: dict) -> list[str]:
+    metadata = document.get("metadata") or {}
+    decisions = _string_list(metadata.get("decisions"))
+    if decisions:
+        return decisions
+    decision_summary = _normalize_text(metadata.get("decision_summary"))
+    return [decision_summary] if decision_summary else []
+
+
+def _build_meeting_timeline(document: dict) -> list[dict]:
+    metadata = document.get("metadata") or {}
+    held_at = _normalize_text(metadata.get("held_at") or document.get("published_at"))
+    meeting_type = _normalize_text(metadata.get("meeting_type")) or "회의"
+    timeline: list[dict] = []
+    if held_at:
+        timeline.append(
+            {
+                "kind": "meeting_event",
+                "at": held_at,
+                "title": f"{meeting_type} 개최",
+                "summary": document.get("summary") or "회의 기록이 등록됐습니다.",
+            }
+        )
+    for decision in _meeting_decisions(document)[:5]:
+        timeline.append(
+            {
+                "kind": "meeting_event",
+                "at": held_at,
+                "title": "결정사항",
+                "summary": decision,
+            }
+        )
+    return timeline
+
+
+def _build_rule_timeline(document: dict) -> list[dict]:
+    metadata = document.get("metadata") or {}
+    timeline: list[dict] = []
+    effective_from = _normalize_text(metadata.get("effective_from") or document.get("published_at"))
+    if effective_from:
+        timeline.append(
+            {
+                "kind": "rule_revision",
+                "at": effective_from,
+                "title": metadata.get("rule_kind_label") or "규정 시행",
+                "summary": metadata.get("version_label") or document.get("summary") or "규정 본문이 반영됐습니다.",
+            }
+        )
+    revisions = metadata.get("revision_history") or []
+    if isinstance(revisions, list):
+        for entry in revisions[:8]:
+            if not isinstance(entry, dict):
+                continue
+            timeline.append(
+                {
+                    "kind": "rule_revision",
+                    "at": _normalize_text(entry.get("at")),
+                    "title": _normalize_text(entry.get("title")) or "규정 개정",
+                    "summary": _normalize_text(entry.get("summary")) or "",
+                }
+            )
+    timeline.sort(key=lambda item: ((item.get("at") or "9999-99-99"), item.get("title") or ""))
+    return timeline
 
 
 TOPIC_RULES = [
@@ -1012,6 +1114,16 @@ def get_policy_document(document_id: int) -> dict:
         item["topic_label"] = _classify_commentary_topic(item)
         approved_positions = list_policy_positions(status="approved")
         item["related_positions"] = item["linked_positions"] or _infer_related_positions_for_document(item, approved_positions)
+    elif item["doc_type"] == "meeting_note":
+        approved_positions = list_policy_positions(status="approved")
+        item["participants"] = _meeting_participants(item)
+        item["agenda_items"] = _meeting_agenda_items(item)
+        item["decisions"] = _meeting_decisions(item)
+        item["timeline"] = _build_meeting_timeline(item)
+        item["related_positions"] = item["linked_positions"] or _infer_related_positions_for_document(item, approved_positions)
+    elif item["doc_type"] == "party_rule":
+        item["timeline"] = _build_rule_timeline(item)
+        item["related_positions"] = item["linked_positions"]
     else:
         item["related_positions"] = item["linked_positions"]
     if "timeline" not in item:
@@ -1515,6 +1627,31 @@ def _build_document_key_points(document: dict) -> str:
             parts.append("연결 정책 " + ", ".join(link.get("position_title") or "" for link in links[:2] if link.get("position_title")))
         return " · ".join([part for part in parts if part]) or "논평 핵심 쟁점 정보가 아직 정리되지 않았습니다."
 
+    if document.get("doc_type") == "meeting_note":
+        meeting_type = _normalize_text((document.get("metadata") or {}).get("meeting_type")) or "회의"
+        agenda = _meeting_agenda_items(document)
+        participants = _meeting_participants(document)
+        parts = [meeting_type]
+        if agenda:
+            parts.append("주요 안건 " + ", ".join(agenda[:2]))
+        if participants:
+            parts.append("참석 " + ", ".join(participants[:3]))
+        if linked_positions:
+            parts.append("연결 정책 " + ", ".join(link.get("position_title") or "" for link in linked_positions[:2] if link.get("position_title")))
+        return " · ".join([part for part in parts if part]) or "회의록 핵심 쟁점 정보가 아직 정리되지 않았습니다."
+
+    if document.get("doc_type") == "party_rule":
+        metadata = document.get("metadata") or {}
+        rule_kind = _normalize_text(metadata.get("rule_kind_label") or metadata.get("rule_kind")) or "규정"
+        version_label = _normalize_text(metadata.get("version_label"))
+        key_articles = _string_list(metadata.get("key_articles"))
+        parts = [rule_kind]
+        if version_label:
+            parts.append(version_label)
+        if key_articles:
+            parts.append("핵심 조항 " + ", ".join(key_articles[:3]))
+        return " · ".join([part for part in parts if part]) or "규정 핵심 쟁점 정보가 아직 정리되지 않았습니다."
+
     return document.get("summary") or "핵심 쟁점 정보가 아직 정리되지 않았습니다."
 
 
@@ -1549,6 +1686,21 @@ def _build_document_relevance_note(document: dict) -> str:
         if related_positions:
             return "정책과 함께 읽어야 맥락이 보이는 공식 메시지입니다."
         return "당의 현재 메시지 방향을 보여주는 공식 발화라서 중요합니다."
+
+    if document.get("doc_type") == "meeting_note":
+        decisions = _meeting_decisions(document)
+        if linked_positions:
+            return f"연결 정책 {len(linked_positions)}건이 어떤 회의 맥락에서 논의됐는지 보여주는 기록입니다."
+        if decisions:
+            return "실제 의사결정 또는 논의 결과가 담긴 회의 기록이라서 중요합니다."
+        return "정책과 메시지의 내부 논의 맥락을 확인할 수 있는 회의 기록입니다."
+
+    if document.get("doc_type") == "party_rule":
+        metadata = document.get("metadata") or {}
+        rule_kind = _normalize_text(metadata.get("rule_kind_label") or metadata.get("rule_kind")) or "규정"
+        if linked_positions:
+            return f"{rule_kind}이 연결 정책 {len(linked_positions)}건의 제도적 기준과 운영 근거를 보여줍니다."
+        return f"{rule_kind}은 당 운영과 의사결정의 기준을 확인하는 기본 문서라서 중요합니다."
 
     return "공개 문서 맥락에서 함께 확인할 가치가 있습니다."
 
@@ -1618,6 +1770,7 @@ def _build_person_detail_payload(person_name: str, roles: set[str], documents_li
     bill_docs = [item for item in ordered_documents if item["doc_type"] == "bill"]
     statement_docs = [item for item in ordered_documents if item["doc_type"] == "statement"]
     press_docs = [item for item in ordered_documents if item["doc_type"] in {"press_release", "briefing"}]
+    message_docs = [item for item in ordered_documents if item["doc_type"] in {"statement", "press_release", "briefing"}]
     pledge_docs = [item for item in ordered_documents if item["doc_type"] == "pledge"]
     role_labels = _human_person_role_labels(roles)
     focus_positions = _build_person_focus_positions(ordered_documents, linked_positions)
@@ -1708,9 +1861,13 @@ def _build_person_detail_payload(person_name: str, roles: set[str], documents_li
     return {
         "brief": brief,
         "role_labels": role_labels,
+        "active_bill_count": active_bill_count,
+        "ended_bill_count": ended_bill_count,
+        "message_count": len(message_docs),
         "focus_positions": focus_positions[:6],
         "featured_bills": bill_docs[:5],
         "featured_commentary": statement_docs[:5],
+        "featured_messages": message_docs[:5],
         "derived_key_points": " · ".join(key_points_parts) if key_points_parts else "핵심 쟁점 정보가 아직 없습니다.",
         "derived_relevance_note": relevance,
         "timeline": timeline,
@@ -1773,6 +1930,9 @@ def get_public_overview() -> dict:
     active_documents = list_policy_documents(status="active")
     public_documents = [item for item in active_documents if _is_verified_public_pledge(item)]
     public_people = list_public_people()
+    latest_messages = list_public_messages(limit=6)
+    latest_meetings = list_public_meetings(limit=6)
+    latest_rules = list_public_rules(limit=6)
 
     latest_positions = sorted(
         approved_positions,
@@ -1780,7 +1940,6 @@ def get_public_overview() -> dict:
         reverse=True,
     )[:6]
     latest_bills = [item for item in public_documents if item["doc_type"] == "bill"][:6]
-    latest_statements = list_public_commentary(limit=6)
     latest_pledges = [item for item in public_documents if item["doc_type"] == "pledge"][:6]
 
     curated_positions = []
@@ -1812,23 +1971,33 @@ def get_public_overview() -> dict:
         "counts": {
             "positions": len(approved_positions),
             "bills": sum(1 for item in public_documents if item["doc_type"] == "bill"),
+            "messages": sum(1 for item in public_documents if item["doc_type"] in PUBLIC_MESSAGE_DOC_TYPES),
             "statements": sum(1 for item in public_documents if item["doc_type"] == "statement"),
             "pledges": sum(1 for item in public_documents if item["doc_type"] == "pledge"),
+            "meetings": sum(1 for item in public_documents if item["doc_type"] == "meeting_note"),
+            "rules": sum(1 for item in public_documents if item["doc_type"] == "party_rule"),
             "people": len(public_people),
         },
         "latest_positions": latest_positions,
         "latest_bills": _decorate_public_documents(latest_bills),
-        "latest_statements": latest_statements,
+        "latest_statements": latest_messages,
+        "latest_messages": latest_messages,
+        "latest_meetings": latest_meetings,
+        "latest_rules": latest_rules,
         "latest_pledges": _decorate_public_documents(latest_pledges),
         "top_people": public_people[:8],
         "curated_positions": curated_positions[:6],
     }
 
 
-def list_public_commentary(*, q: Optional[str] = None, speaker_name: Optional[str] = None, limit: int = 60) -> list[dict]:
+def list_public_messages(*, q: Optional[str] = None, speaker_name: Optional[str] = None, limit: int = 60) -> list[dict]:
     query = _normalize_text(q).lower()
     speaker_filter = _normalize_text(speaker_name)
-    items = [item for item in list_policy_documents(doc_type="statement", status="active") if _is_verified_public_pledge(item)]
+    items = [
+        item
+        for item in list_policy_documents(status="active")
+        if item["doc_type"] in PUBLIC_MESSAGE_DOC_TYPES and _is_verified_public_pledge(item)
+    ]
     approved_positions = list_policy_positions(status="approved")
 
     if speaker_filter:
@@ -1856,8 +2025,12 @@ def list_public_commentary(*, q: Optional[str] = None, speaker_name: Optional[st
     return decorated
 
 
-def get_public_commentary_overview(*, limit: int = 120) -> dict:
-    items = list_public_commentary(limit=limit)
+def list_public_commentary(*, q: Optional[str] = None, speaker_name: Optional[str] = None, limit: int = 60) -> list[dict]:
+    return [item for item in list_public_messages(q=q, speaker_name=speaker_name, limit=limit) if item["doc_type"] == "statement"]
+
+
+def get_public_messages_overview(*, limit: int = 120) -> dict:
+    items = list_public_messages(limit=limit)
 
     topic_counts: dict[str, int] = {}
     speaker_counts: dict[str, int] = {}
@@ -1887,10 +2060,10 @@ def get_public_commentary_overview(*, limit: int = 120) -> dict:
 
     return {
         "counts": {
-            "commentary": len(items),
+            "messages": len(items),
             "topics": len(topic_counts),
             "speakers": len(speaker_counts),
-            "linked_commentary": len(linked),
+            "linked_messages": len(linked),
         },
         "topics": topic_items,
         "speakers": speaker_items,
@@ -1899,8 +2072,67 @@ def get_public_commentary_overview(*, limit: int = 120) -> dict:
     }
 
 
+def get_public_commentary_overview(*, limit: int = 120) -> dict:
+    return get_public_messages_overview(limit=limit)
+
+
+def list_public_meetings(*, q: Optional[str] = None, limit: int = 60) -> list[dict]:
+    query = _normalize_text(q).lower()
+    items = [item for item in list_policy_documents(doc_type="meeting_note", status="active") if _is_verified_public_pledge(item)]
+    approved_positions = list_policy_positions(status="approved")
+    if query:
+        items = [
+            item for item in items
+            if query in (item.get("title") or "").lower()
+            or query in (item.get("summary") or "").lower()
+            or query in (item.get("body") or "").lower()
+        ]
+    decorated = _decorate_public_documents(items[: max(1, min(limit, 200))])
+    for item in decorated:
+        item["participants"] = _meeting_participants(item)
+        item["agenda_items"] = _meeting_agenda_items(item)
+        item["decisions"] = _meeting_decisions(item)
+        item["related_positions"] = item.get("linked_positions") or _infer_related_positions_for_document(item, approved_positions)
+        item["timeline"] = _build_meeting_timeline(item)
+    return decorated
+
+
+def list_public_rules(*, q: Optional[str] = None, limit: int = 60) -> list[dict]:
+    query = _normalize_text(q).lower()
+    items = [item for item in list_policy_documents(doc_type="party_rule", status="active") if _is_verified_public_pledge(item)]
+    if query:
+        items = [
+            item for item in items
+            if query in (item.get("title") or "").lower()
+            or query in (item.get("summary") or "").lower()
+            or query in (item.get("body") or "").lower()
+        ]
+    decorated = _decorate_public_documents(items[: max(1, min(limit, 200))])
+    for item in decorated:
+        item["timeline"] = _build_rule_timeline(item)
+    return decorated
+
+
+def get_public_meetings_overview(*, limit: int = 60) -> dict:
+    items = list_public_meetings(limit=limit)
+    return {
+        "counts": {"meetings": len(items)},
+        "featured": items[:3],
+        "latest": items[:6],
+    }
+
+
+def get_public_rules_overview(*, limit: int = 60) -> dict:
+    items = list_public_rules(limit=limit)
+    return {
+        "counts": {"rules": len(items)},
+        "featured": items[:3],
+        "latest": items[:6],
+    }
+
+
 def auto_link_public_commentary(*, actor_id: Optional[int], limit: int = 300, min_score: int = 4) -> dict:
-    items = list_public_commentary(limit=max(1, min(limit, 500)))
+    items = list_public_messages(limit=max(1, min(limit, 500)))
     created = 0
     skipped = 0
 

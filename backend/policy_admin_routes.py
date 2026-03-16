@@ -438,20 +438,51 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_ssot import list_public_commentary
         return {"items": list_public_commentary(q=q, speaker_name=speaker_name, limit=limit)}
 
+    @app.get("/api/policy/messages", tags=["policy"])
+    def api_policy_messages(q: Optional[str] = Query(default=None), speaker_name: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import list_public_messages
+        return {"items": list_public_messages(q=q, speaker_name=speaker_name, limit=limit)}
+
     @app.get("/api/policy/commentary/overview", tags=["policy"])
     def api_policy_commentary_overview(limit: int = Query(default=120, ge=1, le=200)):
         ensure_db_ready()
         from backend.policy_ssot import get_public_commentary_overview
         return get_public_commentary_overview(limit=limit)
 
+    @app.get("/api/policy/messages/overview", tags=["policy"])
+    def api_policy_messages_overview(limit: int = Query(default=120, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import get_public_messages_overview
+        return get_public_messages_overview(limit=limit)
+
+    @app.get("/api/policy/meetings", tags=["policy"])
+    def api_policy_meetings(q: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import list_public_meetings
+        return {"items": list_public_meetings(q=q, limit=limit)}
+
+    @app.get("/api/policy/rules", tags=["policy"])
+    def api_policy_rules(q: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
+        ensure_db_ready()
+        from backend.policy_ssot import list_public_rules
+        return {"items": list_public_rules(q=q, limit=limit)}
+
     @app.get("/api/policy/hub", tags=["policy"])
     def api_policy_hub():
         ensure_db_ready()
-        from backend.policy_ssot import get_public_overview, get_public_commentary_overview
+        from backend.policy_ssot import (
+            get_public_meetings_overview,
+            get_public_messages_overview,
+            get_public_overview,
+            get_public_rules_overview,
+        )
         from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
         return {
             "overview": get_public_overview(),
-            "commentary": get_public_commentary_overview(limit=60),
+            "messages": get_public_messages_overview(limit=60),
+            "meetings": get_public_meetings_overview(limit=60),
+            "rules": get_public_rules_overview(limit=60),
             "featured": {
                 "current": get_current_featured_issue(),
                 "recommendations": recommend_featured_issues(limit=5),

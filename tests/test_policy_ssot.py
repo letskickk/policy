@@ -5,9 +5,13 @@ from backend import database
 from backend.policy_ssot import (
     _policy_execution_stage,
     get_policy_operations_overview,
+    get_public_messages_overview,
     get_public_overview,
     get_public_person_detail,
     list_public_people,
+    list_public_meetings,
+    list_public_messages,
+    list_public_rules,
     get_policy_document,
     get_policy_position,
     get_policy_position_timeline,
@@ -336,8 +340,93 @@ def test_public_overview_includes_bills_statements_pledges_and_people(monkeypatc
     assert overview["counts"]["positions"] == 1
     assert overview["counts"]["bills"] == 1
     assert overview["counts"]["statements"] == 1
+    assert overview["counts"]["messages"] == 1
     assert overview["counts"]["pledges"] == 1
     assert overview["counts"]["people"] == 1
+
+
+def test_public_messages_meetings_and_rules_are_listed(monkeypatch):
+    db_file = _workspace_db_path("policy-hub-extended")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    database.init_db()
+
+    position = upsert_policy_position(
+        position_id=None,
+        title="Party governance reform",
+        category="politics",
+        summary="Governance summary",
+        body="Governance body",
+        status="approved",
+        owner_scope="party",
+        effective_from=None,
+        effective_to=None,
+        version_label=None,
+        actor_id=None,
+    )
+    message = upsert_policy_document(
+        document_id=None,
+        title="Governance briefing",
+        doc_type="briefing",
+        summary="Briefing summary",
+        body="Briefing body",
+        speaker="briefing",
+        speaker_name="Kim Example",
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="hub:briefing",
+        published_at="2026-03-15",
+        status="active",
+        metadata={},
+        actor_id=None,
+    )
+    meeting = upsert_policy_document(
+        document_id=None,
+        title="Supreme Council Meeting 12",
+        doc_type="meeting_note",
+        summary="Discussed governance roadmap",
+        body="Agenda and decisions",
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="hub:meeting",
+        published_at="2026-03-16",
+        status="active",
+        metadata={"meeting_type": "Supreme Council", "held_at": "2026-03-16", "agenda_items": ["Organization reform"], "decisions": ["Proceed with review"]},
+        actor_id=None,
+    )
+    rule = upsert_policy_document(
+        document_id=None,
+        title="Bylaw No. 1 Organization Rules",
+        doc_type="party_rule",
+        summary="Organization operating standard",
+        body="Rule body",
+        speaker=None,
+        speaker_name=None,
+        owner_name="Reform Party",
+        source_url=None,
+        source_ref="hub:rule",
+        published_at="2026-03-14",
+        status="active",
+        metadata={"rule_kind": "bylaw", "rule_kind_label": "Bylaw", "version_label": "2026-03", "effective_from": "2026-03-14", "key_articles": ["Article 1", "Article 2"]},
+        actor_id=None,
+    )
+    link_policy_document(position_id=position["id"], document_id=message["id"], relation_type="explains", notes=None, actor_id=None)
+    link_policy_document(position_id=position["id"], document_id=meeting["id"], relation_type="references", notes=None, actor_id=None)
+    link_policy_document(position_id=position["id"], document_id=rule["id"], relation_type="supports", notes=None, actor_id=None)
+
+    messages = list_public_messages()
+    meetings = list_public_meetings()
+    rules = list_public_rules()
+    messages_overview = get_public_messages_overview()
+    overview = get_public_overview()
+
+    assert any(item["id"] == message["id"] for item in messages)
+    assert any(item["id"] == meeting["id"] for item in meetings)
+    assert any(item["id"] == rule["id"] for item in rules)
+    assert messages_overview["counts"]["messages"] >= 1
+    assert overview["counts"]["meetings"] >= 1
+    assert overview["counts"]["rules"] >= 1
 
 
 def test_public_person_detail_infers_focus_from_documents(monkeypatch):
@@ -393,8 +482,10 @@ def test_public_person_detail_infers_focus_from_documents(monkeypatch):
     assert "주요 의제" in detail["derived_key_points"]
     assert len(detail["timeline"]) >= 1
     assert detail["role_labels"]
+    assert detail["message_count"] >= detail["statement_count"]
     assert detail["focus_positions"]
     assert detail["featured_bills"]
+    assert isinstance(detail["featured_messages"], list)
 
 
 def test_policy_versions_timeline_and_operations(monkeypatch):
