@@ -635,22 +635,29 @@
         grid-column: 2;
         padding-left: 0;
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
         justify-content: flex-start;
         text-align: left;
-        gap: 0.3rem 0.6rem;
-        flex-wrap: wrap;
-        margin-top: 0.2rem;
+        gap: 0.05rem;
+        margin-top: 0.15rem;
       }
       .score-value{
         font-size: 1rem;
       }
-      .score-label,
+      .score-label{
+        display: none;
+      }
       .pledge-count{
         margin: 0;
+        font-size: 0.7rem;
+        line-height: 1.2;
+      }
+      .pledge-count::before{
+        content: "평균점수 · ";
       }
       .rank-updated{
-        margin-top: 0.25rem;
+        margin-top: 0.18rem;
         font-size: 0.66rem;
       }
       .modal-pledge-item{
@@ -694,6 +701,9 @@
       }
       .rank-name{
         font-size: 0.95rem;
+      }
+      .pledge-count{
+        font-size: 0.68rem;
       }
     }
 
