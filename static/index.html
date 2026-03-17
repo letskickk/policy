@@ -376,9 +376,10 @@
     .rank-info { flex: 1; min-width: 0; }
     .rank-topline{ display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap; }
     .rank-name { font-weight: 800; color: var(--text-strong); font-size: 0.95rem; }
+    .rank-region { font-size: 0.8rem; color: var(--muted); min-width: 0; }
     .rank-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
     .rank-subline{ display:flex; align-items:center; gap:0.45rem 0.65rem; flex-wrap:wrap; margin-top:0.15rem; }
-    .rank-meta .election-badge {
+    .election-badge {
       display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
       background: rgba(59,130,246,0.15); color: #93c5fd;
       font-size: 0.72rem; font-weight: 700; margin-right: 0.3rem;
@@ -592,9 +593,6 @@
         align-items: start;
         padding: 0.55rem 0.65rem;
       }
-      .champion-main{
-        display:block;
-      }
       .champion-week{
         min-width: auto;
         font-size: 0.7rem;
@@ -602,15 +600,12 @@
       .champion-name{
         min-width: 0;
         font-size: 0.95rem;
-        display:block;
-        margin-top: 0.1rem;
       }
       .champion-region{
-        white-space: normal;
-        grid-column: 1 / -1;
+        white-space: nowrap;
+        grid-column: auto;
         font-size: 0.74rem;
-        line-height: 1.45;
-        margin-top: 0.05rem;
+        line-height: 1.35;
       }
       .champion-score{
         margin-left: 0;
@@ -636,12 +631,15 @@
         font-size: 1rem;
       }
       .rank-topline{
-        display:block;
+        gap: 0.3rem 0.45rem;
       }
       .rank-meta{
         line-height: 1.5;
         font-size: 0.76rem;
         margin-top: 0.12rem;
+      }
+      .rank-region{
+        font-size: 0.76rem;
       }
       .rank-subline{
         gap: 0.2rem 0.55rem;
@@ -716,12 +714,6 @@
       }
       .rank-name{
         font-size: 0.95rem;
-      }
-      .rank-subline{
-        display:block;
-      }
-      .rank-meta{
-        margin-top: 0.08rem;
       }
       .rank-updated{
         margin-top: 0.08rem;
@@ -1020,9 +1012,9 @@
             <div class="rank-topline">
               <div class="rank-name">${safe(r.name)}</div>
               ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
+              <div class="rank-region">${region}</div>
             </div>
             <div class="rank-subline">
-              <div class="rank-meta">${region}</div>
               ${updatedDate ? `<div class="rank-updated">업데이트 ${safe(updatedDate)}</div>` : ''}
             </div>
           </div>
