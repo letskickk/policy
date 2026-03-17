@@ -600,6 +600,7 @@
         min-width: 0;
         flex-wrap: wrap;
         grid-column: 1 / -1;
+        grid-row: 2;
       }
       .champion-week{
         grid-column: 1 / -1;
@@ -614,7 +615,8 @@
       }
       .champion-region{
         white-space: nowrap;
-        grid-column: 1 / -1;
+        grid-column: 1;
+        grid-row: 3;
         font-size: 0.72rem;
         line-height: 1.25;
         overflow: hidden;
@@ -622,7 +624,7 @@
       }
       .champion-score{
         margin-left: 0;
-        grid-column: 1 / -1;
+        grid-column: 2;
         grid-row: 3;
         font-size: 0.94rem;
         align-self: start;
@@ -1018,8 +1020,8 @@
           <span class="champion-main">
             <span class="champion-name">${safe(c.candidate_name)}</span>
             ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
-            <span class="champion-region">${safe(regionText)}</span>
           </span>
+          <span class="champion-region">${safe(regionText)}</span>
           <span class="champion-score ${scoreClass(c.avg_score)}">${c.avg_score}</span>
         </div>`;
       });
@@ -1056,7 +1058,7 @@
           <div class="rank-score">
             <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
             <div class="score-label">평균점수</div>
-            <div class="pledge-count">공약 ${r.scored_pledge_count}개</div>
+            <div class="pledge-count">${r.scored_pledge_count}개</div>
           </div>
         </div>`;
       });
