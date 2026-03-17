@@ -478,6 +478,11 @@
       font-size: 0.9rem; color: #cbd5e1; line-height: 1.75;
       white-space: pre-wrap; word-break: break-word;
     }
+    .modal-pledge-meta{
+      margin-top: 0.55rem;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
     .modal-pledge-empty{
       color: #64748b; font-style: italic; font-size: 0.9rem; margin-top: 0.4rem;
     }
@@ -864,6 +869,19 @@
       return div.innerHTML;
     }
 
+    function formatPledgeCreatedAt(value) {
+      if (!value) return '';
+      const iso = String(value).trim().replace(' ', 'T');
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) {
+        return String(value).slice(0, 10);
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
     function renderModalPledges(pledges) {
       if (!pledges || pledges.length === 0) {
         pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">등록된 공약이 없습니다.</div>';
@@ -875,13 +893,19 @@
           const title = escapeHtml(p.title || p);
           const content = (p.content || '').trim();
           const score = p.total_score;
+          const createdAt = formatPledgeCreatedAt(p.created_at);
           let scoreBadge = '';
+          let metaLine = '';
           if (score != null) {
             const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
             scoreBadge = '<span class="modal-pledge-score ' + cls + '">' + Math.round(score) + '점</span>';
           }
+          if (createdAt) {
+            metaLine = '<div class="modal-pledge-meta">등록 ' + createdAt + '</div>';
+          }
           return '<div class="modal-pledge-item">' +
             '<div class="modal-pledge-title"><span class="modal-pledge-num">' + (i + 1) + '</span>' + title + scoreBadge + '</div>' +
+            metaLine +
             (content
               ? '<div class="modal-pledge-content">' + escapeHtml(content) + '</div>'
               : '<div class="modal-pledge-empty">세부내용 없음</div>') +
