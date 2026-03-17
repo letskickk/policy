@@ -147,10 +147,10 @@
     <div class="card approval-section" id="approval_section">
       <h2>공약 승인 관리 <span class="count-badge" id="approval_count"></span></h2>
       <div class="approval-tabs">
-        <button class="active" data-filter="PENDING">대기중</button>
-        <button data-filter="APPROVED">승인됨</button>
-        <button data-filter="REJECTED">거절됨</button>
-        <button data-filter="ALL">전체</button>
+        <button class="active" data-filter="PENDING" data-label="대기중">대기중</button>
+        <button data-filter="APPROVED" data-label="승인됨">승인됨</button>
+        <button data-filter="REJECTED" data-label="거절됨">거절됨</button>
+        <button data-filter="ALL" data-label="전체">전체</button>
       </div>
       <div id="approval_list"></div>
     </div>
@@ -264,10 +264,11 @@
 
     const approvalListEl = document.getElementById('approval_list');
     const approvalCountEl = document.getElementById('approval_count');
+    const approvalTabButtons = Array.from(document.querySelectorAll('.approval-tabs button'));
 
-    document.querySelectorAll('.approval-tabs button').forEach(btn => {
+    approvalTabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.approval-tabs button').forEach(b => b.classList.remove('active'));
+        approvalTabButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         _currentFilter = btn.dataset.filter;
         renderApprovalList();
@@ -294,17 +295,38 @@
       return (candidate?.approval_status || 'PENDING').toUpperCase();
     }
 
+    function updateApprovalTabCounts() {
+      const counts = {
+        PENDING: 0,
+        APPROVED: 0,
+        REJECTED: 0,
+        ALL: _allCandidates.length,
+      };
+
+      _allCandidates.forEach(candidate => {
+        const status = getCandidateReviewState(candidate);
+        if (status === 'PENDING' || status === 'MIXED') counts.PENDING += 1;
+        else if (status === 'APPROVED') counts.APPROVED += 1;
+        else if (status === 'REJECTED') counts.REJECTED += 1;
+      });
+
+      approvalTabButtons.forEach(btn => {
+        const filter = btn.dataset.filter || 'ALL';
+        const label = btn.dataset.label || btn.textContent || '';
+        const count = counts[filter] ?? 0;
+        btn.textContent = `${label} (${count})`;
+      });
+
+      approvalCountEl.textContent = counts.PENDING > 0 ? `(${counts.PENDING}건 대기)` : '';
+    }
+
     async function loadAllCandidates() {
       try {
         const r = await fetch('/api/admin/candidates', { credentials: 'include' });
         if (!r.ok) return;
         const data = await r.json();
         _allCandidates = Array.isArray(data) ? data : [];
-        const pendingCount = _allCandidates.filter(c => {
-          const status = getCandidateReviewState(c);
-          return status === 'PENDING' || status === 'MIXED';
-        }).length;
-        approvalCountEl.textContent = pendingCount > 0 ? `(${pendingCount}건 대기)` : '';
+        updateApprovalTabCounts();
         renderApprovalList();
       } catch (e) { console.error(e); }
     }
