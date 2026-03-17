@@ -935,8 +935,9 @@
         const d = await res.json();
         const etype = ELECTION_LABELS[d.election_type] || d.election_type || '';
         const region = d.district_name ? (d.region_name || '') + ' ' + cleanDN(d.district_name) : (d.region_name || '');
+        const basis = asOf ? ('기준 ' + String(asOf).slice(0, 10) + ' 스냅샷') : '현재 공개본';
         pledgeModalTitle.textContent = d.name || '';
-        pledgeModalSub.textContent = region + ' \u00B7 ' + etype;
+        pledgeModalSub.textContent = region + ' \u00B7 ' + etype + ' \u00B7 ' + basis;
         renderModalPledges(d.pledges || []);
       } catch (e) {
         pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">오류가 발생했습니다.</div>';
