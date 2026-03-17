@@ -1839,6 +1839,47 @@ def _fetch_candidate_pledges(
         conn.close()
 
 
+def _fetch_candidate_pledges_current_public(
+    candidate_id: int,
+    limit: Optional[int] = None,
+) -> list[CandidatePledgeResponse]:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT cp.title, cp.content, cp.total_score,
+                   COALESCE(prh.approved_reviewed_at, cp.created_at) AS created_at
+            FROM candidate_pledges cp
+            LEFT JOIN (
+                SELECT pledge_id, MAX(reviewed_at) AS approved_reviewed_at
+                FROM candidate_pledge_review_history
+                WHERE approval_status = 'APPROVED'
+                  AND pledge_id IS NOT NULL
+                GROUP BY pledge_id
+            ) prh ON prh.pledge_id = cp.id
+            WHERE cp.candidate_id = ?
+              AND cp.approval_status = 'APPROVED'
+            ORDER BY cp.priority ASC, datetime(COALESCE(prh.approved_reviewed_at, cp.created_at)) DESC, cp.id DESC
+        """
+        params: tuple = (candidate_id,)
+        if limit is not None:
+            sql += " LIMIT ?"
+            params = (candidate_id, limit)
+        rows = conn.execute(sql, params).fetchall()
+        return [
+            CandidatePledgeResponse(
+                title=r["title"],
+                content=r["content"],
+                total_score=r["total_score"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
 def _fetch_candidate_pledges_snapshot(
     candidate_id: int,
     as_of: str,
@@ -2754,7 +2795,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of) if as_of else _fetch_candidate_pledges(int(row["id"]), limit=None),
+        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of) if as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
     )
 
 
