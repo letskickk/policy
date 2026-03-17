@@ -3567,6 +3567,66 @@ def api_my_candidate_delete(request: Request):
     return {"ok": True}
 
 
+@app.delete("/api/my/pledges/{pledge_id}", tags=["my-candidate"])
+def api_my_pledge_delete(pledge_id: int, request: Request):
+    """사용자 본인의 개별 공약 삭제."""
+    _ensure_db_ready()
+    user = require_approved(request)
+    uid = user["id"]
+
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id, cp.candidate_id, c.approval_status, c.rejection_reason
+            FROM candidate_pledges cp
+            JOIN candidates c ON c.id = cp.candidate_id
+            WHERE cp.id = ? AND c.user_id = ?
+            """,
+            (pledge_id, uid),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="해당 공약을 찾을 수 없습니다.")
+
+        candidate_id = int(row["candidate_id"])
+        previous_status = (row["approval_status"] or "PENDING").upper()
+        previous_reason = row["rejection_reason"] or ""
+        if previous_status in {"APPROVED", "REJECTED", "MIXED"}:
+            _snapshot_candidate_pledges(
+                conn,
+                candidate_id,
+                approval_status=previous_status,
+                rejection_reason=previous_reason,
+                source_action="DELETE_PLEDGE",
+            )
+
+        conn.execute("DELETE FROM candidate_pledges WHERE id = ?", (pledge_id,))
+        remaining = conn.execute(
+            "SELECT COUNT(*) AS n FROM candidate_pledges WHERE candidate_id = ?",
+            (candidate_id,),
+        ).fetchone()
+        if int(remaining["n"] or 0) == 0:
+            conn.execute(
+                "UPDATE candidates SET approval_status = 'PENDING', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+                (candidate_id,),
+            )
+            candidate_status = "PENDING"
+        else:
+            candidate_status = _recalculate_candidate_approval(conn, candidate_id)
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {"ok": True, "candidate_status": candidate_status}
+
+
 # ─────────────────────── 개별 공약 분석 ───────────────────────
 
 @app.post("/api/my/pledges/{pledge_id}/analyze", tags=["my-candidate"])

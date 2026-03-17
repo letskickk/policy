@@ -74,6 +74,30 @@
     function approvalHtml(candidate){if(!candidate)return'<div class="ainfo pending">\uC544\uC9C1 \uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uACF5\uC57D\uC744 \uBD88\uB7EC\uC640 \uC800\uC7A5\uD558\uBA74 \uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4.</div>';const s=String(candidate.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return'<div class="ainfo approved">\uD604\uC7AC \uB4F1\uB85D\uB41C \uACF5\uC57D\uC740 \uC2B9\uC778\uB41C \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uC5EC \uB2E4\uC2DC \uC800\uC7A5\uD558\uBA74 \uC7AC\uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uC804\uD658\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</div>';if(s==='REJECTED')return `<div class="ainfo rejected">\uC774\uC804\uC5D0 \uB4F1\uB85D\uD55C \uACF5\uC57D\uC774 \uBC18\uB824\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uBCF4\uC644\uD574 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.${candidate.rejection_reason?`<br><strong>\uBC18\uB824 \uC0AC\uC720:</strong> ${esc(candidate.rejection_reason)}`:''}</div>`;return'<div class="ainfo pending">\uC800\uC7A5\uB41C \uACF5\uC57D\uC740 \uAD00\uB9AC\uC790 \uAC80\uC218 \uD6C4 \uACF5\uAC1C\uB429\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uACFC \uC2E4\uC81C \uACF5\uC57D\uC774 \uC77C\uCE58\uD558\uB294\uC9C0 \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694.</div>'}
     function renumber(){[...els.list.querySelectorAll('.row')].forEach((row,i)=>{const n=row.querySelector('.n');if(n)n.textContent=String(i+1)})}
     function ensureEmpty(){if(els.list.querySelector('.row'))return;els.list.innerHTML='<div class="empty">\uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uACF5\uC57D\uC744 \uCD94\uAC00\uD55C \uB4A4 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.</div>'}
+    async function deletePledgeRow(row){
+      const pledgeId=row?.dataset?.pledgeId?Number(row.dataset.pledgeId):null;
+      if(!pledgeId){
+        row.remove();renumber();ensureEmpty();return;
+      }
+      if(!confirm('\uC774 \uACF5\uC57D\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?'))return;
+      clearMsg();
+      const btn=row.querySelector('.remove');
+      if(btn)btn.disabled=true;
+      try{
+        const res=await fetch(`/api/my/pledges/${pledgeId}`,{method:'DELETE',credentials:'include'});
+        if(res.status===401){location.href='/login?next=/my-pledges';return}
+        if(res.status===403){location.href='/pending';return}
+        const text=await res.text();let data={};try{data=JSON.parse(text)}catch(_){}
+        if(!res.ok)throw new Error(data.detail||'\uACF5\uC57D \uC0AD\uC81C \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
+        setMsg('\uACF5\uC57D\uC744 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.',true);
+        historyCache=null;
+        await load();
+      }catch(e){
+        setMsg(e.message||'\uACF5\uC57D \uC0AD\uC81C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',false);
+      }finally{
+        if(btn)btn.disabled=false;
+      }
+    }
     function addRow(data={}){
       idx+=1;
       const row=document.createElement('div');
@@ -93,7 +117,7 @@
         if(data.analysis_result){preview.style.display='block';preview.textContent=data.analysis_result}
       }
       row.querySelector('.import').addEventListener('click',()=>openModal(row));
-      row.querySelector('.remove').addEventListener('click',()=>{row.remove();renumber();ensureEmpty()});
+      row.querySelector('.remove').addEventListener('click',()=>{deletePledgeRow(row)});
       renumber();
       return row;
     }
