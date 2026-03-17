@@ -1839,6 +1839,72 @@ def _fetch_candidate_pledges(
         conn.close()
 
 
+def _fetch_candidate_pledges_snapshot(
+    candidate_id: int,
+    as_of: str,
+) -> list[CandidatePledgeResponse]:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        snapshot = conn.execute(
+            """
+            SELECT snapshot_group
+            FROM candidate_pledge_review_history
+            WHERE candidate_id = ?
+              AND approval_status = 'APPROVED'
+              AND datetime(reviewed_at) <= datetime(?)
+            ORDER BY datetime(reviewed_at) DESC, snapshot_group DESC, id DESC
+            LIMIT 1
+            """,
+            (candidate_id, as_of),
+        ).fetchone()
+        if snapshot is None:
+            rows = conn.execute(
+                """
+                SELECT title, content, total_score, created_at
+                FROM candidate_pledges
+                WHERE candidate_id = ?
+                  AND approval_status = 'APPROVED'
+                  AND datetime(created_at) <= datetime(?)
+                ORDER BY priority ASC, datetime(created_at) DESC, id DESC
+                """,
+                (candidate_id, as_of),
+            ).fetchall()
+            return [
+                CandidatePledgeResponse(
+                    title=r["title"],
+                    content=r["content"],
+                    total_score=r["total_score"],
+                    created_at=r["created_at"],
+                )
+                for r in rows
+            ]
+
+        rows = conn.execute(
+            """
+            SELECT title, content, total_score, pledge_created_at
+            FROM candidate_pledge_review_history
+            WHERE candidate_id = ?
+              AND snapshot_group = ?
+              AND approval_status = 'APPROVED'
+            ORDER BY priority ASC, id ASC
+            """,
+            (candidate_id, snapshot["snapshot_group"]),
+        ).fetchall()
+        return [
+            CandidatePledgeResponse(
+                title=r["title"],
+                content=r["content"],
+                total_score=r["total_score"],
+                created_at=r["pledge_created_at"],
+            )
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
 def _recalculate_candidate_approval(conn, candidate_id: int):
     rows = conn.execute(
         """
@@ -2648,7 +2714,7 @@ def get_candidates(
 
 
 @app.get("/api/candidates/{candidate_id}", response_model=CandidateDetailResponse, tags=["candidates"])
-def get_candidate_detail(candidate_id: int):
+def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default=None)):
     """후보 상세 정보와 공약 전체를 반환한다."""
     _ensure_db_ready()
     from backend.database import get_connection
@@ -2688,7 +2754,7 @@ def get_candidate_detail(candidate_id: int):
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None),
+        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of) if as_of else _fetch_candidate_pledges(int(row["id"]), limit=None),
     )
 
 
@@ -3830,6 +3896,12 @@ def api_leaderboard(
                    ORDER BY wc.week_start DESC LIMIT 20"""
             ).fetchall()
         ]
+        for champ in champions:
+            try:
+                champ_week = _dt.date.fromisoformat(champ["week_start"])
+                champ["detail_as_of"] = f"{(champ_week + _dt.timedelta(days=6)).isoformat()} 23:59:59"
+            except Exception:
+                champ["detail_as_of"] = None
 
         # ── 랭킹 쿼리 ──
         sql = f"""
@@ -3901,6 +3973,7 @@ def api_leaderboard(
         rows = conn.execute(sql, tuple(params)).fetchall()
 
         ranking = []
+        detail_as_of = None if is_current_week else f"{target_sunday.isoformat()} 23:59:59"
         for rank, r in enumerate(rows, 1):
             ranking.append({
                 "rank": rank,
@@ -3912,6 +3985,7 @@ def api_leaderboard(
                 "avg_score": float(r["avg_score"]),
                 "scored_pledge_count": int(r["scored_pledge_count"]),
                 "updated_at": r["updated_at"] or "",
+                "detail_as_of": detail_as_of,
             })
 
         # ── 주차 라벨 + 네비게이션 ──

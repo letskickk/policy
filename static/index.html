@@ -751,7 +751,8 @@
       champions.forEach(c => {
         const wLabel = weekLabelFromDate(c.week_start);
         const regionText = c.district_name ? (c.region_name || '') + ' ' + cleanDN(c.district_name) : (c.region_name || '');
-        html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0})" title="공약 상세 보기">
+        const asOf = c.detail_as_of ? safe(c.detail_as_of) : '';
+        html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0}, '${asOf}')" title="공약 상세 보기">
           <span class="champion-week">${safe(wLabel)}</span>
           <span class="champion-name">${safe(c.candidate_name)}</span>
           <span class="champion-region">${safe(regionText)}</span>
@@ -775,7 +776,8 @@
         const region = r.district_name ? `${safe(r.region_name)} ${safe(cleanDN(r.district_name))}` : safe(r.region_name);
         const cid = r.candidate_id || '';
         const updatedDate = r.updated_at ? r.updated_at.slice(0, 10) : '';
-        html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid})" title="공약 상세 보기">
+        const asOf = r.detail_as_of ? safe(r.detail_as_of) : '';
+        html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid}, '${asOf}')" title="공약 상세 보기">
           <div class="rank-num ${numCls}">${r.rank}</div>
           <div class="rank-info">
             <div class="rank-name">${safe(r.name)}</div>
@@ -913,7 +915,7 @@
         }).join('');
     }
 
-    window.openCandidateModal = async function(candidateId) {
+    window.openCandidateModal = async function(candidateId, asOf) {
       if (!candidateId) return;
       pledgeModalTitle.textContent = '';
       pledgeModalSub.textContent = '';
@@ -921,7 +923,9 @@
       pledgeModalOverlay.classList.add('open');
       document.body.style.overflow = 'hidden';
       try {
-        const res = await fetch('/api/candidates/' + candidateId);
+        const params = new URLSearchParams();
+        if (asOf) params.set('as_of', asOf);
+        const res = await fetch('/api/candidates/' + candidateId + (params.toString() ? ('?' + params.toString()) : ''));
         if (!res.ok) {
           pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">후보 정보를 불러올 수 없습니다.</div>';
           return;
