@@ -712,7 +712,7 @@
         <a href="/my-pledges" class="panel-cta-btn" id="myPledgesBtn">내 공약 올리기</a>
         <p class="panel-cta-desc">나의 공약을 등록하고 지도에 공개하세요</p>
         <div class="panel-cta-row">
-          <a href="/my-pledges" class="panel-cta-btn" id="myPledgesStatusBtn">내 공약 확인하기</a>
+          <a href="/my-pledges-status" class="panel-cta-btn" id="myPledgesStatusBtn">내 공약 확인하기</a>
           <p class="panel-cta-desc">공약별 승인 여부와 반려 사유를 확인하세요</p>
         </div>
       </div>
@@ -1630,7 +1630,24 @@
     }
 
     if (myPledgesStatusBtn) {
-      myPledgesStatusBtn.addEventListener('click', routeToMyPledges);
+      myPledgesStatusBtn.addEventListener('click', async function(event) {
+        event.preventDefault();
+        const target = '/my-pledges-status';
+        try {
+          const res = await fetch('/api/my/candidate', { credentials: 'include' });
+          if (res.status === 401) {
+            window.location.href = `/login?next=${encodeURIComponent(target)}`;
+            return;
+          }
+          if (res.status === 403) {
+            window.location.href = '/pending';
+            return;
+          }
+        } catch (error) {
+          console.warn('my pledges status route probe failed:', error);
+        }
+        window.location.href = target;
+      });
     }
 
   </script>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 공약 확인하기 - 정책 메이트</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;min-height:100vh;color:#e2e8f0;padding:20px 16px 40px;background:radial-gradient(1000px 500px at 20% 10%,rgba(255,114,16,.10),transparent 60%),radial-gradient(900px 600px at 90% 20%,rgba(56,189,248,.10),transparent 60%),linear-gradient(160deg,#04162b 0%,#073053 55%,#0a3b69 100%);background-attachment:fixed}.wrap{max-width:980px;margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;color:inherit}.brand img{height:30px}.brand b{display:block;font-size:17px;color:#fff}.brand span{display:block;font-size:13px;color:#ffb37a;font-weight:700}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,.nav button,.btn2{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;cursor:pointer;color:#e2e8f0;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.18)}h1{font-size:32px;font-weight:950;color:#fff;margin-bottom:12px}.sub{font-size:16px;line-height:1.7;margin-bottom:16px}.card{background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:22px;box-shadow:0 18px 40px rgba(0,0,0,.28);backdrop-filter:blur(10px);margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.item{background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.12);border-radius:14px;padding:14px 16px}.item em{display:block;font-style:normal;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:700}.item b{display:block;color:#fff;line-height:1.5}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:800}.bnew{background:rgba(59,130,246,.16);color:#bfdbfe}.bpen{background:rgba(250,204,21,.16);color:#fde68a}.bapp{background:rgba(34,197,94,.16);color:#bbf7d0}.brej{background:rgba(239,68,68,.16);color:#fecaca}.ainfo{margin-top:12px;padding:13px 15px;border-radius:12px;line-height:1.6;font-size:14px;border:1px solid rgba(148,163,184,.18)}.pending{background:rgba(250,204,21,.08);border-color:rgba(250,204,21,.22);color:#fde68a}.approved{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.22);color:#bbf7d0}.rejected{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.22);color:#fecaca}.list{display:grid;gap:14px}.row{background:rgba(2,6,23,.24);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:16px}.rowtop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}.ord{display:inline-flex;align-items:center;gap:10px;font-weight:900;color:#fff}.ord .n{width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:13px}.title{font-size:18px;font-weight:800;color:#fff;line-height:1.5}.content{margin-top:10px;padding:14px 16px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(148,163,184,.1);white-space:pre-wrap;word-break:break-word;line-height:1.7;color:#dbeafe}.review{margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.18);font-size:14px;line-height:1.65}.review.pending{background:rgba(250,204,21,.06);border-color:rgba(250,204,21,.14);color:#fde68a}.review.approved{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.16);color:#bbf7d0}.review.rejected{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.16);color:#fecaca}.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.score{display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:800}.good{background:rgba(34,197,94,.14);color:#bbf7d0}.mid{background:rgba(250,204,21,.14);color:#fde68a}.low{background:rgba(239,68,68,.14);color:#fecaca}.date{font-size:12px;color:#94a3b8}.empty,.loading{text-align:center;padding:32px 16px;color:#94a3b8;line-height:1.7}@media (max-width:720px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a href="/" class="brand">
+        <img src="/static/logo.svg" alt="개혁신당 로고">
+        <span><b>개혁신당 정책 메이트</b><span>내 공약 공개 상태를 확인하세요</span></span>
+      </a>
+      <nav class="nav">
+        <a href="/my-pledges">내 공약 올리기</a>
+        <a href="/map">지도 보기</a>
+        <form action="/api/auth/logout" method="POST"><button type="submit">로그아웃</button></form>
+      </nav>
+    </div>
+    <h1>내 공약 확인하기</h1>
+    <p class="sub">공약별 승인 여부, 공개 상태, 반려 사유를 한 번에 확인할 수 있습니다.</p>
+    <div id="loading" class="card loading">공약 상태를 불러오는 중입니다.</div>
+    <div id="no-position" class="card empty" style="display:none;">출마 정보가 확인되지 않아 공약 상태를 불러올 수 없습니다.</div>
+    <div id="main" style="display:none;">
+      <div class="card">
+        <div id="info" class="grid"></div>
+        <div style="margin-top:16px" id="badge"></div>
+        <div id="approval"></div>
+      </div>
+      <div class="card">
+        <div id="list" class="list"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const els={loading:document.getElementById('loading'),noPos:document.getElementById('no-position'),main:document.getElementById('main'),info:document.getElementById('info'),badge:document.getElementById('badge'),approval:document.getElementById('approval'),list:document.getElementById('list')};
+    const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const fdate=v=>{if(!v)return'';const d=new Date(String(v).replace(' ','T'));return Number.isNaN(d.getTime())?v:d.toLocaleString('ko-KR')};
+    const badgeClass=s=>{s=String(s||'NEW').toUpperCase();if(s==='APPROVED')return['bapp','승인 완료'];if(s==='REJECTED')return['brej','반려'];if(s==='PENDING')return['bpen','검수 대기'];return['bnew','신규 등록']};
+    const scoreClass=n=>!Number.isFinite(Number(n))?'mid':Number(n)>=80?'good':Number(n)>=60?'mid':'low';
+    const infoItem=(l,v)=>`<div class="item"><em>${esc(l)}</em><b>${esc(v||'-')}</b></div>`;
+    function approvalHtml(candidate){if(!candidate)return'<div class="ainfo pending">아직 등록된 공약이 없습니다.</div>';const s=String(candidate.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return'<div class="ainfo approved">현재 등록된 공약 묶음은 승인되어 공개 중입니다.</div>';if(s==='REJECTED')return `<div class="ainfo rejected">현재 등록된 공약 묶음은 반려 상태입니다.${candidate.rejection_reason?`<br><strong>반려 사유:</strong> ${esc(candidate.rejection_reason)}`:''}</div>`;return'<div class="ainfo pending">현재 등록된 공약 묶음은 검수 대기 상태입니다.</div>'}
+    function pledgeReviewHtml(pledge){const s=String(pledge.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return `<div class="review approved"><strong>승인 완료</strong><br>이 공약은 승인되어 공개 중입니다.</div>`;if(s==='REJECTED')return `<div class="review rejected"><strong>반려</strong><br>이 공약은 현재 공개되지 않습니다.${pledge.rejection_reason?`<br><strong>반려 사유:</strong> ${esc(pledge.rejection_reason)}`:''}</div>`;return `<div class="review pending"><strong>검수 대기</strong><br>이 공약은 관리자 검수 후 공개됩니다.</div>`}
+    function renderPledges(pledges){if(!pledges.length){els.list.innerHTML='<div class="empty">등록된 공약이 없습니다.</div>';return}els.list.innerHTML=pledges.map((p,i)=>{const [bc,bt]=badgeClass(p.approval_status||'PENDING');const score=(p.total_score===null||p.total_score===undefined||p.total_score==='')?null:Number(p.total_score);return `<div class="row"><div class="rowtop"><div class="ord"><span class="n">${i+1}</span><span>공약</span></div><span class="badge ${bc}">${bt}</span></div><div class="title">${esc(p.title||'제목 없음')}</div><div class="content">${esc(p.content||'내용 없음')}</div>${pledgeReviewHtml(p)}<div class="meta">${score!==null&&Number.isFinite(score)?`<span class="score ${scoreClass(score)}">총점 ${score.toFixed(1)}</span>`:''}${p.analyzed_at?`<span class="date">${esc(fdate(p.analyzed_at))}</span>`:''}</div></div>`}).join('')}
+    async function load(){try{const res=await fetch('/api/my/candidate',{credentials:'include'});if(res.status===401){location.href='/login?next=/my-pledges-status';return}if(res.status===403){location.href='/pending';return}if(!res.ok)throw new Error('공약 상태를 불러오지 못했습니다.');const data=await res.json(),ui=data.user_info||{},candidate=data.candidate||null,pledges=Array.isArray(data.pledges)?data.pledges:[];if(!ui.election_position||!ui.region_code){els.loading.style.display='none';els.noPos.style.display='block';return}els.info.innerHTML=[infoItem('후보자명',ui.name||candidate?.name||'-'),infoItem('출마 유형',ui.election_position||ui.election_type||'-'),infoItem('지역',ui.region_name||'-'),infoItem('선거구',ui.district_name||'-')].join('');const [bc,bt]=badgeClass(candidate?candidate.approval_status:'NEW');els.badge.innerHTML=`<span class="badge ${bc}">${bt}</span>`;els.approval.innerHTML=approvalHtml(candidate);renderPledges(pledges);els.loading.style.display='none';els.main.style.display='block'}catch(e){els.loading.textContent=e.message||'공약 상태를 불러오지 못했습니다.'}}
+    load();
+  </script>
+</body>
+</html>

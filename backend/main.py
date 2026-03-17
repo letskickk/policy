@@ -2766,6 +2766,24 @@ def my_pledges_page(request: Request):
     raise HTTPException(status_code=404, detail="my-pledges.html not found")
 
 
+@app.api_route("/my-pledges-status", methods=["GET", "HEAD"])
+def my_pledges_status_page(request: Request):
+    """사용자 본인 공약 상태 확인 페이지."""
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if (
+        user["status"] != STATUS_APPROVED
+        and user["email"] not in ADMIN_EMAILS
+        and user["role"] != ROLE_ADMIN
+    ):
+        return RedirectResponse(url="/pending", status_code=302)
+    res = _serve_html("my-pledges-status.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="my-pledges-status.html not found")
+
+
 @app.get("/api/my/candidate", tags=["my-candidate"])
 def api_my_candidate_get(request: Request):
     """로그인 사용자의 후보 프로필 + 공약 목록 반환. 미등록이면 user 정보만 반환."""
