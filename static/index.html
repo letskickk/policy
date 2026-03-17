@@ -632,13 +632,13 @@
       }
       .rank-row{
         display: grid;
-        grid-template-columns: 32px minmax(0, 1fr);
+        grid-template-columns: 32px minmax(0, 1fr) auto;
         gap: 0.22rem 0.65rem;
-        align-items: start;
+        align-items: center;
         padding: 0.68rem 0.78rem;
       }
       .rank-num{
-        grid-row: 1 / span 3;
+        grid-row: 1 / span 2;
       }
       .rank-info{
         min-width: 0;
@@ -673,10 +673,10 @@
         flex-wrap: wrap;
       }
       .rank-score{
-        grid-column: 2;
-        grid-row: 3;
-        text-align: left;
-        align-self: start;
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        text-align: right;
+        align-self: center;
         display:flex;
         align-items:baseline;
         gap: 0.35rem;
@@ -693,7 +693,7 @@
         line-height: 1.2;
       }
       .pledge-count::before{
-        content: "공약 ";
+        content: "";
       }
       .rank-updated{
         font-size: 0.66rem;
@@ -725,7 +725,7 @@
         grid-row: 1;
       }
       .rank-row{
-        grid-template-columns: 28px minmax(0, 1fr);
+        grid-template-columns: 28px minmax(0, 1fr) auto;
         padding: 0.66rem 0.7rem;
       }
       .rank-num{
