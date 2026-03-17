@@ -3612,6 +3612,13 @@ def api_leaderboard(
     from backend.database import get_connection
     conn = get_connection()
     try:
+        approved_review_subquery = """
+            SELECT pledge_id, MAX(reviewed_at) AS approved_reviewed_at
+            FROM candidate_pledge_review_history
+            WHERE approval_status = 'APPROVED'
+              AND pledge_id IS NOT NULL
+            GROUP BY pledge_id
+        """
         today = _dt.date.today()
         current_monday = today - _dt.timedelta(days=today.weekday())
 
@@ -3643,7 +3650,7 @@ def api_leaderboard(
             if existing is None:
                 last_sunday_str = (current_monday - _dt.timedelta(days=1)).isoformat()
                 champ = conn.execute(
-                    """
+                    f"""
                     SELECT c.id AS candidate_id, c.name,
                            COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                            COALESCE(u.district_name, c.district_name) AS district_name,
@@ -3654,9 +3661,12 @@ def api_leaderboard(
                     LEFT JOIN users u ON u.id = c.user_id
                     LEFT JOIN region_codes rc ON rc.region_code = c.region_code
                     JOIN candidate_pledges cp ON cp.candidate_id = c.id
+                    LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
                     WHERE cp.total_score IS NOT NULL
-                      AND c.approval_status = 'APPROVED'
-                      AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?
+                      AND cp.approval_status = 'APPROVED'
+                      AND c.approval_status IN ('APPROVED', 'MIXED')
+                      AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ?
+                      AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?
                     GROUP BY c.id
                     HAVING cnt > 0
                     ORDER BY avg_score DESC, cnt DESC
@@ -3692,7 +3702,7 @@ def api_leaderboard(
         ]
 
         # ── 랭킹 쿼리 ──
-        sql = """
+        sql = f"""
             SELECT c.id AS candidate_id, c.name,
                    COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
@@ -3704,12 +3714,14 @@ def api_leaderboard(
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             JOIN candidate_pledges cp ON cp.candidate_id = c.id
+            LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
             WHERE cp.total_score IS NOT NULL
-              AND c.approval_status = 'APPROVED'
+              AND cp.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
         """
         params: list = []
 
-        sql += " AND date(cp.analyzed_at) >= ? AND date(cp.analyzed_at) <= ?"
+        sql += " AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ? AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?"
         params.extend([target_monday.isoformat(), ranking_end.isoformat()])
 
         if is_current_week:
