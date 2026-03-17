@@ -598,7 +598,8 @@
         align-items: center;
         gap: 0.32rem 0.5rem;
         min-width: 0;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow: hidden;
       }
       .champion-week{
         grid-column: 1 / -1;
@@ -615,6 +616,8 @@
         grid-column: auto;
         font-size: 0.72rem;
         line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .champion-score{
         margin-left: 0;
@@ -643,9 +646,15 @@
       }
       .rank-topline{
         gap: 0.22rem 0.45rem;
+        flex-wrap: nowrap;
+        min-width: 0;
       }
       .rank-region{
         font-size: 0.74rem;
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .rank-subline{
         gap: 0.22rem 0.5rem;
