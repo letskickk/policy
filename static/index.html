@@ -374,8 +374,10 @@
     .rank-num.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; box-shadow: 0 2px 8px rgba(217,119,6,0.3); }
     .rank-num.normal { background: rgba(255,255,255,0.08); color: var(--muted); }
     .rank-info { flex: 1; min-width: 0; }
+    .rank-topline{ display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap; }
     .rank-name { font-weight: 800; color: var(--text-strong); font-size: 0.95rem; }
     .rank-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+    .rank-subline{ display:flex; align-items:center; gap:0.45rem 0.65rem; flex-wrap:wrap; margin-top:0.15rem; }
     .rank-meta .election-badge {
       display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
       background: rgba(59,130,246,0.15); color: #93c5fd;
@@ -403,8 +405,9 @@
     .champion-item:last-child { margin-bottom: 0; }
     .champion-item:hover { background: rgba(250,204,21,0.18); }
     .champion-week { color: var(--muted); font-size: 0.72rem; min-width: 5.5em; flex-shrink: 0; }
-    .champion-name { font-weight: 700; min-width: 3.5em; }
-    .champion-region { color: var(--muted); font-size: 0.75rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .champion-main { display:flex; align-items:center; gap:0.45rem 0.6rem; flex:1; min-width:0; flex-wrap:wrap; }
+    .champion-name { font-weight: 700; min-width: 0; }
+    .champion-region { color: var(--muted); font-size: 0.75rem; min-width:0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .champion-score { font-weight: 800; margin-left: auto; flex-shrink: 0; }
     .champion-score.green { color: #4ade80; }
     .champion-score.yellow { color: #facc15; }
@@ -589,6 +592,9 @@
         align-items: start;
         padding: 0.55rem 0.65rem;
       }
+      .champion-main{
+        display:block;
+      }
       .champion-week{
         min-width: auto;
         font-size: 0.7rem;
@@ -596,13 +602,15 @@
       .champion-name{
         min-width: 0;
         font-size: 0.95rem;
+        display:block;
+        margin-top: 0.1rem;
       }
       .champion-region{
-        flex-basis: 100%;
         white-space: normal;
         grid-column: 1 / -1;
         font-size: 0.74rem;
         line-height: 1.45;
+        margin-top: 0.05rem;
       }
       .champion-score{
         margin-left: 0;
@@ -627,9 +635,16 @@
         line-height: 1.35;
         font-size: 1rem;
       }
+      .rank-topline{
+        display:block;
+      }
       .rank-meta{
         line-height: 1.5;
         font-size: 0.76rem;
+        margin-top: 0.12rem;
+      }
+      .rank-subline{
+        gap: 0.2rem 0.55rem;
       }
       .rank-score{
         grid-column: 2;
@@ -701,6 +716,15 @@
       }
       .rank-name{
         font-size: 0.95rem;
+      }
+      .rank-subline{
+        display:block;
+      }
+      .rank-meta{
+        margin-top: 0.08rem;
+      }
+      .rank-updated{
+        margin-top: 0.08rem;
       }
       .pledge-count{
         font-size: 0.68rem;
@@ -968,8 +992,7 @@
         const asOf = c.detail_as_of ? safe(c.detail_as_of) : '';
         html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0}, '${asOf}')" title="공약 상세 보기">
           <span class="champion-week">${safe(wLabel)}</span>
-          <span class="champion-name">${safe(c.candidate_name)}</span>
-          <span class="champion-region">${safe(regionText)}</span>
+          <span class="champion-main"><span class="champion-name">${safe(c.candidate_name)}</span><span class="champion-region">${safe(regionText)}</span></span>
           <span class="champion-score ${scoreClass(c.avg_score)}">${c.avg_score}</span>
         </div>`;
       });
@@ -994,12 +1017,14 @@
         html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid}, '${asOf}')" title="공약 상세 보기">
           <div class="rank-num ${numCls}">${r.rank}</div>
           <div class="rank-info">
-            <div class="rank-name">${safe(r.name)}</div>
-            <div class="rank-meta">
+            <div class="rank-topline">
+              <div class="rank-name">${safe(r.name)}</div>
               ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
-              ${region}
             </div>
-            ${updatedDate ? `<div class="rank-updated">업데이트 ${safe(updatedDate)}</div>` : ''}
+            <div class="rank-subline">
+              <div class="rank-meta">${region}</div>
+              ${updatedDate ? `<div class="rank-updated">업데이트 ${safe(updatedDate)}</div>` : ''}
+            </div>
           </div>
           <div class="rank-score">
             <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
