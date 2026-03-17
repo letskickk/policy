@@ -100,6 +100,7 @@
     .badge-pending { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(250,204,21,0.18); color: #fde047; margin-left: 0.4rem; }
     .badge-approved { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(34,197,94,0.18); color: #86efac; margin-left: 0.4rem; }
     .badge-rejected { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(239,68,68,0.18); color: #fca5a5; margin-left: 0.4rem; }
+    .badge-mixed { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.75rem; font-weight: 700; background: rgba(59,130,246,0.18); color: #93c5fd; margin-left: 0.4rem; }
     .btn-approve { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 700; }
     .btn-approve:hover { background: rgba(34,197,94,0.3); }
     .btn-reject { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 700; }
@@ -273,6 +274,26 @@
       });
     });
 
+    function getStatusLabel(status) {
+      if (status === 'APPROVED') return '승인됨';
+      if (status === 'REJECTED') return '거절됨';
+      if (status === 'MIXED') return '일부 대기';
+      return '대기중';
+    }
+
+    function getCandidateReviewState(candidate) {
+      const pledges = Array.isArray(candidate?.pledges) ? candidate.pledges : [];
+      if (!pledges.length) return (candidate?.approval_status || 'PENDING').toUpperCase();
+      const statuses = new Set(
+        pledges.map(p => (p?.approval_status || 'PENDING').toUpperCase())
+      );
+      if (statuses.has('PENDING')) return 'PENDING';
+      if (statuses.size === 1 && statuses.has('APPROVED')) return 'APPROVED';
+      if (statuses.size === 1 && statuses.has('REJECTED')) return 'REJECTED';
+      if (statuses.has('APPROVED') || statuses.has('REJECTED')) return 'MIXED';
+      return (candidate?.approval_status || 'PENDING').toUpperCase();
+    }
+
     async function loadAllCandidates() {
       try {
         const r = await fetch('/api/admin/candidates', { credentials: 'include' });
@@ -280,7 +301,7 @@
         const data = await r.json();
         _allCandidates = Array.isArray(data) ? data : [];
         const pendingCount = _allCandidates.filter(c => {
-          const status = (c.approval_status || 'PENDING').toUpperCase();
+          const status = getCandidateReviewState(c);
           return status === 'PENDING' || status === 'MIXED';
         }).length;
         approvalCountEl.textContent = pendingCount > 0 ? `(${pendingCount}건 대기)` : '';
@@ -292,7 +313,7 @@
       const filtered = _currentFilter === 'ALL'
         ? _allCandidates
         : _allCandidates.filter(c => {
-            const status = (c.approval_status || 'PENDING').toUpperCase();
+            const status = getCandidateReviewState(c);
             if (_currentFilter === 'PENDING') return status === 'PENDING' || status === 'MIXED';
             return status === _currentFilter;
           });
@@ -306,8 +327,8 @@
         const regBadge = c.user_id
           ? `<span class="badge-user" title="${_esc(c.registered_by || '')}">사용자</span>`
           : `<span class="badge-admin">관리자</span>`;
-        const st = (c.approval_status || 'PENDING').toUpperCase();
-        const statusLabel = st === 'APPROVED' ? '승인됨' : st === 'REJECTED' ? '거절됨' : '대기중';
+        const st = getCandidateReviewState(c);
+        const statusLabel = getStatusLabel(st);
         const statusBadge = `<span class="badge-${st.toLowerCase()}">${statusLabel}</span>`;
         const region = REGION_NAMES[c.region_code] || c.region_code || '';
         const etype = ET_LABELS[c.election_type] || c.election_type || '';
@@ -328,7 +349,7 @@
           : pledges.map((p, i) => {
             const sc = p.total_score;
             const pst = (p.approval_status || 'PENDING').toUpperCase();
-            const pLabel = pst === 'APPROVED' ? '승인됨' : pst === 'REJECTED' ? '거절됨' : '대기중';
+            const pLabel = getStatusLabel(pst);
             const scoreTag = sc != null
               ? `<span style="margin-left:0.5rem;font-size:0.8rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:5px;background:${sc>=80?'rgba(34,197,94,0.15)':sc>=60?'rgba(250,204,21,0.15)':'rgba(239,68,68,0.15)'};color:${sc>=80?'#86efac':sc>=60?'#fde047':'#fca5a5'}">${sc}점</span>`
               : '<span style="margin-left:0.5rem;font-size:0.75rem;color:#fde047;">미분석</span>';
@@ -378,8 +399,9 @@
 
     function togglePledges(headerEl) {
       headerEl.classList.toggle('open');
-      const pledgesEl = headerEl.nextElementSibling;
-      pledgesEl.classList.toggle('show');
+      const itemEl = headerEl.closest('.approval-item');
+      const pledgesEl = itemEl ? itemEl.querySelector('.approval-pledges') : null;
+      if (pledgesEl) pledgesEl.classList.toggle('show');
     }
 
     function _esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -575,8 +597,8 @@
           const regBadge = c.user_id
             ? `<span class="badge-user" title="${escapeAttr(c.registered_by || '')}">사용자 등록</span>`
             : `<span class="badge-admin">관리자 등록</span>`;
-          const st = (c.approval_status || 'PENDING').toUpperCase();
-          const statusLabel = st === 'APPROVED' ? '승인됨' : st === 'REJECTED' ? '거절됨' : '대기중';
+          const st = getCandidateReviewState(c);
+          const statusLabel = getStatusLabel(st);
           const statusBadge = `<span class="badge-${st.toLowerCase()}">${statusLabel}</span>`;
           const approveBtn = st !== 'APPROVED' ? `<button class="btn-approve" onclick="approveCandidate(${c.candidate_id})">승인</button>` : '';
           const rejectBtn = st !== 'REJECTED' ? `<button class="btn-reject" onclick="rejectCandidate(${c.candidate_id})">거절</button>` : '';
