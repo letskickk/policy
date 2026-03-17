@@ -883,8 +883,12 @@
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
     const charCounterEl = document.getElementById('charCounter');
-    const MAX_CHARS = 10000;
+    const MAX_CHARS = 3000;
     let lastResultFullText = '';
+    pledgeEl.maxLength = MAX_CHARS;
+    if (charCounterEl) {
+      charCounterEl.insertAdjacentHTML('afterend', '<div class="form-hint" style="margin-top:0.55rem;margin-bottom:0;">한 번에 한 가지 공약만 올려 주세요. 여러 공약을 함께 넣으면 심사와 점수 해석이 부정확해질 수 있습니다.</div>');
+    }
 
     function updateCharCounter() {
       const len = (pledgeEl.value || '').length;
@@ -892,6 +896,7 @@
       charCounterEl.className = 'char-counter' + (len > MAX_CHARS ? ' over' : len > MAX_CHARS * 0.9 ? ' warn' : '');
     }
     pledgeEl.addEventListener('input', updateCharCounter);
+    updateCharCounter();
 
     const emptyMessage = '<div style="font-size:2rem;margin-bottom:0.5rem;">🧐</div>공약 내용을 입력하고 \'AI 분석 시작하기\' 버튼을 눌러주세요.';
 

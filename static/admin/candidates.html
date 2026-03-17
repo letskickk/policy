@@ -219,23 +219,26 @@
 
   <script>
     /* ===== 거절 모달 ===== */
-    let _rejectTargetCid = null;
-    function openRejectModal(cid) {
-      _rejectTargetCid = cid;
+    let _rejectTarget = null;
+    function openRejectModal(targetType, targetId) {
+      _rejectTarget = { type: targetType, id: targetId };
       document.getElementById('rejectReasonInput').value = '';
       document.getElementById('rejectModal').classList.add('show');
     }
     function closeRejectModal() {
-      _rejectTargetCid = null;
+      _rejectTarget = null;
       document.getElementById('rejectModal').classList.remove('show');
     }
     async function confirmReject() {
-      const cid = _rejectTargetCid;
-      if (!cid) return;
+      const target = _rejectTarget;
+      if (!target || !target.id) return;
       const reason = (document.getElementById('rejectReasonInput').value || '').trim();
       closeRejectModal();
       try {
-        const r = await fetch('/api/admin/candidates/' + cid + '/reject', {
+        const path = target.type === 'pledge'
+          ? '/api/admin/pledges/' + target.id + '/reject'
+          : '/api/admin/candidates/' + target.id + '/reject';
+        const r = await fetch(path, {
           method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reason })
@@ -276,7 +279,10 @@
         if (!r.ok) return;
         const data = await r.json();
         _allCandidates = Array.isArray(data) ? data : [];
-        const pendingCount = _allCandidates.filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
+        const pendingCount = _allCandidates.filter(c => {
+          const status = (c.approval_status || 'PENDING').toUpperCase();
+          return status === 'PENDING' || status === 'MIXED';
+        }).length;
         approvalCountEl.textContent = pendingCount > 0 ? `(${pendingCount}건 대기)` : '';
         renderApprovalList();
       } catch (e) { console.error(e); }
@@ -285,7 +291,11 @@
     function renderApprovalList() {
       const filtered = _currentFilter === 'ALL'
         ? _allCandidates
-        : _allCandidates.filter(c => (c.approval_status || 'PENDING') === _currentFilter);
+        : _allCandidates.filter(c => {
+            const status = (c.approval_status || 'PENDING').toUpperCase();
+            if (_currentFilter === 'PENDING') return status === 'PENDING' || status === 'MIXED';
+            return status === _currentFilter;
+          });
 
       if (filtered.length === 0) {
         approvalListEl.innerHTML = '<div class="approval-empty">해당 상태의 후보가 없습니다.</div>';
@@ -317,13 +327,27 @@
           ? '<div style="color:#64748b;font-size:0.85rem;padding:0.5rem 0;">등록된 공약이 없습니다.</div>'
           : pledges.map((p, i) => {
             const sc = p.total_score;
+            const pst = (p.approval_status || 'PENDING').toUpperCase();
+            const pLabel = pst === 'APPROVED' ? '승인됨' : pst === 'REJECTED' ? '거절됨' : '대기중';
             const scoreTag = sc != null
               ? `<span style="margin-left:0.5rem;font-size:0.8rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:5px;background:${sc>=80?'rgba(34,197,94,0.15)':sc>=60?'rgba(250,204,21,0.15)':'rgba(239,68,68,0.15)'};color:${sc>=80?'#86efac':sc>=60?'#fde047':'#fca5a5'}">${sc}점</span>`
               : '<span style="margin-left:0.5rem;font-size:0.75rem;color:#fde047;">미분석</span>';
+            const pledgeStatusTag = `<span class="badge-${pst.toLowerCase()}" style="margin-left:0.5rem;">${pLabel}</span>`;
+            const pledgeApproveBtn = pst !== 'APPROVED'
+              ? `<button class="btn-approve" onclick="event.stopPropagation();doApprovePledge(${p.id})">승인</button>`
+              : '';
+            const pledgeRejectBtn = pst !== 'REJECTED'
+              ? `<button class="btn-reject" onclick="event.stopPropagation();doRejectPledge(${p.id})">거절</button>`
+              : '';
+            const pledgeReasonHtml = pst === 'REJECTED' && p.rejection_reason
+              ? `<div class="rejection-reason-text"><span class="reason-label">거절 사유:</span>${_escHtml(p.rejection_reason)}</div>`
+              : '';
             return `
             <div class="pledge-detail">
-              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}${scoreTag}</div>
+              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}${scoreTag}${pledgeStatusTag}</div>
+              <div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap;">${pledgeApproveBtn}${pledgeRejectBtn}</div>
               ${p.content ? `<div class="pledge-content-text">${_escHtml(p.content)}</div>` : '<div class="no-content">세부내용 없음</div>'}
+              ${pledgeReasonHtml}
             </div>`;
           }).join('');
 
@@ -368,8 +392,18 @@
         else alert('승인 실패');
       } catch (e) { alert('서버 오류'); }
     }
+    async function doApprovePledge(pledgeId) {
+      try {
+        const r = await fetch('/api/admin/pledges/' + pledgeId + '/approve', { method: 'POST', credentials: 'include' });
+        if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
+        else alert('공약 승인 실패');
+      } catch (e) { alert('서버 오류'); }
+    }
     async function doReject(cid) {
-      openRejectModal(cid);
+      openRejectModal('candidate', cid);
+    }
+    async function doRejectPledge(pledgeId) {
+      openRejectModal('pledge', pledgeId);
     }
     async function doDeleteApproval(cid, name) {
       if (!confirm(`"${name}" 후보를 삭제하시겠습니까? 공약도 모두 삭제됩니다.`)) return;
@@ -574,7 +608,7 @@
       } catch (e) { alert('서버 오류'); }
     }
     async function rejectCandidate(cid) {
-      openRejectModal(cid);
+      openRejectModal('candidate', cid);
     }
     function escapeHtml(s) {
       const d = document.createElement('div');

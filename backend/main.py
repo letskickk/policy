@@ -346,7 +346,7 @@ def require_approved(request: Request) -> dict:
 
 
 class PledgeCheckRequest(BaseModel):
-    pledge: str = Field(..., max_length=10000, description="점검할 출마자 공약 텍스트")
+    pledge: str = Field(..., max_length=3000, description="점검할 출마자 공약 텍스트")
 
 
 class PledgeCheckResponse(BaseModel):
@@ -1802,7 +1802,11 @@ def _validate_region_code(region_code: Optional[str]) -> str:
     return code
 
 
-def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> list[CandidatePledgeResponse]:
+def _fetch_candidate_pledges(
+    candidate_id: int,
+    limit: Optional[int] = None,
+    public_only: bool = False,
+) -> list[CandidatePledgeResponse]:
     from backend.database import get_connection
 
     conn = get_connection()
@@ -1811,6 +1815,10 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
             SELECT title, content, total_score, created_at
             FROM candidate_pledges
             WHERE candidate_id = ?
+        """
+        if public_only:
+            sql += " AND approval_status = 'APPROVED'"
+        sql += """
             ORDER BY priority ASC, datetime(created_at) DESC, id DESC
         """
         params: tuple = (candidate_id,)
@@ -1829,6 +1837,43 @@ def _fetch_candidate_pledges(candidate_id: int, limit: Optional[int] = None) -> 
         ]
     finally:
         conn.close()
+
+
+def _recalculate_candidate_approval(conn, candidate_id: int):
+    rows = conn.execute(
+        """
+        SELECT approval_status, rejection_reason
+        FROM candidate_pledges
+        WHERE candidate_id = ?
+        ORDER BY priority ASC, id ASC
+        """,
+        (candidate_id,),
+    ).fetchall()
+    if not rows:
+        conn.execute(
+            "UPDATE candidates SET approval_status = 'PENDING', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+            (candidate_id,),
+        )
+        return "PENDING"
+
+    statuses = [(row["approval_status"] or "PENDING").upper() for row in rows]
+    unique_statuses = set(statuses)
+    candidate_status = "PENDING"
+    candidate_reason = None
+    if unique_statuses == {"APPROVED"}:
+        candidate_status = "APPROVED"
+    elif unique_statuses == {"REJECTED"}:
+        candidate_status = "REJECTED"
+        reasons = [row["rejection_reason"] for row in rows if row["rejection_reason"]]
+        candidate_reason = reasons[0] if reasons else None
+    elif "APPROVED" in unique_statuses or "REJECTED" in unique_statuses:
+        candidate_status = "MIXED"
+
+    conn.execute(
+        "UPDATE candidates SET approval_status = ?, rejection_reason = ?, updated_at = datetime('now') WHERE id = ?",
+        (candidate_status, candidate_reason, candidate_id),
+    )
+    return candidate_status
 
 
 def _resolve_region_name(code: str) -> str:
@@ -1955,11 +2000,24 @@ def admin_list_candidates(
         conn2 = get_connection()
         try:
             p_rows = conn2.execute(
-                f"SELECT candidate_id, title, content, total_score FROM candidate_pledges WHERE candidate_id IN ({placeholders}) ORDER BY priority ASC, id ASC",
+                f"""
+                SELECT id, candidate_id, title, content, total_score, approval_status, rejection_reason, created_at
+                FROM candidate_pledges
+                WHERE candidate_id IN ({placeholders})
+                ORDER BY priority ASC, id ASC
+                """,
                 tuple(candidate_ids),
             ).fetchall()
             for p in p_rows:
-                pledges_map[int(p["candidate_id"])].append({"title": p["title"], "content": p["content"], "total_score": p["total_score"]})
+                pledges_map[int(p["candidate_id"])].append({
+                    "id": p["id"],
+                    "title": p["title"],
+                    "content": p["content"],
+                    "total_score": p["total_score"],
+                    "approval_status": p["approval_status"] or "PENDING",
+                    "rejection_reason": p["rejection_reason"] or "",
+                    "created_at": p["created_at"],
+                })
         finally:
             conn2.close()
 
@@ -2038,9 +2096,10 @@ def admin_approve_candidate(candidate_id: int, request: Request):
             source_action="APPROVE",
         )
         conn.execute(
-            "UPDATE candidates SET approval_status = 'APPROVED', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE candidate_pledges SET approval_status = 'APPROVED', rejection_reason = NULL WHERE candidate_id = ?",
             (candidate_id,),
         )
+        _recalculate_candidate_approval(conn, candidate_id)
         conn.commit()
     except HTTPException:
         conn.rollback()
@@ -2100,9 +2159,10 @@ def admin_reject_candidate(candidate_id: int, request: Request, body: Optional[R
             source_action="REJECT",
         )
         conn.execute(
-            "UPDATE candidates SET approval_status = 'REJECTED', rejection_reason = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE candidate_pledges SET approval_status = 'REJECTED', rejection_reason = ? WHERE candidate_id = ?",
             (rejection_reason or None, candidate_id),
         )
+        _recalculate_candidate_approval(conn, candidate_id)
         conn.commit()
     except HTTPException:
         conn.rollback()
@@ -2128,6 +2188,89 @@ def admin_reject_candidate(candidate_id: int, request: Request, body: Optional[R
             logger.warning("공약 거절 알림 메일 발송 실패 (무시): %s", e)
 
     return {"ok": True, "approval_status": "REJECTED"}
+
+
+@app.post("/api/admin/pledges/{pledge_id}/approve", tags=["admin", "candidates"])
+def admin_approve_pledge(pledge_id: int, request: Request):
+    _ensure_db_ready()
+    _ = require_admin(request)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id, cp.candidate_id
+            FROM candidate_pledges cp
+            WHERE cp.id = ?
+            """,
+            (pledge_id,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="공약을 찾을 수 없습니다.")
+        candidate_id = int(row["candidate_id"])
+        _snapshot_candidate_pledges(conn, candidate_id, approval_status="APPROVED", source_action="PLEDGE_APPROVE")
+        conn.execute(
+            "UPDATE candidate_pledges SET approval_status = 'APPROVED', rejection_reason = NULL WHERE id = ?",
+            (pledge_id,),
+        )
+        candidate_status = _recalculate_candidate_approval(conn, candidate_id)
+        conn.commit()
+        return {"ok": True, "approval_status": "APPROVED", "candidate_status": candidate_status}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        logger.exception("공약 승인 처리 중 오류")
+        raise HTTPException(status_code=500, detail="공약 승인 처리 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
+
+
+@app.post("/api/admin/pledges/{pledge_id}/reject", tags=["admin", "candidates"])
+def admin_reject_pledge(pledge_id: int, request: Request, body: Optional[RejectBody] = None):
+    _ensure_db_ready()
+    _ = require_admin(request)
+    rejection_reason = (body.reason or "").strip() if body else ""
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id, cp.candidate_id
+            FROM candidate_pledges cp
+            WHERE cp.id = ?
+            """,
+            (pledge_id,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="공약을 찾을 수 없습니다.")
+        candidate_id = int(row["candidate_id"])
+        _snapshot_candidate_pledges(
+            conn,
+            candidate_id,
+            approval_status="REJECTED",
+            rejection_reason=rejection_reason,
+            source_action="PLEDGE_REJECT",
+        )
+        conn.execute(
+            "UPDATE candidate_pledges SET approval_status = 'REJECTED', rejection_reason = ? WHERE id = ?",
+            (rejection_reason or None, pledge_id),
+        )
+        candidate_status = _recalculate_candidate_approval(conn, candidate_id)
+        conn.commit()
+        return {"ok": True, "approval_status": "REJECTED", "candidate_status": candidate_status}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        logger.exception("공약 거절 처리 중 오류")
+        raise HTTPException(status_code=500, detail="공약 거절 처리 중 오류가 발생했습니다.")
+    finally:
+        conn.close()
 
 
 @app.post("/api/admin/candidates", response_model=CandidateDetailResponse, tags=["admin", "candidates"])
@@ -2291,7 +2434,12 @@ def get_regions():
             """
             SELECT region_code, COUNT(*) AS candidate_count
             FROM candidates
-            WHERE approval_status = 'APPROVED'
+            WHERE approval_status IN ('APPROVED', 'MIXED')
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = candidates.id
+                    AND cp.approval_status = 'APPROVED'
+              )
             GROUP BY region_code
             """
         ).fetchall()
@@ -2325,7 +2473,12 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 """
                 SELECT election_type, COUNT(*) AS n
                 FROM candidates
-                WHERE approval_status = 'APPROVED'
+                WHERE approval_status IN ('APPROVED', 'MIXED')
+                  AND EXISTS (
+                      SELECT 1 FROM candidate_pledges cp
+                      WHERE cp.candidate_id = candidates.id
+                        AND cp.approval_status = 'APPROVED'
+                  )
                   AND region_code = ?
                 GROUP BY election_type
                 """,
@@ -2336,7 +2489,12 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 """
                 SELECT election_type, COUNT(*) AS n
                 FROM candidates
-                WHERE approval_status = 'APPROVED'
+                WHERE approval_status IN ('APPROVED', 'MIXED')
+                  AND EXISTS (
+                      SELECT 1 FROM candidate_pledges cp
+                      WHERE cp.candidate_id = candidates.id
+                        AND cp.approval_status = 'APPROVED'
+                  )
                 GROUP BY election_type
                 """
             ).fetchall()
@@ -2362,9 +2520,14 @@ def get_districts(
             SELECT district_name, district_code, election_type
             FROM candidates
             WHERE region_code = ?
-              AND approval_status = 'APPROVED'
+              AND approval_status IN ('APPROVED', 'MIXED')
               AND district_name IS NOT NULL
               AND TRIM(district_name) <> ''
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = candidates.id
+                    AND cp.approval_status = 'APPROVED'
+              )
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2436,7 +2599,12 @@ def get_candidates(
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             WHERE c.region_code = ?
-              AND c.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND cp.approval_status = 'APPROVED'
+              )
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2473,7 +2641,7 @@ def get_candidates(
                 region_code=r["region_code"],
                 election_type=r["election_type"],
                 election_level=r["election_level"],
-                pledges=_fetch_candidate_pledges(candidate_id, limit=3),
+                pledges=_fetch_candidate_pledges(candidate_id, limit=3, public_only=True),
             )
         )
     return result
@@ -2494,7 +2662,13 @@ def get_candidate_detail(candidate_id: int):
                    c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            WHERE c.id = ? AND c.approval_status = 'APPROVED'
+            WHERE c.id = ?
+              AND c.approval_status IN ('APPROVED', 'MIXED')
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND cp.approval_status = 'APPROVED'
+              )
             """,
             (candidate_id,),
         ).fetchone()
@@ -2549,7 +2723,7 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None),
+        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None, public_only=True),
     )
 
 
