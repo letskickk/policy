@@ -86,7 +86,40 @@
     .htitle{color:#fff;font-weight:800;line-height:1.45}
     .hmeta{color:#94a3b8;font-size:12px}
     .hprev{color:#cbd5e1;font-size:13px;line-height:1.6;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-    @media (max-width:720px){.grid{grid-template-columns:1fr}.actions{flex-direction:column}.rowtop{align-items:flex-start}}
+    @media (max-width:768px){
+      body{padding:16px 12px 32px}
+      .top{align-items:stretch;gap:10px}
+      .brand{width:100%}
+      .brand span{min-width:0}
+      .nav{width:100%}
+      .nav a,.nav button,.btn,.btn2,.btn3{flex:1 1 calc(50% - 4px);min-width:0}
+      h1{font-size:28px;line-height:1.25}
+      .sub{font-size:15px;line-height:1.65}
+      .card{padding:18px}
+      .grid{grid-template-columns:1fr}
+      .head{align-items:flex-start}
+      .head h2{font-size:20px}
+      .summarybar{gap:6px}
+      .summarylink{width:100%;margin-top:2px}
+      .row{padding:14px}
+      .rowtop{align-items:flex-start}
+      .ord{width:100%}
+      .rowmeta,.acts{width:100%}
+      .acts .btn2,.acts .btn3{flex:1 1 calc(50% - 4px)}
+      input[type=text],textarea{padding:12px 13px;font-size:15px}
+      textarea{min-height:180px}
+      .meta{align-items:flex-start}
+      .preview{max-height:180px}
+      .actions{flex-direction:column}
+      .actions .btn,.actions .btn3{width:100%}
+      .modal{padding:12px}
+      .mbox{max-height:calc(100vh - 24px);border-radius:16px}
+      .mhead,.mfoot,.mbody{padding:14px}
+      .mhead{align-items:flex-start}
+      .mfoot{flex-direction:column}
+      .mfoot .btn,.mfoot .btn2{width:100%}
+      .htop{gap:8px}
+    }
   </style>
 </head>
 <body>

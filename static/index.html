@@ -497,6 +497,110 @@
       .pledge-modal-body{ padding: 1rem 1.1rem 1.5rem; }
     }
 
+    @media (max-width: 768px){
+      body{ padding: 1.25rem 0.9rem 2rem; }
+      .top-bar{ align-items: stretch; gap: 0.9rem; }
+      .top-bar .top-bar-left{
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.65rem;
+      }
+      .top-bar .nav-wrap{
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+      }
+      .top-bar .nav-login-row{
+        width: 100%;
+        margin-right: 0;
+      }
+      .top-bar .nav-btns{
+        width: 100%;
+      }
+      .top-bar .nav-link{
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+      }
+      .hero{
+        padding: 1.35rem;
+      }
+      h1{
+        font-size: 1.85rem;
+      }
+      .hero-desc{
+        font-size: 0.98rem;
+      }
+      .trust-chips{
+        gap: 0.4rem;
+      }
+      .flow{
+        grid-template-columns: 1fr;
+      }
+      .step{
+        min-height: auto;
+      }
+      .feature-grid{
+        grid-template-columns: 1fr;
+      }
+      .leaderboard-header{
+        align-items: flex-start;
+      }
+      .leaderboard-filters{
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+      }
+      .leaderboard-filters select{
+        flex: 1 1 calc(50% - 0.2rem);
+        min-width: 0;
+      }
+      .champion-item{
+        flex-wrap: wrap;
+        gap: 0.35rem 0.55rem;
+        align-items: flex-start;
+      }
+      .champion-week{
+        min-width: auto;
+      }
+      .champion-region{
+        flex-basis: 100%;
+        white-space: normal;
+      }
+      .champion-score{
+        margin-left: 0;
+      }
+      .rank-row{
+        align-items: flex-start;
+        gap: 0.7rem;
+      }
+      .rank-info{
+        min-width: 0;
+      }
+      .rank-meta{
+        line-height: 1.5;
+      }
+      .rank-score{
+        width: 100%;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+      }
+      .score-label,
+      .pledge-count{
+        margin: 0;
+      }
+      .modal-pledge-item{
+        padding: 0.95rem 1rem;
+      }
+      .modal-pledge-content{
+        font-size: 0.88rem;
+        line-height: 1.7;
+      }
+    }
+
     @media (min-width: 720px){
       .cta-group{
         grid-template-columns: 1fr 1fr;

@@ -734,6 +734,96 @@
       textarea { min-height: 180px; }
       .btn-primary, .btn-secondary{ padding: 0.7rem 1rem; font-size: 0.9rem; }
     }
+
+    @media (max-width: 768px){
+      body{ padding: 1.35rem 0.9rem 2.2rem; }
+      .top-bar{
+        align-items: stretch;
+      }
+      .brand{
+        width: 100%;
+      }
+      .top-bar .nav-wrap{
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .nav-login-row{
+        width: 100%;
+        margin-right: 0;
+      }
+      .nav-btns{
+        width: 100%;
+      }
+      .nav-link{
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+      }
+      header{
+        margin-bottom: 1.6rem;
+      }
+      h1{
+        font-size: 1.85rem;
+      }
+      .subtitle{
+        font-size: 0.98rem;
+      }
+      .card{
+        padding: 1.25rem;
+      }
+      .pledge-input-group{
+        border-radius: 14px;
+      }
+      .pledge-input-group textarea{
+        min-height: 190px;
+        padding: 0.55rem 1rem 1rem;
+      }
+      .input-text{
+        font-size: 0.95rem;
+      }
+      .result-summary{
+        gap: 0.45rem;
+      }
+      .result-actions{
+        flex-direction: column;
+      }
+      .result-actions .btn-primary,
+      .result-actions .btn-secondary,
+      #btn{
+        width: 100%;
+      }
+      .section-card-body,
+      .analysis-text{
+        font-size: 0.92rem;
+        line-height: 1.7;
+      }
+      .draft-modal{
+        padding: 0.75rem 0.5rem;
+        align-items: flex-start;
+      }
+      .draft-modal-box{
+        max-height: calc(100vh - 1.5rem);
+        border-radius: 16px;
+      }
+      .draft-modal-head,
+      .draft-modal-admin-row,
+      .draft-modal-body,
+      .draft-modal-footer{
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+      .draft-modal-admin-row{
+        align-items: stretch;
+      }
+      .draft-modal-admin-row label,
+      .draft-modal-admin-row input[type="text"],
+      .draft-modal-admin-row select,
+      .draft-modal-footer .btn-secondary{
+        width: 100%;
+      }
+      .draft-modal-footer{
+        flex-direction: column;
+      }
+    }
   </style>
 </head>
 

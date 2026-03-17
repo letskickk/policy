@@ -579,6 +579,80 @@
       .candidate-card, .candidate-header{ padding-left: 0.75rem; padding-right: 0.75rem; }
     }
 
+    @media (max-width: 768px){
+      body{ padding: 1.1rem 0.85rem 1.8rem; }
+      .top-bar{
+        padding: 0;
+        align-items: stretch;
+      }
+      .top-bar .top-bar-left{
+        width: 100%;
+        gap: 0.75rem;
+      }
+      .top-bar .brand{
+        width: 100%;
+      }
+      .top-bar .nav{
+        width: 100%;
+      }
+      .nav-link{
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+      }
+      .container{
+        gap: 1rem;
+      }
+      .map-container,
+      .panel{
+        padding: 1.1rem;
+        border-radius: 16px;
+      }
+      .panel-header{
+        margin-bottom: 1.1rem;
+      }
+      .panel-title{
+        font-size: 1.15rem;
+        line-height: 1.35;
+      }
+      .panel-subtitle{
+        font-size: 0.88rem;
+        line-height: 1.6;
+      }
+      .filter-row{
+        gap: 0.45rem;
+        margin-bottom: 0.85rem;
+      }
+      .filter-row label{
+        font-size: 0.82rem;
+      }
+      .filter-select{
+        min-height: 44px;
+        font-size: 0.95rem;
+      }
+      .candidate-card{
+        border-radius: 14px;
+      }
+      .candidate-header{
+        padding: 0.95rem 0.9rem;
+        align-items: flex-start;
+      }
+      .candidate-name,
+      .candidate-position,
+      .candidate-meta{
+        line-height: 1.5;
+      }
+      .candidate-pledges{
+        padding: 0 0.9rem 0.95rem;
+      }
+      .pledge-modal-overlay{
+        padding: 0.75rem 0.5rem;
+        align-items: flex-start;
+      }
+      .pledge-modal{
+        max-height: calc(100vh - 1.5rem);
+      }
+    }
+
     /* 공약 상세 모달 */
     .pledge-modal-overlay{
       display:none; position:fixed; inset:0; z-index:9999;
