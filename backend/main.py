@@ -3791,8 +3791,23 @@ def api_leaderboard(
         """
         params: list = []
 
-        sql += " AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ? AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?"
-        params.extend([target_monday.isoformat(), ranking_end.isoformat()])
+        if is_current_week:
+            sql += f"""
+              AND EXISTS (
+                  SELECT 1
+                  FROM candidate_pledges cpw
+                  LEFT JOIN ({approved_review_subquery}) prhw ON prhw.pledge_id = cpw.id
+                  WHERE cpw.candidate_id = c.id
+                    AND cpw.total_score IS NOT NULL
+                    AND cpw.approval_status = 'APPROVED'
+                    AND date(COALESCE(prhw.approved_reviewed_at, cpw.analyzed_at, cpw.created_at)) >= ?
+                    AND date(COALESCE(prhw.approved_reviewed_at, cpw.analyzed_at, cpw.created_at)) <= ?
+              )
+            """
+            params.extend([target_monday.isoformat(), ranking_end.isoformat()])
+        else:
+            sql += " AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ? AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?"
+            params.extend([target_monday.isoformat(), ranking_end.isoformat()])
 
         if is_current_week:
             # 이번 주: 챔피언 제외 (단, 이번 주에 공약을 업데이트한 챔피언은 다시 포함)
