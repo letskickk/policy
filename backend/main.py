@@ -8,6 +8,8 @@ import logging
 import os
 import re
 import sys
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -2019,7 +2021,7 @@ def admin_approve_candidate(candidate_id: int, request: Request):
     conn = get_connection()
     try:
         existing = conn.execute(
-            """SELECT c.id, c.approval_status, c.name AS candidate_name,
+            """SELECT c.id, c.approval_status, c.rejection_reason, c.name AS candidate_name,
                       u.email AS user_email, u.name AS user_name
                FROM candidates c
                LEFT JOIN users u ON u.id = c.user_id
@@ -2028,8 +2030,15 @@ def admin_approve_candidate(candidate_id: int, request: Request):
         ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+        _snapshot_candidate_pledges(
+            conn,
+            candidate_id,
+            approval_status="APPROVED",
+            rejection_reason=None,
+            source_action="APPROVE",
+        )
         conn.execute(
-            "UPDATE candidates SET approval_status = 'APPROVED', updated_at = datetime('now') WHERE id = ?",
+            "UPDATE candidates SET approval_status = 'APPROVED', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
             (candidate_id,),
         )
         conn.commit()
@@ -2083,6 +2092,13 @@ def admin_reject_candidate(candidate_id: int, request: Request, body: Optional[R
         ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="후보를 찾을 수 없습니다.")
+        _snapshot_candidate_pledges(
+            conn,
+            candidate_id,
+            approval_status="REJECTED",
+            rejection_reason=rejection_reason,
+            source_action="REJECT",
+        )
         conn.execute(
             "UPDATE candidates SET approval_status = 'REJECTED', rejection_reason = ?, updated_at = datetime('now') WHERE id = ?",
             (rejection_reason or None, candidate_id),
@@ -2537,6 +2553,98 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
     )
 
 
+def _snapshot_candidate_pledges(
+    conn,
+    candidate_id: int,
+    approval_status: str,
+    rejection_reason: Optional[str] = None,
+    source_action: str = "REVIEW",
+    reviewed_at: Optional[str] = None,
+):
+    rows = conn.execute(
+        """
+        SELECT id, title, content, priority, total_score, analysis_result, analyzed_at, created_at
+        FROM candidate_pledges
+        WHERE candidate_id = ?
+        ORDER BY priority ASC, id ASC
+        """,
+        (candidate_id,),
+    ).fetchall()
+    if not rows:
+        return None
+
+    snapshot_group = uuid.uuid4().hex
+    reviewed_value = reviewed_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO candidate_pledge_review_history (
+                candidate_id, snapshot_group, source_action, approval_status, rejection_reason,
+                reviewed_at, pledge_id, title, content, priority, total_score, analysis_result,
+                analyzed_at, pledge_created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                candidate_id,
+                snapshot_group,
+                source_action,
+                (approval_status or "PENDING").upper(),
+                rejection_reason or None,
+                reviewed_value,
+                row["id"],
+                row["title"],
+                row["content"],
+                row["priority"],
+                row["total_score"],
+                row["analysis_result"],
+                row["analyzed_at"],
+                row["created_at"],
+            ),
+        )
+    return snapshot_group
+
+
+def _fetch_candidate_review_history(conn, candidate_id: int) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT snapshot_group, source_action, approval_status, rejection_reason, reviewed_at,
+               title, content, priority, total_score, analyzed_at, pledge_created_at
+        FROM candidate_pledge_review_history
+        WHERE candidate_id = ?
+        ORDER BY datetime(reviewed_at) DESC, snapshot_group DESC, priority ASC, id ASC
+        """,
+        (candidate_id,),
+    ).fetchall()
+    groups: list[dict] = []
+    current_group: Optional[str] = None
+    current_item: Optional[dict] = None
+    for row in rows:
+        group_id = row["snapshot_group"]
+        if group_id != current_group:
+            current_group = group_id
+            current_item = {
+                "snapshot_group": group_id,
+                "source_action": row["source_action"] or "REVIEW",
+                "approval_status": row["approval_status"] or "PENDING",
+                "rejection_reason": row["rejection_reason"] or "",
+                "reviewed_at": row["reviewed_at"],
+                "pledges": [],
+            }
+            groups.append(current_item)
+        current_item["pledges"].append(
+            {
+                "title": row["title"],
+                "content": row["content"],
+                "priority": row["priority"],
+                "total_score": row["total_score"],
+                "analyzed_at": row["analyzed_at"],
+                "created_at": row["pledge_created_at"],
+            }
+        )
+    return groups
+
+
 PLEDGE_TEMPLATES_PATH = ROOT_DIR / "data" / "pledge_templates.json"
 
 
@@ -2812,7 +2920,7 @@ def api_my_candidate_get(request: Request):
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status, rejection_reason FROM candidates WHERE user_id = ? LIMIT 1",
+            "SELECT id, name, district_name, district_code, region_code, election_type, election_level, approval_status, rejection_reason, created_at, updated_at FROM candidates WHERE user_id = ? LIMIT 1",
             (uid,),
         ).fetchone()
 
@@ -2843,6 +2951,28 @@ def api_my_candidate_get(request: Request):
             """,
             (candidate_id,),
         ).fetchall()
+        review_history = _fetch_candidate_review_history(conn, candidate_id)
+        if not review_history and (row["approval_status"] or "PENDING").upper() == "REJECTED" and pledges:
+            review_history = [
+                {
+                    "snapshot_group": f"synthetic-{candidate_id}",
+                    "source_action": "REJECT",
+                    "approval_status": "REJECTED",
+                    "rejection_reason": row["rejection_reason"] or "",
+                    "reviewed_at": row["updated_at"] if "updated_at" in row.keys() else row["created_at"],
+                    "pledges": [
+                        {
+                            "title": p["title"],
+                            "content": p["content"],
+                            "priority": p["priority"],
+                            "total_score": p["total_score"],
+                            "analyzed_at": p["analyzed_at"],
+                            "created_at": p["created_at"],
+                        }
+                        for p in pledges
+                    ],
+                }
+            ]
 
         return {
             "candidate": {
@@ -2863,6 +2993,7 @@ def api_my_candidate_get(request: Request):
                  "approval_status": p["approval_status"] or "PENDING", "rejection_reason": p["rejection_reason"] or ""}
                 for p in pledges
             ],
+            "review_history": review_history,
             "user_info": {
                 "name": user.get("name") or user.get("email", ""),
                 "election_position": election_position,
@@ -2929,7 +3060,10 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
     from backend.database import get_connection
     conn = get_connection()
     try:
-        row = conn.execute("SELECT id FROM candidates WHERE user_id = ? LIMIT 1", (uid,)).fetchone()
+        row = conn.execute(
+            "SELECT id, approval_status, rejection_reason FROM candidates WHERE user_id = ? LIMIT 1",
+            (uid,),
+        ).fetchone()
 
         if row is None:
             cur = conn.execute(
@@ -2963,6 +3097,8 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 )
         else:
             candidate_id = int(row["id"])
+            previous_status = (row["approval_status"] or "PENDING").upper()
+            previous_reason = row["rejection_reason"] or ""
             # 삭제-전용 여부 판별: 기존 공약의 부분집합이면 승인 상태 유지
             existing_rows = conn.execute(
                 "SELECT id, title, content FROM candidate_pledges WHERE candidate_id = ?",
@@ -2986,8 +3122,16 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 )
             else:
                 conn.execute(
-                    "UPDATE candidates SET name = ?, approval_status = 'PENDING', updated_at = datetime('now') WHERE id = ?",
+                    "UPDATE candidates SET name = ?, approval_status = 'PENDING', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
                     (candidate_name, candidate_id),
+                )
+            if existing_rows and previous_status in {"APPROVED", "REJECTED"} and not is_delete_only:
+                _snapshot_candidate_pledges(
+                    conn,
+                    candidate_id,
+                    approval_status=previous_status,
+                    rejection_reason=previous_reason,
+                    source_action="RESUBMIT",
                 )
 
         conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))

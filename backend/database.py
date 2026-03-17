@@ -122,6 +122,28 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_candidate_pledges_candidate_priority_created
             ON candidate_pledges(candidate_id, priority, created_at);
 
+        CREATE TABLE IF NOT EXISTS candidate_pledge_review_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            candidate_id INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+            snapshot_group TEXT NOT NULL,
+            source_action TEXT NOT NULL DEFAULT 'REVIEW',
+            approval_status TEXT NOT NULL DEFAULT 'PENDING',
+            rejection_reason TEXT,
+            reviewed_at TEXT NOT NULL DEFAULT (datetime('now')),
+            pledge_id INTEGER,
+            title TEXT NOT NULL,
+            content TEXT,
+            priority INTEGER NOT NULL DEFAULT 100,
+            total_score REAL,
+            analysis_result TEXT,
+            analyzed_at TEXT,
+            pledge_created_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_candidate_pledge_review_history_candidate
+            ON candidate_pledge_review_history(candidate_id, reviewed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_candidate_pledge_review_history_group
+            ON candidate_pledge_review_history(snapshot_group);
+
         CREATE TABLE IF NOT EXISTS region_codes (
             region_code TEXT PRIMARY KEY,
             region_name TEXT NOT NULL,
