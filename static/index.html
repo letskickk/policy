@@ -1015,7 +1015,7 @@
         const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
         const region = r.district_name ? `${safe(r.region_name)} ${safe(cleanDN(r.district_name))}` : safe(r.region_name);
         const cid = r.candidate_id || '';
-        const updatedDate = r.updated_at ? r.updated_at.slice(0, 10) : '';
+        const updatedDate = formatShortMonthDay(r.updated_at);
         const asOf = r.detail_as_of ? safe(r.detail_as_of) : '';
         html += `<div class="rank-row${cls}" style="cursor:pointer;" onclick="openCandidateModal(${cid}, '${asOf}')" title="공약 상세 보기">
           <div class="rank-num ${numCls}">${r.rank}</div>
@@ -1026,7 +1026,7 @@
               <div class="rank-region">${region}</div>
             </div>
             <div class="rank-subline">
-              ${updatedDate ? `<div class="rank-updated">업데이트 ${safe(updatedDate)}</div>` : ''}
+              ${updatedDate ? `<div class="rank-updated">${safe(updatedDate)}</div>` : ''}
             </div>
           </div>
           <div class="rank-score">
@@ -1126,6 +1126,20 @@
         month: '2-digit',
         day: '2-digit',
       }).format(date).replace(/\. /g, '-').replace('.', '').trim();
+    }
+
+    function formatShortMonthDay(value) {
+      if (!value) return '';
+      const raw = String(value).trim();
+      const date = new Date(raw.replace(' ', 'T'));
+      if (!Number.isNaN(date.getTime())) {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return month + '.' + day;
+      }
+      const match = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (match) return match[2] + '.' + match[3];
+      return raw;
     }
 
     function renderModalPledges(pledges) {
