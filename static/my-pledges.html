@@ -59,8 +59,24 @@
       <div class="mfoot"><button type="button" class="btn2" id="mclose2">닫기</button></div>
     </div>
   </div>
+  <div class="modal" id="successModal" aria-hidden="true">
+    <div class="mbox" style="max-width:520px;">
+      <div class="mhead">
+        <div><b>공약을 저장했습니다</b><div class="hint">관리자 검수 후 공개 화면에 반영됩니다.</div></div>
+      </div>
+      <div class="mbody">
+        <div class="ainfo pending" style="margin-top:0;">
+          저장한 공약은 검수 대기 상태로 등록되었습니다. 다음에 할 작업을 선택해 주세요.
+        </div>
+      </div>
+      <div class="mfoot">
+        <button type="button" class="btn2" id="successStatus">내 공약 확인하기</button>
+        <button type="button" class="btn" id="successMap">지도 보기</button>
+      </div>
+    </div>
+  </div>
   <script>
-    const els={loading:document.getElementById('loading'),noPos:document.getElementById('no-position'),main:document.getElementById('main'),info:document.getElementById('info'),badge:document.getElementById('badge'),approval:document.getElementById('approval'),list:document.getElementById('list'),add:document.getElementById('add'),form:document.getElementById('form'),save:document.getElementById('save'),del:document.getElementById('delete'),msg:document.getElementById('msg'),modal:document.getElementById('modal'),mbody:document.getElementById('mbody'),mclose:document.getElementById('mclose'),mclose2:document.getElementById('mclose2')};
+    const els={loading:document.getElementById('loading'),noPos:document.getElementById('no-position'),main:document.getElementById('main'),info:document.getElementById('info'),badge:document.getElementById('badge'),approval:document.getElementById('approval'),list:document.getElementById('list'),add:document.getElementById('add'),form:document.getElementById('form'),save:document.getElementById('save'),del:document.getElementById('delete'),msg:document.getElementById('msg'),modal:document.getElementById('modal'),mbody:document.getElementById('mbody'),mclose:document.getElementById('mclose'),mclose2:document.getElementById('mclose2'),successModal:document.getElementById('successModal'),successStatus:document.getElementById('successStatus'),successMap:document.getElementById('successMap')};
     let idx=0,hasCandidate=false,importTarget=null,historyCache=null;
     const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const fdate=v=>{if(!v)return'';const d=new Date(String(v).replace(' ','T'));return Number.isNaN(d.getTime())?v:d.toLocaleString('ko-KR')};
@@ -71,6 +87,8 @@
     const infoItem=(l,v)=>`<div class="item"><em>${esc(l)}</em><b>${esc(v||'-')}</b></div>`;
     function setMsg(text,ok){els.msg.className=ok?'ok':'error';els.msg.textContent=text}
     function clearMsg(){els.msg.className='';els.msg.textContent=''}
+    function openSuccessModal(){els.successModal.classList.add('open');els.successModal.setAttribute('aria-hidden','false')}
+    function closeSuccessModal(){els.successModal.classList.remove('open');els.successModal.setAttribute('aria-hidden','true')}
     function approvalHtml(candidate){if(!candidate)return'<div class="ainfo pending">\uC544\uC9C1 \uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uACF5\uC57D\uC744 \uBD88\uB7EC\uC640 \uC800\uC7A5\uD558\uBA74 \uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4.</div>';const s=String(candidate.approval_status||'PENDING').toUpperCase();if(s==='APPROVED')return'<div class="ainfo approved">\uD604\uC7AC \uB4F1\uB85D\uB41C \uACF5\uC57D\uC740 \uC2B9\uC778\uB41C \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uC5EC \uB2E4\uC2DC \uC800\uC7A5\uD558\uBA74 \uC7AC\uAC80\uC218 \uB300\uAE30 \uC0C1\uD0DC\uB85C \uC804\uD658\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</div>';if(s==='REJECTED')return `<div class="ainfo rejected">\uC774\uC804\uC5D0 \uB4F1\uB85D\uD55C \uACF5\uC57D\uC774 \uBC18\uB824\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB0B4\uC6A9\uC744 \uBCF4\uC644\uD574 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.${candidate.rejection_reason?`<br><strong>\uBC18\uB824 \uC0AC\uC720:</strong> ${esc(candidate.rejection_reason)}`:''}</div>`;return'<div class="ainfo pending">\uC800\uC7A5\uB41C \uACF5\uC57D\uC740 \uAD00\uB9AC\uC790 \uAC80\uC218 \uD6C4 \uACF5\uAC1C\uB429\uB2C8\uB2E4. \uBD84\uC11D \uAE30\uB85D\uACFC \uC2E4\uC81C \uACF5\uC57D\uC774 \uC77C\uCE58\uD558\uB294\uC9C0 \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694.</div>'}
     function renumber(){[...els.list.querySelectorAll('.row')].forEach((row,i)=>{const n=row.querySelector('.n');if(n)n.textContent=String(i+1)})}
     function ensureEmpty(){if(els.list.querySelector('.row'))return;els.list.innerHTML='<div class="empty">\uB4F1\uB85D\uB41C \uACF5\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uACF5\uC57D\uC744 \uCD94\uAC00\uD55C \uB4A4 \uBD84\uC11D \uAE30\uB85D\uC5D0\uC11C \uBD88\uB7EC\uC640 \uC8FC\uC138\uC694.</div>'}
@@ -152,9 +170,9 @@
         if(res.status===403){location.href='/pending';return}
         const text=await res.text();let data={};try{data=JSON.parse(text)}catch(_){}
         if(!res.ok)throw new Error(data.detail||'\uACF5\uC57D \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
-        setMsg('\uACF5\uC57D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uC9C0\uB3C4 \uD398\uC774\uC9C0\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.',true);
+        setMsg('\uACF5\uC57D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.',true);
         historyCache=null;
-        setTimeout(()=>{location.href='/map';},1200);
+        openSuccessModal();
       }catch(e2){setMsg(e2.message||'\uACF5\uC57D \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',false)}finally{els.save.disabled=false}
     }
     async function removeAll(){
@@ -200,8 +218,15 @@
     els.del.addEventListener('click',removeAll);
     els.mclose.addEventListener('click',closeModal);
     els.mclose2.addEventListener('click',closeModal);
+    els.successStatus.addEventListener('click',()=>{location.href='/my-pledges-status'});
+    els.successMap.addEventListener('click',()=>{location.href='/map'});
     els.modal.addEventListener('click',e=>{if(e.target===els.modal)closeModal()});
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&els.modal.classList.contains('open'))closeModal()});
+    els.successModal.addEventListener('click',e=>{if(e.target===els.successModal)closeSuccessModal()});
+    document.addEventListener('keydown',e=>{
+      if(e.key!=='Escape')return;
+      if(els.modal.classList.contains('open'))closeModal();
+      if(els.successModal.classList.contains('open'))closeSuccessModal();
+    });
     load();
   </script>
 </body>
