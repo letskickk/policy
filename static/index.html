@@ -705,8 +705,8 @@
 
     @media (max-width: 640px){
       .wrap{ padding: 0 0.75rem; }
-      .top-bar{ margin-bottom: 1rem; flex-direction: row; flex-wrap: wrap; align-items: center; }
-      .top-bar .top-bar-left{ width: 100%; justify-content: space-between; }
+      .top-bar{ margin-bottom: 1rem; flex-direction: column; align-items: stretch; }
+      .top-bar .top-bar-left{ width: 100%; justify-content: flex-start; align-items: flex-start; }
       .top-bar .brand-tag{ display: none; }
       .top-bar .nav-wrap{ margin-left: 0; }
       .top-bar .nav-link{ min-height: 32px; padding: 0 0.75rem; font-size: 0.85rem; }
@@ -718,11 +718,15 @@
       .feature-grid .txt{ font-size: 0.9rem; }
       .cta-group{ gap: 0.6rem; }
       .cta{ padding: 0.85rem 1rem; font-size: 0.95rem; }
-      .leaderboard-header { flex-wrap: wrap; gap: 0.4rem; }
-      .leaderboard-card { padding: 1rem; }
+      .leaderboard-header { gap: 0.65rem; }
       .leaderboard-title { font-size: 0.95rem; }
-      .leaderboard-filters { width: 100%; }
-      .leaderboard-filters select { flex: 1; min-width: 0; }
+      .week-nav-label { font-size: 0.72rem; }
+      .leaderboard-filters { grid-template-columns: 1fr; gap: 0.4rem; }
+      .champions-strip{ padding: 0.65rem; }
+      .champion-item{ padding: 0.5rem 0.6rem; }
+      .rank-row{ padding: 0.72rem; }
+      .rank-meta{ font-size: 0.74rem; }
+      .rank-score{ gap: 0.25rem 0.5rem; }
     }
   </style>
 </head>
