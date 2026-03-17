@@ -983,6 +983,16 @@
       return m + '월 ' + weekNum + '째주';
     }
 
+    function formatShortMonthDay(value) {
+      if (!value) return '';
+      const raw = String(value).trim();
+      const date = new Date(raw.replace(' ', 'T'));
+      if (Number.isNaN(date.getTime())) return raw.slice(5, 10).replace('-', '.');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${month}.${day}`;
+    }
+
     function renderChampions(champions) {
       if (!champions || champions.length === 0) {
         champStrip.innerHTML = '';
