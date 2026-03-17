@@ -709,8 +709,12 @@
 
     <div class="panel">
       <div class="panel-cta-section">
-        <a href="/my-pledges" class="panel-cta-btn">내 공약 올리기</a>
+        <a href="/my-pledges" class="panel-cta-btn" id="myPledgesBtn">내 공약 올리기</a>
         <p class="panel-cta-desc">나의 공약을 등록하고 지도에 공개하세요</p>
+        <div class="panel-cta-row">
+          <a href="/my-pledges" class="panel-cta-btn" id="myPledgesStatusBtn">내 공약 확인하기</a>
+          <p class="panel-cta-desc">공약별 승인 여부와 반려 사유를 확인하세요</p>
+        </div>
       </div>
       <div class="panel-header">
         <h2 class="panel-title" id="panel-title">다른 출마자 공약 보기</h2>
@@ -1502,6 +1506,8 @@
     });
 
     /* ===== 공약 상세 모달 ===== */
+    const myPledgesBtn = document.getElementById('myPledgesBtn');
+    const myPledgesStatusBtn = document.getElementById('myPledgesStatusBtn');
     const pledgeModalOverlay = document.getElementById('pledgeModalOverlay');
     const pledgeModalTitle = document.getElementById('pledgeModalTitle');
     const pledgeModalSub = document.getElementById('pledgeModalSub');
@@ -1599,6 +1605,33 @@
         closePledgeModal();
       }
     });
+
+    async function routeToMyPledges(event) {
+      event.preventDefault();
+      const target = '/my-pledges';
+      try {
+        const res = await fetch('/api/my/candidate', { credentials: 'include' });
+        if (res.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(target)}`;
+          return;
+        }
+        if (res.status === 403) {
+          window.location.href = '/pending';
+          return;
+        }
+      } catch (error) {
+        console.warn('my pledges route probe failed:', error);
+      }
+      window.location.href = target;
+    }
+
+    if (myPledgesBtn) {
+      myPledgesBtn.addEventListener('click', routeToMyPledges);
+    }
+
+    if (myPledgesStatusBtn) {
+      myPledgesStatusBtn.addEventListener('click', routeToMyPledges);
+    }
 
   </script>
 
