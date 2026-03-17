@@ -590,7 +590,7 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 0.14rem 0.55rem;
-        align-items: center;
+        align-items: start;
         padding: 0.5rem 0.6rem;
       }
       .champion-main{
@@ -600,13 +600,15 @@
         min-width: 0;
         flex-wrap: wrap;
         grid-column: 1 / -1;
-        grid-row: 2;
+        grid-row: 1;
       }
       .champion-week{
-        grid-column: 1 / -1;
-        min-width: auto;
+        grid-column: 1;
+        grid-row: 3;
+        min-width: 0;
         font-size: 0.68rem;
         line-height: 1.2;
+        color: var(--muted);
       }
       .champion-name{
         min-width: 0;
@@ -615,8 +617,8 @@
       }
       .champion-region{
         white-space: nowrap;
-        grid-column: 1;
-        grid-row: 3;
+        grid-column: 1 / -1;
+        grid-row: 2;
         font-size: 0.72rem;
         line-height: 1.25;
         overflow: hidden;
@@ -627,7 +629,7 @@
         grid-column: 2;
         grid-row: 3;
         font-size: 0.94rem;
-        align-self: start;
+        align-self: end;
         justify-self: end;
       }
       .rank-row{
