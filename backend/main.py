@@ -3269,37 +3269,126 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                     """,
                     (resolved_district_code, district_name, region_code, election_type),
                 )
+            for idx, p in enumerate(body.pledges):
+                # 분석 결과 없이 점수만 있는 경우 점수 무시 (불러오기 통해서만 점수 허용)
+                imported_result = (p.imported_result or "").strip() or None
+                valid_score = p.imported_score if (p.imported_score is not None and imported_result) else None
+                valid_analyzed_at = p.imported_analyzed_at if valid_score is not None else None
+                conn.execute(
+                    """INSERT INTO candidate_pledges
+                       (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        candidate_id,
+                        p.title.strip(),
+                        (p.content or "").strip() or None,
+                        p.priority if p.priority else (idx + 1),
+                        valid_score,
+                        imported_result,
+                        valid_analyzed_at,
+                    ),
+                )
+            _recalculate_candidate_approval(conn, candidate_id)
+            conn.commit()
         else:
             candidate_id = int(row["id"])
             previous_status = (row["approval_status"] or "PENDING").upper()
             previous_reason = row["rejection_reason"] or ""
-            # 삭제-전용 여부 판별: 기존 공약의 부분집합이면 승인 상태 유지
             existing_rows = conn.execute(
-                "SELECT id, title, content FROM candidate_pledges WHERE candidate_id = ?",
+                """
+                SELECT id, title, content, priority, total_score, analysis_result, analyzed_at,
+                       approval_status, rejection_reason
+                FROM candidate_pledges
+                WHERE candidate_id = ?
+                ORDER BY priority ASC, id ASC
+                """,
                 (candidate_id,),
             ).fetchall()
-            existing_map = {r["id"]: (r["title"], (r["content"] or "").strip()) for r in existing_rows}
-            submitted_ids = {p.pledge_id for p in body.pledges if p.pledge_id is not None}
-            is_delete_only = (
-                len(body.pledges) <= len(existing_rows)
-                and submitted_ids.issubset(existing_map.keys())
-                and all(
-                    p.pledge_id is not None
-                    and existing_map.get(p.pledge_id) == (p.title.strip(), (p.content or "").strip())
-                    for p in body.pledges
+            existing_by_id = {int(r["id"]): r for r in existing_rows}
+            existing_ids = set(existing_by_id.keys())
+            submitted_existing_ids = {int(p.pledge_id) for p in body.pledges if p.pledge_id is not None and int(p.pledge_id) in existing_ids}
+            reorder_all = bool(existing_ids) and existing_ids.issubset(submitted_existing_ids)
+            next_priority = max((int(r["priority"] or 0) for r in existing_rows), default=0)
+            has_changes = False
+
+            for idx, p in enumerate(body.pledges):
+                title = p.title.strip()
+                content = (p.content or "").strip() or None
+                imported_result = (p.imported_result or "").strip() or None
+                valid_score = p.imported_score if (p.imported_score is not None and imported_result) else None
+                valid_analyzed_at = p.imported_analyzed_at if valid_score is not None else None
+                existing_id = int(p.pledge_id) if p.pledge_id is not None and int(p.pledge_id) in existing_ids else None
+
+                if existing_id is None:
+                    next_priority += 1
+                    conn.execute(
+                        """INSERT INTO candidate_pledges
+                           (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            candidate_id,
+                            title,
+                            content,
+                            (idx + 1) if reorder_all else next_priority,
+                            valid_score,
+                            imported_result,
+                            valid_analyzed_at,
+                        ),
+                    )
+                    has_changes = True
+                    continue
+
+                prev = existing_by_id[existing_id]
+                prev_title = prev["title"] or ""
+                prev_content = (prev["content"] or "").strip() or None
+                prev_priority = int(prev["priority"] or 0)
+                prev_score = prev["total_score"]
+                prev_result = (prev["analysis_result"] or "").strip() or None
+                prev_analyzed_at = prev["analyzed_at"] or None
+                prev_status = (prev["approval_status"] or "PENDING").upper()
+                prev_rejection_reason = prev["rejection_reason"] or None
+
+                new_priority = (idx + 1) if reorder_all else (p.priority if p.priority else prev_priority)
+                content_changed = (prev_title != title) or (prev_content != content)
+                analysis_changed = (
+                    imported_result is not None and (
+                        prev_score != valid_score
+                        or prev_result != imported_result
+                        or prev_analyzed_at != valid_analyzed_at
+                    )
                 )
+                needs_reapproval = content_changed or analysis_changed
+                row_changed = needs_reapproval or (prev_priority != new_priority)
+
+                if not row_changed:
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE candidate_pledges
+                    SET title = ?, content = ?, priority = ?, total_score = ?, analysis_result = ?, analyzed_at = ?,
+                        approval_status = ?, rejection_reason = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        title,
+                        content,
+                        new_priority,
+                        valid_score if analysis_changed else prev_score,
+                        imported_result if analysis_changed else prev_result,
+                        valid_analyzed_at if analysis_changed else prev_analyzed_at,
+                        "PENDING" if needs_reapproval else prev_status,
+                        None if needs_reapproval else prev_rejection_reason,
+                        existing_id,
+                    ),
+                )
+                has_changes = True
+
+            conn.execute(
+                "UPDATE candidates SET name = ?, rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+                (candidate_name, candidate_id),
             )
-            if is_delete_only:
-                conn.execute(
-                    "UPDATE candidates SET name = ?, updated_at = datetime('now') WHERE id = ?",
-                    (candidate_name, candidate_id),
-                )
-            else:
-                conn.execute(
-                    "UPDATE candidates SET name = ?, approval_status = 'PENDING', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?",
-                    (candidate_name, candidate_id),
-                )
-            if existing_rows and previous_status in {"APPROVED", "REJECTED"} and not is_delete_only:
+            if existing_rows and previous_status in {"APPROVED", "REJECTED", "MIXED"} and has_changes:
                 _snapshot_candidate_pledges(
                     conn,
                     candidate_id,
@@ -3307,28 +3396,9 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                     rejection_reason=previous_reason,
                     source_action="RESUBMIT",
                 )
-
-        conn.execute("DELETE FROM candidate_pledges WHERE candidate_id = ?", (candidate_id,))
-        for idx, p in enumerate(body.pledges):
-            # 분석 결과 없이 점수만 있는 경우 점수 무시 (불러오기 통해서만 점수 허용)
-            imported_result = (p.imported_result or "").strip() or None
-            valid_score = p.imported_score if (p.imported_score is not None and imported_result) else None
-            valid_analyzed_at = p.imported_analyzed_at if valid_score is not None else None
-            conn.execute(
-                """INSERT INTO candidate_pledges
-                   (candidate_id, title, content, priority, total_score, analysis_result, analyzed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    candidate_id,
-                    p.title.strip(),
-                    (p.content or "").strip() or None,
-                    p.priority if p.priority else (idx + 1),
-                    valid_score,
-                    imported_result,
-                    valid_analyzed_at,
-                ),
-            )
-        conn.commit()
+            if has_changes:
+                _recalculate_candidate_approval(conn, candidate_id)
+            conn.commit()
     except HTTPException:
         conn.rollback()
         raise
