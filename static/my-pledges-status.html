@@ -34,6 +34,13 @@
     .rejected{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.22);color:#fecaca}
     .mixed{background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.22);color:#bae6fd}
     .list{display:grid;gap:14px}
+    .sectionhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .sectioncopy{display:grid;gap:6px}
+    .sectioncopy .title{font-size:20px}
+    .sectioncopy .desc{font-size:13px;line-height:1.6;color:#94a3b8}
+    .togglebtn{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;color:#e2e8f0;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.18)}
+    .togglebtn:hover{background:rgba(255,255,255,.1)}
+    .historybody[hidden]{display:none}
     .row{background:rgba(2,6,23,.24);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:16px}
     .rowtop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
     .ord{display:inline-flex;align-items:center;gap:10px;font-weight:900;color:#fff}
@@ -81,7 +88,16 @@
         <div id="list" class="list"></div>
       </div>
       <div class="card" id="history-wrap" style="display:none;">
-        <div id="history" class="list"></div>
+        <div class="sectionhead">
+          <div class="sectioncopy">
+            <div class="title" id="history-title"></div>
+            <div class="desc" id="history-desc"></div>
+          </div>
+          <button type="button" class="togglebtn" id="history-toggle"></button>
+        </div>
+        <div id="history-body" class="historybody" hidden>
+          <div id="history" class="list"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -102,6 +118,10 @@
       summary: '\uCC98\uB9AC \uD604\uD669 \uC694\uC57D',
       historyHeader: '\uACFC\uAC70 \uBC18\uB824/\uC2B9\uC778 \uC774\uB825',
       historyDesc: '\uC774\uC804 \uAC80\uD1A0 \uC2DC\uC810\uC758 \uACF5\uC57D \uC6D0\uBB38\uC744 \uC2DC\uAC04\uC21C\uC73C\uB85C \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
+      historyCollapsed: '\uC774\uB825 \uD3BC\uCCD0\uBCF4\uAE30',
+      historyExpanded: '\uC774\uB825 \uC811\uAE30',
+      historySummary: '\uC2B9\uC778 {approved}\uAC74, \uBC18\uB824 {rejected}\uAC74, \uB300\uAE30 {pending}\uAC74',
+      historyEntry: '\uC774\uB825',
       bundleRejected: '\uD604\uC7AC \uACF5\uC57D\uC740 \uBAA8\uB450 \uBC18\uB824 \uC0C1\uD0DC\uC785\uB2C8\uB2E4.',
       bundleApproved: '\uD604\uC7AC \uACF5\uC57D\uC740 \uBAA8\uB450 \uC2B9\uC778\uB418\uC5B4 \uACF5\uAC1C \uC911\uC785\uB2C8\uB2E4.',
       bundleMixed: '\uC2B9\uC778\uB41C \uACF5\uC57D\uACFC \uBC18\uB824\uB41C \uACF5\uC57D\uC774 \uD568\uAED8 \uC788\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uBAA9\uB85D\uC5D0\uC11C \uACF5\uC57D\uBCC4 \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uC138\uC694.',
@@ -135,8 +155,13 @@
       approval: document.getElementById('approval'),
       list: document.getElementById('list'),
       historyWrap: document.getElementById('history-wrap'),
+      historyTitle: document.getElementById('history-title'),
+      historyDesc: document.getElementById('history-desc'),
+      historyToggle: document.getElementById('history-toggle'),
+      historyBody: document.getElementById('history-body'),
       history: document.getElementById('history'),
     };
+    let historyExpanded = false;
 
     const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const fdate = (v) => {
@@ -206,6 +231,22 @@
       return T.pendingReview;
     }
 
+    function toggleHistory(expanded) {
+      historyExpanded = !!expanded;
+      els.historyBody.hidden = !historyExpanded;
+      els.historyToggle.textContent = historyExpanded ? T.historyExpanded : T.historyCollapsed;
+      els.historyToggle.setAttribute('aria-expanded', historyExpanded ? 'true' : 'false');
+    }
+
+    function sourceActionLabel(action) {
+      const value = String(action || '').toUpperCase();
+      if (value === 'REJECT') return T.rejected;
+      if (value === 'APPROVE') return T.approved;
+      if (value === 'DELETE_PLEDGE') return '\uC0AD\uC81C';
+      if (value === 'RESUBMIT') return '\uC7AC\uC81C\uCD9C';
+      return action || '-';
+    }
+
     function historyReviewHtml(group) {
       const status = String(group.approval_status || 'PENDING').toUpperCase();
       if (status === 'REJECTED') {
@@ -222,17 +263,32 @@
         els.historyWrap.style.display = 'none';
         return;
       }
+      const counts = history.reduce((acc, group) => {
+        const status = String(group.approval_status || 'PENDING').toUpperCase();
+        if (status === 'APPROVED') acc.approved += 1;
+        else if (status === 'REJECTED') acc.rejected += 1;
+        else acc.pending += 1;
+        return acc;
+      }, { approved: 0, rejected: 0, pending: 0 });
       const sections = history.map((group, groupIndex) => {
         const [bc, bt] = badgeClass(group.approval_status || 'PENDING');
         const rows = (group.pledges || []).map((pledge, index) => {
           const score = (pledge.total_score === null || pledge.total_score === undefined || pledge.total_score === '') ? null : Number(pledge.total_score);
           return `<div class="row"><div class="rowtop"><div class="ord"><span class="n">${index + 1}</span><span>${historyLabel(group.approval_status)}</span></div><span class="badge ${bc}">${bt}</span></div><div class="title">${esc(pledge.title || '-')}</div><div class="content">${esc(pledge.content || '-')}</div>${historyReviewHtml(group)}<div class="meta">${score !== null && Number.isFinite(score) ? `<span class="score ${scoreClass(score)}">${T.totalScore} ${score.toFixed(1)}</span>` : ''}${pledge.created_at ? `<span class="date">${T.created} ${esc(fdate(pledge.created_at))}</span>` : ''}${group.reviewed_at ? `<span class="date">${T.reviewed} ${esc(fdate(group.reviewed_at))}</span>` : ''}</div></div>`;
         }).join('');
-        return `<div class="row"><div class="rowtop"><div class="title">${T.historyHeader} ${history.length - groupIndex}</div><span class="badge ${bc}">${bt}</span></div><div class="meta">${group.reviewed_at ? `<span class="date">${T.reviewed} ${esc(fdate(group.reviewed_at))}</span>` : ''}${group.source_action ? `<span class="date">${T.event} ${esc(group.source_action)}</span>` : ''}</div></div>${rows}`;
+        return `<div class="row"><div class="rowtop"><div class="title">${historyLabel(group.approval_status)} ${T.historyEntry} ${history.length - groupIndex}</div><span class="badge ${bc}">${bt}</span></div><div class="meta">${group.reviewed_at ? `<span class="date">${T.reviewed} ${esc(fdate(group.reviewed_at))}</span>` : ''}${group.source_action ? `<span class="date">${T.event} ${esc(sourceActionLabel(group.source_action))}</span>` : ''}</div></div>${rows}`;
       }).join('');
-      els.history.innerHTML = `<div class="row"><div class="title">${T.historyHeader}</div><div class="meta"><span class="date">${T.historyDesc}</span></div></div>${sections}`;
+      els.historyTitle.textContent = T.historyHeader;
+      els.historyDesc.textContent = T.historySummary
+        .replace('{approved}', String(counts.approved))
+        .replace('{rejected}', String(counts.rejected))
+        .replace('{pending}', String(counts.pending));
+      els.history.innerHTML = sections;
       els.historyWrap.style.display = 'block';
+      toggleHistory(false);
     }
+
+    els.historyToggle.addEventListener('click', () => toggleHistory(!historyExpanded));
 
     async function load() {
       try {
