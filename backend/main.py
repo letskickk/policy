@@ -1880,14 +1880,101 @@ def _fetch_candidate_pledges_current_public(
         conn.close()
 
 
+def _analysis_title_from_text(text: Optional[str]) -> str:
+    raw = (text or "").replace("\r\n", "\n")
+    for line in raw.split("\n"):
+        line = line.strip()
+        if line:
+            return line[:100]
+    return "불러온 공약"
+
+
+def _normalize_snapshot_title(title: str) -> str:
+    value = (title or "").strip()
+    return re.sub(r"^\[\s*핵심\s*공약\s*\d+\s*\]\s*", "", value)
+
+
+def _as_of_kst_to_utc_string(as_of: str) -> str:
+    import datetime as _dt
+
+    raw = (as_of or "").strip()
+    if not raw:
+        return raw
+    try:
+        dt = _dt.datetime.fromisoformat(raw.replace(" ", "T"))
+    except ValueError:
+        return raw
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone(_dt.timedelta(hours=9)))
+    return dt.astimezone(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _fetch_candidate_analysis_snapshot(
+    user_id: Optional[int],
+    as_of: str,
+    limit: Optional[int] = None,
+) -> list[CandidatePledgeResponse]:
+    if not user_id:
+        return []
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        as_of_utc = _as_of_kst_to_utc_string(as_of)
+        rows = conn.execute(
+            """
+            SELECT id, input_text, total_score, created_at
+            FROM analysis_history
+            WHERE user_id = ?
+              AND status_code = 200
+              AND datetime(created_at) <= datetime(?)
+            ORDER BY datetime(created_at) DESC, id DESC
+            LIMIT 100
+            """,
+            (user_id, as_of_utc),
+        ).fetchall()
+        picked: list[dict] = []
+        seen_titles: set[str] = set()
+        for row in rows:
+            title = _analysis_title_from_text(row["input_text"])
+            normalized_title = _normalize_snapshot_title(title)
+            if normalized_title in seen_titles:
+                continue
+            seen_titles.add(normalized_title)
+            picked.append(
+                {
+                    "title": normalized_title or title,
+                    "content": row["input_text"],
+                    "total_score": row["total_score"],
+                    "created_at": row["created_at"],
+                }
+            )
+            if limit is not None and len(picked) >= limit:
+                break
+        picked.sort(key=lambda item: item["created_at"] or "")
+        return [
+            CandidatePledgeResponse(
+                title=item["title"],
+                content=item["content"],
+                total_score=item["total_score"],
+                created_at=item["created_at"],
+            )
+            for item in picked
+        ]
+    finally:
+        conn.close()
+
+
 def _fetch_candidate_pledges_snapshot(
     candidate_id: int,
     as_of: str,
+    user_id: Optional[int] = None,
 ) -> list[CandidatePledgeResponse]:
     from backend.database import get_connection
 
     conn = get_connection()
     try:
+        as_of_utc = _as_of_kst_to_utc_string(as_of)
         snapshot = conn.execute(
             """
             SELECT snapshot_group
@@ -1898,7 +1985,7 @@ def _fetch_candidate_pledges_snapshot(
             ORDER BY datetime(reviewed_at) DESC, snapshot_group DESC, id DESC
             LIMIT 1
             """,
-            (candidate_id, as_of),
+            (candidate_id, as_of_utc),
         ).fetchone()
         if snapshot is None:
             rows = conn.execute(
@@ -1910,9 +1997,9 @@ def _fetch_candidate_pledges_snapshot(
                   AND datetime(created_at) <= datetime(?)
                 ORDER BY priority ASC, datetime(created_at) DESC, id DESC
                 """,
-                (candidate_id, as_of),
+                (candidate_id, as_of_utc),
             ).fetchall()
-            return [
+            fallback_rows = [
                 CandidatePledgeResponse(
                     title=r["title"],
                     content=r["content"],
@@ -1921,6 +2008,10 @@ def _fetch_candidate_pledges_snapshot(
                 )
                 for r in rows
             ]
+            analysis_rows = _fetch_candidate_analysis_snapshot(user_id, as_of, limit=None)
+            if analysis_rows and len(analysis_rows) >= len(fallback_rows):
+                return analysis_rows
+            return fallback_rows
 
         rows = conn.execute(
             """
@@ -2766,7 +2857,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
             """
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
-                   c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status
+                   c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status, c.user_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             WHERE c.id = ?
@@ -2795,7 +2886,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of) if as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
+        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of, int(row["user_id"]) if row["user_id"] is not None else None) if as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
     )
 
 
