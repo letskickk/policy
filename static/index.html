@@ -927,7 +927,10 @@
       try {
         const params = new URLSearchParams();
         if (asOf) params.set('as_of', asOf);
-        const res = await fetch('/api/candidates/' + candidateId + (params.toString() ? ('?' + params.toString()) : ''));
+        params.set('_ts', String(Date.now()));
+        const res = await fetch('/api/candidates/' + candidateId + (params.toString() ? ('?' + params.toString()) : ''), {
+          cache: 'no-store',
+        });
         if (!res.ok) {
           pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">후보 정보를 불러올 수 없습니다.</div>';
           return;
@@ -939,6 +942,9 @@
         pledgeModalTitle.textContent = d.name || '';
         pledgeModalSub.textContent = region + ' \u00B7 ' + etype + ' \u00B7 ' + basis;
         renderModalPledges(d.pledges || []);
+        if (!d.pledges || d.pledges.length === 0) {
+          pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">공약을 찾지 못했습니다. 잠시 후 다시 열어 주세요.</div>';
+        }
       } catch (e) {
         pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">오류가 발생했습니다.</div>';
       }
