@@ -3345,6 +3345,7 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 prev_score = prev["total_score"]
                 prev_result = (prev["analysis_result"] or "").strip() or None
                 prev_analyzed_at = prev["analyzed_at"] or None
+                prev_created_at = prev["created_at"] or None
                 prev_status = (prev["approval_status"] or "PENDING").upper()
                 prev_rejection_reason = prev["rejection_reason"] or None
 
@@ -3363,11 +3364,13 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 if not row_changed:
                     continue
 
+                next_created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if needs_reapproval else prev_created_at
+
                 conn.execute(
                     """
                     UPDATE candidate_pledges
                     SET title = ?, content = ?, priority = ?, total_score = ?, analysis_result = ?, analyzed_at = ?,
-                        approval_status = ?, rejection_reason = ?
+                        approval_status = ?, rejection_reason = ?, created_at = ?
                     WHERE id = ?
                     """,
                     (
@@ -3379,6 +3382,7 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                         valid_analyzed_at if analysis_changed else prev_analyzed_at,
                         "PENDING" if needs_reapproval else prev_status,
                         None if needs_reapproval else prev_rejection_reason,
+                        next_created_at,
                         existing_id,
                     ),
                 )
