@@ -599,6 +599,7 @@
         gap: 0.32rem 0.5rem;
         min-width: 0;
         flex-wrap: wrap;
+        grid-column: 1 / -1;
       }
       .champion-week{
         grid-column: 1 / -1;
@@ -621,10 +622,11 @@
       }
       .champion-score{
         margin-left: 0;
-        grid-column: 2;
-        grid-row: 1;
+        grid-column: 1 / -1;
+        grid-row: 3;
         font-size: 0.94rem;
-        align-self: center;
+        align-self: start;
+        justify-self: end;
       }
       .rank-row{
         display: grid;
