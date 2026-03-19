@@ -650,6 +650,15 @@
         font-size: 0.68rem;
         line-height: 1.2;
         color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+      }
+      .champion-count{
+        font-size: 0.68rem;
+        line-height: 1.2;
+        color: var(--muted);
       }
       .champion-name{
         min-width: 0;
@@ -1045,8 +1054,9 @@
         const regionText = getCandidateRegionText(c.region_name, c.district_name);
         const elLabel = getElectionLabel(c.election_type);
         const asOf = c.detail_as_of ? safe(c.detail_as_of) : '';
+        const pledgeCount = Number.isFinite(Number(c.scored_pledge_count)) ? `${Number(c.scored_pledge_count)}개` : '';
         html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0}, '${asOf}')" title="공약 상세 보기">
-          <span class="champion-week">${safe(wLabel)}</span>
+          <span class="champion-week">${safe(wLabel)}${pledgeCount ? `<span class="champion-count">공약 ${safe(pledgeCount)}</span>` : ''}</span>
           <span class="champion-main">
             <span class="champion-name">${safe(c.candidate_name)}</span>
             ${elLabel ? `<span class="election-badge">${safe(elLabel)}</span>` : ''}
