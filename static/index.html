@@ -415,6 +415,25 @@
     .champion-score.yellow { color: #facc15; }
     .champion-score.red { color: #f87171; }
     .rank-empty { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.9rem; }
+    .rank-retry-btn{
+      margin-top: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 0 0.9rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.26);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .rank-retry-btn:hover{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+    }
 
     /* ===== 공약 상세 모달 (map.html 동일) ===== */
     .pledge-modal-overlay{
@@ -995,6 +1014,26 @@
       return `${month}.${day}`;
     }
 
+    function getElectionLabel(value) {
+      return ELECTION_LABELS[value] || value || '';
+    }
+
+    function getCandidateRegionText(regionName, districtName) {
+      return districtName ? `${regionName || ''} ${cleanDN(districtName)}`.trim() : (regionName || '');
+    }
+
+    function renderRankEmpty(message, retryable) {
+      rankList.innerHTML =
+        '<div class="rank-empty">' +
+        safe(message) +
+        (retryable ? '<div><button type="button" class="rank-retry-btn" id="leaderboardRetryBtn">다시 시도</button></div>' : '') +
+        '</div>';
+      if (retryable) {
+        const retryBtn = document.getElementById('leaderboardRetryBtn');
+        if (retryBtn) retryBtn.addEventListener('click', function() { loadLeaderboard(currentWeekStart); });
+      }
+    }
+
     function renderChampions(champions) {
       if (!champions || champions.length === 0) {
         champStrip.innerHTML = '';
@@ -1003,8 +1042,8 @@
       let html = '<div class="champions-strip"><div class="champions-strip-title">&#127942; 주간 챔피언 (과거 1위 달성자)</div>';
       champions.forEach(c => {
         const wLabel = weekLabelFromDate(c.week_start);
-        const regionText = c.district_name ? (c.region_name || '') + ' ' + cleanDN(c.district_name) : (c.region_name || '');
-        const elLabel = ELECTION_LABELS[c.election_type] || c.election_type || '';
+        const regionText = getCandidateRegionText(c.region_name, c.district_name);
+        const elLabel = getElectionLabel(c.election_type);
         const asOf = c.detail_as_of ? safe(c.detail_as_of) : '';
         html += `<div class="champion-item" onclick="openCandidateModal(${c.candidate_id || 0}, '${asOf}')" title="공약 상세 보기">
           <span class="champion-week">${safe(wLabel)}</span>
@@ -1022,15 +1061,15 @@
 
     function renderRanking(ranking) {
       if (!ranking || ranking.length === 0) {
-        rankList.innerHTML = '<div class="rank-empty">아직 분석된 공약이 없습니다.</div>';
+        renderRankEmpty('아직 분석된 공약이 없습니다.', false);
         return;
       }
       let html = '';
       ranking.forEach(r => {
         const cls = r.rank <= 3 ? ' top-3' : '';
         const numCls = rankClass(r.rank);
-        const elLabel = ELECTION_LABELS[r.election_type] || r.election_type || '';
-        const region = r.district_name ? `${safe(r.region_name)} ${safe(cleanDN(r.district_name))}` : safe(r.region_name);
+        const elLabel = getElectionLabel(r.election_type);
+        const region = safe(getCandidateRegionText(r.region_name, r.district_name));
         const cid = r.candidate_id || '';
         const updatedDate = formatShortMonthDay(r.updated_at);
         const asOf = r.detail_as_of ? safe(r.detail_as_of) : '';
@@ -1067,7 +1106,7 @@
         if (!res.ok) {
           section.style.display = '';
           champStrip.innerHTML = '';
-          rankList.innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';
+          renderRankEmpty('랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', true);
           return;
         }
         const data = await res.json();
@@ -1102,7 +1141,7 @@
         console.error('leaderboard fetch error:', e);
         section.style.display = '';
         champStrip.innerHTML = '';
-        rankList.innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';
+        renderRankEmpty('랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', true);
       }
     }
 
