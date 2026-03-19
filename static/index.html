@@ -6,6 +6,7 @@
   <title>개혁신당 정책 멘토링</title>
   <meta name="description" content="지방선거 공약을 정강·정책 기준으로 점검하고, 지역/선거구별 후보 공약을 함께 비교합니다." />
   <link rel="canonical" href="https://policy.reformparty.kr/" />
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
 
   <!-- Open Graph (KakaoTalk, etc.) -->
   <meta property="og:type" content="website" />
@@ -719,13 +720,6 @@
       .leaderboard-filters{
         grid-template-columns: 1fr;
       }
-      .champion-item{
-        grid-template-columns: minmax(0, 1fr) auto;
-      }
-      .champion-score{
-        grid-column: 2;
-        grid-row: 1;
-      }
       .rank-row{
         grid-template-columns: 28px minmax(0, 1fr) auto;
         padding: 0.66rem 0.7rem;
@@ -773,8 +767,6 @@
       .week-nav-label { font-size: 0.72rem; }
       .leaderboard-filters { grid-template-columns: 1fr; gap: 0.4rem; }
       .champions-strip{ padding: 0.65rem; }
-      .champion-item{ padding: 0.5rem 0.6rem; }
-      .rank-row{ padding: 0.72rem; }
       .rank-meta{ font-size: 0.74rem; }
       .rank-score{ gap: 0.25rem 0.5rem; }
     }
@@ -1075,7 +1067,12 @@
       const qs = params.toString();
       try {
         const res = await fetch('/api/leaderboard' + (qs ? '?' + qs : ''));
-        if (!res.ok) return;
+        if (!res.ok) {
+          section.style.display = '';
+          champStrip.innerHTML = '';
+          rankList.innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';
+          return;
+        }
         const data = await res.json();
         currentWeekStart = data.week_start;
         // 주차 라벨 표시
@@ -1106,6 +1103,9 @@
         section.style.display = '';
       } catch (e) {
         console.error('leaderboard fetch error:', e);
+        section.style.display = '';
+        champStrip.innerHTML = '';
+        rankList.innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';
       }
     }
 
@@ -1154,20 +1154,6 @@
         month: '2-digit',
         day: '2-digit',
       }).format(date).replace(/\. /g, '-').replace('.', '').trim();
-    }
-
-    function formatShortMonthDay(value) {
-      if (!value) return '';
-      const raw = String(value).trim();
-      const date = new Date(raw.replace(' ', 'T'));
-      if (!Number.isNaN(date.getTime())) {
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return month + '.' + day;
-      }
-      const match = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
-      if (match) return match[2] + '.' + match[3];
-      return raw;
     }
 
     function renderModalPledges(pledges) {
