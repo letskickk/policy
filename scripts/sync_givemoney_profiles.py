@@ -1,0 +1,300 @@
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import unicodedata
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from backend.database import get_connection, init_db
+
+
+API_BASE = "https://prod-api.givemoney.kr"
+WEB_BASE = "https://givemoney.kr"
+PAGE_SIZE = 100
+
+REGION_NAME_TO_CODE = {
+    "서울특별시": "11",
+    "부산광역시": "26",
+    "대구광역시": "27",
+    "인천광역시": "28",
+    "광주광역시": "29",
+    "대전광역시": "30",
+    "울산광역시": "31",
+    "세종특별자치시": "36",
+    "경기도": "41",
+    "강원특별자치도": "42",
+    "충청북도": "43",
+    "충청남도": "44",
+    "전북특별자치도": "45",
+    "전라남도": "46",
+    "경상북도": "47",
+    "경상남도": "48",
+    "제주특별자치도": "50",
+}
+
+POSITION_TO_ELECTION_TYPE = {
+    "광역단체장": "metro_mayor",
+    "기초단체장": "local_mayor",
+    "광역의원": "regional_council",
+    "기초의원": "local_council",
+    "국회의원": "national_assembly",
+}
+
+
+@dataclass
+class GivemoneyCandidate:
+    external_id: str
+    name: str
+    region_name: str
+    region_code: Optional[str]
+    district_name: Optional[str]
+    position_name: Optional[str]
+    election_type: Optional[str]
+    profile_url: str
+    photo_url: Optional[str]
+    support_url: Optional[str]
+    bio: Optional[str]
+    raw_payload: dict[str, Any]
+
+
+def _normalize_text(value: Optional[str]) -> str:
+    text = unicodedata.normalize("NFC", (value or "").strip())
+    text = re.sub(r"\s+", "", text)
+    return text.lower()
+
+
+def _normalize_district(value: Optional[str]) -> str:
+    text = _normalize_text(value)
+    text = text.replace("선거구", "")
+    return text
+
+
+def _build_photo_url(image_url: Optional[str]) -> Optional[str]:
+    if not image_url:
+        return None
+    if image_url.startswith("http://") or image_url.startswith("https://"):
+        return image_url
+    return urllib.parse.urljoin(API_BASE, image_url)
+
+
+def _fetch_json(url: str) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "policy-local-sync/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.load(response)
+
+
+def _iter_donation_groups(search_term: Optional[str] = None):
+    page = 0
+    while True:
+        params = {
+            "page": page,
+            "size": PAGE_SIZE,
+            "sort": "createdAt,desc",
+        }
+        if search_term:
+            params["searchContent"] = search_term
+        url = f"{API_BASE}/api/donation-groups?{urllib.parse.urlencode(params)}"
+        payload = _fetch_json(url)
+        groups = payload.get("data", {}).get("groups", [])
+        yielded = 0
+        for group in groups:
+            for item in group.get("donationGroups", []) or []:
+                yielded += 1
+                yield item
+        if yielded == 0:
+            break
+        page += 1
+
+
+def _to_candidate(item: dict[str, Any]) -> GivemoneyCandidate:
+    candidate_info = item.get("candidateInfo") or {}
+    external_id = str(item.get("id"))
+    profile_url = f"{WEB_BASE}/politicians/{external_id}"
+    return GivemoneyCandidate(
+        external_id=external_id,
+        name=(candidate_info.get("name") or item.get("name") or "").strip(),
+        region_name=(candidate_info.get("electionRegion") or "").strip(),
+        region_code=REGION_NAME_TO_CODE.get((candidate_info.get("electionRegion") or "").strip()),
+        district_name=(candidate_info.get("electionDistrict") or "").strip() or None,
+        position_name=(candidate_info.get("electionPosition") or "").strip() or None,
+        election_type=POSITION_TO_ELECTION_TYPE.get((candidate_info.get("electionPosition") or "").strip()),
+        profile_url=profile_url,
+        photo_url=_build_photo_url(item.get("imageUrl")),
+        support_url=profile_url,
+        bio=(item.get("description") or "").strip() or None,
+        raw_payload=item,
+    )
+
+
+def _district_matches(local_district: Optional[str], external_district: Optional[str]) -> bool:
+    left = _normalize_district(local_district)
+    right = _normalize_district(external_district)
+    if not left and not right:
+        return True
+    if not left or not right:
+        return False
+    return left == right or left in right or right in left
+
+
+def _find_match(conn, external: GivemoneyCandidate, candidate_name: Optional[str] = None):
+    if not external.name or not external.region_code or not external.election_type:
+        return None
+
+    rows = conn.execute(
+        """
+        SELECT id, name, region_code, district_name, election_type, election_level
+        FROM candidates
+        WHERE name = ?
+          AND region_code = ?
+          AND election_type = ?
+        ORDER BY id ASC
+        """,
+        (external.name, external.region_code, external.election_type),
+    ).fetchall()
+
+    if candidate_name and external.name != candidate_name:
+        return None
+
+    exact = [row for row in rows if _district_matches(row["district_name"], external.district_name)]
+    if len(exact) == 1:
+        return exact[0]
+    if len(rows) == 1 and (not external.district_name or not rows[0]["district_name"]):
+        return rows[0]
+    return None
+
+
+def sync_profiles(*, dry_run: bool, search_term: Optional[str], candidate_name: Optional[str], limit: Optional[int], verbose: bool) -> dict[str, Any]:
+    init_db()
+    conn = get_connection()
+    scanned = 0
+    matched = 0
+    upserted = 0
+    unmatched: list[dict[str, Any]] = []
+    preview: list[dict[str, Any]] = []
+
+    try:
+        for item in _iter_donation_groups(search_term=search_term):
+            external = _to_candidate(item)
+            if candidate_name and external.name != candidate_name:
+                continue
+            scanned += 1
+            row = _find_match(conn, external, candidate_name=candidate_name)
+            if row is None:
+                unmatched.append(
+                    {
+                        "name": external.name,
+                        "region_name": external.region_name,
+                        "district_name": external.district_name,
+                        "position_name": external.position_name,
+                        "external_id": external.external_id,
+                    }
+                )
+                if verbose:
+                    print(f"[miss] {external.name} | {external.region_name} | {external.district_name or '-'} | {external.position_name or '-'}")
+            else:
+                matched += 1
+                payload_json = json.dumps(external.raw_payload, ensure_ascii=False)
+                record = {
+                    "candidate_id": int(row["id"]),
+                    "candidate_name": row["name"],
+                    "external_id": external.external_id,
+                    "profile_url": external.profile_url,
+                    "photo_url": external.photo_url,
+                    "support_url": external.support_url,
+                }
+                preview.append(record)
+                if verbose:
+                    print(f"[match] #{row['id']} {row['name']} <= givemoney:{external.external_id}")
+                if not dry_run:
+                    conn.execute(
+                        """
+                        INSERT INTO candidate_external_profiles (
+                            candidate_id, source_key, external_id, external_profile_url,
+                            external_photo_url, external_support_url, external_bio,
+                            matched_name, matched_region, matched_district, matched_position,
+                            raw_payload_json, last_synced_at
+                        )
+                        VALUES (?, 'givemoney', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                        ON CONFLICT(candidate_id, source_key) DO UPDATE SET
+                            external_id = excluded.external_id,
+                            external_profile_url = excluded.external_profile_url,
+                            external_photo_url = excluded.external_photo_url,
+                            external_support_url = excluded.external_support_url,
+                            external_bio = excluded.external_bio,
+                            matched_name = excluded.matched_name,
+                            matched_region = excluded.matched_region,
+                            matched_district = excluded.matched_district,
+                            matched_position = excluded.matched_position,
+                            raw_payload_json = excluded.raw_payload_json,
+                            last_synced_at = excluded.last_synced_at
+                        """,
+                        (
+                            int(row["id"]),
+                            external.external_id,
+                            external.profile_url,
+                            external.photo_url,
+                            external.support_url,
+                            external.bio,
+                            external.name,
+                            external.region_name,
+                            external.district_name,
+                            external.position_name,
+                            payload_json,
+                        ),
+                    )
+                    upserted += 1
+            if limit is not None and scanned >= limit:
+                break
+
+        if not dry_run:
+            conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "dry_run": dry_run,
+        "scanned": scanned,
+        "matched": matched,
+        "upserted": upserted,
+        "preview": preview[:10],
+        "unmatched_preview": unmatched[:10],
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Sync givemoney candidate profile metadata into the local database.")
+    parser.add_argument("--dry-run", action="store_true", help="Print matches without writing to the database.")
+    parser.add_argument("--search-term", help="Optional givemoney searchContent filter.")
+    parser.add_argument("--candidate-name", help="Only attempt to match a single candidate name.")
+    parser.add_argument("--limit", type=int, help="Stop after scanning this many external candidates.")
+    parser.add_argument("--verbose", action="store_true", help="Print per-candidate matching logs.")
+    args = parser.parse_args()
+
+    result = sync_profiles(
+        dry_run=args.dry_run,
+        search_term=args.search_term,
+        candidate_name=args.candidate_name,
+        limit=args.limit,
+        verbose=args.verbose,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
