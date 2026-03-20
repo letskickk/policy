@@ -23,31 +23,31 @@ WEB_BASE = "https://givemoney.kr"
 PAGE_SIZE = 100
 
 REGION_NAME_TO_CODE = {
-    "서울특별시": "11",
-    "부산광역시": "26",
-    "대구광역시": "27",
-    "인천광역시": "28",
-    "광주광역시": "29",
-    "대전광역시": "30",
-    "울산광역시": "31",
-    "세종특별자치시": "36",
-    "경기도": "41",
-    "강원특별자치도": "42",
-    "충청북도": "43",
-    "충청남도": "44",
-    "전북특별자치도": "45",
-    "전라남도": "46",
-    "경상북도": "47",
-    "경상남도": "48",
-    "제주특별자치도": "50",
+    "?????": "11",
+    "?????": "26",
+    "?????": "27",
+    "?????": "28",
+    "?????": "29",
+    "?????": "30",
+    "?????": "31",
+    "???????": "36",
+    "???": "41",
+    "???????": "42",
+    "????": "43",
+    "????": "44",
+    "???????": "45",
+    "????": "46",
+    "????": "47",
+    "????": "48",
+    "???????": "50",
 }
 
 POSITION_TO_ELECTION_TYPE = {
-    "광역단체장": "metro_mayor",
-    "기초단체장": "local_mayor",
-    "광역의원": "regional_council",
-    "기초의원": "local_council",
-    "국회의원": "national_assembly",
+    "?????": "metro_mayor",
+    "?????": "local_mayor",
+    "????": "regional_council",
+    "????": "local_council",
+    "????": "national_assembly",
 }
 
 
@@ -170,6 +170,9 @@ def _find_match(conn, external: GivemoneyCandidate, candidate_name: Optional[str
 
     if candidate_name and external.name != candidate_name:
         return None
+
+    if len(rows) == 1 and not external.district_name:
+        return rows[0]
 
     exact = [row for row in rows if _district_matches(row["district_name"], external.district_name)]
     if len(exact) == 1:
