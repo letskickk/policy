@@ -23,31 +23,31 @@ WEB_BASE = "https://givemoney.kr"
 PAGE_SIZE = 100
 
 REGION_NAME_TO_CODE = {
-    "?????": "11",
-    "?????": "26",
-    "?????": "27",
-    "?????": "28",
-    "?????": "29",
-    "?????": "30",
-    "?????": "31",
-    "???????": "36",
-    "???": "41",
-    "???????": "42",
-    "????": "43",
-    "????": "44",
-    "???????": "45",
-    "????": "46",
-    "????": "47",
-    "????": "48",
-    "???????": "50",
+    "\uC11C\uC6B8\uD2B9\uBCC4\uC2DC": "11",
+    "\uBD80\uC0B0\uAD11\uC5ED\uC2DC": "26",
+    "\uB300\uAD6C\uAD11\uC5ED\uC2DC": "27",
+    "\uC778\uCC9C\uAD11\uC5ED\uC2DC": "28",
+    "\uAD11\uC8FC\uAD11\uC5ED\uC2DC": "29",
+    "\uB300\uC804\uAD11\uC5ED\uC2DC": "30",
+    "\uC6B8\uC0B0\uAD11\uC5ED\uC2DC": "31",
+    "\uC138\uC885\uD2B9\uBCC4\uC790\uCE58\uC2DC": "36",
+    "\uACBD\uAE30\uB3C4": "41",
+    "\uAC15\uC6D0\uD2B9\uBCC4\uC790\uCE58\uB3C4": "42",
+    "\uCDA9\uCCAD\uBD81\uB3C4": "43",
+    "\uCDA9\uCCAD\uB0A8\uB3C4": "44",
+    "\uC804\uBD81\uD2B9\uBCC4\uC790\uCE58\uB3C4": "45",
+    "\uC804\uB77C\uB0A8\uB3C4": "46",
+    "\uACBD\uC0C1\uBD81\uB3C4": "47",
+    "\uACBD\uC0C1\uB0A8\uB3C4": "48",
+    "\uC81C\uC8FC\uD2B9\uBCC4\uC790\uCE58\uB3C4": "50",
 }
 
 POSITION_TO_ELECTION_TYPE = {
-    "?????": "metro_mayor",
-    "?????": "local_mayor",
-    "????": "regional_council",
-    "????": "local_council",
-    "????": "national_assembly",
+    "\uAD11\uC5ED\uB2E8\uCCB4\uC7A5": "metro_mayor",
+    "\uAE30\uCD08\uB2E8\uCCB4\uC7A5": "local_mayor",
+    "\uAD11\uC5ED\uC758\uC6D0": "regional_council",
+    "\uAE30\uCD08\uC758\uC6D0": "local_council",
+    "\uAD6D\uD68C\uC758\uC6D0": "national_assembly",
 }
 
 
@@ -75,7 +75,7 @@ def _normalize_text(value: Optional[str]) -> str:
 
 def _normalize_district(value: Optional[str]) -> str:
     text = _normalize_text(value)
-    text = text.replace("선거구", "")
+    text = text.replace("\uC120\uAC70\uAD6C", "")
     return text
 
 
