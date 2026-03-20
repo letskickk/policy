@@ -22,6 +22,15 @@ API_BASE = "https://prod-api.givemoney.kr"
 WEB_BASE = "https://givemoney.kr"
 PAGE_SIZE = 100
 PROFILE_SCAN_MAX_ID = 220
+PROFILE_PAGE_MARKER = "\uD6C4\uC6D0\uC13C\uD130"
+FALLBACK_REQUIRED_MARKER = "politicianName"
+POSITION_PATTERN = (
+    "\uAD11\uC5ED\uB2E8\uCCB4\uC7A5|"
+    "\uAE30\uCD08\uB2E8\uCCB4\uC7A5|"
+    "\uAD11\uC5ED\uC758\uC6D0|"
+    "\uAE30\uCD08\uC758\uC6D0|"
+    "\uAD6D\uD68C\uC758\uC6D0"
+)
 
 REGION_NAME_TO_CODE = {
     "\uC11C\uC6B8\uD2B9\uBCC4\uC2DC": "11",
@@ -141,7 +150,7 @@ def _candidate_from_profile_page(profile_id: int) -> Optional[GivemoneyCandidate
         html = _fetch_text(url)
     except Exception:
         return None
-    if "후원센터" not in html or "politicianName" not in html:
+    if PROFILE_PAGE_MARKER not in html or FALLBACK_REQUIRED_MARKER not in html:
         return None
 
     def _extract(pattern: str) -> Optional[str]:
@@ -164,7 +173,7 @@ def _candidate_from_profile_page(profile_id: int) -> Optional[GivemoneyCandidate
         return None
 
     detail_match = re.search(
-        r"^(?P<region>\S+)\s+(?P<district>.+?)\s+(?P<position>광역단체장|기초단체장|광역의원|기초의원|국회의원)\s+후보\s+(?P<name>.+)$",
+        rf"^(?P<region>\S+)\s+(?P<district>.+?)\s+(?P<position>{POSITION_PATTERN})\s+\uD6C4\uBCF4\s+(?P<name>.+)$",
         candidate_details,
     )
     if not detail_match:
