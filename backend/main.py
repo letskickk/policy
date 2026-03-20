@@ -2022,6 +2022,43 @@ def _as_of_kst_to_utc_string(as_of: str) -> str:
     return dt.astimezone(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _weekly_snapshot_limit(candidate_id: int, as_of: str) -> Optional[int]:
+    import datetime as _dt
+
+    raw = (as_of or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = _dt.datetime.fromisoformat(raw.replace(" ", "T"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone(_dt.timedelta(hours=9)))
+    local_date = dt.astimezone(_dt.timezone(_dt.timedelta(hours=9))).date()
+    week_start = (local_date - _dt.timedelta(days=local_date.weekday())).isoformat()
+
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT scored_pledge_count
+            FROM weekly_champions
+            WHERE candidate_id = ?
+              AND week_start = ?
+            LIMIT 1
+            """,
+            (candidate_id, week_start),
+        ).fetchone()
+        if row is None:
+            return None
+        count = int(row["scored_pledge_count"] or 0)
+        return count if count > 0 else None
+    finally:
+        conn.close()
+
+
 def _fetch_candidate_analysis_snapshot(
     user_id: Optional[int],
     as_of: str,
@@ -2124,10 +2161,11 @@ def _fetch_candidate_pledges_snapshot(
                 )
                 for r in rows
             ]
-            analysis_rows = _fetch_candidate_analysis_snapshot(user_id, as_of, limit=None)
-            if analysis_rows and len(analysis_rows) >= len(fallback_rows):
-                return analysis_rows
-            return fallback_rows
+            if fallback_rows:
+                return fallback_rows
+            analysis_limit = _weekly_snapshot_limit(candidate_id, as_of)
+            analysis_rows = _fetch_candidate_analysis_snapshot(user_id, as_of, limit=analysis_limit)
+            return analysis_rows
 
         rows = conn.execute(
             """
