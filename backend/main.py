@@ -2059,9 +2059,8 @@ def _weekly_snapshot_limit(candidate_id: int, as_of: str) -> Optional[int]:
         conn.close()
 
 
-def _is_public_nomination_status(status_note: Optional[str]) -> bool:
-    note = (status_note or "").strip()
-    return note in {"", "공천 확정"}
+def _is_public_applicant_match(applicant_verified: Optional[int], applicant_match_id: Optional[int]) -> bool:
+    return int(applicant_verified or 0) == 1 and applicant_match_id is not None
 
 
 def _fetch_candidate_analysis_snapshot(
@@ -2793,14 +2792,14 @@ def get_regions():
             SELECT c.region_code, COUNT(*) AS candidate_count
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
-              AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+              AND COALESCE(u.applicant_verified, 0) = 1
+              AND u.applicant_match_id IS NOT NULL
             GROUP BY c.region_code
             """
         ).fetchall()
@@ -2835,7 +2834,6 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 SELECT c.election_type, COUNT(*) AS n
                 FROM candidates c
                 LEFT JOIN users u ON u.id = c.user_id
-                LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
                   AND EXISTS (
                       SELECT 1 FROM candidate_pledges cp
@@ -2843,7 +2841,8 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                         AND cp.approval_status = 'APPROVED'
                   )
                   AND c.region_code = ?
-                  AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+                  AND COALESCE(u.applicant_verified, 0) = 1
+                  AND u.applicant_match_id IS NOT NULL
                 GROUP BY c.election_type
                 """,
                 (region_code,),
@@ -2854,14 +2853,14 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 SELECT c.election_type, COUNT(*) AS n
                 FROM candidates c
                 LEFT JOIN users u ON u.id = c.user_id
-                LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
                   AND EXISTS (
                       SELECT 1 FROM candidate_pledges cp
                       WHERE cp.candidate_id = c.id
                         AND cp.approval_status = 'APPROVED'
                   )
-                  AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+                  AND COALESCE(u.applicant_verified, 0) = 1
+                  AND u.applicant_match_id IS NOT NULL
                 GROUP BY c.election_type
                 """
             ).fetchall()
@@ -2884,11 +2883,9 @@ def get_districts(
     conn = get_connection()
     try:
         candidate_sql = """
-            SELECT c.district_name, c.district_code, c.election_type,
-                   pa.status_note AS applicant_status_note
+            SELECT c.district_name, c.district_code, c.election_type
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
               AND c.approval_status IN ('APPROVED', 'MIXED')
               AND c.district_name IS NOT NULL
@@ -2898,7 +2895,8 @@ def get_districts(
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
-              AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+              AND COALESCE(u.applicant_verified, 0) = 1
+              AND u.applicant_match_id IS NOT NULL
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2967,10 +2965,9 @@ def get_candidates(
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level,
-                   pa.status_note AS applicant_status_note
+                   u.applicant_verified, u.applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
               AND c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
@@ -3001,7 +2998,7 @@ def get_candidates(
 
     result: list[CandidateListItemResponse] = []
     for r in rows:
-        if not _is_public_nomination_status(r["applicant_status_note"]):
+        if not _is_public_applicant_match(r["applicant_verified"], r["applicant_match_id"]):
             continue
         candidate_id = int(r["id"])
         resolved_district_code = _derive_district_code(code, r["district_code"], r["district_name"])
@@ -3035,10 +3032,9 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status, c.user_id,
-                   pa.status_note AS applicant_status_note
+                   u.applicant_verified, u.applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.id = ?
               AND c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
@@ -3052,7 +3048,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
     finally:
         conn.close()
 
-    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+    if row is None or not _is_public_applicant_match(row["applicant_verified"], row["applicant_match_id"]):
         raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
 
     code = row["region_code"]
@@ -4272,19 +4268,19 @@ def api_leaderboard(
                            COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                            COALESCE(u.district_name, c.district_name) AS district_name,
                            c.election_type,
-                           pa.status_note AS applicant_status_note,
+                           u.applicant_verified, u.applicant_match_id,
                            ROUND(AVG(cp.total_score), 1) AS avg_score,
                            COUNT(cp.id) AS cnt
                     FROM candidates c
                     LEFT JOIN users u ON u.id = c.user_id
-                    LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                     LEFT JOIN region_codes rc ON rc.region_code = c.region_code
                     JOIN candidate_pledges cp ON cp.candidate_id = c.id
                     LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
                     WHERE cp.total_score IS NOT NULL
                       AND cp.approval_status = 'APPROVED'
                       AND c.approval_status IN ('APPROVED', 'MIXED')
-                      AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+                      AND COALESCE(u.applicant_verified, 0) = 1
+                      AND u.applicant_match_id IS NOT NULL
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ?
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?
                     GROUP BY c.id
@@ -4314,15 +4310,14 @@ def api_leaderboard(
                           wc.region_name,
                           COALESCE(u.district_name, wc.district_name) AS district_name,
                           wc.election_type, wc.avg_score, wc.scored_pledge_count,
-                          pa.status_note AS applicant_status_note
+                          u.applicant_verified, u.applicant_match_id
                    FROM weekly_champions wc
                    LEFT JOIN candidates c ON c.id = wc.candidate_id
                    LEFT JOIN users u ON u.id = c.user_id
-                   LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                    ORDER BY wc.week_start DESC LIMIT 20"""
             ).fetchall()
         ]
-        champions = [champ for champ in champions if _is_public_nomination_status(champ.get("applicant_status_note"))]
+        champions = [champ for champ in champions if _is_public_applicant_match(champ.get("applicant_verified"), champ.get("applicant_match_id"))]
         for champ in champions:
             try:
                 champ_week = _dt.date.fromisoformat(champ["week_start"])
@@ -4336,20 +4331,20 @@ def api_leaderboard(
                    COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.election_type,
-                   pa.status_note AS applicant_status_note,
+                   u.applicant_verified, u.applicant_match_id,
                    ROUND(AVG(cp.total_score), 1) AS avg_score,
                    COUNT(cp.id) AS scored_pledge_count,
                    c.updated_at
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
-            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             JOIN candidate_pledges cp ON cp.candidate_id = c.id
             LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
             WHERE cp.total_score IS NOT NULL
               AND cp.approval_status = 'APPROVED'
               AND c.approval_status IN ('APPROVED', 'MIXED')
-              AND TRIM(COALESCE(pa.status_note, '')) IN ('', '공천 확정')
+              AND COALESCE(u.applicant_verified, 0) = 1
+              AND u.applicant_match_id IS NOT NULL
         """
         params: list = []
 
