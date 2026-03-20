@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse, Response
 from pydantic import BaseModel, Field
 
 from backend.config import (
@@ -24,6 +24,7 @@ from backend.config import (
     INDEX_CACHE_DIR,
     OPENAI_MODEL,
     CHAT_MODEL,
+    CARD_SUMMARY_MODEL,
     DEBUG_ENDPOINTS_ENABLED,
     PDF_S3_URI,
     USE_OPENAI_VECTOR_STORE,
@@ -1745,10 +1746,20 @@ class RegionResponse(BaseModel):
 
 
 class CandidatePledgeResponse(BaseModel):
+    id: Optional[int] = Field(default=None, description="공약 ID")
     title: str = Field(..., description="공약 제목")
     content: Optional[str] = Field(default=None, description="공약 세부내용")
     total_score: Optional[float] = Field(default=None, description="점검 종합점수")
     created_at: Optional[str] = Field(default=None, description="공약 등록일")
+
+
+class CandidateExternalProfileResponse(BaseModel):
+    source: str = Field(..., description="외부 프로필 소스 키")
+    external_id: Optional[str] = Field(default=None, description="외부 서비스 후보 ID")
+    profile_url: Optional[str] = Field(default=None, description="외부 후보 프로필 링크")
+    photo_url: Optional[str] = Field(default=None, description="외부 후보 사진 링크")
+    support_url: Optional[str] = Field(default=None, description="외부 후원 링크")
+    bio: Optional[str] = Field(default=None, description="외부 프로필 소개")
 
 
 class CandidateListItemResponse(BaseModel):
@@ -1771,7 +1782,22 @@ class CandidateDetailResponse(BaseModel):
     region_name: str = Field(..., description="행정구역 이름")
     election_type: str = Field(..., description="선거 구분")
     election_level: Optional[str] = Field(default=None, description="선거 레벨(광역/기초 등)")
+    external_profile: Optional[CandidateExternalProfileResponse] = Field(default=None, description="외부 후보 프로필")
     pledges: list[CandidatePledgeResponse] = Field(default_factory=list, description="공약 전체")
+
+
+class PledgeShareSummaryRequest(BaseModel):
+    candidate_name: str = Field(..., description="후보명")
+    election_label: Optional[str] = Field(default=None, description="출마 직위 라벨")
+    region: Optional[str] = Field(default=None, description="지역/선거구")
+    pledge_title: str = Field(..., description="공약 제목")
+    pledge_content: str = Field(..., description="공약 본문")
+
+
+class PledgeShareSummaryResponse(BaseModel):
+    title: str = Field(..., description="카드뉴스용 정제 제목")
+    headline: str = Field(..., description="핵심 한 줄")
+    bullets: list[str] = Field(default_factory=list, description="실행 포인트")
 
 
 class DistrictResponse(BaseModel):
@@ -1812,7 +1838,7 @@ def _fetch_candidate_pledges(
     conn = get_connection()
     try:
         sql = """
-            SELECT title, content, total_score, created_at
+            SELECT id, title, content, total_score, created_at
             FROM candidate_pledges
             WHERE candidate_id = ?
         """
@@ -1828,6 +1854,7 @@ def _fetch_candidate_pledges(
         rows = conn.execute(sql, params).fetchall()
         return [
             CandidatePledgeResponse(
+                id=r["id"],
                 title=r["title"],
                 content=r["content"],
                 total_score=r["total_score"],
@@ -1839,6 +1866,65 @@ def _fetch_candidate_pledges(
         conn.close()
 
 
+def _fetch_candidate_external_profile(candidate_id: int) -> Optional[CandidateExternalProfileResponse]:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT source_key, external_id, external_profile_url, external_photo_url,
+                   external_support_url, external_bio
+            FROM candidate_external_profiles
+            WHERE candidate_id = ?
+            ORDER BY datetime(last_synced_at) DESC, id DESC
+            LIMIT 1
+            """,
+            (candidate_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return None
+
+    return CandidateExternalProfileResponse(
+        source=row["source_key"],
+        external_id=row["external_id"],
+        profile_url=row["external_profile_url"],
+        photo_url=row["external_photo_url"],
+        support_url=row["external_support_url"],
+        bio=row["external_bio"],
+    )
+
+
+def _clean_pledge_share_title(value: str) -> str:
+    text = (value or "").strip()
+    text = re.sub(r"^\s*<[^>]+>\s*", "", text)
+    text = re.sub(r"^\s*\[[^\]]+\]\s*", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or "공약"
+
+
+def _fallback_pledge_share_summary(title: str, content: str) -> PledgeShareSummaryResponse:
+    clean_title = _clean_pledge_share_title(title)
+    lines = [line.strip() for line in str(content or "").replace("\r", "").split("\n") if line.strip()]
+    merged = " ".join(lines)
+    headline = lines[0] if lines else merged or "핵심 내용을 준비 중입니다."
+    bullets = [
+        re.sub(r"^[-•·*\s]+|^\d+[.)]\s*|^[①-⑳]\s*", "", line).strip()
+        for line in lines
+        if re.match(r"^[-•·*]|^\d+[.)]|^[①-⑳]", line)
+    ]
+    if not bullets and merged:
+        bullets = [part.strip() for part in re.split(r"[.!?]\s+|다\.\s+|요\.\s+", merged) if part.strip()]
+    return PledgeShareSummaryResponse(
+        title=_truncate_complete(clean_title, 12),
+        headline=_truncate_complete(headline or clean_title, 55),
+        bullets=[_truncate_complete(item, 40) for item in bullets[:2]],
+    )
+
+
 def _fetch_candidate_pledges_current_public(
     candidate_id: int,
     limit: Optional[int] = None,
@@ -1848,7 +1934,7 @@ def _fetch_candidate_pledges_current_public(
     conn = get_connection()
     try:
         sql = """
-            SELECT cp.title, cp.content, cp.total_score,
+            SELECT cp.id, cp.title, cp.content, cp.total_score,
                    COALESCE(prh.approved_reviewed_at, cp.created_at) AS created_at
             FROM candidate_pledges cp
             LEFT JOIN (
@@ -1869,6 +1955,7 @@ def _fetch_candidate_pledges_current_public(
         rows = conn.execute(sql, params).fetchall()
         return [
             CandidatePledgeResponse(
+                id=r["id"],
                 title=r["title"],
                 content=r["content"],
                 total_score=r["total_score"],
@@ -1943,6 +2030,7 @@ def _fetch_candidate_analysis_snapshot(
             seen_titles.add(normalized_title)
             picked.append(
                 {
+                    "id": None,
                     "title": normalized_title or title,
                     "content": row["input_text"],
                     "total_score": row["total_score"],
@@ -1954,6 +2042,7 @@ def _fetch_candidate_analysis_snapshot(
         picked.sort(key=lambda item: item["created_at"] or "")
         return [
             CandidatePledgeResponse(
+                id=item["id"],
                 title=item["title"],
                 content=item["content"],
                 total_score=item["total_score"],
@@ -1990,7 +2079,7 @@ def _fetch_candidate_pledges_snapshot(
         if snapshot is None:
             rows = conn.execute(
                 """
-                SELECT title, content, total_score, created_at
+                SELECT id, title, content, total_score, created_at
                 FROM candidate_pledges
                 WHERE candidate_id = ?
                   AND approval_status = 'APPROVED'
@@ -2001,6 +2090,7 @@ def _fetch_candidate_pledges_snapshot(
             ).fetchall()
             fallback_rows = [
                 CandidatePledgeResponse(
+                    id=r["id"],
                     title=r["title"],
                     content=r["content"],
                     total_score=r["total_score"],
@@ -2015,7 +2105,7 @@ def _fetch_candidate_pledges_snapshot(
 
         rows = conn.execute(
             """
-            SELECT title, content, total_score, pledge_created_at
+            SELECT pledge_id, title, content, total_score, pledge_created_at
             FROM candidate_pledge_review_history
             WHERE candidate_id = ?
               AND snapshot_group = ?
@@ -2026,6 +2116,7 @@ def _fetch_candidate_pledges_snapshot(
         ).fetchall()
         return [
             CandidatePledgeResponse(
+                id=r["pledge_id"],
                 title=r["title"],
                 content=r["content"],
                 total_score=r["total_score"],
@@ -2886,8 +2977,115 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
+        external_profile=_fetch_candidate_external_profile(int(row["id"])),
         pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of, int(row["user_id"]) if row["user_id"] is not None else None) if as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
     )
+
+
+@app.get("/api/proxy-image", tags=["utility"])
+def proxy_image(url: str = Query(..., description="외부 이미지 URL")):
+    """카드뉴스 렌더링용 외부 이미지를 same-origin으로 중계한다."""
+    from urllib.parse import urlparse
+    from urllib.request import Request, urlopen
+
+    parsed = urlparse(url)
+    allowed_hosts = {"prod-api.givemoney.kr", "givemoney.kr"}
+    if parsed.scheme not in {"http", "https"} or parsed.netloc not in allowed_hosts:
+        raise HTTPException(status_code=400, detail="허용되지 않은 이미지 URL입니다.")
+    try:
+        req = Request(url, headers={"User-Agent": "PolicyMentoring/1.0"})
+        with urlopen(req, timeout=15) as resp:
+            content = resp.read()
+            media_type = resp.headers.get_content_type() or "image/jpeg"
+            return Response(content=content, media_type=media_type)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="이미지를 불러오지 못했습니다.")
+
+
+def _truncate_complete(text: str, limit: int) -> str:
+    """limit 이내로 자르되 문장이 잘리면 '…'을 붙인다."""
+    text = _clean_pledge_share_title(text)
+    if len(text) <= limit:
+        return text
+    # 마침표·종결어미 등으로 끝나면 거기서 자름
+    cut = text[:limit]
+    for end in ("다.", "요.", "음.", "함.", "임.", "됨."):
+        idx = cut.rfind(end)
+        if idx > 0:
+            return cut[: idx + len(end)]
+    # 공백 기준으로 단어가 끊기지 않게
+    space = cut.rfind(" ")
+    if space > limit // 2:
+        return cut[:space] + "…"
+    return cut.rstrip() + "…"
+
+
+_share_summary_cache: dict[str, PledgeShareSummaryResponse] = {}
+
+@app.post("/api/pledge/share-summary", response_model=PledgeShareSummaryResponse, tags=["candidates"])
+def create_pledge_share_summary(body: PledgeShareSummaryRequest):
+    """공약 카드뉴스용 짧은 요약을 생성한다. 캐시 우선, 실패 시 규칙 기반 요약으로 대체한다."""
+    import hashlib
+    cache_key = hashlib.md5((body.pledge_title or "") + "|" + (body.pledge_content or "")).hexdigest()
+    if cache_key in _share_summary_cache:
+        return _share_summary_cache[cache_key]
+
+    fallback = _fallback_pledge_share_summary(body.pledge_title, body.pledge_content)
+    try:
+        from openai import OpenAI
+        from backend.config import OPENAI_API_KEY
+
+        if not OPENAI_API_KEY:
+            return fallback
+
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        payload = {
+            "candidate_name": body.candidate_name,
+            "election_label": body.election_label or "",
+            "region": body.region or "",
+            "pledge_title": _clean_pledge_share_title(body.pledge_title),
+            "pledge_content": body.pledge_content,
+        }
+        response = client.chat.completions.create(
+            model=CARD_SUMMARY_MODEL,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "당신은 선거 공약 카드뉴스 편집자다. "
+                        "원문에 없는 사실을 추가하지 말고, 유권자가 한눈에 읽히는 한국어 문장으로 짧게 정리하라. "
+                        "모든 항목은 반드시 완결된 문장이어야 한다. 문장이 중간에 끊기면 안 된다. "
+                        "글자 수를 초과하느니 내용을 과감히 줄여서라도 문장을 완성하라. "
+                        "반드시 JSON만 반환하고, 형식은 "
+                        '{"title":"12자 이내 핵심 키워드", "headline":"완결된 문장 55자 이내", '
+                        '"bullets":["완결된 문장 40자 이내", "완결된 문장 40자 이내"]} '
+                        "이다. bullets는 최대 2개다."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(payload, ensure_ascii=False),
+                },
+            ],
+        )
+        raw = response.choices[0].message.content or "{}"
+        data = json.loads(raw)
+        title = _truncate_complete(str(data.get("title") or fallback.title).strip(), 12)
+        headline = _truncate_complete(str(data.get("headline") or fallback.headline).strip(), 55)
+        bullets = [_truncate_complete(str(item).strip(), 40) for item in (data.get("bullets") or []) if str(item).strip()][:2]
+        if not headline:
+            headline = fallback.headline
+        if not bullets:
+            bullets = fallback.bullets
+        result = PledgeShareSummaryResponse(title=title, headline=headline, bullets=bullets)
+        _share_summary_cache[cache_key] = result
+        return result
+    except Exception:
+        _share_summary_cache[cache_key] = fallback
+        return fallback
 
 
 def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailResponse:
@@ -2921,6 +3119,7 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
+        external_profile=_fetch_candidate_external_profile(int(row["id"])),
         pledges=_fetch_candidate_pledges(int(row["id"]), limit=None, public_only=True),
     )
 

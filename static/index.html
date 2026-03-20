@@ -513,6 +513,278 @@
     .modal-pledge-count{
       font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;
     }
+    .modal-candidate-profile{
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 1rem;
+      padding: 1.05rem 1.1rem;
+      margin-bottom: 1rem;
+      border-radius: 18px;
+      background: rgba(0,0,0,0.24);
+      border: 1px solid rgba(148,163,184,0.18);
+      align-items: start;
+    }
+    .modal-candidate-photo{
+      width: 112px;
+      height: 144px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #cbd5e1;
+      font-size: 1.8rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .modal-candidate-photo img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .modal-candidate-photo.is-clickable{
+      cursor: zoom-in;
+    }
+    .modal-candidate-photo-button{
+      all: unset;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: zoom-in;
+    }
+    .modal-candidate-photo-button img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .modal-candidate-name-row{
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.32rem;
+    }
+    .modal-candidate-name{
+      font-size: 1.22rem;
+      font-weight: 900;
+      color: #f8fafc;
+      line-height: 1.3;
+    }
+    .modal-candidate-badge{
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(59,130,246,0.18);
+      color: #93c5fd;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    .modal-candidate-meta{
+      color: #cbd5e1;
+      font-size: 0.93rem;
+      line-height: 1.55;
+    }
+    .modal-candidate-bio{
+      margin-top: 0.55rem;
+      color: #dbeafe;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .modal-candidate-links{
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+    .modal-candidate-link{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 0.92rem;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.18);
+      background: rgba(255,255,255,0.04);
+      color: #e2e8f0;
+      font-size: 0.86rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .modal-candidate-link:hover{ background: rgba(255,255,255,0.08); }
+    .modal-pledge-actions{
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      margin-top: 0.6rem;
+    }
+    .modal-pledge-action{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 0.72rem;
+      border: 1px solid rgba(148,163,184,0.18);
+      background: rgba(255,255,255,0.04);
+      color: #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .modal-pledge-action:hover{ background: rgba(255,255,255,0.08); }
+    .modal-pledge-action.secondary{
+      background: rgba(15,23,42,0.42);
+      color: #cbd5e1;
+    }
+    .share-toast{
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(18px);
+      padding: 0.78rem 1rem;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.94);
+      color: #f8fafc;
+      font-size: 0.88rem;
+      font-weight: 700;
+      box-shadow: 0 18px 40px rgba(15,23,42,0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 10001;
+    }
+    .share-toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .modal-pledge-item.is-target{
+      border-color: rgba(56,189,248,0.75);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.24), 0 16px 32px rgba(2,132,199,0.12);
+    }
+    .photo-lightbox{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: rgba(2, 6, 23, 0.84);
+      backdrop-filter: blur(4px);
+      z-index: 10020;
+    }
+    .photo-lightbox.open{
+      display: flex;
+    }
+    .photo-lightbox-dialog{
+      position: relative;
+      max-width: min(92vw, 760px);
+      max-height: min(88vh, 960px);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 28px 70px rgba(2, 6, 23, 0.45);
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(148,163,184,0.16);
+    }
+    .photo-lightbox-image{
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: min(88vh, 960px);
+      object-fit: contain;
+      background: #0f172a;
+    }
+    .photo-lightbox-close{
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.72);
+      color: #f8fafc;
+      font-size: 1.1rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .image-preview-overlay{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: rgba(2, 6, 23, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 10030;
+    }
+    .image-preview-overlay.open{
+      display: flex;
+    }
+    .image-preview-dialog{
+      width: min(96vw, 1240px);
+      max-height: 92vh;
+      overflow: auto;
+      border-radius: 28px;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(148,163,184,0.16);
+      box-shadow: 0 28px 70px rgba(2, 6, 23, 0.45);
+      padding: 1.15rem;
+    }
+    .image-preview-top{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+    .image-preview-title{
+      font-size: 1rem;
+      font-weight: 900;
+      color: #f8fafc;
+    }
+    .image-preview-actions{
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+    .image-preview-btn{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 0.95rem;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.18);
+      background: rgba(255,255,255,0.05);
+      color: #f8fafc;
+      font-size: 0.86rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .image-preview-btn.primary{
+      background: rgba(56,189,248,0.16);
+      border-color: rgba(56,189,248,0.32);
+      color: #dbeafe;
+    }
+    .image-preview-frame{
+      border-radius: 22px;
+      overflow: hidden;
+      background: #0f172a;
+      border: 1px solid rgba(148,163,184,0.12);
+    }
+    .image-preview-frame img{
+      display: block;
+      width: 100%;
+      height: auto;
+    }
     @media (max-width: 640px){
       .wrap{ padding: 0 0.75rem; }
       .top-bar{ margin-bottom: 1rem; flex-direction: column; align-items: stretch; }
@@ -540,6 +812,15 @@
       .pledge-modal-header{ padding: 1rem 1.1rem; }
       .pledge-modal-header h3{ font-size: 1.05rem; }
       .pledge-modal-body{ padding: 1rem 1.1rem 1.5rem; }
+      .modal-candidate-profile{
+        grid-template-columns: 68px minmax(0, 1fr);
+        gap: 0.8rem;
+        padding: 0.9rem;
+      }
+      .modal-candidate-photo{
+        width: 68px;
+        height: 88px;
+      }
     }
 
     @media (max-width: 768px){
@@ -943,6 +1224,26 @@
       <div class="pledge-modal-body" id="pledgeModalBody"></div>
     </div>
   </div>
+  <div class="photo-lightbox" id="photoLightbox" onclick="closePhotoLightbox(event)">
+    <div class="photo-lightbox-dialog" onclick="event.stopPropagation()">
+      <button class="photo-lightbox-close" type="button" onclick="closePhotoLightbox()" title="닫기">✕</button>
+      <img class="photo-lightbox-image" id="photoLightboxImage" alt="">
+    </div>
+  </div>
+  <div class="image-preview-overlay" id="imagePreviewOverlay" onclick="closeImagePreview(event)">
+    <div class="image-preview-dialog" onclick="event.stopPropagation()">
+      <div class="image-preview-top">
+        <div class="image-preview-title">이미지 미리보기</div>
+        <div class="image-preview-actions">
+          <button type="button" class="image-preview-btn" onclick="closeImagePreview()">닫기</button>
+          <button type="button" class="image-preview-btn primary" id="imagePreviewSaveBtn">저장</button>
+        </div>
+      </div>
+      <div class="image-preview-frame">
+        <img id="imagePreviewImage" alt="공약 카드 미리보기">
+      </div>
+    </div>
+  </div>
 
   <script>
     (async function() {
@@ -1177,9 +1478,22 @@
       local_mayor: '기초단체장', local_council: '기초의원',
     };
     const pledgeModalOverlay = document.getElementById('pledgeModalOverlay');
+    const photoLightbox = document.getElementById('photoLightbox');
+    const photoLightboxImage = document.getElementById('photoLightboxImage');
+    const imagePreviewOverlay = document.getElementById('imagePreviewOverlay');
+    const imagePreviewImage = document.getElementById('imagePreviewImage');
+    const imagePreviewSaveBtn = document.getElementById('imagePreviewSaveBtn');
+    let _pendingImagePreview = null;
     const pledgeModalTitle = document.getElementById('pledgeModalTitle');
     const pledgeModalSub = document.getElementById('pledgeModalSub');
     const pledgeModalBody = document.getElementById('pledgeModalBody');
+
+    function buildPledgeShareUrl(candidateId, pledgeId) {
+      const url = new URL('/map', window.location.origin);
+      if (candidateId) url.searchParams.set('candidate', String(candidateId));
+      if (pledgeId) url.searchParams.set('pledge', String(pledgeId));
+      return url.toString();
+    }
 
     function escapeHtml(text) {
       const div = document.createElement('div');
@@ -1201,6 +1515,490 @@
         day: '2-digit',
       }).format(date).replace(/\. /g, '-').replace('.', '').trim();
     }
+
+    function shouldDisplayExternalBio(value) {
+      if (!value) return false;
+      const text = String(value).trim();
+      if (!text) return false;
+      if (/[�]/.test(text)) return false;
+      if (/\?{2,}/.test(text)) return false;
+      if (/^[\s?.!,-]+$/.test(text)) return false;
+      return /[가-힣A-Za-z0-9]/.test(text);
+    }
+
+    function formatExternalBio(value) {
+      const text = String(value || '').replace(/\s+/g, ' ').trim();
+      return text
+        .replace(/\s+\./g, '.')
+        .replace(/\s+,/g, ',')
+        .replace(/\.{2,}/g, '.')
+        .trim();
+    }
+
+    let shareToastTimer = null;
+    function showShareToast(message) {
+      let toast = document.getElementById('shareToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'shareToast';
+        toast.className = 'share-toast';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('show');
+      if (shareToastTimer) clearTimeout(shareToastTimer);
+      shareToastTimer = setTimeout(function() {
+        toast.classList.remove('show');
+      }, 1800);
+    }
+
+    function getCandidatePhotoMarkup(detail) {
+      const profile = detail.external_profile || null;
+      if (profile && profile.photo_url) {
+        const alt = escapeHtml((detail.name || '예비후보') + ' 사진');
+        const src = escapeHtml(profile.photo_url);
+        return `<button type="button" class="modal-candidate-photo-button" onclick="openPhotoLightbox('${src}', '${alt}')"><img src="${src}" alt="${alt}" loading="lazy"></button>`;
+      }
+      return `<span>${escapeHtml((detail.name || '?').slice(0, 1) || '?')}</span>`;
+    }
+
+    function renderCandidateProfile(detail) {
+      const profile = detail.external_profile || null;
+      const badgeText = escapeHtml(ELECTION_LABELS[detail.election_type] || detail.election_type || '');
+      const badge = badgeText ? `<span class="modal-candidate-badge">${badgeText}</span>` : '';
+      const region = detail.district_name ? (detail.region_name || '') + ' ' + cleanDN(detail.district_name) : (detail.region_name || '');
+      const pledgeCount = Array.isArray(detail.pledges) ? detail.pledges.length : 0;
+      const links = [];
+      if (profile && profile.profile_url) {
+        links.push(`<a class="modal-candidate-link" href="${escapeHtml(profile.profile_url)}" target="_blank" rel="noopener noreferrer">예비후보 프로필</a>`);
+      }
+      if (profile && profile.support_url && profile.support_url !== profile.profile_url) {
+        links.push(`<a class="modal-candidate-link" href="${escapeHtml(profile.support_url)}" target="_blank" rel="noopener noreferrer">후원 페이지</a>`);
+      }
+      return `
+        <div class="modal-candidate-profile">
+          <div class="modal-candidate-photo${profile && profile.photo_url ? ' is-clickable' : ''}">${getCandidatePhotoMarkup(detail)}</div>
+          <div>
+            <div class="modal-candidate-name-row">
+              <div class="modal-candidate-name">${escapeHtml(detail.name || '')}</div>
+              ${badge}
+            </div>
+            <div class="modal-candidate-meta">${escapeHtml(region)} · 공약 ${pledgeCount}개</div>
+            ${profile && profile.bio ? `<div class="modal-candidate-bio">${escapeHtml(profile.bio)}</div>` : ''}
+            ${links.length ? `<div class="modal-candidate-links">${links.join('')}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCandidateProfileV2(detail) {
+      const profile = detail.external_profile || null;
+      const badgeText = escapeHtml(ELECTION_LABELS[detail.election_type] || detail.election_type || '');
+      const badge = badgeText ? `<span class="modal-candidate-badge">${badgeText}</span>` : '';
+      const region = detail.district_name ? (detail.region_name || '') + ' ' + cleanDN(detail.district_name) : (detail.region_name || '');
+      const pledgeCount = Array.isArray(detail.pledges) ? detail.pledges.length : 0;
+      const bioText = profile && shouldDisplayExternalBio(profile.bio) ? escapeHtml(formatExternalBio(profile.bio)) : '';
+      const links = [];
+      const supportLink = profile && (profile.support_url || profile.profile_url);
+      if (supportLink) {
+        links.push(`<a class="modal-candidate-link" href="${escapeHtml(supportLink)}" target="_blank" rel="noopener noreferrer">후원하기</a>`);
+      }
+      return `
+        <div class="modal-candidate-profile">
+          <div class="modal-candidate-photo${profile && profile.photo_url ? ' is-clickable' : ''}">${getCandidatePhotoMarkup(detail)}</div>
+          <div>
+            <div class="modal-candidate-name-row">
+              <div class="modal-candidate-name">${escapeHtml(detail.name || '')}</div>
+              ${badge}
+            </div>
+            <div class="modal-candidate-meta">${escapeHtml(region)} · 공약 ${pledgeCount}개</div>
+            ${bioText ? `<div class="modal-candidate-bio">${bioText}</div>` : ''}
+            ${links.length ? `<div class="modal-candidate-links">${links.join('')}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    renderCandidateProfile = renderCandidateProfileV2;
+
+    async function shareCandidatePledge(candidateId, pledgeId, pledgeTitle, candidateName, event) {
+      if (event) event.preventDefault();
+      const shareUrl = buildPledgeShareUrl(candidateId, pledgeId);
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showShareToast('공약 링크가 복사되었습니다.');
+      } catch (error) {
+        window.prompt('공약 링크를 복사하세요.', shareUrl);
+      }
+    }
+
+    function cleanPledgeShareTitle(value) {
+      return String(value || '')
+        .replace(/^\s*<[^>]+>\s*/g, '')
+        .replace(/^\s*\[[^\]]+\]\s*/g, '')
+        .replace(/\s+/g, ' ')
+        .trim() || '공약';
+    }
+
+    function smartTruncate(text, limit) {
+      text = String(text || '').trim();
+      if (text.length <= limit) return text;
+      var cut = text.slice(0, limit);
+      var ends = ['다.', '요.', '음.', '함.', '임.', '됨.'];
+      var best = -1;
+      ends.forEach(function(e) { var i = cut.lastIndexOf(e); if (i + e.length > best) best = i + e.length; });
+      if (best > limit / 2) return cut.slice(0, best);
+      var sp = cut.lastIndexOf(' ');
+      if (sp > limit / 2) return cut.slice(0, sp) + '…';
+      return cut + '…';
+    }
+
+    function extractPledgeSummary(content, title) {
+      var normalized = String(content || '').replace(/\r/g, '');
+      var lines = normalized.split('\n').map(function(line) { return line.trim(); }).filter(Boolean);
+      var text = lines.join(' ').replace(/\s+/g, ' ').trim();
+      var headline = lines[0] || text || cleanPledgeShareTitle(title);
+      var bullets = lines
+        .filter(function(line) { return /^[-•·*]|^\d+[.)]|^[①-⑳]/.test(line); })
+        .map(function(line) { return line.replace(/^[-•·*\s]+|^\d+[.)]\s*|^[①-⑳]\s*/g, '').trim(); })
+        .filter(Boolean)
+        .slice(0, 2);
+      if (!bullets.length && text) {
+        bullets = text
+          .split(/[.!?]\s+|다\.\s+|요\.\s+/)
+          .map(function(line) { return line.trim(); })
+          .filter(Boolean)
+          .slice(0, 2);
+      }
+      return {
+        title: smartTruncate(cleanPledgeShareTitle(title), 12),
+        headline: smartTruncate(headline, 55),
+        bullets: bullets.map(function(line) { return smartTruncate(line, 40); }).slice(0, 2),
+      };
+    }
+
+    async function fetchPledgeShareSummary(candidateName, pledgeTitle, content, region, electionLabel) {
+      const fallback = extractPledgeSummary(content, pledgeTitle);
+      try {
+        const res = await fetch('/api/pledge/share-summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidate_name: candidateName,
+            election_label: electionLabel,
+            region: region,
+            pledge_title: pledgeTitle,
+            pledge_content: content,
+          }),
+        });
+        if (!res.ok) return fallback;
+        const data = await res.json();
+        return {
+          title: smartTruncate(cleanPledgeShareTitle(data.title || fallback.title), 12),
+          headline: smartTruncate(String(data.headline || fallback.headline).trim(), 55),
+          bullets: Array.isArray(data.bullets) && data.bullets.length
+            ? data.bullets.map(function(line) { return smartTruncate(String(line).trim(), 40); }).slice(0, 2)
+            : fallback.bullets,
+        };
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    function normalizeShareText(text) {
+      return String(text || '')
+        .replace(/[??"'`]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    }
+
+    function dedupeShareSummary(summary, fallbackTitle) {
+      var title = smartTruncate(cleanPledgeShareTitle((summary && summary.title) || fallbackTitle), 12);
+      var titleNorm = normalizeShareText(title);
+      var headline = String(summary && summary.headline || '').trim();
+      if (!headline || normalizeShareText(headline) === titleNorm) {
+        headline = '';
+      }
+      var seen = new Set([titleNorm]);
+      if (headline) seen.add(normalizeShareText(headline));
+      var bullets = [];
+      (Array.isArray(summary && summary.bullets) ? summary.bullets : []).forEach(function(line) {
+        var cleaned = String(line || '').trim();
+        var norm = normalizeShareText(cleaned);
+        if (!cleaned || !norm || seen.has(norm)) return;
+        seen.add(norm);
+        bullets.push(smartTruncate(cleaned, 40));
+      });
+      return {
+        title: title,
+        headline: smartTruncate(headline, 55),
+        bullets: bullets.slice(0, 2),
+      };
+    }
+
+    function roundRectPath(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      var str = String(text || '');
+      if (!str) return 0;
+      var tokens = str.match(/\S+|\s+/g) || [str];
+      var lines = [];
+      var current = '';
+      tokens.forEach(function(token) {
+        if (/^\s+$/.test(token)) { current += token; return; }
+        for (var i = 0; i < token.length; i++) {
+          var ch = token[i];
+          var next = current + ch;
+          if (ctx.measureText(next).width <= maxWidth) {
+            current = next;
+          } else {
+            if (current) lines.push(current);
+            current = ch;
+          }
+        }
+      });
+      if (current.trim()) lines.push(current);
+      var clipped = lines.slice(0, maxLines);
+      if (lines.length > maxLines && clipped.length) {
+        var last = clipped[clipped.length - 1];
+        while (ctx.measureText(last + '…').width > maxWidth && last.length > 1) {
+          last = last.slice(0, -1);
+        }
+        clipped[clipped.length - 1] = last + '…';
+      }
+      clipped.forEach(function(line, index) {
+        ctx.fillText(line, x, y + (index * lineHeight));
+      });
+      return clipped.length;
+    }
+
+    async function loadCardPhoto(photoUrl) {
+      if (!photoUrl) return null;
+      try {
+        const proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(photoUrl);
+        const img = new Image();
+        const loaded = new Promise(function(resolve, reject) {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        img.src = proxyUrl;
+        await loaded;
+        return img;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    async function saveCandidatePledgeImage(candidateName, pledgeTitle, content, region, electionLabel, photoUrl, bio, event) {
+      if (event) event.preventDefault();
+      showShareToast('이미지 미리보기를 준비하고 있습니다.');
+      var summary = dedupeShareSummary(
+        await fetchPledgeShareSummary(candidateName, pledgeTitle, content, region, electionLabel),
+        pledgeTitle
+      );
+      var photo = await loadCardPhoto(photoUrl);
+      var canvas = document.createElement('canvas');
+      var W = 1080, H = 1080;
+      canvas.width = W; canvas.height = H;
+      var ctx = canvas.getContext('2d');
+      var F = 'Pretendard, Apple SD Gothic Neo, sans-serif';
+      var safeName = candidateName || '예비후보';
+      var safeTitle = summary.title || cleanPledgeShareTitle(pledgeTitle) || '공약 요약';
+      var roleLabel = [region, electionLabel].filter(Boolean).join(' ');
+      var candidateLine = roleLabel ? roleLabel + ' 예비후보' : '예비후보';
+      var bioText = shouldDisplayExternalBio(bio) ? formatExternalBio(bio) : '';
+      var summaryHeadline = summary.headline || '';
+      var bullets = (summary.bullets || []).filter(Boolean).slice(0, 3);
+      var PAD = 56;
+      var CW = W - PAD * 2;
+
+      // ── 배경 ──
+      var bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#050d1a');
+      bg.addColorStop(0.4, '#0c1e3d');
+      bg.addColorStop(1, '#060e1e');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      var glow = ctx.createRadialGradient(W / 2, 280, 0, W / 2, 280, 500);
+      glow.addColorStop(0, 'rgba(30, 64, 175, 0.12)');
+      glow.addColorStop(1, 'rgba(30, 64, 175, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── 상단: 프로필 영역 ──
+      var profileH = 200;
+      var photoSize = 150;
+      var photoX = PAD;
+      var photoY = PAD;
+
+      if (photo) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+        ctx.clip();
+        var scale = Math.max(photoSize / photo.width, photoSize / photo.height);
+        var sw = photo.width * scale, sh = photo.height * scale;
+        ctx.drawImage(photo, photoX + (photoSize - sw) / 2, photoY + (photoSize - sh) / 2, sw, sh);
+        ctx.restore();
+        // 테두리
+        ctx.beginPath();
+        ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(250,204,21,0.3)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fill();
+        ctx.fillStyle = 'rgba(147,197,253,0.5)';
+        ctx.font = '700 72px ' + F;
+        ctx.textAlign = 'center';
+        ctx.fillText(safeName.slice(0, 1), photoX + photoSize / 2, photoY + photoSize / 2 + 24);
+        ctx.textAlign = 'left';
+      }
+
+      // 이름 + 직함 (사진 오른쪽)
+      var infoX = photoX + photoSize + 28;
+      var infoW = CW - photoSize - 28;
+      var infoY = photoY + 30;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 48px ' + F;
+      drawWrappedText(ctx, safeName, infoX, infoY, infoW, 56, 1);
+      infoY += 60;
+      ctx.fillStyle = 'rgba(147,197,253,0.8)';
+      ctx.font = '600 22px ' + F;
+      drawWrappedText(ctx, candidateLine, infoX, infoY, infoW, 28, 1);
+      infoY += 32;
+      if (bioText) {
+        ctx.fillStyle = 'rgba(203,213,225,0.5)';
+        ctx.font = '500 18px ' + F;
+        drawWrappedText(ctx, bioText, infoX, infoY, infoW, 24, 2);
+      }
+
+      // ── 구분선 ──
+      var divY = PAD + profileH + 10;
+      var lineGrad = ctx.createLinearGradient(PAD, divY, PAD + CW, divY);
+      lineGrad.addColorStop(0, 'rgba(250,204,21,0.5)');
+      lineGrad.addColorStop(0.3, 'rgba(250,204,21,0.2)');
+      lineGrad.addColorStop(1, 'rgba(250,204,21,0)');
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(PAD, divY);
+      ctx.lineTo(PAD + CW, divY);
+      ctx.stroke();
+
+      // ── 공약 제목 ──
+      var rY = divY + 36;
+      var titleFontSize = 44;
+      ctx.font = '800 ' + titleFontSize + 'px ' + F;
+      while (titleFontSize > 28) {
+        var testLines2 = [];
+        var cur2 = '';
+        for (var ci2 = 0; ci2 < safeTitle.length; ci2++) {
+          var nxt2 = cur2 + safeTitle[ci2];
+          if (ctx.measureText(nxt2).width <= CW) { cur2 = nxt2; }
+          else { if (cur2) testLines2.push(cur2); cur2 = safeTitle[ci2]; }
+        }
+        if (cur2) testLines2.push(cur2);
+        if (testLines2.length <= 2) break;
+        titleFontSize -= 2;
+        ctx.font = '800 ' + titleFontSize + 'px ' + F;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 ' + titleFontSize + 'px ' + F;
+      var tLines = drawWrappedText(ctx, safeTitle, PAD, rY, CW, titleFontSize + 10, 2);
+      rY += tLines * (titleFontSize + 10) + 20;
+
+      // 골드 악센트
+      ctx.fillStyle = '#facc15';
+      roundRectPath(ctx, PAD, rY, 50, 4, 2);
+      ctx.fill();
+      rY += 28;
+
+      // ── headline ──
+      if (summaryHeadline) {
+        ctx.fillStyle = 'rgba(219,234,254,0.9)';
+        ctx.font = '600 26px ' + F;
+        var maxHL = bullets.length ? 4 : 6;
+        var hlLines = drawWrappedText(ctx, summaryHeadline, PAD, rY, CW, 36, maxHL);
+        rY += hlLines * 36 + 30;
+      }
+
+      // ── 실행 포인트 ──
+      var contentBottom = H - 70;
+      if (bullets.length && rY < contentBottom - 60) {
+        ctx.fillStyle = 'rgba(250,204,21,0.5)';
+        ctx.font = '700 15px ' + F;
+        ctx.fillText('POINT', PAD, rY);
+        var lw = ctx.measureText('POINT').width;
+        ctx.beginPath();
+        ctx.moveTo(PAD + lw + 14, rY - 5);
+        ctx.lineTo(PAD + CW, rY - 5);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        rY += 28;
+
+        bullets.forEach(function(line, idx) {
+          if (rY > contentBottom - 30) return;
+          ctx.fillStyle = 'rgba(250,204,21,0.12)';
+          roundRectPath(ctx, PAD, rY - 20, 28, 28, 7);
+          ctx.fill();
+          ctx.fillStyle = '#facc15';
+          ctx.font = '800 15px ' + F;
+          ctx.textAlign = 'center';
+          ctx.fillText(String(idx + 1), PAD + 14, rY);
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = '500 23px ' + F;
+          var bLines = drawWrappedText(ctx, line, PAD + 40, rY, CW - 40, 32, 2);
+          rY += bLines * 32 + 18;
+        });
+      }
+
+      // ── 하단 브랜딩 ──
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.fillRect(0, H - 56, W, 56);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '600 16px ' + F;
+      ctx.textAlign = 'right';
+      ctx.fillText('policy.reformparty.kr', W - PAD, H - 22);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.font = '700 15px ' + F;
+      ctx.fillText('개혁신당 정책 멘토링', PAD, H - 22);
+
+      try {
+        var pngUrl = canvas.toDataURL('image/png');
+        var filename = safeName.replace(/[\/:*?"<>|]/g, '_') + '_' + cleanPledgeShareTitle(pledgeTitle).replace(/[\/:*?"<>|]/g, '_') + '.png';
+        openImagePreview(pngUrl, filename);
+        showShareToast('이미지 미리보기를 준비했습니다.');
+      } catch (error) {
+        alert('이미지 미리보기를 준비하지 못했습니다.');
+      }
+    }
+    window.shareCandidatePledge = shareCandidatePledge;
+    window.saveCandidatePledgeImage = saveCandidatePledgeImage;
+    window.openExternalProfile = function(url, event) {
+      if (event) event.preventDefault();
+      if (!url) return;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    };
 
     function renderModalPledges(pledges) {
       if (!pledges || pledges.length === 0) {
@@ -1233,6 +2031,115 @@
         }).join('');
     }
 
+    function renderModalPledgesV2(detail, options = {}) {
+      const pledges = detail.pledges || [];
+      if (!pledges || pledges.length === 0) {
+        pledgeModalBody.innerHTML = renderCandidateProfile(detail) + '<div class="modal-pledge-empty">등록된 공약이 없습니다.</div>';
+        return;
+      }
+      const targetPledgeId = options.pledgeId ? String(options.pledgeId) : '';
+      pledgeModalBody.innerHTML =
+        renderCandidateProfile(detail) +
+        '<div class="modal-pledge-count">공약 ' + pledges.length + '개</div>' +
+        pledges.map(function(p, i) {
+          const title = escapeHtml(p.title || p);
+          const content = (p.content || '').trim();
+          const score = p.total_score;
+          const createdAt = formatPledgeCreatedAt(p.created_at);
+          const pledgeId = p.id != null ? String(p.id) : '';
+          const isTarget = targetPledgeId && pledgeId === targetPledgeId;
+          let scoreBadge = '';
+          let metaLine = '';
+          if (score != null) {
+            const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
+            scoreBadge = '<span class="modal-pledge-score ' + cls + '">' + Math.round(score) + '점</span>';
+          }
+          if (createdAt) {
+            metaLine = '<div class="modal-pledge-meta">등록 ' + createdAt + '</div>';
+          }
+          const shareButton = pledgeId
+            ? '<button class="modal-pledge-action" type="button" onclick="shareCandidatePledge(' + (detail.candidate_id || 0) + ', ' + pledgeId + ', ' + JSON.stringify(p.title || '') + ', ' + JSON.stringify(detail.name || '') + ', event)">공유하기</button>'
+            : '';
+          return '<div class="modal-pledge-item' + (isTarget ? ' is-target' : '') + '"' + (pledgeId ? (' data-pledge-id="' + pledgeId + '"') : '') + '>' +
+            '<div class="modal-pledge-title"><span class="modal-pledge-num">' + (i + 1) + '</span>' + title + scoreBadge + '</div>' +
+            metaLine +
+            (shareButton ? '<div class="modal-pledge-actions">' + shareButton + '</div>' : '') +
+            (content
+              ? '<div class="modal-pledge-content">' + escapeHtml(content) + '</div>'
+              : '<div class="modal-pledge-empty">세부 내용 없음</div>') +
+            '</div>';
+        }).join('');
+
+      if (targetPledgeId) {
+        requestAnimationFrame(function() {
+          const target = pledgeModalBody.querySelector('[data-pledge-id="' + targetPledgeId + '"]');
+          if (target) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+      }
+    }
+
+    function renderModalPledgesV3(detail, options = {}) {
+      const pledges = detail.pledges || [];
+      if (!pledges || pledges.length === 0) {
+        pledgeModalBody.innerHTML = renderCandidateProfile(detail) + '<div class="modal-pledge-empty">등록된 공약이 없습니다.</div>';
+        return;
+      }
+      const targetPledgeId = options.pledgeId ? String(options.pledgeId) : '';
+      pledgeModalBody.innerHTML =
+        renderCandidateProfile(detail) +
+        '<div class="modal-pledge-count">공약 ' + pledges.length + '개</div>' +
+        pledges.map(function(p, i) {
+          const title = escapeHtml(p.title || p);
+          const content = (p.content || '').trim();
+          const score = p.total_score;
+          const createdAt = formatPledgeCreatedAt(p.created_at);
+          const pledgeId = p.id != null ? String(p.id) : '';
+          const isTarget = targetPledgeId && pledgeId === targetPledgeId;
+          let scoreBadge = '';
+          let metaLine = '';
+          if (score != null) {
+            const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
+            scoreBadge = '<span class="modal-pledge-score ' + cls + '">' + Math.round(score) + '점</span>';
+          }
+          if (createdAt) {
+            metaLine = '<div class="modal-pledge-meta">등록 ' + createdAt + '</div>';
+          }
+          return '<div class="modal-pledge-item' + (isTarget ? ' is-target' : '') + '"' + (pledgeId ? (' data-pledge-id="' + pledgeId + '"') : '') + '>' +
+            '<div class="modal-pledge-title"><span class="modal-pledge-num">' + (i + 1) + '</span>' + title + scoreBadge + '</div>' +
+            metaLine +
+            (pledgeId ? '<div class="modal-pledge-actions">'
+              + '<button class="modal-pledge-action js-share-pledge" type="button" data-candidate-id="' + (detail.candidate_id || 0) + '" data-pledge-id="' + pledgeId + '" data-pledge-title="' + escapeHtml(p.title || '') + '" data-candidate-name="' + escapeHtml(detail.name || '') + '">링크 공유</button>'
+              /* 이미지 저장 버튼 제거됨 */
+              + '</div>' : '') +
+            (content
+              ? '<div class="modal-pledge-content">' + escapeHtml(content) + '</div>'
+              : '<div class="modal-pledge-empty">세부 내용 없음</div>') +
+            '</div>';
+        }).join('');
+
+      if (targetPledgeId) {
+        requestAnimationFrame(function() {
+          const target = pledgeModalBody.querySelector('[data-pledge-id="' + targetPledgeId + '"]');
+          if (target) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+      }
+
+      pledgeModalBody.querySelectorAll('.js-share-pledge').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+          shareCandidatePledge(
+            button.dataset.candidateId,
+            button.dataset.pledgeId,
+            button.dataset.pledgeTitle || '',
+            button.dataset.candidateName || '',
+            event,
+          );
+        });
+      });
+      /* 이미지 저장 기능 제거됨 — 링크 공유만 유지 */
+    }
+
+    renderModalPledges = renderModalPledgesV3;
+
     window.openCandidateModal = async function(candidateId, asOf) {
       if (!candidateId) return;
       pledgeModalTitle.textContent = '';
@@ -1257,7 +2164,7 @@
         const basis = asOf ? ('기준 ' + String(asOf).slice(0, 10) + ' 스냅샷') : '현재 공개본';
         pledgeModalTitle.textContent = d.name || '';
         pledgeModalSub.textContent = region + ' \u00B7 ' + etype + ' \u00B7 ' + basis;
-        renderModalPledges(d.pledges || []);
+        renderModalPledges(d, { pledgeId: null });
         if (!d.pledges || d.pledges.length === 0) {
           pledgeModalBody.innerHTML = '<div class="modal-pledge-empty">공약을 찾지 못했습니다. 잠시 후 다시 열어 주세요.</div>';
         }
@@ -1272,11 +2179,71 @@
       document.body.style.overflow = '';
     };
 
+    function openPhotoLightbox(src, alt) {
+      if (!src || !photoLightbox || !photoLightboxImage) return;
+      photoLightboxImage.src = src;
+      photoLightboxImage.alt = alt || '';
+      photoLightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closePhotoLightbox(event) {
+      if (event && event.target && event.target !== photoLightbox) return;
+      if (!photoLightbox || !photoLightboxImage) return;
+      photoLightbox.classList.remove('open');
+      photoLightboxImage.removeAttribute('src');
+      photoLightboxImage.alt = '';
+      if (!pledgeModalOverlay.classList.contains('open')) {
+        document.body.style.overflow = '';
+      }
+    }
+
+    function openImagePreview(imageUrl, filename) {
+      if (!imagePreviewOverlay || !imagePreviewImage || !imagePreviewSaveBtn || !imageUrl) return;
+      _pendingImagePreview = { imageUrl, filename };
+      imagePreviewImage.src = imageUrl;
+      imagePreviewOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeImagePreview(event) {
+      if (event && event.target && event.target !== imagePreviewOverlay) return;
+      if (!imagePreviewOverlay || !imagePreviewImage) return;
+      imagePreviewOverlay.classList.remove('open');
+      imagePreviewImage.removeAttribute('src');
+      _pendingImagePreview = null;
+      if (!pledgeModalOverlay.classList.contains('open') && !photoLightbox.classList.contains('open')) {
+        document.body.style.overflow = '';
+      }
+    }
+
     document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && photoLightbox.classList.contains('open')) {
+        closePhotoLightbox();
+        return;
+      }
+      if (e.key === 'Escape' && imagePreviewOverlay.classList.contains('open')) {
+        closeImagePreview();
+        return;
+      }
       if (e.key === 'Escape' && pledgeModalOverlay.classList.contains('open')) {
         window.closePledgeModal();
       }
     });
+
+    if (imagePreviewSaveBtn) {
+      imagePreviewSaveBtn.addEventListener('click', function() {
+        if (!_pendingImagePreview) return;
+        const link = document.createElement('a');
+        link.href = _pendingImagePreview.imageUrl;
+        link.download = _pendingImagePreview.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showShareToast('카드 이미지를 저장했습니다.');
+        closeImagePreview();
+      });
+    }
   })();
   </script>
 </body>

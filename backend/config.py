@@ -59,6 +59,8 @@ else:
 # /api/pledge/verify·카드 생성에서 사용. 미설정 시 OPENAI_MODEL(gpt-5.2)과 동일
 # Responses API 사용 시 gpt-5.2 등 최신 모델 지원
 CHAT_MODEL = os.getenv("CHAT_MODEL", "").strip() or OPENAI_MODEL
+# 이미지 저장용 카드뉴스 요약 전용 모델. 미설정 시 gpt-5.2-mini 사용.
+CARD_SUMMARY_MODEL = os.getenv("CARD_SUMMARY_MODEL", "").strip() or "gpt-5-mini"
 
 # 인덱스 캐시: AWS/컨테이너에서 /tmp는 재시작 시 휘발 → INDEX_CACHE_DIR로 영구 경로 지정 권장
 _def_cache_env = os.getenv("INDEX_CACHE_DIR", "").strip()
