@@ -3179,6 +3179,206 @@ def create_pledge_share_summary(body: PledgeShareSummaryRequest):
         return fallback
 
 
+def _public_site_origin(request: Request) -> str:
+    explicit = (os.getenv("PUBLIC_SITE_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    return str(request.base_url).rstrip("/")
+
+
+def _fetch_public_pledge_share_payload(pledge_id: int):
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT cp.id AS pledge_id, cp.title, cp.content, cp.total_score, cp.created_at,
+                   c.id AS candidate_id, c.name AS candidate_name, c.election_type, c.election_level,
+                   c.region_code, COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   pa.status_note AS applicant_status_note
+            FROM candidate_pledges cp
+            JOIN candidates c ON c.id = cp.candidate_id
+            LEFT JOIN users u ON u.id = c.user_id
+            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
+            LEFT JOIN region_codes rc ON rc.region_code = c.region_code
+            WHERE cp.id = ?
+              AND cp.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
+            LIMIT 1
+            """,
+            (pledge_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+        return None
+
+    return {
+        "pledge_id": int(row["pledge_id"]),
+        "title": row["title"] or "",
+        "content": row["content"] or "",
+        "total_score": row["total_score"],
+        "created_at": row["created_at"] or "",
+        "candidate_id": int(row["candidate_id"]),
+        "candidate_name": row["candidate_name"] or "",
+        "election_type": row["election_type"] or "",
+        "election_level": row["election_level"] or "",
+        "region_code": row["region_code"] or "",
+        "region_name": row["region_name"] or "",
+        "district_name": row["district_name"] or "",
+    }
+
+
+@app.get("/share/pledges/{pledge_id}", tags=["candidates"])
+def share_pledge_page(pledge_id: int, request: Request):
+    payload = _fetch_public_pledge_share_payload(pledge_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="공유할 공약을 찾을 수 없습니다.")
+
+    profile = _fetch_candidate_external_profile(payload["candidate_id"])
+    election_label = ELECTION_LABELS.get(payload["election_type"], payload["election_type"] or "")
+    region_label = (
+        f'{payload["region_name"]} {payload["district_name"]}'.strip()
+        if payload["district_name"]
+        else payload["region_name"]
+    ).strip()
+    summary = _fallback_pledge_share_summary(payload["title"], payload["content"])
+
+    origin = _public_site_origin(request)
+    share_url = f"{origin}/share/pledges/{pledge_id}"
+    target_url = f"{origin}/map?candidate={payload['candidate_id']}&pledge={pledge_id}"
+    og_image = (profile.photo_url if profile and profile.photo_url else f"{origin}/og.png")
+
+    import html as _html
+
+    title_text = f"{payload['candidate_name']} 공약 | {summary.title}"
+    description_text = " · ".join(
+        part for part in [
+            region_label,
+            election_label,
+            summary.headline or _truncate_complete(payload["content"], 80),
+        ] if part
+    )
+    candidate_meta = " · ".join(part for part in [region_label, election_label] if part)
+    bio_text = profile.bio.strip() if profile and profile.bio else ""
+
+    html = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{_html.escape(title_text)}</title>
+  <meta name="description" content="{_html.escape(description_text)}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="개혁신당 정책 멘토링">
+  <meta property="og:title" content="{_html.escape(title_text)}">
+  <meta property="og:description" content="{_html.escape(description_text)}">
+  <meta property="og:url" content="{_html.escape(share_url)}">
+  <meta property="og:image" content="{_html.escape(og_image)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{_html.escape(title_text)}">
+  <meta name="twitter:description" content="{_html.escape(description_text)}">
+  <meta name="twitter:image" content="{_html.escape(og_image)}">
+  <style>
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font-family: Pretendard, Apple SD Gothic Neo, sans-serif;
+      background: radial-gradient(circle at top, #153a72 0%, #071b3a 65%, #041227 100%);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }}
+    .card {{
+      width: min(720px, 100%);
+      background: rgba(9, 23, 49, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 28px 60px rgba(2, 6, 23, 0.38);
+    }}
+    .eyebrow {{
+      color: #fbbf24;
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+    }}
+    h1 {{
+      margin: 0 0 10px;
+      font-size: clamp(1.7rem, 5vw, 2.6rem);
+      line-height: 1.12;
+    }}
+    .meta {{
+      color: #bfdbfe;
+      font-size: 0.98rem;
+      margin-bottom: 18px;
+    }}
+    .headline {{
+      color: #e2e8f0;
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }}
+    .bio {{
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }}
+    .actions {{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }}
+    .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 0.98rem;
+      border: 1px solid rgba(191, 219, 254, 0.22);
+      color: #f8fafc;
+      background: rgba(30, 64, 175, 0.22);
+    }}
+    .button.primary {{
+      background: linear-gradient(135deg, #f59e0b, #fb7185);
+      color: #081120;
+      border: 0;
+    }}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="eyebrow">개혁신당 공약 공유</div>
+    <h1>{_html.escape(payload["title"])}</h1>
+    <div class="meta">{_html.escape(candidate_meta or payload["candidate_name"])}</div>
+    <div class="headline">{_html.escape(summary.headline or payload["content"])}</div>
+    {f'<div class="bio">{_html.escape(bio_text)}</div>' if bio_text else ''}
+    <div class="actions">
+      <a class="button primary" href="{_html.escape(target_url)}">공약 보러가기</a>
+      {f'<a class="button" href="{_html.escape(profile.support_url)}" target="_blank" rel="noopener noreferrer">후원하기</a>' if profile and profile.support_url else ''}
+    </div>
+  </main>
+  <script>
+    setTimeout(function() {{
+      window.location.replace({json.dumps(target_url)});
+    }}, 1200);
+  </script>
+</body>
+</html>"""
+    return Response(content=html, media_type="text/html; charset=utf-8")
+
+
 def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailResponse:
     """승인 상태 무관하게 후보 상세를 반환 (관리자·내부용)."""
     from backend.database import get_connection

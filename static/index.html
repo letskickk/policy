@@ -1489,9 +1489,11 @@
     const pledgeModalBody = document.getElementById('pledgeModalBody');
 
     function buildPledgeShareUrl(candidateId, pledgeId) {
+      if (pledgeId) {
+        return new URL(`/share/pledges/${pledgeId}`, window.location.origin).toString();
+      }
       const url = new URL('/map', window.location.origin);
       if (candidateId) url.searchParams.set('candidate', String(candidateId));
-      if (pledgeId) url.searchParams.set('pledge', String(pledgeId));
       return url.toString();
     }
 
