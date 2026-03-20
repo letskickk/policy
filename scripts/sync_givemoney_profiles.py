@@ -158,12 +158,15 @@ def _find_match(conn, external: GivemoneyCandidate, candidate_name: Optional[str
 
     rows = conn.execute(
         """
-        SELECT id, name, region_code, district_name, election_type, election_level
+        SELECT c.id, c.name, c.region_code,
+               COALESCE(u.district_name, c.district_name) AS district_name,
+               c.election_type, c.election_level
         FROM candidates
-        WHERE name = ?
-          AND region_code = ?
-          AND election_type = ?
-        ORDER BY id ASC
+        LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.name = ?
+          AND c.region_code = ?
+          AND c.election_type = ?
+        ORDER BY c.id ASC
         """,
         (external.name, external.region_code, external.election_type),
     ).fetchall()
