@@ -1898,6 +1898,32 @@ def _fetch_candidate_external_profile(candidate_id: int) -> Optional[CandidateEx
     )
 
 
+def _try_sync_candidate_external_profile(candidate_name: str) -> None:
+    """후보 저장 직후 givemoney 프로필을 가볍게 재동기화한다."""
+    safe_name = (candidate_name or "").strip()
+    if not safe_name:
+        return
+    try:
+        from scripts.sync_givemoney_profiles import sync_profiles
+
+        result = sync_profiles(
+            dry_run=False,
+            search_term=safe_name,
+            candidate_name=safe_name,
+            limit=20,
+            verbose=False,
+        )
+        logger.info(
+            "givemoney profile sync attempted for %s: scanned=%s matched=%s upserted=%s",
+            safe_name,
+            result.get("scanned"),
+            result.get("matched"),
+            result.get("upserted"),
+        )
+    except Exception as e:
+        logger.warning("givemoney profile sync failed for %s: %s", safe_name, e)
+
+
 def _clean_pledge_share_title(value: str) -> str:
     text = (value or "").strip()
     text = re.sub(r"^\s*<[^>]+>\s*", "", text)
@@ -3687,6 +3713,7 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
                 )
             _recalculate_candidate_approval(conn, candidate_id)
             conn.commit()
+            _try_sync_candidate_external_profile(candidate_name)
         else:
             candidate_id = int(row["id"])
             previous_status = (row["approval_status"] or "PENDING").upper()
@@ -3796,6 +3823,7 @@ def api_my_candidate_save(body: MyPledgesBody, request: Request):
             if has_changes:
                 _recalculate_candidate_approval(conn, candidate_id)
             conn.commit()
+            _try_sync_candidate_external_profile(candidate_name)
     except HTTPException:
         conn.rollback()
         raise
