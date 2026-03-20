@@ -144,28 +144,6 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_candidate_pledge_review_history_group
             ON candidate_pledge_review_history(snapshot_group);
 
-        CREATE TABLE IF NOT EXISTS candidate_external_profiles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            candidate_id INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
-            source_key TEXT NOT NULL,
-            external_id TEXT,
-            external_profile_url TEXT,
-            external_photo_url TEXT,
-            external_support_url TEXT,
-            external_bio TEXT,
-            matched_name TEXT,
-            matched_region TEXT,
-            matched_district TEXT,
-            matched_position TEXT,
-            raw_payload_json TEXT NOT NULL DEFAULT '{}',
-            last_synced_at TEXT NOT NULL DEFAULT (datetime('now')),
-            UNIQUE(candidate_id, source_key)
-        );
-        CREATE INDEX IF NOT EXISTS idx_candidate_external_profiles_candidate
-            ON candidate_external_profiles(candidate_id);
-        CREATE INDEX IF NOT EXISTS idx_candidate_external_profiles_source_external
-            ON candidate_external_profiles(source_key, external_id);
-
         CREATE TABLE IF NOT EXISTS region_codes (
             region_code TEXT PRIMARY KEY,
             region_name TEXT NOT NULL,

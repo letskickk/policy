@@ -1751,15 +1751,6 @@ class CandidatePledgeResponse(BaseModel):
     created_at: Optional[str] = Field(default=None, description="공약 등록일")
 
 
-class CandidateExternalProfileResponse(BaseModel):
-    source: str = Field(..., description="외부 프로필 소스 키")
-    external_id: Optional[str] = Field(default=None, description="외부 서비스 후보 ID")
-    profile_url: Optional[str] = Field(default=None, description="외부 후보 프로필 링크")
-    photo_url: Optional[str] = Field(default=None, description="외부 후보 사진 링크")
-    support_url: Optional[str] = Field(default=None, description="외부 후원 링크")
-    bio: Optional[str] = Field(default=None, description="외부 프로필 소개")
-
-
 class CandidateListItemResponse(BaseModel):
     candidate_id: int = Field(..., description="후보 ID")
     name: str = Field(..., description="후보명")
@@ -1780,7 +1771,6 @@ class CandidateDetailResponse(BaseModel):
     region_name: str = Field(..., description="행정구역 이름")
     election_type: str = Field(..., description="선거 구분")
     election_level: Optional[str] = Field(default=None, description="선거 레벨(광역/기초 등)")
-    external_profile: Optional[CandidateExternalProfileResponse] = Field(default=None, description="외부 후보 프로필")
     pledges: list[CandidatePledgeResponse] = Field(default_factory=list, description="공약 전체")
 
 
@@ -1847,38 +1837,6 @@ def _fetch_candidate_pledges(
         ]
     finally:
         conn.close()
-
-
-def _fetch_candidate_external_profile(candidate_id: int) -> Optional[CandidateExternalProfileResponse]:
-    from backend.database import get_connection
-
-    conn = get_connection()
-    try:
-        row = conn.execute(
-            """
-            SELECT source_key, external_id, external_profile_url, external_photo_url,
-                   external_support_url, external_bio
-            FROM candidate_external_profiles
-            WHERE candidate_id = ?
-            ORDER BY datetime(last_synced_at) DESC, id DESC
-            LIMIT 1
-            """,
-            (candidate_id,),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if row is None:
-        return None
-
-    return CandidateExternalProfileResponse(
-        source=row["source_key"],
-        external_id=row["external_id"],
-        profile_url=row["external_profile_url"],
-        photo_url=row["external_photo_url"],
-        support_url=row["external_support_url"],
-        bio=row["external_bio"],
-    )
 
 
 def _fetch_candidate_pledges_current_public(
@@ -2928,7 +2886,6 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        external_profile=_fetch_candidate_external_profile(int(row["id"])),
         pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), as_of, int(row["user_id"]) if row["user_id"] is not None else None) if as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
     )
 
@@ -2964,7 +2921,6 @@ def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailRespon
         region_name=_resolve_region_name(code),
         election_type=row["election_type"],
         election_level=row["election_level"],
-        external_profile=_fetch_candidate_external_profile(int(row["id"])),
         pledges=_fetch_candidate_pledges(int(row["id"]), limit=None, public_only=True),
     )
 
