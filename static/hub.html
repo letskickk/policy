@@ -65,22 +65,38 @@
     .box h3 { margin: 0 0 10px; font-size: 16px; color: #fff; }
     .detail-title { margin: 12px 0 0; font-size: 30px; line-height: 1.15; color: #fff; overflow-wrap: anywhere; }
     .body { min-height: 360px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .body.poll-layout { white-space: normal; }
     .links, .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .link, .chip { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
     .chip.subtle { background: rgba(29, 155, 240, 0.12); }
     .empty { padding: 18px; border-radius: 18px; border: 1px dashed var(--border); background: rgba(255, 255, 255, 0.04); color: var(--muted); }
+    .poll-layout { display: grid; gap: 16px; }
+    .poll-overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .poll-card { padding: 16px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.05); }
+    .poll-card h3 { margin: 0 0 10px; font-size: 16px; color: #fff; }
+    .poll-card strong { display: block; font-size: 22px; color: #fff; }
+    .poll-card .label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .poll-card .sub { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .poll-method-list, .poll-copy-list { display: grid; gap: 10px; }
+    .poll-method-row { display: grid; gap: 6px; }
+    .poll-method-row .meta { margin-top: 0; }
+    .poll-bar { width: 100%; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
+    .poll-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff7a1a 0%, #ffbf93 100%); }
+    .poll-copy-list p { margin: 0; }
 
     @media (max-width: 1180px) {
       .curation-grid, .shell, .split, .hero { grid-template-columns: 1fr; }
       .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .sidebar { position: static; }
       .list { max-height: none; }
+      .poll-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 720px) {
       body { padding-inline: 12px; }
       h1 { font-size: 28px; }
       .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .poll-overview-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -394,7 +410,156 @@
       if (!root.children.length) root.innerHTML = '<div class="empty">표시할 타임라인이 없습니다.</div>';
     }
 
+    function bodyLines(body) {
+      return String(body || "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+    }
+
+    function findLineValue(lines, label, options = {}) {
+      const startIndex = options.startIndex || 0;
+      const stopLabels = options.stopLabels || [];
+      const index = lines.findIndex((line, lineIndex) => lineIndex >= startIndex && line === label);
+      if (index < 0) return "";
+      const values = [];
+      for (let i = index + 1; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (!line || line === label) continue;
+        if (stopLabels.includes(line) || /^[0-9]+\.$/.test(line)) break;
+        values.push(line);
+      }
+      return values.join(" ").trim();
+    }
+
+    function findRegexValue(text, pattern) {
+      const match = String(text || "").match(pattern);
+      return match ? match[1].trim() : "";
+    }
+
+    function extractPollSections(data) {
+      const body = String(data.body || "");
+      const metadata = data.metadata || {};
+      const lines = bodyLines(body);
+      const basicStart = Math.max(lines.indexOf("여론조사 기본"), 0);
+      const basicLines = lines.slice(basicStart);
+      const surveyDate = findLineValue(basicLines, "조사일시", {
+        stopLabels: ["조사일수", "조사시간", "조사대상", "표본의 크기"],
+      });
+      const sampleSize = findRegexValue(body, /조사완료 사례수\(명\)\s+전체\s+(\d+)/);
+      const margin = findRegexValue(body, /95% 신뢰수준에\s*±?([0-9.]+%P)/);
+      const responseRate = findRegexValue(body, /전체 응답률\s+([0-9.]+%)/);
+      const contactRate = findRegexValue(body, /전체 접촉률\s+([0-9.]+%)/);
+      const publication = findLineValue(lines, "최초 공표·보도 지정일시", {
+        stopLabels: ["전체질문지 자료", "결과분석 자료", "용어설명"],
+      });
+      const overview = {
+        pollster: metadata.pollster || findLineValue(basicLines, "조사기관명", { stopLabels: ["공동조사기관명", "조사지역"] }),
+        client: metadata.client_name || findLineValue(basicLines, "조사의뢰자", { stopLabels: ["조사기관명", "공동조사기관명"] }),
+        method: metadata.survey_method || findLineValue(basicLines, "조사방법", { stopLabels: ["피조사자 선정방법", "조사대상"] }),
+        sampleFrame: metadata.sample_frame || findLineValue(basicLines, "추출틀", { stopLabels: ["규모", "구축방법"] }),
+        region: metadata.title_region || findLineValue(basicLines, "지역", { stopLabels: ["선거명", "조사의뢰자"] }),
+        target: findLineValue(basicLines, "조사대상", { stopLabels: ["표본의 크기", "조사방법"] }),
+        surveyDate,
+        sampleSize,
+        margin,
+        responseRate,
+        contactRate,
+        publication: publication || data.published_at || metadata.registered_at || "",
+      };
+
+      const methodMix = [];
+      const wireless = findRegexValue(body, /무선\s+([0-9.]+)\s*%/);
+      const wired = findRegexValue(body, /유선\s+([0-9.]+)\s*%/);
+      if (wireless) methodMix.push({ label: "무선 비중", value: `${wireless}%` });
+      if (wired) methodMix.push({ label: "유선 비중", value: `${wired}%` });
+
+      const keyStats = [
+        { label: "표본 수", value: overview.sampleSize ? `${overview.sampleSize}명` : "미추출", sub: overview.margin ? `표본오차 ±${overview.margin}` : "표본오차 정보 없음" },
+        { label: "응답률", value: overview.responseRate || "미추출", sub: overview.contactRate ? `접촉률 ${overview.contactRate}` : "접촉률 정보 없음" },
+        { label: "조사 방식", value: overview.method || "미추출", sub: overview.sampleFrame || "표본추출틀 정보 없음" },
+        { label: "공표 시점", value: overview.publication || "미추출", sub: overview.surveyDate || "조사일시 정보 없음" },
+      ];
+
+      const cleanedBody = body.replace(/^여론조사결과 등록현황 상세보기[\s\S]*?여론조사 기본\s*/u, "").trim();
+      const bodyPreview = cleanedBody.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean).slice(0, 4);
+      return { overview, methodMix, keyStats, bodyPreview };
+    }
+
+    function renderPollBody(data) {
+      const { overview, methodMix, keyStats, bodyPreview } = extractPollSections(data);
+      const keyPoints = ((data.metadata || {}).support_lines || []).slice(0, 4);
+      const pointMarkup = keyPoints.length
+        ? keyPoints.map((item) => `<p>${safe(item)}</p>`).join("")
+        : '<p>본문에 개혁신당 관련 수치가 구조화되어 있지 않아, 우선 조사 개요와 응답 설계를 위주로 보여줍니다.</p>';
+      const methodMarkup = methodMix.length
+        ? methodMix.map((item) => {
+            const numeric = Number.parseFloat(String(item.value).replace("%", ""));
+            const width = Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0;
+            return `
+              <div class="poll-method-row">
+                <div class="meta">${safe(item.label)} · ${safe(item.value)}</div>
+                <div class="poll-bar"><span style="width:${width}%"></span></div>
+              </div>
+            `;
+          }).join("")
+        : '<div class="empty">유·무선 비중 등 비율 정보는 아직 추출되지 않았습니다.</div>';
+      const previewMarkup = bodyPreview.length
+        ? bodyPreview.map((item) => `<p>${safe(item)}</p>`).join("")
+        : `<p>${safe(data.summary || "보여줄 요약 본문이 없습니다.")}</p>`;
+
+      return `
+        <div class="poll-layout">
+          <section class="poll-overview-grid">
+            ${keyStats.map((item) => `
+              <article class="poll-card">
+                <div class="label">${safe(item.label)}</div>
+                <strong>${safe(item.value)}</strong>
+                <div class="sub">${safe(item.sub)}</div>
+              </article>
+            `).join("")}
+          </section>
+          <section class="poll-overview-grid">
+            <article class="poll-card">
+              <h3>조사 개요</h3>
+              <div class="poll-copy-list">
+                <p><strong>조사기관</strong><br>${safe(overview.pollster || "미추출")}</p>
+                <p><strong>의뢰자</strong><br>${safe(overview.client || "미추출")}</p>
+                <p><strong>조사 지역</strong><br>${safe(overview.region || data.title || "미추출")}</p>
+                <p><strong>조사대상</strong><br>${safe(overview.target || "미추출")}</p>
+              </div>
+            </article>
+            <article class="poll-card">
+              <h3>조사 설계</h3>
+              <div class="poll-copy-list">
+                <p><strong>조사 방식</strong><br>${safe(overview.method || "미추출")}</p>
+                <p><strong>표본추출틀</strong><br>${safe(overview.sampleFrame || "미추출")}</p>
+                <p><strong>조사일시</strong><br>${safe(overview.surveyDate || "미추출")}</p>
+              </div>
+            </article>
+            <article class="poll-card">
+              <h3>핵심 포인트</h3>
+              <div class="poll-copy-list">${pointMarkup}</div>
+            </article>
+            <article class="poll-card">
+              <h3>비율 요약</h3>
+              <div class="poll-method-list">${methodMarkup}</div>
+            </article>
+          </section>
+          <section class="poll-card">
+            <h3>정리된 본문</h3>
+            <div class="poll-copy-list">${previewMarkup}</div>
+          </section>
+          <section class="poll-card">
+            <h3>원문 안내</h3>
+            <div class="sub">선관위 설명문과 원문 본문은 하단 링크에서 확인하고, 상세 상단은 조사 개요와 핵심 지표가 먼저 보이도록 재배치했습니다.</div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderEmptyDetail() {
+      document.getElementById("detailBody").classList.remove("poll-layout");
       document.getElementById("detailType").textContent = "허브";
       document.getElementById("detailTitle").textContent = "좌측 목록에서 항목을 선택해 주세요.";
       document.getElementById("detailSummary").textContent = "선택한 문서의 요약과 맥락이 여기에 표시됩니다.";
@@ -425,6 +590,7 @@
         renderEmptyDetail();
         return;
       }
+      bodyEl.classList.remove("poll-layout");
 
       if (state.tab === "positions") {
         typeEl.textContent = "정책";
@@ -501,12 +667,13 @@
         typeEl.textContent = "여론조사";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${(data.metadata || {}).pollster || "조사기관"} 자료입니다.`;
-        briefEl.textContent = data.summary || "개혁신당 관련 지표와 조사 개요를 확인할 수 있습니다.";
-        keyPointsEl.textContent = ((data.metadata || {}).support_lines || []).join("\n") || data.derived_key_points || "주요 지지율 요약이 없습니다.";
+        briefEl.textContent = "원문 텍스트보다 조사기관, 표본 수, 응답률 같은 핵심 정보를 먼저 보이도록 정리했습니다.";
+        keyPointsEl.textContent = ((data.metadata || {}).support_lines || []).join("\n") || "개혁신당 관련 수치는 아직 본문 구조화가 덜 되어 있어 조사 개요를 우선 배치했습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "개혁신당 또는 관련 후보가 포함된 여론조사 공표 자료입니다.";
         stageLabelEl.textContent = (data.metadata || {}).election_label || "공표 자료";
-        stageDescEl.textContent = (data.metadata || {}).survey_period ? `조사기간 ${(data.metadata || {}).survey_period}` : "조사기관, 의뢰자, 첨부 자료를 함께 확인합니다.";
-        bodyEl.textContent = data.body || data.summary || "";
+        stageDescEl.textContent = (data.metadata || {}).survey_period ? `조사기간 ${(data.metadata || {}).survey_period}` : "시각화 요약 → 정리된 본문 → 원문 링크 순서로 재배치했습니다.";
+        bodyEl.classList.add("poll-layout");
+        bodyEl.innerHTML = renderPollBody(data);
         metaEl.innerHTML = [(data.metadata || {}).pollster ? `<span class="link">${safe((data.metadata || {}).pollster)}</span>` : "", (data.metadata || {}).client_name ? `<span class="link">${safe((data.metadata || {}).client_name)}</span>` : "", (data.metadata || {}).survey_method ? `<span class="link">${safe((data.metadata || {}).survey_method)}</span>` : "", data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "", data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">선관위 원문</a>` : ""].join("");
         const attachmentLinks = ((data.metadata || {}).attachments || []).map((item) => ({ href: item.url, label: `첨부 · ${item.name || item.url}` }));
         linksEl.innerHTML = renderDocLinks(attachmentLinks) || '<div class="empty">첨부 자료가 없습니다.</div>';
