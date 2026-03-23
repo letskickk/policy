@@ -2059,7 +2059,9 @@ def _weekly_snapshot_limit(candidate_id: int, as_of: str) -> Optional[int]:
         conn.close()
 
 
-def _is_public_nomination_status(status_note: Optional[str]) -> bool:
+def _is_public_nomination_status(status_note: Optional[str], applicant_match_id: Optional[int] = None) -> bool:
+    if applicant_match_id is not None:
+        return True
     return (status_note or "").strip() == "공천 확정"
 
 
@@ -2970,7 +2972,8 @@ def get_candidates(
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
@@ -3004,7 +3007,7 @@ def get_candidates(
 
     result: list[CandidateListItemResponse] = []
     for r in rows:
-        if not _is_public_nomination_status(r["applicant_status_note"]):
+        if not _is_public_nomination_status(r["applicant_status_note"], r["applicant_match_id"]):
             continue
         candidate_id = int(r["id"])
         resolved_district_code = _derive_district_code(code, r["district_code"], r["district_name"])
@@ -3055,7 +3058,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
     finally:
         conn.close()
 
-    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+    if row is None or not _is_public_nomination_status(row["applicant_status_note"], row["applicant_match_id"]):
         raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
 
     code = row["region_code"]
@@ -3213,7 +3216,7 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
     finally:
         conn.close()
 
-    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+    if row is None or not _is_public_nomination_status(row["applicant_status_note"], row["applicant_match_id"]):
         return None
 
     return {
@@ -4533,7 +4536,8 @@ def api_leaderboard(
                           wc.region_name,
                           COALESCE(u.district_name, wc.district_name) AS district_name,
                           wc.election_type, wc.avg_score, wc.scored_pledge_count,
-                          pa.status_note AS applicant_status_note
+                          pa.status_note AS applicant_status_note,
+                          u.applicant_match_id AS applicant_match_id
                    FROM weekly_champions wc
                    LEFT JOIN candidates c ON c.id = wc.candidate_id
                    LEFT JOIN users u ON u.id = c.user_id
@@ -4543,7 +4547,7 @@ def api_leaderboard(
                 (reset_monday.isoformat(),)
             ).fetchall()
         ]
-        champions = [champ for champ in champions if _is_public_nomination_status(champ.get("applicant_status_note"))]
+        champions = [champ for champ in champions if _is_public_nomination_status(champ.get("applicant_status_note"), champ.get("applicant_match_id"))]
         for champ in champions:
             try:
                 champ_week = _dt.date.fromisoformat(champ["week_start"])
