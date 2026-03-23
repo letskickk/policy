@@ -2805,7 +2805,7 @@ def get_regions():
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
             GROUP BY c.region_code
             """
         ).fetchall()
@@ -2848,7 +2848,7 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                         AND cp.approval_status = 'APPROVED'
                   )
                   AND c.region_code = ?
-                  AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+                  AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
                 """,
                 (region_code,),
@@ -2866,7 +2866,7 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                       WHERE cp.candidate_id = c.id
                         AND cp.approval_status = 'APPROVED'
                   )
-                  AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+                  AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
                 """
             ).fetchall()
@@ -2890,7 +2890,8 @@ def get_districts(
     try:
         candidate_sql = """
             SELECT c.district_name, c.district_code, c.election_type,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
@@ -2903,7 +2904,7 @@ def get_districts(
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -3041,7 +3042,8 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status, c.user_id,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
@@ -4506,7 +4508,7 @@ def api_leaderboard(
                     WHERE cp.total_score IS NOT NULL
                       AND cp.approval_status = 'APPROVED'
                       AND c.approval_status IN ('APPROVED', 'MIXED')
-                      AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+                      AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ?
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?
                     GROUP BY c.id
@@ -4574,7 +4576,7 @@ def api_leaderboard(
             WHERE cp.total_score IS NOT NULL
               AND cp.approval_status = 'APPROVED'
               AND c.approval_status IN ('APPROVED', 'MIXED')
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
         params: list = []
 

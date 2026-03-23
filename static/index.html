@@ -1076,6 +1076,77 @@
         grid-template-columns: 1fr 1fr;
       }
     }
+  
+    @media (max-width: 640px){
+      .modal-candidate-name-row{
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+      .modal-candidate-name{
+        font-size: 1.02rem;
+        line-height: 1.35;
+      }
+      .modal-candidate-badge{
+        max-width: 100%;
+        white-space: normal;
+        line-height: 1.35;
+      }
+      .modal-candidate-meta,
+      .modal-candidate-bio{
+        font-size: 0.92rem;
+        line-height: 1.65;
+      }
+      .modal-candidate-links{
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .modal-candidate-link{
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+        text-align: center;
+      }
+      .pledge-item{
+        padding: 0.9rem;
+      }
+      .pledge-item h4{
+        font-size: 0.98rem;
+        line-height: 1.45;
+      }
+      .pledge-body{
+        font-size: 0.93rem;
+        line-height: 1.72;
+      }
+      .js-share-pledge{
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+      }
+    }
+
+    @media (max-width: 540px){
+      .leaderboard-card{
+        padding: 0.95rem;
+      }
+      .champion-item{
+        padding: 0.58rem;
+      }
+      .rank-row{
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 0.55rem;
+      }
+      .rank-actions,
+      .rank-score{
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .week-nav button,
+      .leaderboard-filters select{
+        min-height: 44px;
+      }
+    }
+
   </style>
 </head>
 

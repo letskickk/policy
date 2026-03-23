@@ -83,6 +83,12 @@
     .poll-bar { width: 100%; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
     .poll-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff7a1a 0%, #ffbf93 100%); }
     .poll-copy-list p { margin: 0; }
+.poll-result-grid { display:grid; gap:10px; }
+    .poll-result-row { display:grid; grid-template-columns: minmax(88px, 140px) minmax(0,1fr) auto; gap:10px; align-items:center; }
+    .poll-result-label { font-size:13px; color:#e2e8f0; line-height:1.4; }
+    .poll-result-value { font-weight:800; color:#fff; font-variant-numeric: tabular-nums; }
+    .poll-result-bar { width:100%; height:14px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
+    .poll-result-bar > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#60a5fa 0%, #a78bfa 100%); }
 
     @media (max-width: 1180px) {
       .curation-grid, .shell, .split, .hero { grid-template-columns: 1fr; }
@@ -105,14 +111,14 @@
     <section class="panel topbar">
       <div class="brand">
         <strong>개혁신당 정책 허브</strong>
-        <span>정책, 메시지, 법안, 인물, 회의록, 규정, 여론조사를 한 화면에서 보는 통합 허브</span>
+        <span>정책, 메시지, 법안, 인물, 규정, 여론조사를 한 화면에서 보는 통합 허브</span>
       </div>
     </section>
 
     <section class="panel hero">
       <div>
         <span class="eyebrow">Policy SSOT</span>
-        <h1>정책과 메시지뿐 아니라 회의록, 규정, 여론조사까지 함께 봅니다.</h1>
+        <h1>정책과 메시지뿐 아니라 규정, 여론조사까지 함께 봅니다.</h1>
         <p class="muted">좌측에서 카테고리를 바꾸면 목록이 즉시 갱신되고, 우측에서 본문과 메타데이터, 연결 정보, 타임라인을 바로 확인할 수 있습니다.</p>
       </div>
       <div class="summary-grid" id="summaryGrid"></div>
@@ -132,8 +138,7 @@
           <button class="tab" data-tab="messages">메시지</button>
           <button class="tab" data-tab="bills">법안</button>
           <button class="tab" data-tab="people">인물</button>
-          <button class="tab" data-tab="meetings">회의록</button>
-          <button class="tab" data-tab="rules">규정</button>
+                    <button class="tab" data-tab="rules">규정</button>
           <button class="tab" data-tab="polls">여론조사</button>
         </div>
         <input id="searchInput" class="search" placeholder="제목, 요약, 인물, 규정, 여론조사 검색" />
@@ -198,8 +203,8 @@
     const state = {
       tab: "positions",
       search: "",
-      datasets: { positions: [], messages: [], people: [], bills: [], meetings: [], rules: [], polls: [] },
-      selected: { positions: null, messages: null, people: null, bills: null, meetings: null, rules: null, polls: null },
+      datasets: { positions: [], messages: [], people: [], bills: [], rules: [], polls: [] },
+      selected: { positions: null, messages: null, people: null, bills: null, rules: null, polls: null },
     };
 
     function hubUrl(tab, key) {
@@ -282,7 +287,7 @@
       `).join("") || '<div class="empty">표시할 정책이 없습니다.</div>';
 
       document.getElementById("curatedMessages").innerHTML = curatedMessages.map((item) => `
-        <a class="mini-item" href="${hubUrl(item.doc_type === "meeting_note" ? "meetings" : "messages", item.id)}">
+        <a class="mini-item" href="${hubUrl("messages", item.id)}">
           <div class="meta">${safe(docTypeLabel(item.doc_type || "statement"))}</div>
           <strong>${safe(item.title)}</strong>
           <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker, (item.participants || []).slice(0, 2).join(", ")].filter(Boolean).join(" · "))}</div>
@@ -321,8 +326,7 @@
         return [item.published_at, speakerLabel, item.topic_label].filter(Boolean).join(" · ");
       }
       if (state.tab === "people") return [`대표발의 ${number(item.proposer_count)}건`, `전체 문서 ${number(item.document_count)}건`].join(" · ");
-      if (state.tab === "meetings") return [item.metadata?.meeting_type, item.metadata?.held_at || item.published_at, (item.participants || []).slice(0, 2).join(", ")].filter(Boolean).join(" · ");
-      if (state.tab === "rules") return [item.metadata?.rule_kind_label || item.metadata?.rule_kind, item.metadata?.version_label, item.metadata?.effective_from || item.published_at].filter(Boolean).join(" · ");
+            if (state.tab === "rules") return [item.metadata?.rule_kind_label || item.metadata?.rule_kind, item.metadata?.version_label, item.metadata?.effective_from || item.published_at].filter(Boolean).join(" · ");
       if (state.tab === "polls") return [item.metadata?.pollster, item.metadata?.client_name, item.published_at].filter(Boolean).join(" · ");
       return [item.published_at, (item.primary_people || []).map((person) => person.person_name).join(", "), (item.linked_positions || item.related_positions || []).map((link) => link.position_title).slice(0, 1).join(", ")].filter(Boolean).join(" · ");
     }
@@ -375,7 +379,7 @@
 
       let data = null;
       if (state.tab === "positions") data = await api(`/api/policy/positions/${encodeURIComponent(key)}`);
-      else if (["messages", "bills", "meetings", "rules", "polls"].includes(state.tab)) data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
+      else if (["messages", "bills", "rules", "polls"].includes(state.tab)) data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
       else if (state.tab === "people") data = await api(`/api/policy/people/${encodeURIComponent(key)}`);
       renderDetail(data);
     }
@@ -488,10 +492,24 @@
 
     function renderPollBody(data) {
       const { overview, methodMix, keyStats, bodyPreview } = extractPollSections(data);
-      const keyPoints = ((data.metadata || {}).support_lines || []).slice(0, 4);
+      const keyPoints = ((data.metadata || {}).support_lines || []).slice(0, 6);
       const pointMarkup = keyPoints.length
         ? keyPoints.map((item) => `<p>${safe(item)}</p>`).join("")
         : '<p>본문에 개혁신당 관련 수치가 구조화되어 있지 않아, 우선 조사 개요와 응답 설계를 위주로 보여줍니다.</p>';
+      const graphMarkup = keyPoints.length
+        ? keyPoints.map((item) => {
+            const match = String(item).match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+            const value = match ? Math.max(0, Math.min(100, Number(match[1]))) : 0;
+            const label = String(item).replace(/([0-9]+(?:\.[0-9]+)?)\s*%/, '').replace(/[:·-]+\s*$/, '').trim() || '지표';
+            return `
+              <div class="poll-result-row">
+                <div class="poll-result-label">${safe(label)}</div>
+                <div class="poll-result-bar"><span style="width:${value}%"></span></div>
+                <div class="poll-result-value">${value ? value.toFixed(value % 1 ? 1 : 0) : '-'}${value ? '%' : ''}</div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">그래프로 표시할 비율 데이터가 아직 충분하지 않습니다.</div>';
       const methodMarkup = methodMix.length
         ? methodMix.map((item) => {
             const numeric = Number.parseFloat(String(item.value).replace("%", ""));
@@ -540,6 +558,10 @@
             <article class="poll-card">
               <h3>핵심 포인트</h3>
               <div class="poll-copy-list">${pointMarkup}</div>
+            </article>
+            <article class="poll-card">
+              <h3>주요 수치 그래프</h3>
+              <div class="poll-result-grid">${graphMarkup}</div>
             </article>
             <article class="poll-card">
               <h3>비율 요약</h3>
@@ -603,7 +625,7 @@
         stageDescEl.textContent = data.execution_stage?.description || "공식 문서와 연결 자료를 바탕으로 정책 상태를 추적합니다.";
         bodyEl.textContent = data.body || data.summary || "";
         metaEl.innerHTML = [data.category ? `<span class="link">${safe(data.category)}</span>` : "", data.status ? `<span class="link">${safe(statusLabel(data.status))}</span>` : "", data.version_label ? `<span class="link">${safe(data.version_label)}</span>` : ""].join("");
-        const documents = (data.documents || []).map((item) => ({ href: hubUrl(item.doc_type === "bill" ? "bills" : item.doc_type === "policy" ? "positions" : item.doc_type === "meeting_note" ? "meetings" : item.doc_type === "party_rule" ? "rules" : "messages", item.doc_type === "policy" ? data.slug : item.id), label: `${docTypeLabel(item.doc_type)} · ${item.title}` }));
+        const documents = (data.documents || []).map((item) => ({ href: hubUrl(item.doc_type === "bill" ? "bills" : item.doc_type === "policy" ? "positions" : item.doc_type === "party_rule" ? "rules" : "messages", item.doc_type === "policy" ? data.slug : item.id), label: `${docTypeLabel(item.doc_type)} · ${item.title}` }));
         linksEl.innerHTML = renderDocLinks(documents) || '<div class="empty">연결 문서가 없습니다.</div>';
         renderTimeline(data.timeline || []);
         return;
@@ -623,24 +645,6 @@
         const official = renderPolicyLinks(data.linked_positions || [], "공식 연결 · ");
         const inferred = renderPolicyLinks((data.related_positions || []).filter((item) => !(data.linked_positions || []).some((linked) => linked.position_id === item.position_id)), "추정 연결 · ");
         linksEl.innerHTML = `${official}${inferred}` || '<div class="empty">연결 정책이 없습니다.</div>';
-        renderTimeline(data.timeline || []);
-        return;
-      }
-
-      if (state.tab === "meetings") {
-        typeEl.textContent = "회의록";
-        titleEl.textContent = data.title || "";
-        summaryEl.textContent = data.summary || `${(data.metadata || {}).meeting_type || "회의"} 기록입니다.`;
-        briefEl.textContent = data.summary || "회의 안건과 결정사항을 확인합니다.";
-        keyPointsEl.textContent = data.derived_key_points || "아직 구조화된 회의 포인트가 없습니다.";
-        relevanceEl.textContent = data.derived_relevance_note || "정책 결정과 공개 메시지의 내부 맥락을 확인할 수 있습니다.";
-        stageLabelEl.textContent = (data.decisions || []).length ? "결정사항 있음" : "회의 기록";
-        stageDescEl.textContent = (data.decisions || []).length ? `${(data.decisions || []).length}개의 결정사항이 확인됩니다.` : "참석자와 회의 날짜 중심으로 기록된 문서입니다.";
-        bodyEl.textContent = data.body || data.summary || "";
-        metaEl.innerHTML = [(data.metadata || {}).meeting_type ? `<span class="link">${safe((data.metadata || {}).meeting_type)}</span>` : "", ((data.metadata || {}).held_at || data.published_at) ? `<span class="link">${safe((data.metadata || {}).held_at || data.published_at)}</span>` : "", (data.participants || []).length ? `<span class="link">참석자 ${(data.participants || []).length}명</span>` : ""].join("");
-        const participantLinks = (data.participants || []).slice(0, 8).map((name) => ({ href: hubUrl("people", name), label: `참석자 · ${name}` }));
-        const policyLinks = renderPolicyLinks(data.linked_positions || data.related_positions || [], "연결 정책 · ");
-        linksEl.innerHTML = `${policyLinks}${renderDocLinks(participantLinks)}` || '<div class="empty">연결 정보가 없습니다.</div>';
         renderTimeline(data.timeline || []);
         return;
       }
@@ -700,13 +704,12 @@
     }
 
     async function init() {
-      const [hub, positions, messages, people, bills, meetings, rules, polls] = await Promise.all([
+      const [hub, positions, messages, people, bills, rules, polls] = await Promise.all([
         api("/api/policy/hub"),
         api("/api/policy/positions"),
         api("/api/policy/messages?limit=150"),
         api("/api/policy/people"),
         api("/api/policy/documents?doc_type=bill&status=active"),
-        api("/api/policy/meetings?limit=150"),
         api("/api/policy/rules?limit=150"),
         api("/api/policy/polls?limit=150"),
       ]);
@@ -715,7 +718,6 @@
       state.datasets.messages = messages.items || [];
       state.datasets.people = people.items || [];
       state.datasets.bills = bills.items || [];
-      state.datasets.meetings = meetings.items || [];
       state.datasets.rules = rules.items || [];
       state.datasets.polls = polls.items || [];
 

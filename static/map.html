@@ -1129,6 +1129,71 @@
       font-weight: 700;
     }
     .footer a:hover{ text-decoration: underline; }
+  
+    @media (max-width: 640px){
+      .filter-row{
+        margin-bottom: 0.95rem;
+      }
+      .filter-select{
+        min-height: 46px;
+      }
+      .candidate-card{
+        border-radius: 16px;
+      }
+      .candidate-name{
+        font-size: 1rem;
+        line-height: 1.4;
+      }
+      .candidate-meta,
+      .candidate-position{
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .candidate-pledges{
+        padding: 0 0.9rem 1rem;
+      }
+      .pledge-item{
+        padding: 0.9rem;
+      }
+      .btn-detail{
+        min-height: 44px;
+      }
+      .modal-candidate-name-row{
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+      .modal-candidate-name{
+        font-size: 1.02rem;
+        line-height: 1.35;
+      }
+      .modal-candidate-badge{
+        max-width: 100%;
+        white-space: normal;
+        line-height: 1.35;
+      }
+      .modal-candidate-meta,
+      .modal-candidate-bio{
+        font-size: 0.92rem;
+        line-height: 1.65;
+      }
+      .modal-candidate-links{
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .modal-candidate-link{
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+        text-align: center;
+      }
+      .js-share-pledge{
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+      }
+    }
+
   </style>
 </head>
 <body>
