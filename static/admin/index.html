@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Home - Policy Mentoring</title>
+  <title>관리자 홈 - 정책 멘토링</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif; min-height: 100vh; padding: 2rem; }
@@ -15,62 +15,62 @@
 <body class="rf-admin-page">
   <div class="wrap">
     <section class="hero">
-      <div class="section-title">Admin Desk</div>
-      <h1>Admin home for real work</h1>
-      <p class="page-desc">Track approval queues, policy source-of-truth work, usage, and runtime health from one operating surface.</p>
+      <div class="section-title">관리자 데스크</div>
+      <h1>운영 우선순위부터 보는 관리자 홈</h1>
+      <p class="page-desc">승인 대기, 정책 기준 데이터 정리, 사용량, 런타임 상태를 한 화면에서 바로 이어서 처리합니다.</p>
       <div class="summary-grid" style="margin-top:18px;">
         <div class="stat-item">
-          <div class="meta">Users pending</div>
+          <div class="meta">사용자 승인 대기</div>
           <div id="pendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
         </div>
         <div class="stat-item">
-          <div class="meta">Pledges pending</div>
+          <div class="meta">공약 승인 대기</div>
           <div id="pledgePendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
         </div>
         <div class="stat-item">
-          <div class="meta">Core workspaces</div>
+          <div class="meta">핵심 워크스페이스</div>
           <div style="font-size:22px;font-weight:900;color:var(--rf-text-strong);">6</div>
         </div>
       </div>
     </section>
 
     <section class="card" style="margin-top:16px;">
-      <div class="section-title">Task Queue</div>
+      <div class="section-title">작업 큐</div>
       <div class="briefing-grid">
         <a class="mini-item" href="/admin/users">
-          <strong>User admin</strong>
-          <div class="meta">Approve, reject, suspend, and bulk-manage applicant accounts.</div>
+          <strong>사용자 관리</strong>
+          <div class="meta">승인, 거절, 정지, 일괄 업로드까지 한 곳에서 처리합니다.</div>
         </a>
         <a class="mini-item" href="/admin/candidates">
-          <strong>Candidate and pledge admin</strong>
-          <div class="meta">Process the pledge approval inbox and new candidate submissions in one place.</div>
+          <strong>출마자·공약 관리</strong>
+          <div class="meta">공약 승인 인박스와 신규 등록 작업을 같은 화면에서 이어갑니다.</div>
         </a>
         <a class="mini-item" href="/admin/policy-ssot">
-          <strong>Policy SSOT</strong>
-          <div class="meta">Maintain the canonical policy, commentary, bill, and rule records.</div>
+          <strong>정책 SSOT 관리</strong>
+          <div class="meta">정책 원문, 논평, 법안, 규정의 기준 데이터를 정리합니다.</div>
         </a>
         <a class="mini-item" href="/admin/usage">
-          <strong>Usage analytics</strong>
-          <div class="meta">Review daily and monthly usage trends before they become incidents.</div>
+          <strong>사용량 통계</strong>
+          <div class="meta">일간·월간 사용량 흐름과 과부하 징후를 먼저 확인합니다.</div>
         </a>
         <a class="mini-item" href="/admin/ops">
-          <strong>Ops status</strong>
-          <div class="meta">Check vector store, PDF processing, and runtime diagnostics.</div>
+          <strong>운영 상태</strong>
+          <div class="meta">벡터스토어, PDF 처리, 런타임 진단 상태를 점검합니다.</div>
         </a>
         <a class="mini-item" href="/map">
-          <strong>Public candidate map</strong>
-          <div class="meta">Jump directly to the public-facing map and verify what users see.</div>
+          <strong>지역계 후보 지도</strong>
+          <div class="meta">실제 공개 화면으로 나가는 후보 지도를 바로 확인합니다.</div>
         </a>
       </div>
     </section>
 
     <section class="card" style="margin-top:16px;">
-      <div class="section-title">Quick Actions</div>
+      <div class="section-title">빠른 이동</div>
       <div class="links">
-        <a class="nav-link" href="/my-pledges">My pledges</a>
-        <a class="nav-link" href="/dashboard">My history</a>
+        <a class="nav-link" href="/my-pledges">내 공약 등록</a>
+        <a class="nav-link" href="/dashboard">내 기록</a>
         <form action="/api/auth/logout" method="POST" style="display:inline-flex;">
-          <button type="submit" class="btn-secondary">Sign out</button>
+          <button type="submit" class="btn-secondary">로그아웃</button>
         </form>
       </div>
     </section>

@@ -86,17 +86,18 @@ body.rf-workspace-page main {
 }
 
 body.rf-admin-page {
+  color: var(--rf-text);
   background:
-    radial-gradient(circle at top right, rgba(217, 93, 25, 0.12), transparent 26%),
-    linear-gradient(180deg, #f7f1e6 0%, #f0e5d5 100%);
-  color: #241d18;
+    radial-gradient(circle at 16% 8%, rgba(255, 123, 37, 0.18), transparent 28%),
+    radial-gradient(circle at 84% 14%, rgba(120, 196, 255, 0.12), transparent 24%),
+    linear-gradient(160deg, #07131d 0%, #102433 54%, #173650 100%);
 }
 
 body.rf-admin-page::before {
   background:
-    linear-gradient(90deg, rgba(42, 33, 25, 0.08) 1px, transparent 1px),
-    linear-gradient(rgba(42, 33, 25, 0.06) 1px, transparent 1px);
-  opacity: 0.1;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  opacity: 0.18;
 }
 
 body.rf-admin-page .wrap,
@@ -124,18 +125,11 @@ body.rf-admin-page .compact-card,
 body.rf-admin-page .curation-card,
 body.rf-admin-page .detail,
 body.rf-admin-page .sidebar {
-  background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(255, 247, 239, 0.92));
-  color: #241d18;
-  border-color: rgba(120, 95, 72, 0.14);
-  box-shadow: 0 18px 42px rgba(79, 50, 25, 0.12);
-}
-
-body.rf-admin-page h1,
-body.rf-admin-page h2,
-body.rf-admin-page h3,
-body.rf-admin-page .brand strong,
-body.rf-admin-page .brand-title {
-  color: #1f1712;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  color: var(--rf-text);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: var(--rf-shadow);
 }
 
 body.rf-admin-page .muted,
@@ -145,15 +139,15 @@ body.rf-admin-page .footer,
 body.rf-admin-page .empty,
 body.rf-admin-page .hint,
 body.rf-admin-page .page-desc {
-  color: rgba(50, 39, 30, 0.66);
+  color: rgba(232, 240, 246, 0.72);
 }
 
 body.rf-admin-page input,
 body.rf-admin-page select,
 body.rf-admin-page textarea {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(120, 95, 72, 0.18);
-  color: #241d18;
+  background: rgba(4, 17, 29, 0.5);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--rf-text-strong);
 }
 
 body.rf-admin-page .btn-secondary,
@@ -162,12 +156,11 @@ body.rf-admin-page .btn-delete,
 body.rf-admin-page .btn-suspend,
 body.rf-admin-page .nav-link,
 body.rf-admin-page .hero-action.secondary,
-body.rf-admin-page .links a,
 body.rf-admin-page .tab,
 body.rf-admin-page .ghost-btn {
-  background: rgba(243, 230, 217, 0.88);
-  color: #241d18;
-  border-color: rgba(120, 95, 72, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--rf-text);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 img {
