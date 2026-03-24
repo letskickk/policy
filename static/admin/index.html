@@ -1,56 +1,94 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>관리자 - 정책 멘토링</title>
+  <title>Admin Home - Policy Mentoring</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; }
-    @media (max-width: 640px) { body { padding: 1rem; } .card { padding: 1rem; border-radius: 14px; } h1 { font-size: 1.25rem; } }
-    .wrap { max-width: 900px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
-    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem; }
-    .card a { color: #ffb37a; text-decoration: none; font-weight: 700; font-size: 1.1rem; }
-    .card a:hover { text-decoration: underline; }
-    .links a { margin-right: 1rem; }
-    .links form { display: inline; }
-    .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
-    #pendingCount { font-weight: 900; color: #fbbf24; }
-    #pledgePendingCount { font-weight: 900; color: #fde047; }
+    body { font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif; min-height: 100vh; padding: 2rem; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 640px) { body { padding: 1rem; } }
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
-<body>
+<body class="rf-admin-page">
   <div class="wrap">
-    <h1>관리자</h1>
-    <div class="card">
-      <p style="margin-bottom: 0.5rem;">사용자 승인 대기: <span id="pendingCount">0</span>명</p>
-      <p style="margin-bottom: 1rem;">공약 승인 대기: <span id="pledgePendingCount">0</span>건</p>
+    <section class="hero">
+      <div class="section-title">Admin Desk</div>
+      <h1>Admin home for real work</h1>
+      <p class="page-desc">Track approval queues, policy source-of-truth work, usage, and runtime health from one operating surface.</p>
+      <div class="summary-grid" style="margin-top:18px;">
+        <div class="stat-item">
+          <div class="meta">Users pending</div>
+          <div id="pendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="meta">Pledges pending</div>
+          <div id="pledgePendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="meta">Core workspaces</div>
+          <div style="font-size:22px;font-weight:900;color:var(--rf-text-strong);">6</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <div class="section-title">Task Queue</div>
+      <div class="briefing-grid">
+        <a class="mini-item" href="/admin/users">
+          <strong>User admin</strong>
+          <div class="meta">Approve, reject, suspend, and bulk-manage applicant accounts.</div>
+        </a>
+        <a class="mini-item" href="/admin/candidates">
+          <strong>Candidate and pledge admin</strong>
+          <div class="meta">Process the pledge approval inbox and new candidate submissions in one place.</div>
+        </a>
+        <a class="mini-item" href="/admin/policy-ssot">
+          <strong>Policy SSOT</strong>
+          <div class="meta">Maintain the canonical policy, commentary, bill, and rule records.</div>
+        </a>
+        <a class="mini-item" href="/admin/usage">
+          <strong>Usage analytics</strong>
+          <div class="meta">Review daily and monthly usage trends before they become incidents.</div>
+        </a>
+        <a class="mini-item" href="/admin/ops">
+          <strong>Ops status</strong>
+          <div class="meta">Check vector store, PDF processing, and runtime diagnostics.</div>
+        </a>
+        <a class="mini-item" href="/map">
+          <strong>Public candidate map</strong>
+          <div class="meta">Jump directly to the public-facing map and verify what users see.</div>
+        </a>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <div class="section-title">Quick Actions</div>
       <div class="links">
-        <a href="/admin/users">사용자 관리 (승인/거절)</a><br><br>
-        <a href="/admin/candidates">출마자·공약 관리 (등록/승인/거절)</a><br><br>
-        <a href="/admin/policy-ssot">정책 SSOT 관리</a><br><br>
-        <a href="/admin/usage">사용량 통계</a><br><br>
-        <a href="/admin/ops">운영 상태 (벡터스토어·PDF)</a><br><br>
-        <a href="/map">지역별 후보 지도</a><br><br>
-        <a href="/my-pledges">내 공약 등록</a> · <a href="/dashboard">내 기록</a>
-        <form action="/api/auth/logout" method="POST" style="display:inline; margin-left:1rem">
-          <button type="submit">로그아웃</button>
+        <a class="nav-link" href="/my-pledges">My pledges</a>
+        <a class="nav-link" href="/dashboard">My history</a>
+        <form action="/api/auth/logout" method="POST" style="display:inline-flex;">
+          <button type="submit" class="btn-secondary">Sign out</button>
         </form>
       </div>
-    </div>
+    </section>
   </div>
   <script>
     (async () => {
       try {
         const r = await fetch('/api/admin/users/pending', { credentials: 'include' });
-        if (r.ok) { const d = await r.json(); document.getElementById('pendingCount').textContent = (d.users || []).length; }
+        if (r.ok) {
+          const d = await r.json();
+          document.getElementById('pendingCount').textContent = (d.users || []).length;
+        }
       } catch (e) {}
       try {
         const r2 = await fetch('/api/admin/candidates', { credentials: 'include' });
         if (r2.ok) {
           const list = await r2.json();
-          const pending = (Array.isArray(list) ? list : []).filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
+          const pending = (Array.isArray(list) ? list : []).filter((c) => (c.approval_status || 'PENDING') === 'PENDING').length;
           document.getElementById('pledgePendingCount').textContent = pending;
         }
       } catch (e) {}

@@ -186,30 +186,456 @@
       .poll-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
+    .topbar {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 18px 0 4px;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+    .brand strong {
+      font-size: clamp(24px, 4vw, 40px);
+      letter-spacing: -0.04em;
+    }
+    .brand span {
+      display: inline-block;
+      max-width: 56ch;
+      margin-top: 8px;
+      color: rgba(226, 236, 244, 0.72);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .topbar-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(226, 236, 244, 0.76);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hero {
+      position: relative;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      gap: 28px;
+      padding: 34px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        radial-gradient(circle at top left, rgba(255, 122, 26, 0.24), transparent 28%),
+        radial-gradient(circle at 80% 18%, rgba(96, 165, 250, 0.22), transparent 24%),
+        linear-gradient(135deg, rgba(7, 24, 38, 0.88) 0%, rgba(8, 34, 56, 0.94) 50%, rgba(4, 17, 29, 0.98) 100%);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 120px 120px;
+      opacity: 0.08;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,1), rgba(0,0,0,0.1));
+      pointer-events: none;
+    }
+    .hero-copy,
+    .hero-visual {
+      position: relative;
+      z-index: 1;
+    }
+    .hero-copy {
+      display: grid;
+      align-content: space-between;
+      min-height: min(70svh, 680px);
+      gap: 26px;
+    }
+    .hero-copy h1 {
+      max-width: 9ch;
+      margin-top: 18px;
+      font-size: clamp(48px, 7vw, 82px);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+    }
+    .hero-copy .muted {
+      max-width: 44ch;
+      font-size: 16px;
+      color: rgba(226, 236, 244, 0.78);
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .hero-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+    }
+    .hero-action.primary {
+      border-color: rgba(255, 122, 26, 0.4);
+      background: linear-gradient(135deg, rgba(255, 122, 26, 0.94), rgba(255, 173, 102, 0.92));
+      color: #09111b;
+    }
+    .hero-action:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .hero-action.primary:hover {
+      background: linear-gradient(135deg, rgba(255, 140, 55, 0.98), rgba(255, 195, 135, 0.96));
+    }
+    .hero-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .signal-chip {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.18);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    }
+    .signal-chip span {
+      display: block;
+      color: rgba(226, 236, 244, 0.62);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .signal-chip strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 17px;
+      line-height: 1.35;
+      color: #fff;
+    }
+    .hero-visual {
+      display: grid;
+      align-content: stretch;
+      gap: 14px;
+    }
+    .hero-note {
+      display: grid;
+      gap: 8px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      background: rgba(4, 17, 29, 0.46);
+      color: rgba(226, 236, 244, 0.76);
+    }
+    .hero-note strong {
+      font-size: 13px;
+      color: #fff;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .stat {
+      min-height: 148px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+      backdrop-filter: blur(18px);
+      transition: transform 180ms ease, border-color 180ms ease;
+    }
+    .stat:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .stat .label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+    }
+    .stat strong {
+      margin-top: 10px;
+      font-size: clamp(32px, 5vw, 52px);
+      line-height: 1;
+      letter-spacing: -0.05em;
+    }
+    .briefing-grid {
+      gap: 14px;
+    }
+    .briefing-card {
+      position: relative;
+      min-height: 240px;
+      padding: 22px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+    .briefing-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.18);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    }
+    .briefing-card::after {
+      content: "";
+      position: absolute;
+      inset: auto 22px 22px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(255, 122, 26, 0.9), rgba(255, 255, 255, 0));
+      opacity: 0.7;
+    }
+    .briefing-card strong {
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: -0.04em;
+    }
+    .briefing-card p {
+      max-width: 34ch;
+    }
+    .poll-focus-grid {
+      gap: 14px;
+    }
+    .poll-focus-main,
+    .curation-card,
+    .compact-card,
+    .sidebar,
+    .detail {
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    }
+    .poll-focus-main {
+      padding: 26px;
+      background:
+        radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    }
+    .featured-poll {
+      display: grid;
+      gap: 22px;
+      color: #fff;
+    }
+    .featured-poll-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .featured-poll-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(226, 236, 244, 0.76);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .featured-poll-title {
+      margin: 0;
+      max-width: 18ch;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+    .featured-poll-copy {
+      max-width: 48ch;
+      color: rgba(226, 236, 244, 0.76);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .featured-poll-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .featured-metric {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(4, 17, 29, 0.34);
+    }
+    .featured-metric span {
+      display: block;
+      color: rgba(226, 236, 244, 0.58);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .featured-metric strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+    .featured-points {
+      display: grid;
+      gap: 10px;
+    }
+    .featured-point {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      color: rgba(226, 236, 244, 0.82);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .featured-point::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      margin-top: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff7a1a, #60a5fa);
+    }
+    .mini-item,
+    .item {
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+    .mini-item:hover,
+    .item:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .item.selected {
+      border-color: rgba(255, 122, 26, 0.45);
+      background: linear-gradient(180deg, rgba(255, 122, 26, 0.18), rgba(255, 255, 255, 0.03));
+    }
+    .compact-card h3,
+    .section-title {
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(226, 236, 244, 0.72);
+    }
+    .archive-pill {
+      border-color: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .detail-title {
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+    }
+    .detail-bullet {
+      border-radius: 22px;
+      border-color: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .body.compact,
+    .poll-card {
+      border-radius: 24px;
+    }
+    .hero,
+    .briefing-card,
+    .poll-focus-main,
+    .curation-card,
+    .compact-card,
+    .sidebar,
+    .detail {
+      animation: rise-in 520ms ease both;
+    }
+    .briefing-grid .briefing-card:nth-child(2) { animation-delay: 80ms; }
+    .briefing-grid .briefing-card:nth-child(3) { animation-delay: 160ms; }
+    @keyframes rise-in {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @media (max-width: 1180px) {
+      .topbar,
+      .hero,
+      .poll-focus-grid,
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      .hero-copy {
+        min-height: auto;
+      }
+      .hero-strip,
+      .featured-poll-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     @media (max-width: 720px) {
       body { padding-inline: 12px; }
-      h1 { font-size: 28px; }
-      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .poll-overview-grid { grid-template-columns: 1fr; }
+      .topbar {
+        gap: 10px;
+      }
+      .hero {
+        padding: 22px;
+      }
+      h1,
+      .hero-copy h1 {
+        font-size: 42px;
+      }
+      .summary-grid,
+      .poll-overview-grid {
+        grid-template-columns: 1fr;
+      }
+      .briefing-grid,
+      .compact-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
-<body>
+<body class="rf-workspace-page">
   <main>
-    <section class="panel topbar">
+    <section class="topbar">
       <div class="brand">
+        <div class="topbar-meta">Policy Signal Desk</div>
         <strong>개혁신당 정책 허브</strong>
-        <span>정책, 메시지, 법안, 인물, 규정, 여론조사를 한 화면에서 보는 통합 허브</span>
+        <span>정책, 메시지, 법안, 규정, 여론조사를 문서 더미가 아니라 바로 판단 가능한 운영 화면으로 다시 묶었습니다.</span>
       </div>
+      <a class="hero-action" href="#archiveShell">아카이브 바로가기</a>
     </section>
 
     <section class="panel hero">
-      <div>
+      <div class="hero-copy">
+        <div>
         <span class="eyebrow">오늘의 브리핑</span>
-        <h1>오늘 중요한 이슈와 여론 흐름만 빠르게 봅니다.</h1>
-        <p class="muted">정보를 한 화면에 다 펼치지 않고, 지금 먼저 봐야 할 것부터 요약해서 보여줍니다. 자세한 자료는 아래 아카이브에서 이어서 확인하세요.</p>
+          <h1>오늘 중요한 흐름부터 먼저 잡습니다.</h1>
+          <p class="muted">정책과 메시지, 여론조사와 규정을 같은 비중으로 늘어놓지 않고, 지금 바로 판단에 필요한 신호를 앞에 세웁니다. 깊은 자료는 아래 아카이브에서 이어서 확인합니다.</p>
+        </div>
+        <div>
+          <div class="hero-actions">
+            <a class="hero-action primary" id="heroPrimaryLink" href="#archiveShell">최신 여론조사 보기</a>
+            <a class="hero-action" href="#briefingGrid">오늘의 브리핑</a>
+          </div>
+          <div class="hero-strip" id="heroStrip"></div>
+        </div>
       </div>
-      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="hero-visual">
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div class="hero-note">
+          <strong>Operating Note</strong>
+          <div>첫 화면은 브리핑과 핵심 수치에 집중시키고, 세부 원문과 연결 자료는 아래에서 단계적으로 열어보는 구조로 바꿨습니다.</div>
+        </div>
+      </div>
     </section>
 
     <section class="briefing-grid" id="briefingGrid"></section>
@@ -277,25 +703,25 @@
     const number = (value) => Number(value || 0).toLocaleString("ko-KR");
 
     const DOC_TYPE_LABELS = {
-      bill: "법안",
-      statement: "논평",
-      press_release: "보도자료",
-      briefing: "브리핑",
-      pledge: "공약",
-      policy: "정책 문서",
-      party_rule: "규정",
-      poll_result: "여론조사",
-      research: "연구 자료",
-      other: "문서",
+      bill: "??",
+      statement: "??",
+      press_release: "????",
+      briefing: "???",
+      pledge: "??",
+      policy: "?? ??",
+      party_rule: "??",
+      poll_result: "????",
+      research: "?? ??",
+      other: "??",
     };
 
     const STATUS_LABELS = {
-      approved: "확정",
-      review: "검토 중",
-      draft: "초안",
-      active: "공개 중",
-      archived: "보관",
-      superseded: "대체됨",
+      approved: "??",
+      review: "?? ?",
+      draft: "??",
+      active: "?? ?",
+      archived: "??",
+      superseded: "???",
     };
 
     const state = {
@@ -369,8 +795,7 @@
         ['정책', counts.positions],
         ['법안', counts.bills],
         ['메시지', counts.messages || counts.statements],
-        ['인물', counts.people],
-        ['여론조사', state.datasets.polls.length],
+        ['규정', state.datasets.rules.length],
       ];
       document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) => `
         <div class="stat"><div class="label">${safe(label)}</div><strong>${number(value)}</strong></div>
@@ -380,6 +805,21 @@
       const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 2);
       const curatedPolls = (state.datasets.polls || []).slice(0, 3);
       const featuredPoll = curatedPolls[0] || null;
+      const featuredPosition = curatedPositions[0] || null;
+      const featuredMessage = curatedMessages[0] || null;
+      const heroSignals = [
+        { label: '우선 정책', value: featuredPosition?.title || '정책 브리핑 준비 중' },
+        { label: '최근 메시지', value: featuredMessage?.title || '메시지 브리핑 준비 중' },
+        { label: '최신 여론조사', value: featuredPoll?.title || '여론조사 브리핑 준비 중' },
+      ];
+      document.getElementById('heroStrip').innerHTML = heroSignals.map((item) => `
+        <div class="signal-chip">
+          <span>${safe(item.label)}</span>
+          <strong>${safe(item.value)}</strong>
+        </div>
+      `).join('');
+      document.getElementById('heroPrimaryLink').href = featuredPoll ? hubUrl('polls', featuredPoll.id) : '#archiveShell';
+
       const briefings = [
         { kicker:'정책', title: curatedPositions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(curatedPositions[0]) || '지금 먼저 볼 정책을 앞에 놓습니다.', href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#' },
         { kicker:'메시지', title: curatedMessages[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(curatedMessages[0]) || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.', href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#' },
@@ -420,10 +860,30 @@
       document.getElementById('archiveSummary').innerHTML = items.map(([label, value]) => `<span class="archive-pill">${safe(label)} ${number(value)}</span>`).join('');
 
       document.getElementById('featuredPoll').innerHTML = featuredPoll ? `
-        <a href="${hubUrl('polls', featuredPoll.id)}" class="mini-item" style="display:block; background:transparent; border:none; padding:0;">
-          <div class="meta">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div>
-          <strong style="font-size:22px; margin-top:10px; line-height:1.4;">${safe(featuredPoll.title || '')}</strong>
-          <div class="meta">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
+        <a href="${hubUrl('polls', featuredPoll.id)}" class="featured-poll">
+          <div class="featured-poll-head">
+            <span class="featured-poll-label">${safe((featuredPoll.metadata || {}).pollster || '여론조사')}</span>
+            <span class="featured-poll-label">${safe(featuredPoll.published_at || '최신 공표')}</span>
+          </div>
+          <h3 class="featured-poll-title">${safe(featuredPoll.title || '')}</h3>
+          <div class="featured-poll-copy">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
+          <div class="featured-poll-grid">
+            <div class="featured-metric">
+              <span>조사기관</span>
+              <strong>${safe((featuredPoll.metadata || {}).pollster || '미정리')}</strong>
+            </div>
+            <div class="featured-metric">
+              <span>의뢰자</span>
+              <strong>${safe((featuredPoll.metadata || {}).client_name || '미정리')}</strong>
+            </div>
+            <div class="featured-metric">
+              <span>조사기간</span>
+              <strong>${safe((featuredPoll.metadata || {}).survey_period || featuredPoll.published_at || '미정리')}</strong>
+            </div>
+          </div>
+          <div class="featured-points">
+            ${(((featuredPoll.metadata || {}).support_lines || []).slice(0, 3).map((line) => `<div class="featured-point">${safe(line)}</div>`).join('')) || '<div class="featured-point">수치형 하이라이트가 정리되지 않은 항목은 조사 개요와 원문 링크로 바로 이어집니다.</div>'}
+          </div>
         </a>
       ` : '<div class="empty">표시할 여론조사가 없습니다.</div>';
     }
@@ -699,8 +1159,7 @@
 
 
     function asBullets(value, fallback) {
-      const lines = String(value || '').split(/
-+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
+      const lines = String(value || '').split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
       const items = lines.length ? lines : [fallback];
       return items.map(line => `<div class="detail-bullet">${safe(line)}</div>`).join('');
     }
