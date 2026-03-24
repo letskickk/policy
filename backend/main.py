@@ -632,6 +632,15 @@ def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
     return sgg
 
 
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    icon_path = ROOT_DIR / "static" / "favicon.ico"
+    if icon_path.exists():
+        return FileResponse(icon_path)
+    raise HTTPException(status_code=404, detail="favicon not found")
+
 @app.get("/api/signup/regions")
 def api_signup_regions():
     """회원가입·어드민용 시/도 목록. region_map.json 전체를 반환하여 전 시도가 항상 노출되도록 함."""
@@ -2065,6 +2074,18 @@ def _is_public_nomination_status(status_note: Optional[str], applicant_match_id:
     return (status_note or "").strip() == "공천 확정"
 
 
+def _public_candidate_sql_condition() -> str:
+    return """
+        c.approval_status IN ('APPROVED', 'MIXED')
+        AND EXISTS (
+            SELECT 1 FROM candidate_pledges cp
+            WHERE cp.candidate_id = c.id
+              AND cp.approval_status = 'APPROVED'
+        )
+        AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+    """
+
+
 def _leaderboard_reset_monday():
     return datetime(2026, 3, 23).date()
 
@@ -2842,13 +2863,13 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
-                  AND EXISTS (
-                      SELECT 1 FROM candidate_pledges cp
-                      WHERE cp.candidate_id = c.id
-                        AND cp.approval_status = 'APPROVED'
-                  )
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND cp.approval_status = 'APPROVED'
+              )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                   AND c.region_code = ?
-                  AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
                 """,
                 (region_code,),
@@ -2861,12 +2882,12 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
-                  AND EXISTS (
-                      SELECT 1 FROM candidate_pledges cp
-                      WHERE cp.candidate_id = c.id
-                        AND cp.approval_status = 'APPROVED'
-                  )
-                  AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND cp.approval_status = 'APPROVED'
+              )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
                 """
             ).fetchall()
@@ -2897,14 +2918,14 @@ def get_districts(
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
               AND c.approval_status IN ('APPROVED', 'MIXED')
-              AND c.district_name IS NOT NULL
-              AND TRIM(c.district_name) <> ''
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND c.district_name IS NOT NULL
+              AND TRIM(c.district_name) <> ''
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2985,6 +3006,7 @@ def get_candidates(
                   WHERE cp.candidate_id = c.id
                     AND cp.approval_status = 'APPROVED'
               )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -3202,7 +3224,8 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
                    c.id AS candidate_id, c.name AS candidate_name, c.election_type, c.election_level,
                    c.region_code, COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidate_pledges cp
             JOIN candidates c ON c.id = cp.candidate_id
             LEFT JOIN users u ON u.id = c.user_id
@@ -3210,6 +3233,7 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             WHERE cp.id = ?
               AND cp.approval_status = 'APPROVED'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
               AND c.approval_status IN ('APPROVED', 'MIXED')
             LIMIT 1
             """,
@@ -3244,7 +3268,13 @@ def share_pledge_page(pledge_id: int, request: Request):
         raise HTTPException(status_code=404, detail="공유할 공약을 찾을 수 없습니다.")
 
     profile = _fetch_candidate_external_profile(payload["candidate_id"])
-    election_label = ELECTION_LABELS.get(payload["election_type"], payload["election_type"] or "")
+    election_label_map = {
+        "metro_mayor": "광역단체장",
+        "local_mayor": "기초단체장",
+        "regional_council": "광역의원",
+        "local_council": "기초의원",
+    }
+    election_label = election_label_map.get(payload["election_type"], payload["election_type"] or "")
     region_label = (
         f'{payload["region_name"]} {payload["district_name"]}'.strip()
         if payload["district_name"]

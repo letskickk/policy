@@ -477,12 +477,6 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_ssot import get_public_messages_overview
         return get_public_messages_overview(limit=limit)
 
-    @app.get("/api/policy/meetings", tags=["policy"])
-    def api_policy_meetings(q: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
-        ensure_db_ready()
-        from backend.policy_ssot import list_public_meetings
-        return {"items": list_public_meetings(q=q, limit=limit)}
-
     @app.get("/api/policy/rules", tags=["policy"])
     def api_policy_rules(q: Optional[str] = Query(default=None), limit: int = Query(default=60, ge=1, le=200)):
         ensure_db_ready()
