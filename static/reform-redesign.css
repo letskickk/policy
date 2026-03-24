@@ -501,6 +501,24 @@ button:hover,
   transform: translateY(-1px);
 }
 
+button:focus-visible,
+.nav-link:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-upload:focus-visible,
+.btn-approve:focus-visible,
+.btn-reject:focus-visible,
+.btn-save:focus-visible,
+.btn-cancel:focus-visible,
+.hero-action:focus-visible,
+.tab:focus-visible,
+.chip:focus-visible,
+.link:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--rf-accent-alt);
+  outline-offset: 2px;
+}
+
 .btn-secondary,
 .btn-cancel,
 .btn-delete,
