@@ -4732,3 +4732,7 @@ def api_admin_repair_pledge_scores(request: Request):
 from backend.policy_admin_routes import register_policy_routes
 register_policy_routes(app, require_admin, _ensure_db_ready, _serve_html)
 
+
+@app.get("/hub-briefing", include_in_schema=False)
+def hub_briefing_page():
+    return FileResponse(ROOT_DIR / "static" / "hub-briefing.html")

@@ -30,12 +30,12 @@
     }
 
     a { color: inherit; text-decoration: none; }
-    main { max-width: 1320px; margin: 0 auto; display: grid; gap: 16px; }
+    main { max-width: 1480px; margin: 0 auto; display: grid; gap: 16px; }
     .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
     .topbar, .hero, .sidebar, .detail, .curation-card { padding: 18px; }
     .brand strong { display: block; font-size: 20px; color: #fff; }
     .brand span { color: #ffbf93; font-size: 13px; }
-    .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr); gap: 16px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr); gap: 16px; }
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--brand-soft); border: 1px solid rgba(255, 122, 26, 0.24); color: #ffbf93; font-size: 12px; font-weight: 800; padding: 8px 12px; }
     h1 { margin: 14px 0 0; font-size: 34px; line-height: 1.12; color: #fff; }
     p, .muted { color: var(--muted); line-height: 1.7; }
@@ -43,7 +43,7 @@
     .stat { border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); border-radius: 20px; padding: 14px 16px; }
     .stat .label { color: var(--muted); font-size: 12px; }
     .stat strong { display: block; margin-top: 8px; font-size: 28px; color: #fff; }
-    .curation-grid { display: none; }
+    .curation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     .section-title { margin: 0 0 12px; font-size: 17px; color: #fff; }
     .shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
     .sidebar { position: sticky; top: 16px; }
@@ -90,94 +90,6 @@
     .poll-result-bar { width:100%; height:14px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
     .poll-result-bar > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#60a5fa 0%, #a78bfa 100%); }
 
-    
-    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); }
-    .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; letter-spacing:.02em; }
-    .briefing-card strong { display:block; margin-top:8px; color:#fff; line-height:1.45; }
-    .briefing-card p { margin:8px 0 0; font-size:14px; line-height:1.6; }
-    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.3fr) minmax(0,0.7fr); gap:12px; }
-    .poll-focus-main { padding:18px; border-radius:22px; border:1px solid rgba(96,165,250,.22); background:linear-gradient(180deg, rgba(96,165,250,.12), rgba(255,255,255,.04)); }
-    .poll-focus-side { display:grid; gap:12px; }
-    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); }
-    .compact-card h3 { margin:0 0 8px; font-size:16px; color:#fff; }
-    .compact-card .meta { margin-top:6px; }
-    .archive-summary { display:flex; gap:8px; flex-wrap:wrap; }
-    .archive-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.06); font-size:13px; color:var(--muted); }
-    .shell.stage1 { grid-template-columns: 1fr; }
-    .detail-grid .panel.detail:nth-child(2), .detail-grid .panel.detail:nth-child(4) { display:none; }
-    
-    .archive-toggle-wrap { display:flex; justify-content:flex-end; margin-top:10px; }
-    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--muted); border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .archive-collapsed .sidebar,
-    .archive-collapsed .detail-grid { display:none; }
-    .archive-shell { display:grid; gap:16px; }
-    .archive-shell.open .sidebar,
-    .archive-shell.open .detail-grid { display:grid; }
-    .archive-shell:not(.open) .sidebar,
-    .archive-shell:not(.open) .detail-grid { display:none; }
-    .poll-focus-side .panel.curation-card:last-child { display:none; }
-
-
-    .brand span { color:#ffd2b6; }
-    .hero { align-items:stretch; }
-    .summary-grid { align-self:stretch; }
-    .briefing-grid .panel { height:100%; }
-    .briefing-card { display:flex; flex-direction:column; justify-content:space-between; min-height:190px; }
-    .briefing-card strong { font-size:18px; }
-    .briefing-card p { color:var(--muted); }
-    .poll-focus-main { min-height: 100%; }
-    .poll-focus-main .mini-item strong { font-size:24px; line-height:1.35; }
-    .poll-focus-side .mini-item, .compact-card .mini-item { min-height: 116px; display:flex; flex-direction:column; justify-content:center; }
-    .compact-grid { align-items:stretch; }
-    .compact-card { min-height: 220px; }
-    .archive-summary { margin-top:10px; }
-    .archive-pill { color:#d7e4ef; background:rgba(255,255,255,.05); }
-    .ghost-btn { color:#fff; }
-    .ghost-btn:hover { background:rgba(255,255,255,.08); }
-    .section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .section-sub { color:var(--muted); font-size:12px; font-weight:600; }
-    .hero .muted { max-width: 58ch; }
-    .poll-focus-grid .section-title { margin-bottom: 14px; }
-    .mini-item .meta { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .mini-item strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .detail-title { font-size: 26px; }
-    .detail .split { align-items:start; }
-    @media (max-width: 720px) {
-      .briefing-card { min-height:auto; }
-      .compact-card { min-height:auto; }
-      .poll-focus-main .mini-item strong { font-size:20px; }
-      .hero .muted { max-width:none; }
-    }
-
-
-    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); display:flex; flex-direction:column; gap:8px; min-height:180px; }
-    .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; }
-    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,0.85fr); gap:12px; }
-    .poll-focus-side { display:grid; gap:12px; }
-    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); min-height:180px; }
-    .archive-toggle-wrap { display:flex; justify-content:flex-start; margin-top:14px; }
-    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:#fff; border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .archive-shell:not(.open) .sidebar, .archive-shell:not(.open) .detail-grid { display:none; }
-    .archive-shell.open .sidebar, .archive-shell.open .detail-grid { display:grid; }
-    .detail-bullets { display:grid; gap:10px; }
-    .detail-bullet { padding:14px 16px; border-radius:18px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); line-height:1.6; }
-    .detail-section-toggle { margin-top:14px; }
-    .detail-section-toggle summary { cursor:pointer; color:#ffbf93; font-weight:700; }
-    .body.compact { min-height:0; }
-
-    @media (max-width: 1180px) {
-      .briefing-grid, .compact-grid, .poll-focus-grid, .shell.stage1 { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 720px) {
-      .briefing-grid { grid-template-columns: 1fr; }
-      .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .curation-grid { grid-template-columns: 1fr; }
-    }
-
     @media (max-width: 1180px) {
       .curation-grid, .shell, .split, .hero { grid-template-columns: 1fr; }
       .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -205,33 +117,21 @@
 
     <section class="panel hero">
       <div>
-        <span class="eyebrow">오늘의 브리핑</span>
-        <h1>오늘 중요한 이슈와 여론 흐름만 빠르게 봅니다.</h1>
-        <p class="muted">정보를 한 화면에 다 펼치지 않고, 지금 먼저 봐야 할 것부터 요약해서 보여줍니다. 자세한 자료는 아래 아카이브에서 이어서 확인하세요.</p>
+        <span class="eyebrow">Policy SSOT</span>
+        <h1>정책과 메시지뿐 아니라 규정, 여론조사까지 함께 봅니다.</h1>
+        <p class="muted">좌측에서 카테고리를 바꾸면 목록이 즉시 갱신되고, 우측에서 본문과 메타데이터, 연결 정보, 타임라인을 바로 확인할 수 있습니다.</p>
       </div>
       <div class="summary-grid" id="summaryGrid"></div>
     </section>
 
-    <section class="briefing-grid" id="briefingGrid"></section>
-
-    <section class="poll-focus-grid">
-      <div class="panel poll-focus-main">
-        <h2 class="section-title">최신 여론조사 <span class="section-sub">핵심 수치부터 먼저</span></h2>
-        <div id="featuredPoll"></div>
-      </div>
-      <div class="poll-focus-side">
-        <div class="panel curation-card"><h2 class="section-title">지금 봐야 할 정책</h2><div class="mini-list" id="curatedPositions"></div></div>
-        <div class="panel curation-card"><h2 class="section-title">최근 메시지</h2><div class="mini-list" id="curatedMessages"></div></div>
-      </div>
+    <section class="curation-grid">
+      <div class="panel curation-card"><h2 class="section-title">지금 봐야 할 정책</h2><div class="mini-list" id="curatedPositions"></div></div>
+      <div class="panel curation-card"><h2 class="section-title">최근 메시지</h2><div class="mini-list" id="curatedMessages"></div></div>
+      <div class="panel curation-card"><h2 class="section-title">최근 규정</h2><div class="mini-list" id="curatedRules"></div></div>
+      <div class="panel curation-card"><h2 class="section-title">최근 여론조사</h2><div class="mini-list" id="curatedPolls"></div></div>
     </section>
 
-    <section class="compact-grid">
-      <div class="panel compact-card"><h3>자료실 요약</h3><div class="archive-summary" id="archiveSummary"></div><div class="archive-toggle-wrap"><button id="archiveToggle" class="ghost-btn" type="button">자료실 펼치기</button></div></div>
-      <div class="panel compact-card"><h3>최신 여론조사 더보기</h3><div class="mini-list" id="curatedPolls"></div></div>
-      <div class="panel compact-card"><h3>오늘 메모</h3><div class="muted">첫 화면은 브리핑 중심으로 줄이고, 세부 자료는 필요할 때만 펼쳐서 보도록 바꿨습니다.</div></div>
-    </section>
-
-    <section class="shell stage1 archive-shell" id="archiveShell">
+    <section class="shell">
       <aside class="panel sidebar">
         <div class="tabs" id="tabs">
           <button class="tab active" data-tab="positions">정책</button>
@@ -247,28 +147,29 @@
 
       <section class="detail-grid">
         <div class="panel detail">
-          <span class="eyebrow" id="detailType">브리핑</span>
-          <div class="detail-title" id="detailTitle">좌측 자료실에서 항목을 선택해 주세요.</div>
-          <p class="muted" id="detailSummary">선택한 항목의 왜 중요한지와 핵심 포인트를 먼저 보여줍니다.</p>
-          <div class="detail-bullets" id="detailBulletList" style="margin-top:14px;"></div>
+          <div class="split">
+            <div class="box">
+              <span class="eyebrow" id="detailType">허브</span>
+              <div class="detail-title" id="detailTitle">좌측 목록에서 항목을 선택해 주세요.</div>
+              <p class="muted" id="detailSummary">선택한 문서의 핵심 요약과 맥락을 이 영역에서 바로 확인할 수 있습니다.</p>
+            </div>
+            <div class="box"><h3>메타데이터</h3><div class="links" id="detailMeta"></div></div>
+            <div class="box"><h3>상태</h3><div id="detailStageLabel" style="font-weight: 800; color: #fff;">-</div><div id="detailStageDesc" class="muted" style="margin-top: 6px;">-</div></div>
+          </div>
         </div>
+
         <div class="panel detail">
-          <h2 class="section-title">왜 지금 중요한가</h2>
-          <div id="detailRelevance" class="muted">선택한 항목의 현재적 의미가 여기에 표시됩니다.</div>
-          <div style="margin-top:14px; font-weight:800; color:#fff;" id="detailStageLabel">-</div>
-          <div id="detailStageDesc" class="muted" style="margin-top: 6px;">-</div>
-          <div class="links" id="detailMeta" style="margin-top:14px;"></div>
+          <div class="split">
+            <div class="box"><h3>핵심 요약</h3><div id="detailBrief" class="muted">선택한 항목의 핵심 요약이 여기에 표시됩니다.</div></div>
+            <div class="box"><h3>주요 포인트</h3><div id="detailKeyPoints" class="muted">선택한 항목의 주요 포인트가 여기에 표시됩니다.</div></div>
+            <div class="box"><h3>왜 중요한가</h3><div id="detailRelevance" class="muted">선택한 항목의 현재적 의미가 여기에 표시됩니다.</div></div>
+          </div>
         </div>
-        <div class="panel detail">
-          <h2 class="section-title">브리핑 본문</h2>
-          <div class="body compact" id="detailBody">본문이 여기에 표시됩니다.</div>
-          <details class="detail-section-toggle">
-            <summary>연결 정보와 타임라인 보기</summary>
-            <h2 class="section-title" style="margin-top:14px;">연결 정보</h2><div class="chips" id="detailLinks"></div>
-            <h2 class="section-title" style="margin-top:16px;">타임라인</h2><div class="timeline" id="detailTimeline"></div>
-          </details>
-        </div>
-      </section>      </section>
+
+        <div class="panel detail"><h2 class="section-title">본문</h2><div class="body" id="detailBody">본문이 여기에 표시됩니다.</div></div>
+        <div class="panel detail"><h2 class="section-title">연결 정보</h2><div class="chips" id="detailLinks"></div></div>
+        <div class="panel detail"><h2 class="section-title">타임라인</h2><div class="timeline" id="detailTimeline"></div></div>
+      </section>
     </section>
   </main>
 
@@ -351,81 +252,62 @@
       });
     }
 
-    function summarizeText(value, fallback = '') {
-      const txt = String(value || '').replace(/\s+/g, ' ').trim();
-      if (!txt) return fallback;
-      return txt.length > 110 ? txt.slice(0, 110).trim() + '…' : txt;
-    }
-
-    function firstMeaningfulText(item) {
-      return summarizeText(item?.official_summary || item?.summary || item?.brief?.summary || item?.relevance_note || item?.body || '', '');
-    }
-
     function renderSummary(data) {
       const overview = data.overview || {};
       const messages = data.messages || {};
       const counts = overview.counts || {};
       const items = [
-        ['정책', counts.positions],
-        ['법안', counts.bills],
-        ['메시지', counts.messages || counts.statements],
-        ['인물', counts.people],
-        ['여론조사', state.datasets.polls.length],
+        ["Policies", counts.positions],
+        ["Bills", counts.bills],
+        ["Messages", counts.messages || counts.statements],
+        ["People", counts.people],
+        ["Rules", state.datasets.rules.length || counts.rules],
+        ["Polls", state.datasets.polls.length],
       ];
-      document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) => `
-        <div class="stat"><div class="label">${safe(label)}</div><strong>${number(value)}</strong></div>
-      `).join('');
 
-      const curatedPositions = (overview.curated_positions || []).slice(0, 2);
-      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 2);
-      const curatedPolls = (state.datasets.polls || []).slice(0, 3);
-      const featuredPoll = curatedPolls[0] || null;
-      const briefings = [
-        { kicker:'정책', title: curatedPositions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(curatedPositions[0]) || '지금 먼저 볼 정책을 앞에 놓습니다.', href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#' },
-        { kicker:'메시지', title: curatedMessages[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(curatedMessages[0]) || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.', href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#' },
-        { kicker:'여론조사', title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 빠르게 요약합니다.', href: featuredPoll ? hubUrl('polls', featuredPoll.id) : '#' },
-      ];
-      document.getElementById('briefingGrid').innerHTML = briefings.map(item => `
-        <a class="panel briefing-card" href="${item.href}">
-          <div class="kicker">${safe(item.kicker)}</div>
+      document.getElementById("summaryGrid").innerHTML = items.map(([label, value]) => `
+        <div class="stat">
+          <div class="label">${safe(label)}</div>
+          <strong>${number(value)}</strong>
+        </div>
+      `).join("");
+
+      const curatedPositions = (overview.curated_positions || []).slice(0, 4);
+      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 4);
+      const curatedRules = (state.datasets.rules || []).slice(0, 4);
+      const curatedPolls = (state.datasets.polls || []).slice(0, 4);
+
+      document.getElementById("curatedPositions").innerHTML = curatedPositions.map((item) => `
+        <a class="mini-item" href="${hubUrl("positions", item.slug)}">
+          <div class="meta">${safe(item.category || "정책")}</div>
           <strong>${safe(item.title)}</strong>
-          <p class="muted">${safe(item.summary)}</p>
+          <div class="meta">${safe(item.official_summary || item.brief?.summary || item.summary || "")}</div>
         </a>
-      `).join('');
+      `).join("") || '<div class="empty">표시할 정책이 없습니다.</div>';
 
-      document.getElementById('curatedPositions').innerHTML = curatedPositions.map(item => `
-        <a class="mini-item" href="${hubUrl('positions', item.slug)}">
-          <div class="meta">${safe(item.category || '정책')}</div>
+      document.getElementById("curatedMessages").innerHTML = curatedMessages.map((item) => `
+        <a class="mini-item" href="${hubUrl("messages", item.id)}">
+          <div class="meta">${safe(docTypeLabel(item.doc_type || "statement"))}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
+          <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker, (item.participants || []).slice(0, 2).join(", ")].filter(Boolean).join(" · "))}</div>
         </a>
-      `).join('') || '<div class="empty">표시할 정책이 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 메시지가 없습니다.</div>';
 
-      document.getElementById('curatedMessages').innerHTML = curatedMessages.map(item => `
-        <a class="mini-item" href="${hubUrl('messages', item.id)}">
-          <div class="meta">${safe(docTypeLabel(item.doc_type || 'statement'))}</div>
+      document.getElementById("curatedRules").innerHTML = curatedRules.map((item) => `
+        <a class="mini-item" href="${hubUrl("rules", item.id)}">
+          <div class="meta">${safe((item.metadata || {}).rule_kind_label || "규정")}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item) || [item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(' · '))}</div>
+          <div class="meta">${safe([(item.metadata || {}).version_label, (item.metadata || {}).effective_from || item.published_at].filter(Boolean).join(" · "))}</div>
         </a>
-      `).join('') || '<div class="empty">표시할 메시지가 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 규정이 없습니다.</div>';
 
-      document.getElementById('curatedPolls').innerHTML = curatedPolls.slice(1).map(item => `
-        <a class="mini-item" href="${hubUrl('polls', item.id)}">
-          <div class="meta">${safe((item.metadata || {}).pollster || '여론조사')}</div>
+      document.getElementById("curatedPolls").innerHTML = curatedPolls.map((item) => `
+        <a class="mini-item" href="${hubUrl("polls", item.id)}">
+          <div class="meta">${safe((item.metadata || {}).pollster || "여론조사")}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
+          <div class="meta">${safe([item.published_at, (item.metadata || {}).client_name, (item.metadata || {}).election_label].filter(Boolean).join(" · "))}</div>
         </a>
-      `).join('') || '<div class="empty">추가 여론조사가 없습니다.</div>';
-
-      document.getElementById('archiveSummary').innerHTML = items.map(([label, value]) => `<span class="archive-pill">${safe(label)} ${number(value)}</span>`).join('');
-
-      document.getElementById('featuredPoll').innerHTML = featuredPoll ? `
-        <a href="${hubUrl('polls', featuredPoll.id)}" class="mini-item" style="display:block; background:transparent; border:none; padding:0;">
-          <div class="meta">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div>
-          <strong style="font-size:22px; margin-top:10px; line-height:1.4;">${safe(featuredPoll.title || '')}</strong>
-          <div class="meta">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
-        </a>
-      ` : '<div class="empty">표시할 여론조사가 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 여론조사가 없습니다.</div>';
     }
 
     function currentItems() {
@@ -697,26 +579,17 @@
       `;
     }
 
-
-    function asBullets(value, fallback) {
-      const lines = String(value || '').split(/
-+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
-      const items = lines.length ? lines : [fallback];
-      return items.map(line => `<div class="detail-bullet">${safe(line)}</div>`).join('');
-    }
-
     function renderEmptyDetail() {
       document.getElementById("detailBody").classList.remove("poll-layout");
       document.getElementById("detailType").textContent = "허브";
       document.getElementById("detailTitle").textContent = "좌측 목록에서 항목을 선택해 주세요.";
-      document.getElementById("detailSummary").textContent = "선택한 항목의 핵심 브리핑이 여기에 표시됩니다.";
+      document.getElementById("detailSummary").textContent = "선택한 문서의 요약과 맥락이 여기에 표시됩니다.";
       document.getElementById("detailBrief").textContent = "선택한 항목의 핵심 요약이 여기에 표시됩니다.";
       document.getElementById("detailKeyPoints").textContent = "선택한 항목의 주요 포인트가 여기에 표시됩니다.";
       document.getElementById("detailRelevance").textContent = "선택한 항목의 중요성이 여기에 표시됩니다.";
       document.getElementById("detailStageLabel").textContent = "-";
       document.getElementById("detailStageDesc").textContent = "-";
-      document.getElementById("detailBody").textContent = "브리핑 본문이 여기에 표시됩니다.";
-      document.getElementById("detailBulletList").innerHTML = '<div class="detail-bullet">선택한 항목의 핵심 포인트가 여기에 표시됩니다.</div>';
+      document.getElementById("detailBody").textContent = "본문이 여기에 표시됩니다.";
       document.getElementById("detailMeta").innerHTML = "";
       document.getElementById("detailLinks").innerHTML = '<div class="empty">연결 정보가 없습니다.</div>';
       renderTimeline([]);
@@ -728,7 +601,8 @@
       const bodyEl = document.getElementById("detailBody");
       const metaEl = document.getElementById("detailMeta");
       const linksEl = document.getElementById("detailLinks");
-      const bulletListEl = document.getElementById("detailBulletList");
+      const briefEl = document.getElementById("detailBrief");
+      const keyPointsEl = document.getElementById("detailKeyPoints");
       const stageLabelEl = document.getElementById("detailStageLabel");
       const stageDescEl = document.getElementById("detailStageDesc");
       const relevanceEl = document.getElementById("detailRelevance");
@@ -743,7 +617,8 @@
         typeEl.textContent = "정책";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || "공식 정책 문서입니다.";
-        bulletListEl.innerHTML = asBullets(data.key_points || data.official_summary || data.summary, "핵심 포인트가 아직 정리되지 않았습니다.");
+        briefEl.textContent = data.official_summary || data.brief?.summary || data.summary || "요약이 없습니다.";
+        keyPointsEl.textContent = data.key_points || "핵심 포인트가 아직 정리되지 않았습니다.";
         relevanceEl.textContent = data.relevance_note || "정책 문서와 연결된 공개 메시지, 법안, 회의 맥락을 함께 볼 수 있습니다.";
         stageLabelEl.textContent = data.execution_stage?.label || "정책 정리";
         stageDescEl.textContent = data.execution_stage?.description || "공식 문서와 연결 자료를 바탕으로 정책 상태를 추적합니다.";
@@ -759,7 +634,8 @@
         typeEl.textContent = "메시지";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${docTypeLabel(data.doc_type || "statement")} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "메시지 핵심 포인트가 없습니다.");
+        briefEl.textContent = data.summary || `${data.speaker_name || data.speaker || "공식 채널"}의 메시지입니다.`;
+        keyPointsEl.textContent = data.derived_key_points || "메시지 핵심 포인트가 없습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "정책과의 연결성을 함께 검토할 수 있습니다.";
         stageLabelEl.textContent = (data.linked_positions || []).length ? "정책 연결 확인" : "공개 메시지";
         stageDescEl.textContent = data.source_url ? "원문 링크와 함께 확인할 수 있습니다." : "본문 중심으로 정리된 메시지입니다.";
@@ -776,7 +652,8 @@
         typeEl.textContent = "규정";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${(data.metadata || {}).rule_kind_label || "규정"} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || ((data.metadata || {}).key_articles || []).join("\n") || data.summary, "핵심 조항 정보가 없습니다.");
+        briefEl.textContent = data.summary || "핵심 조항과 개정 이력을 확인할 수 있습니다.";
+        keyPointsEl.textContent = data.derived_key_points || ((data.metadata || {}).key_articles || []).join("\n") || "핵심 조항 정보가 없습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "당 운영 기준과 의사결정 절차를 담고 있는 문서입니다.";
         stageLabelEl.textContent = (data.metadata || {}).version_label || "규정 본문";
         stageDescEl.textContent = (data.metadata || {}).effective_from ? `${(data.metadata || {}).effective_from} 시행` : "개정 이력과 본문을 함께 검토합니다.";
@@ -793,7 +670,8 @@
         typeEl.textContent = "여론조사";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${(data.metadata || {}).pollster || "조사기관"} 자료입니다.`;
-        bulletListEl.innerHTML = asBullets(((data.metadata || {}).support_lines || []).join("\n") || data.summary, "핵심 수치를 먼저 요약해 보여줍니다.");
+        briefEl.textContent = "원문 텍스트보다 조사기관, 표본 수, 응답률 같은 핵심 정보를 먼저 보이도록 정리했습니다.";
+        keyPointsEl.textContent = ((data.metadata || {}).support_lines || []).join("\n") || "개혁신당 관련 수치는 아직 본문 구조화가 덜 되어 있어 조사 개요를 우선 배치했습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "개혁신당 또는 관련 후보가 포함된 여론조사 공표 자료입니다.";
         stageLabelEl.textContent = (data.metadata || {}).election_label || "공표 자료";
         stageDescEl.textContent = (data.metadata || {}).survey_period ? `조사기간 ${(data.metadata || {}).survey_period}` : "시각화 요약 → 정리된 본문 → 원문 링크 순서로 재배치했습니다.";
@@ -811,7 +689,8 @@
       typeEl.textContent = "법안";
       titleEl.textContent = data.title || "";
       summaryEl.textContent = [data.summary || "", metadata.committee ? `소관 상임위 ${metadata.committee}` : "", billProgress?.raw ? `진행상태 ${billProgress.raw}` : ""].filter(Boolean).join(" · ") || "국회 법안입니다.";
-      bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "법안 핵심 포인트가 없습니다.");
+      briefEl.textContent = data.summary || `${metadata.representative_member_name || "개혁신당 의원"} 대표발의 법안입니다.`;
+      keyPointsEl.textContent = data.derived_key_points || "법안 핵심 포인트가 없습니다.";
       relevanceEl.textContent = data.derived_relevance_note || "법안 요약과 진행 상황을 함께 확인합니다.";
       stageLabelEl.textContent = billProgress?.label || "법안 발의";
       stageDescEl.textContent = billProgress?.description || "소관 상임위와 현재 단계 정보를 함께 확인할 수 있습니다.";
@@ -859,15 +738,6 @@
     document.getElementById("searchInput").addEventListener("input", (event) => {
       state.search = event.target.value || "";
       renderList();
-    });
-
-
-    document.addEventListener('click', (event) => {
-      const btn = event.target.closest('#archiveToggle');
-      if (!btn) return;
-      const shell = document.getElementById('archiveShell');
-      shell.classList.toggle('open');
-      btn.textContent = shell.classList.contains('open') ? '자료실 접기' : '자료실 펼치기';
     });
 
     init().catch((error) => {

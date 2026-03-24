@@ -151,24 +151,6 @@
       .hero .muted { max-width:none; }
     }
 
-
-    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); display:flex; flex-direction:column; gap:8px; min-height:180px; }
-    .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; }
-    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,0.85fr); gap:12px; }
-    .poll-focus-side { display:grid; gap:12px; }
-    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); min-height:180px; }
-    .archive-toggle-wrap { display:flex; justify-content:flex-start; margin-top:14px; }
-    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:#fff; border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .archive-shell:not(.open) .sidebar, .archive-shell:not(.open) .detail-grid { display:none; }
-    .archive-shell.open .sidebar, .archive-shell.open .detail-grid { display:grid; }
-    .detail-bullets { display:grid; gap:10px; }
-    .detail-bullet { padding:14px 16px; border-radius:18px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); line-height:1.6; }
-    .detail-section-toggle { margin-top:14px; }
-    .detail-section-toggle summary { cursor:pointer; color:#ffbf93; font-weight:700; }
-    .body.compact { min-height:0; }
-
     @media (max-width: 1180px) {
       .briefing-grid, .compact-grid, .poll-focus-grid, .shell.stage1 { grid-template-columns: 1fr; }
     }
@@ -247,28 +229,23 @@
 
       <section class="detail-grid">
         <div class="panel detail">
-          <span class="eyebrow" id="detailType">브리핑</span>
-          <div class="detail-title" id="detailTitle">좌측 자료실에서 항목을 선택해 주세요.</div>
-          <p class="muted" id="detailSummary">선택한 항목의 왜 중요한지와 핵심 포인트를 먼저 보여줍니다.</p>
-          <div class="detail-bullets" id="detailBulletList" style="margin-top:14px;"></div>
+          <div class="split">
+            <div class="box">
+              <span class="eyebrow" id="detailType">허브</span>
+              <div class="detail-title" id="detailTitle">좌측 목록에서 항목을 선택해 주세요.</div>
+              <p class="muted" id="detailSummary">선택한 문서의 핵심 요약과 맥락을 이 영역에서 바로 확인할 수 있습니다.</p>
+            </div>
+            <div class="box"><h3>메타데이터</h3><div class="links" id="detailMeta"></div></div>
+            <div class="box"><h3>상태</h3><div id="detailStageLabel" style="font-weight: 800; color: #fff;">-</div><div id="detailStageDesc" class="muted" style="margin-top: 6px;">-</div></div>
+          </div>
         </div>
-        <div class="panel detail">
-          <h2 class="section-title">왜 지금 중요한가</h2>
-          <div id="detailRelevance" class="muted">선택한 항목의 현재적 의미가 여기에 표시됩니다.</div>
-          <div style="margin-top:14px; font-weight:800; color:#fff;" id="detailStageLabel">-</div>
-          <div id="detailStageDesc" class="muted" style="margin-top: 6px;">-</div>
-          <div class="links" id="detailMeta" style="margin-top:14px;"></div>
-        </div>
-        <div class="panel detail">
-          <h2 class="section-title">브리핑 본문</h2>
-          <div class="body compact" id="detailBody">본문이 여기에 표시됩니다.</div>
-          <details class="detail-section-toggle">
-            <summary>연결 정보와 타임라인 보기</summary>
-            <h2 class="section-title" style="margin-top:14px;">연결 정보</h2><div class="chips" id="detailLinks"></div>
-            <h2 class="section-title" style="margin-top:16px;">타임라인</h2><div class="timeline" id="detailTimeline"></div>
-          </details>
-        </div>
-      </section>      </section>
+
+        
+
+        <div class="panel detail"><h2 class="section-title">본문</h2><div class="body" id="detailBody">본문이 여기에 표시됩니다.</div></div>
+        <div class="panel detail"><h2 class="section-title">연결 정보</h2><div class="chips" id="detailLinks"></div></div>
+        <div class="panel detail"><h2 class="section-title">타임라인</h2><div class="timeline" id="detailTimeline"></div></div>
+      </section>
     </section>
   </main>
 
@@ -351,79 +328,100 @@
       });
     }
 
-    function summarizeText(value, fallback = '') {
-      const txt = String(value || '').replace(/\s+/g, ' ').trim();
-      if (!txt) return fallback;
-      return txt.length > 110 ? txt.slice(0, 110).trim() + '…' : txt;
-    }
-
-    function firstMeaningfulText(item) {
-      return summarizeText(item?.official_summary || item?.summary || item?.brief?.summary || item?.relevance_note || item?.body || '', '');
-    }
-
     function renderSummary(data) {
       const overview = data.overview || {};
       const messages = data.messages || {};
       const counts = overview.counts || {};
       const items = [
-        ['정책', counts.positions],
-        ['법안', counts.bills],
-        ['메시지', counts.messages || counts.statements],
-        ['인물', counts.people],
-        ['여론조사', state.datasets.polls.length],
+        ["정책", counts.positions],
+        ["법안", counts.bills],
+        ["메시지", counts.messages || counts.statements],
+        ["인물", counts.people],
+        ["규정", state.datasets.rules.length || counts.rules],
+        ["여론조사", state.datasets.polls.length],
       ];
-      document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) => `
-        <div class="stat"><div class="label">${safe(label)}</div><strong>${number(value)}</strong></div>
-      `).join('');
 
-      const curatedPositions = (overview.curated_positions || []).slice(0, 2);
-      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 2);
+      document.getElementById("summaryGrid").innerHTML = items.map(([label, value]) => `
+        <div class="stat">
+          <div class="label">${safe(label)}</div>
+          <strong>${number(value)}</strong>
+        </div>
+      `).join("");
+
+      const curatedPositions = (overview.curated_positions || []).slice(0, 3);
+      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 3);
+      const curatedRules = (state.datasets.rules || []).slice(0, 3);
       const curatedPolls = (state.datasets.polls || []).slice(0, 3);
-      const featuredPoll = curatedPolls[0] || null;
+      const featuredPoll = (state.datasets.polls || [])[0] || null;
+      const secondPoll = (state.datasets.polls || [])[1] || null;
       const briefings = [
-        { kicker:'정책', title: curatedPositions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(curatedPositions[0]) || '지금 먼저 볼 정책을 앞에 놓습니다.', href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#' },
-        { kicker:'메시지', title: curatedMessages[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(curatedMessages[0]) || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.', href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#' },
-        { kicker:'여론조사', title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 빠르게 요약합니다.', href: featuredPoll ? hubUrl('polls', featuredPoll.id) : '#' },
+        {
+          kicker: '이슈',
+          title: curatedPositions[0]?.title || '핵심 정책 브리핑을 준비 중입니다.',
+          summary: curatedPositions[0]?.official_summary || curatedPositions[0]?.summary || '가장 먼저 봐야 할 정책을 상단에 배치했습니다.',
+          href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#'
+        },
+        {
+          kicker: '메시지',
+          title: curatedMessages[0]?.title || '최근 메시지를 정리 중입니다.',
+          summary: curatedMessages[0]?.summary || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.',
+          href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#'
+        },
+        {
+          kicker: '여론조사',
+          title: featuredPoll?.title || '최신 여론조사를 준비 중입니다.',
+          summary: featuredPoll?.summary || '여론조사 핵심 수치와 흐름을 먼저 확인할 수 있게 재배치했습니다.',
+          href: featuredPoll ? hubUrl('polls', featuredPoll.id) : '#'
+        }
       ];
       document.getElementById('briefingGrid').innerHTML = briefings.map(item => `
         <a class="panel briefing-card" href="${item.href}">
           <div class="kicker">${safe(item.kicker)}</div>
           <strong>${safe(item.title)}</strong>
-          <p class="muted">${safe(item.summary)}</p>
+          <p>${safe(item.summary)}</p>
         </a>
       `).join('');
 
-      document.getElementById('curatedPositions').innerHTML = curatedPositions.map(item => `
-        <a class="mini-item" href="${hubUrl('positions', item.slug)}">
-          <div class="meta">${safe(item.category || '정책')}</div>
+      document.getElementById("curatedPositions").innerHTML = curatedPositions.map((item) => `
+        <a class="mini-item" href="${hubUrl("positions", item.slug)}">
+          <div class="meta">${safe(item.category || "정책")}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
+          <div class="meta">${safe(item.official_summary || item.brief?.summary || item.summary || "")}</div>
         </a>
-      `).join('') || '<div class="empty">표시할 정책이 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 정책이 없습니다.</div>';
 
-      document.getElementById('curatedMessages').innerHTML = curatedMessages.map(item => `
-        <a class="mini-item" href="${hubUrl('messages', item.id)}">
-          <div class="meta">${safe(docTypeLabel(item.doc_type || 'statement'))}</div>
+      document.getElementById("curatedMessages").innerHTML = curatedMessages.map((item) => `
+        <a class="mini-item" href="${hubUrl("messages", item.id)}">
+          <div class="meta">${safe(docTypeLabel(item.doc_type || "statement"))}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item) || [item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(' · '))}</div>
+          <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(" · "))}</div>
         </a>
-      `).join('') || '<div class="empty">표시할 메시지가 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 메시지가 없습니다.</div>';
 
-      document.getElementById('curatedPolls').innerHTML = curatedPolls.slice(1).map(item => `
-        <a class="mini-item" href="${hubUrl('polls', item.id)}">
-          <div class="meta">${safe((item.metadata || {}).pollster || '여론조사')}</div>
+      document.getElementById("curatedRules").innerHTML = curatedRules.map((item) => `
+        <a class="mini-item" href="${hubUrl("rules", item.id)}">
+          <div class="meta">${safe((item.metadata || {}).rule_kind_label || "규정")}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
+          <div class="meta">${safe([(item.metadata || {}).version_label, (item.metadata || {}).effective_from || item.published_at].filter(Boolean).join(" · "))}</div>
         </a>
-      `).join('') || '<div class="empty">추가 여론조사가 없습니다.</div>';
+      `).join("") || '<div class="empty">표시할 규정이 없습니다.</div>';
+
+      document.getElementById("curatedPolls").innerHTML = curatedPolls.map((item) => `
+        <a class="mini-item" href="${hubUrl("polls", item.id)}">
+          <div class="meta">${safe((item.metadata || {}).pollster || "여론조사")}</div>
+          <strong>${safe(item.title)}</strong>
+          <div class="meta">${safe([item.published_at, (item.metadata || {}).client_name].filter(Boolean).join(" · "))}</div>
+        </a>
+      `).join("") || '<div class="empty">표시할 여론조사가 없습니다.</div>';
 
       document.getElementById('archiveSummary').innerHTML = items.map(([label, value]) => `<span class="archive-pill">${safe(label)} ${number(value)}</span>`).join('');
 
       document.getElementById('featuredPoll').innerHTML = featuredPoll ? `
         <a href="${hubUrl('polls', featuredPoll.id)}" class="mini-item" style="display:block; background:transparent; border:none; padding:0;">
           <div class="meta">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div>
-          <strong style="font-size:22px; margin-top:10px; line-height:1.4;">${safe(featuredPoll.title || '')}</strong>
-          <div class="meta">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
+          <strong style="font-size:20px; margin-top:10px;">${safe(featuredPoll.title || '')}</strong>
+          <div class="meta">${safe(featuredPoll.summary || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
+          ${secondPoll ? `<div class="meta" style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.08);">다음 조사 · ${safe(secondPoll.title || '')}</div>` : ''}
         </a>
       ` : '<div class="empty">표시할 여론조사가 없습니다.</div>';
     }
@@ -697,26 +695,17 @@
       `;
     }
 
-
-    function asBullets(value, fallback) {
-      const lines = String(value || '').split(/
-+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
-      const items = lines.length ? lines : [fallback];
-      return items.map(line => `<div class="detail-bullet">${safe(line)}</div>`).join('');
-    }
-
     function renderEmptyDetail() {
       document.getElementById("detailBody").classList.remove("poll-layout");
       document.getElementById("detailType").textContent = "허브";
       document.getElementById("detailTitle").textContent = "좌측 목록에서 항목을 선택해 주세요.";
-      document.getElementById("detailSummary").textContent = "선택한 항목의 핵심 브리핑이 여기에 표시됩니다.";
+      document.getElementById("detailSummary").textContent = "선택한 문서의 요약과 맥락이 여기에 표시됩니다.";
       document.getElementById("detailBrief").textContent = "선택한 항목의 핵심 요약이 여기에 표시됩니다.";
       document.getElementById("detailKeyPoints").textContent = "선택한 항목의 주요 포인트가 여기에 표시됩니다.";
       document.getElementById("detailRelevance").textContent = "선택한 항목의 중요성이 여기에 표시됩니다.";
       document.getElementById("detailStageLabel").textContent = "-";
       document.getElementById("detailStageDesc").textContent = "-";
-      document.getElementById("detailBody").textContent = "브리핑 본문이 여기에 표시됩니다.";
-      document.getElementById("detailBulletList").innerHTML = '<div class="detail-bullet">선택한 항목의 핵심 포인트가 여기에 표시됩니다.</div>';
+      document.getElementById("detailBody").textContent = "본문이 여기에 표시됩니다.";
       document.getElementById("detailMeta").innerHTML = "";
       document.getElementById("detailLinks").innerHTML = '<div class="empty">연결 정보가 없습니다.</div>';
       renderTimeline([]);
@@ -728,7 +717,8 @@
       const bodyEl = document.getElementById("detailBody");
       const metaEl = document.getElementById("detailMeta");
       const linksEl = document.getElementById("detailLinks");
-      const bulletListEl = document.getElementById("detailBulletList");
+      const briefEl = document.getElementById("detailBrief");
+      const keyPointsEl = document.getElementById("detailKeyPoints");
       const stageLabelEl = document.getElementById("detailStageLabel");
       const stageDescEl = document.getElementById("detailStageDesc");
       const relevanceEl = document.getElementById("detailRelevance");
@@ -743,7 +733,8 @@
         typeEl.textContent = "정책";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || "공식 정책 문서입니다.";
-        bulletListEl.innerHTML = asBullets(data.key_points || data.official_summary || data.summary, "핵심 포인트가 아직 정리되지 않았습니다.");
+        briefEl.textContent = data.official_summary || data.brief?.summary || data.summary || "요약이 없습니다.";
+        keyPointsEl.textContent = data.key_points || "핵심 포인트가 아직 정리되지 않았습니다.";
         relevanceEl.textContent = data.relevance_note || "정책 문서와 연결된 공개 메시지, 법안, 회의 맥락을 함께 볼 수 있습니다.";
         stageLabelEl.textContent = data.execution_stage?.label || "정책 정리";
         stageDescEl.textContent = data.execution_stage?.description || "공식 문서와 연결 자료를 바탕으로 정책 상태를 추적합니다.";
@@ -759,7 +750,8 @@
         typeEl.textContent = "메시지";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${docTypeLabel(data.doc_type || "statement")} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "메시지 핵심 포인트가 없습니다.");
+        briefEl.textContent = data.summary || `${data.speaker_name || data.speaker || "공식 채널"}의 메시지입니다.`;
+        keyPointsEl.textContent = data.derived_key_points || "메시지 핵심 포인트가 없습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "정책과의 연결성을 함께 검토할 수 있습니다.";
         stageLabelEl.textContent = (data.linked_positions || []).length ? "정책 연결 확인" : "공개 메시지";
         stageDescEl.textContent = data.source_url ? "원문 링크와 함께 확인할 수 있습니다." : "본문 중심으로 정리된 메시지입니다.";
@@ -776,7 +768,8 @@
         typeEl.textContent = "규정";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${(data.metadata || {}).rule_kind_label || "규정"} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || ((data.metadata || {}).key_articles || []).join("\n") || data.summary, "핵심 조항 정보가 없습니다.");
+        briefEl.textContent = data.summary || "핵심 조항과 개정 이력을 확인할 수 있습니다.";
+        keyPointsEl.textContent = data.derived_key_points || ((data.metadata || {}).key_articles || []).join("\n") || "핵심 조항 정보가 없습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "당 운영 기준과 의사결정 절차를 담고 있는 문서입니다.";
         stageLabelEl.textContent = (data.metadata || {}).version_label || "규정 본문";
         stageDescEl.textContent = (data.metadata || {}).effective_from ? `${(data.metadata || {}).effective_from} 시행` : "개정 이력과 본문을 함께 검토합니다.";
@@ -793,7 +786,8 @@
         typeEl.textContent = "여론조사";
         titleEl.textContent = data.title || "";
         summaryEl.textContent = data.summary || `${(data.metadata || {}).pollster || "조사기관"} 자료입니다.`;
-        bulletListEl.innerHTML = asBullets(((data.metadata || {}).support_lines || []).join("\n") || data.summary, "핵심 수치를 먼저 요약해 보여줍니다.");
+        briefEl.textContent = "원문 텍스트보다 조사기관, 표본 수, 응답률 같은 핵심 정보를 먼저 보이도록 정리했습니다.";
+        keyPointsEl.textContent = ((data.metadata || {}).support_lines || []).join("\n") || "개혁신당 관련 수치는 아직 본문 구조화가 덜 되어 있어 조사 개요를 우선 배치했습니다.";
         relevanceEl.textContent = data.derived_relevance_note || "개혁신당 또는 관련 후보가 포함된 여론조사 공표 자료입니다.";
         stageLabelEl.textContent = (data.metadata || {}).election_label || "공표 자료";
         stageDescEl.textContent = (data.metadata || {}).survey_period ? `조사기간 ${(data.metadata || {}).survey_period}` : "시각화 요약 → 정리된 본문 → 원문 링크 순서로 재배치했습니다.";
@@ -811,7 +805,8 @@
       typeEl.textContent = "법안";
       titleEl.textContent = data.title || "";
       summaryEl.textContent = [data.summary || "", metadata.committee ? `소관 상임위 ${metadata.committee}` : "", billProgress?.raw ? `진행상태 ${billProgress.raw}` : ""].filter(Boolean).join(" · ") || "국회 법안입니다.";
-      bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "법안 핵심 포인트가 없습니다.");
+      briefEl.textContent = data.summary || `${metadata.representative_member_name || "개혁신당 의원"} 대표발의 법안입니다.`;
+      keyPointsEl.textContent = data.derived_key_points || "법안 핵심 포인트가 없습니다.";
       relevanceEl.textContent = data.derived_relevance_note || "법안 요약과 진행 상황을 함께 확인합니다.";
       stageLabelEl.textContent = billProgress?.label || "법안 발의";
       stageDescEl.textContent = billProgress?.description || "소관 상임위와 현재 단계 정보를 함께 확인할 수 있습니다.";
