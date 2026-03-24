@@ -30,12 +30,12 @@
     }
 
     a { color: inherit; text-decoration: none; }
-    main { max-width: 1480px; margin: 0 auto; display: grid; gap: 16px; }
+    main { max-width: 1320px; margin: 0 auto; display: grid; gap: 16px; }
     .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
     .topbar, .hero, .sidebar, .detail, .curation-card { padding: 18px; }
     .brand strong { display: block; font-size: 20px; color: #fff; }
     .brand span { color: #ffbf93; font-size: 13px; }
-    .hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr); gap: 16px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr); gap: 16px; }
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--brand-soft); border: 1px solid rgba(255, 122, 26, 0.24); color: #ffbf93; font-size: 12px; font-weight: 800; padding: 8px 12px; }
     h1 { margin: 14px 0 0; font-size: 34px; line-height: 1.12; color: #fff; }
     p, .muted { color: var(--muted); line-height: 1.7; }
@@ -43,7 +43,7 @@
     .stat { border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); border-radius: 20px; padding: 14px 16px; }
     .stat .label { color: var(--muted); font-size: 12px; }
     .stat strong { display: block; margin-top: 8px; font-size: 28px; color: #fff; }
-    .curation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .curation-grid { display: none; }
     .section-title { margin: 0 0 12px; font-size: 17px; color: #fff; }
     .shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
     .sidebar { position: sticky; top: 16px; }
@@ -90,6 +90,76 @@
     .poll-result-bar { width:100%; height:14px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
     .poll-result-bar > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#60a5fa 0%, #a78bfa 100%); }
 
+    
+    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); }
+    .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; letter-spacing:.02em; }
+    .briefing-card strong { display:block; margin-top:8px; color:#fff; line-height:1.45; }
+    .briefing-card p { margin:8px 0 0; font-size:14px; line-height:1.6; }
+    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.3fr) minmax(0,0.7fr); gap:12px; }
+    .poll-focus-main { padding:18px; border-radius:22px; border:1px solid rgba(96,165,250,.22); background:linear-gradient(180deg, rgba(96,165,250,.12), rgba(255,255,255,.04)); }
+    .poll-focus-side { display:grid; gap:12px; }
+    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); }
+    .compact-card h3 { margin:0 0 8px; font-size:16px; color:#fff; }
+    .compact-card .meta { margin-top:6px; }
+    .archive-summary { display:flex; gap:8px; flex-wrap:wrap; }
+    .archive-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.06); font-size:13px; color:var(--muted); }
+    .shell.stage1 { grid-template-columns: 1fr; }
+    .detail-grid .panel.detail:nth-child(2), .detail-grid .panel.detail:nth-child(4) { display:none; }
+    
+    .archive-toggle-wrap { display:flex; justify-content:flex-end; margin-top:10px; }
+    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--muted); border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
+    .archive-collapsed .sidebar,
+    .archive-collapsed .detail-grid { display:none; }
+    .archive-shell { display:grid; gap:16px; }
+    .archive-shell.open .sidebar,
+    .archive-shell.open .detail-grid { display:grid; }
+    .archive-shell:not(.open) .sidebar,
+    .archive-shell:not(.open) .detail-grid { display:none; }
+    .poll-focus-side .panel.curation-card:last-child { display:none; }
+
+
+    .brand span { color:#ffd2b6; }
+    .hero { align-items:stretch; }
+    .summary-grid { align-self:stretch; }
+    .briefing-grid .panel { height:100%; }
+    .briefing-card { display:flex; flex-direction:column; justify-content:space-between; min-height:190px; }
+    .briefing-card strong { font-size:18px; }
+    .briefing-card p { color:var(--muted); }
+    .poll-focus-main { min-height: 100%; }
+    .poll-focus-main .mini-item strong { font-size:24px; line-height:1.35; }
+    .poll-focus-side .mini-item, .compact-card .mini-item { min-height: 116px; display:flex; flex-direction:column; justify-content:center; }
+    .compact-grid { align-items:stretch; }
+    .compact-card { min-height: 220px; }
+    .archive-summary { margin-top:10px; }
+    .archive-pill { color:#d7e4ef; background:rgba(255,255,255,.05); }
+    .ghost-btn { color:#fff; }
+    .ghost-btn:hover { background:rgba(255,255,255,.08); }
+    .section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .section-sub { color:var(--muted); font-size:12px; font-weight:600; }
+    .hero .muted { max-width: 58ch; }
+    .poll-focus-grid .section-title { margin-bottom: 14px; }
+    .mini-item .meta { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .mini-item strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .detail-title { font-size: 26px; }
+    .detail .split { align-items:start; }
+    @media (max-width: 720px) {
+      .briefing-card { min-height:auto; }
+      .compact-card { min-height:auto; }
+      .poll-focus-main .mini-item strong { font-size:20px; }
+      .hero .muted { max-width:none; }
+    }
+
+    @media (max-width: 1180px) {
+      .briefing-grid, .compact-grid, .poll-focus-grid, .shell.stage1 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .briefing-grid { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .curation-grid { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 1180px) {
       .curation-grid, .shell, .split, .hero { grid-template-columns: 1fr; }
       .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -117,21 +187,33 @@
 
     <section class="panel hero">
       <div>
-        <span class="eyebrow">Policy SSOT</span>
-        <h1>정책과 메시지뿐 아니라 규정, 여론조사까지 함께 봅니다.</h1>
-        <p class="muted">좌측에서 카테고리를 바꾸면 목록이 즉시 갱신되고, 우측에서 본문과 메타데이터, 연결 정보, 타임라인을 바로 확인할 수 있습니다.</p>
+        <span class="eyebrow">오늘의 브리핑</span>
+        <h1>오늘 중요한 이슈와 여론 흐름만 빠르게 봅니다.</h1>
+        <p class="muted">정보를 한 화면에 다 펼치지 않고, 지금 먼저 봐야 할 것부터 요약해서 보여줍니다. 자세한 자료는 아래 아카이브에서 이어서 확인하세요.</p>
       </div>
       <div class="summary-grid" id="summaryGrid"></div>
     </section>
 
-    <section class="curation-grid">
-      <div class="panel curation-card"><h2 class="section-title">지금 봐야 할 정책</h2><div class="mini-list" id="curatedPositions"></div></div>
-      <div class="panel curation-card"><h2 class="section-title">최근 메시지</h2><div class="mini-list" id="curatedMessages"></div></div>
-      <div class="panel curation-card"><h2 class="section-title">최근 규정</h2><div class="mini-list" id="curatedRules"></div></div>
-      <div class="panel curation-card"><h2 class="section-title">최근 여론조사</h2><div class="mini-list" id="curatedPolls"></div></div>
+    <section class="briefing-grid" id="briefingGrid"></section>
+
+    <section class="poll-focus-grid">
+      <div class="panel poll-focus-main">
+        <h2 class="section-title">최신 여론조사 <span class="section-sub">핵심 수치부터 먼저</span></h2>
+        <div id="featuredPoll"></div>
+      </div>
+      <div class="poll-focus-side">
+        <div class="panel curation-card"><h2 class="section-title">지금 봐야 할 정책</h2><div class="mini-list" id="curatedPositions"></div></div>
+        <div class="panel curation-card"><h2 class="section-title">최근 메시지</h2><div class="mini-list" id="curatedMessages"></div></div>
+      </div>
     </section>
 
-    <section class="shell">
+    <section class="compact-grid">
+      <div class="panel compact-card"><h3>자료실 요약</h3><div class="archive-summary" id="archiveSummary"></div><div class="archive-toggle-wrap"><button id="archiveToggle" class="ghost-btn" type="button">자료실 펼치기</button></div></div>
+      <div class="panel compact-card"><h3>최신 여론조사 더보기</h3><div class="mini-list" id="curatedPolls"></div></div>
+      <div class="panel compact-card"><h3>오늘 메모</h3><div class="muted">첫 화면은 브리핑 중심으로 줄이고, 세부 자료는 필요할 때만 펼쳐서 보도록 바꿨습니다.</div></div>
+    </section>
+
+    <section class="shell stage1 archive-shell" id="archiveShell">
       <aside class="panel sidebar">
         <div class="tabs" id="tabs">
           <button class="tab active" data-tab="positions">정책</button>
@@ -158,13 +240,7 @@
           </div>
         </div>
 
-        <div class="panel detail">
-          <div class="split">
-            <div class="box"><h3>핵심 요약</h3><div id="detailBrief" class="muted">선택한 항목의 핵심 요약이 여기에 표시됩니다.</div></div>
-            <div class="box"><h3>주요 포인트</h3><div id="detailKeyPoints" class="muted">선택한 항목의 주요 포인트가 여기에 표시됩니다.</div></div>
-            <div class="box"><h3>왜 중요한가</h3><div id="detailRelevance" class="muted">선택한 항목의 현재적 의미가 여기에 표시됩니다.</div></div>
-          </div>
-        </div>
+        
 
         <div class="panel detail"><h2 class="section-title">본문</h2><div class="body" id="detailBody">본문이 여기에 표시됩니다.</div></div>
         <div class="panel detail"><h2 class="section-title">연결 정보</h2><div class="chips" id="detailLinks"></div></div>
@@ -257,12 +333,12 @@
       const messages = data.messages || {};
       const counts = overview.counts || {};
       const items = [
-        ["Policies", counts.positions],
-        ["Bills", counts.bills],
-        ["Messages", counts.messages || counts.statements],
-        ["People", counts.people],
-        ["Rules", state.datasets.rules.length || counts.rules],
-        ["Polls", state.datasets.polls.length],
+        ["정책", counts.positions],
+        ["법안", counts.bills],
+        ["메시지", counts.messages || counts.statements],
+        ["인물", counts.people],
+        ["규정", state.datasets.rules.length || counts.rules],
+        ["여론조사", state.datasets.polls.length],
       ];
 
       document.getElementById("summaryGrid").innerHTML = items.map(([label, value]) => `
@@ -272,10 +348,39 @@
         </div>
       `).join("");
 
-      const curatedPositions = (overview.curated_positions || []).slice(0, 4);
-      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 4);
-      const curatedRules = (state.datasets.rules || []).slice(0, 4);
-      const curatedPolls = (state.datasets.polls || []).slice(0, 4);
+      const curatedPositions = (overview.curated_positions || []).slice(0, 3);
+      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 3);
+      const curatedRules = (state.datasets.rules || []).slice(0, 3);
+      const curatedPolls = (state.datasets.polls || []).slice(0, 3);
+      const featuredPoll = (state.datasets.polls || [])[0] || null;
+      const secondPoll = (state.datasets.polls || [])[1] || null;
+      const briefings = [
+        {
+          kicker: '이슈',
+          title: curatedPositions[0]?.title || '핵심 정책 브리핑을 준비 중입니다.',
+          summary: curatedPositions[0]?.official_summary || curatedPositions[0]?.summary || '가장 먼저 봐야 할 정책을 상단에 배치했습니다.',
+          href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#'
+        },
+        {
+          kicker: '메시지',
+          title: curatedMessages[0]?.title || '최근 메시지를 정리 중입니다.',
+          summary: curatedMessages[0]?.summary || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.',
+          href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#'
+        },
+        {
+          kicker: '여론조사',
+          title: featuredPoll?.title || '최신 여론조사를 준비 중입니다.',
+          summary: featuredPoll?.summary || '여론조사 핵심 수치와 흐름을 먼저 확인할 수 있게 재배치했습니다.',
+          href: featuredPoll ? hubUrl('polls', featuredPoll.id) : '#'
+        }
+      ];
+      document.getElementById('briefingGrid').innerHTML = briefings.map(item => `
+        <a class="panel briefing-card" href="${item.href}">
+          <div class="kicker">${safe(item.kicker)}</div>
+          <strong>${safe(item.title)}</strong>
+          <p>${safe(item.summary)}</p>
+        </a>
+      `).join('');
 
       document.getElementById("curatedPositions").innerHTML = curatedPositions.map((item) => `
         <a class="mini-item" href="${hubUrl("positions", item.slug)}">
@@ -289,7 +394,7 @@
         <a class="mini-item" href="${hubUrl("messages", item.id)}">
           <div class="meta">${safe(docTypeLabel(item.doc_type || "statement"))}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker, (item.participants || []).slice(0, 2).join(", ")].filter(Boolean).join(" · "))}</div>
+          <div class="meta">${safe([item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(" · "))}</div>
         </a>
       `).join("") || '<div class="empty">표시할 메시지가 없습니다.</div>';
 
@@ -305,9 +410,20 @@
         <a class="mini-item" href="${hubUrl("polls", item.id)}">
           <div class="meta">${safe((item.metadata || {}).pollster || "여론조사")}</div>
           <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe([item.published_at, (item.metadata || {}).client_name, (item.metadata || {}).election_label].filter(Boolean).join(" · "))}</div>
+          <div class="meta">${safe([item.published_at, (item.metadata || {}).client_name].filter(Boolean).join(" · "))}</div>
         </a>
       `).join("") || '<div class="empty">표시할 여론조사가 없습니다.</div>';
+
+      document.getElementById('archiveSummary').innerHTML = items.map(([label, value]) => `<span class="archive-pill">${safe(label)} ${number(value)}</span>`).join('');
+
+      document.getElementById('featuredPoll').innerHTML = featuredPoll ? `
+        <a href="${hubUrl('polls', featuredPoll.id)}" class="mini-item" style="display:block; background:transparent; border:none; padding:0;">
+          <div class="meta">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div>
+          <strong style="font-size:20px; margin-top:10px;">${safe(featuredPoll.title || '')}</strong>
+          <div class="meta">${safe(featuredPoll.summary || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
+          ${secondPoll ? `<div class="meta" style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.08);">다음 조사 · ${safe(secondPoll.title || '')}</div>` : ''}
+        </a>
+      ` : '<div class="empty">표시할 여론조사가 없습니다.</div>';
     }
 
     function currentItems() {
@@ -738,6 +854,15 @@
     document.getElementById("searchInput").addEventListener("input", (event) => {
       state.search = event.target.value || "";
       renderList();
+    });
+
+
+    document.addEventListener('click', (event) => {
+      const btn = event.target.closest('#archiveToggle');
+      if (!btn) return;
+      const shell = document.getElementById('archiveShell');
+      shell.classList.toggle('open');
+      btn.textContent = shell.classList.contains('open') ? '자료실 접기' : '자료실 펼치기';
     });
 
     init().catch((error) => {
