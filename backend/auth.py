@@ -391,8 +391,10 @@ def verify_session_token(token: str) -> Optional[dict]:
         user = get_user(uid)
         if not user:
             return None
-        expected = create_session_token(user)
-        # Token timestamp must match exactly
+        # Recompute hash with the ORIGINAL timestamp from the token
+        data = f"{user['id']}:{user['email']}:{user['status']}:{user['role']}"
+        h = hashlib.sha256((SESSION_SECRET + data + str(ts)).encode()).hexdigest()
+        expected = f"{user['id']}.{ts}.{h[:32]}"
         if not secrets.compare_digest(token, expected):
             return None
         return user
