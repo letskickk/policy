@@ -1,5 +1,13 @@
 # TODOS
 
+## P1: 여론조사 정당 지지율 그래프
+- **What:** nesdc PDF 첨부파일에서 정당별 지지율 데이터를 추출하여 바 차트로 시각화
+- **Why:** 현재 support_lines가 전부 비어있음. nesdc 사이트는 HTML에 지지율 수치를 노출하지 않고 PDF에만 포함. 텍스트 추출 regex(SUPPORT_LINE_RE)가 테이블 구조를 파싱 못함.
+- **How:** (1) nesdc_polls.py에서 PDF 다운로드 → pdfplumber/tabula로 테이블 파싱 → 정당명+지지율 추출 → support_lines에 저장, (2) hub.html에서 support_lines 데이터로 CSS 바 차트 렌더링
+- **Effort:** L (human) → M (CC+gstack)
+- **Priority:** P1
+- **Depends on:** pdfplumber 또는 tabula-py 패키지 추가 필요
+
 ## P2: policy_ssot.py 백엔드 리팩토링
 - **What:** N+1 풀스캔(list_policy_document_people) 수정, God Object 분리, API 엔드포인트 정리
 - **Why:** 허브 프론트엔드 정리 후 백엔드가 다음 병목. 인코딩은 수정했지만 구조적 문제 잔존.
