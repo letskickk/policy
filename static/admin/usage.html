@@ -46,6 +46,7 @@
     </div>
   </div>
   <script>
+    function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     async function load() {
       const period = document.getElementById('period').value;
       const r = await fetch(`/api/admin/usage/stats?period=${period}`, { credentials: 'include' });
@@ -55,7 +56,7 @@
       tbody.innerHTML = '';
       for (const row of d.by_user || []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${row.email || row.user_id}</td><td>${row.count}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
+        tr.innerHTML = `<td>${esc(row.email || row.user_id)}</td><td>${esc(row.count)}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
         tbody.appendChild(tr);
       }
     }

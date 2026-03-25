@@ -2181,7 +2181,11 @@
         selectRegion(urlRegionCode, urlDistrictCode, urlElectionType);
       }
     }
-    initializePage();
+    initializePage().catch(err => {
+      console.error('map init error:', err);
+      const panel = document.getElementById('candidateList');
+      if (panel) panel.innerHTML = '<div style="padding:1rem;color:#f87171;">지도를 불러오지 못했습니다. 새로고침해주세요.</div>';
+    });
 
     districtSelect.addEventListener('change', function() {
       if (!selectedRegionCode) return;

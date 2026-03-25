@@ -438,11 +438,11 @@
     }
 
     function timelineLabel(item) {
-      if (item.kind === "version") return "?? ??";
-      if (item.doc_type === "bill") return "??? ??";
-      if (item.doc_type === "statement") return "??? ??";
-      if (item.doc_type === "pledge") return "????";
-      return "?? ??";
+      if (item.kind === "version") return "버전 정보";
+      if (item.doc_type === "bill") return "관련 법안";
+      if (item.doc_type === "statement") return "관련 논평";
+      if (item.doc_type === "pledge") return "관련 공약";
+      return "관련 문서";
     }
 
     function renderTimeline(items) {
@@ -453,14 +453,14 @@
         el.className = "doc-card";
         el.style.borderLeft = "3px solid #da5d18";
         el.innerHTML = `
-          <div class="tiny muted">${escapeHtml(item.at || "-")} ? ${escapeHtml(timelineLabel(item))}</div>
+          <div class="tiny muted">${escapeHtml(item.at || "-")} · ${escapeHtml(timelineLabel(item))}</div>
           <div style="margin-top:6px;font-weight:800;">${escapeHtml(item.title || "-")}</div>
           <div class="muted tiny" style="margin-top:6px;line-height:1.6;">${escapeHtml(item.summary || item.status || item.relation_type || "")}</div>
         `;
         root.appendChild(el);
       }
       if (!root.children.length) {
-        root.innerHTML = '<div class="empty">?? ??? ????? ????.</div>';
+        root.innerHTML = '<div class="empty">관련 타임라인이 없습니다.</div>';
       }
     }
 
