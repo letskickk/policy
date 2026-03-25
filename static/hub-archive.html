@@ -80,8 +80,7 @@
           <button class="tab active" data-tab="positions">정책</button>
           <button class="tab" data-tab="messages">메시지</button>
           <button class="tab" data-tab="bills">법안</button>
-          <!-- 인물 탭: policy_people 테이블 미구현, 추후 활성화 -->
-          <!-- <button class="tab" data-tab="people">인물</button> -->
+          <button class="tab" data-tab="people">인물</button>
           <button class="tab" data-tab="rules">규정</button>
           <button class="tab" data-tab="polls">여론조사</button>
         </div>
@@ -108,7 +107,7 @@ const TAB_API = {
   positions: { url: '/api/policy/positions', items: r => r.items || [], key: i => i.slug, title: i => i.title, meta: i => i.category || '' },
   messages:  { url: '/api/policy/messages',  items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [i.speaker_name || i.speaker, i.published_at].filter(Boolean).join(' · ') },
   bills:     { url: '/api/policy/documents?doc_type=bill&status=active', items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).bill_no, i.published_at].filter(Boolean).join(' · ') },
-  people:    { url: '/api/policy/people',    items: r => r.items || [], key: i => i.name, title: i => i.name, meta: i => i.role || '' },
+  people:    { url: '/api/policy/people',    items: r => r.items || [], key: i => i.person_name, title: i => i.person_name, meta: i => `관련 문서 ${i.document_count || 0}건 · 대표발의 ${i.proposer_count || 0}건` },
   rules:     { url: '/api/policy/rules',     items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).rule_kind_label, statusLabel(i.status)].filter(Boolean).join(' · ') },
   polls:     { url: '/api/policy/polls',     items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).pollster, i.published_at].filter(Boolean).join(' · ') },
 };
@@ -306,14 +305,21 @@ function renderPollBody(data) {
 
 function renderPersonBody(data) {
   const parts = [];
-  if (data.bio) parts.push(`<div>${safe(data.bio)}</div>`);
-  if ((data.positions || []).length) {
-    parts.push('<div style="margin-top:12px;"><strong style="color:#fff;">연결 정책</strong></div>');
-    data.positions.forEach(p => parts.push(`<div class="meta" style="margin-top:4px;">· ${safe(p.title || p.position_title || '')}</div>`));
-  }
-  if ((data.documents || []).length) {
-    parts.push('<div style="margin-top:12px;"><strong style="color:#fff;">관련 문서</strong></div>');
-    data.documents.slice(0, 10).forEach(d => parts.push(`<div class="meta" style="margin-top:4px;">· ${safe(docTypeLabel(d.doc_type))} — ${safe(d.title)}</div>`));
+  const roles = (data.roles || []).map(r => r === 'proposer' ? '대표발의' : r === 'policy_owner' ? '정책 소유자' : r).join(', ');
+  if (roles) parts.push(`<div style="margin-top:8px;"><span class="meta-pill">${safe(roles)}</span></div>`);
+  if (data.bio) parts.push(`<div style="margin-top:12px;">${safe(data.bio)}</div>`);
+  const docs = data.documents || [];
+  if (docs.length) {
+    const byType = {};
+    docs.forEach(d => { const t = docTypeLabel(d.doc_type); byType[t] = byType[t] || []; byType[t].push(d); });
+    Object.entries(byType).forEach(([typeName, items]) => {
+      parts.push(`<div style="margin-top:16px;"><strong style="color:#fff;">${safe(typeName)} (${items.length}건)</strong></div>`);
+      items.slice(0, 10).forEach(d => {
+        const date = d.published_at ? ` · ${d.published_at}` : '';
+        parts.push(`<div class="meta" style="margin-top:6px; cursor:pointer;" onclick="loadDetail('${d.doc_type === 'bill' ? 'bills' : 'messages'}','${d.id}')">· ${safe(d.title)}${date}</div>`);
+      });
+      if (items.length > 10) parts.push(`<div class="muted" style="margin-top:4px;">외 ${items.length - 10}건</div>`);
+    });
   }
   return parts.join('') || '<div class="muted">상세 정보가 없습니다.</div>';
 }
