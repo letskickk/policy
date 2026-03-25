@@ -254,12 +254,20 @@ function formatBodyParagraphs(body, tab) {
     text = text.replace(/서울특별시선거관리위원회[\s\S]*$/, '');
   }
   if (tab === 'messages') {
-    // Messages are often a single block — split on sentence boundaries
+    // Strip [날짜_개혁신당 대변인 논평] header if present
+    text = text.replace(/^\[\d{6}_[^\]]+\]\s*/, '');
+    // Strip ■ header (already in title)
+    text = text.replace(/^■\s*"[^"]*"\s*/, '');
+    // Messages are often a single block — split on Korean sentence endings
     if (!text.includes('\n') || text.split('\n').filter(l => l.trim().length > 10).length < 3) {
+      // Korean: 합니다. / 입니다. / 습니다. / 했습니다. / 됩니다. / etc.
+      text = text.replace(/(다|요|죠|음)\.\s+/g, '$1.\n');
       text = text.replace(/([.!?])\s+/g, '$1\n');
     }
-    // Also split on quote marks that start new thoughts
+    // Split on quote marks that start new thoughts
     text = text.replace(/\u201C/g, '\n\u201C');
+    // Strip trailing signature block (2026. 03. 10. 개혁신당 대변인 ...)
+    text = text.replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*대변인[\s\S]*$/, '');
   }
   const paras = text.split(/\n+/)
     .map(p => p.trim())
@@ -303,7 +311,7 @@ function extractPollEssentials(body) {
 function extractPositionSummary(data) {
   const body = String(data.body || '');
   // PDF structure: look for "요 약" or "요약" section
-  const summaryMatch = body.match(/요\s*약[)\s]*\n([\s\S]{30,500}?)(?=\n\d+\.|$)/);
+  const summaryMatch = body.match(/요\s*약[)\s]*\n([\s\S]{30,500}?)(?=\n\d+[.\s]|$)/);
   if (summaryMatch) return summaryMatch[1].replace(/\n/g, ' ').trim().slice(0, 250);
   // Fallback: skip header lines, take first meaningful paragraph
   const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 30);
@@ -401,26 +409,30 @@ async function loadDetailFromState(tab, key) {
       document.getElementById('detailRelevance').textContent = '';
       document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
       document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
-      // Poll body: only show the "여론조사 기본" essentials, not the full nesdc dump
+      // Poll body: hide nesdc dump entirely — meta card + PDF link is sufficient
       const bodyEl = document.getElementById('detailBody');
-      const pollEssentials = extractPollEssentials(data.body || '');
-      bodyEl.innerHTML = pollEssentials || '<div class="muted">원문 링크에서 전체 조사 결과를 확인하세요.</div>';
+      bodyEl.innerHTML = '<div class="muted">여론조사 원문은 상단 원문 보기 링크 또는 첨부 PDF를 참고하세요.</div>';
     } else if (tab === 'messages') {
       // Messages: speaker + date, body as main content
       const speaker = data.speaker_name || data.speaker || '';
       const date = data.published_at || '';
       document.getElementById('detailSummary').textContent = [speaker, date].filter(Boolean).join(' · ');
-      let bodyText = data.body || data.summary || '';
-      // Split single-block body into sentences for bullets
-      if (!bodyText.includes('\n') || bodyText.split('\n').filter(l => l.trim().length > 10).length < 3) {
-        bodyText = bodyText.replace(/([.!?])\s+/g, '$1\n');
+      let rawBody = data.body || data.summary || '';
+      // Clean up header/signature for bullet extraction
+      let cleaned = rawBody
+        .replace(/^\[\d{6}_[^\]]+\]\s*/, '')
+        .replace(/^■\s*"[^"]*"\s*/, '')
+        .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*대변인[\s\S]*$/, '');
+      // Split single-block body into sentences
+      if (!cleaned.includes('\n') || cleaned.split('\n').filter(l => l.trim().length > 10).length < 3) {
+        cleaned = cleaned.replace(/(다|요|죠|음)\.\s+/g, '$1.\n').replace(/([.!?])\s+/g, '$1\n');
       }
-      const msgBullets = bodyText.split(/\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4);
+      const msgBullets = cleaned.split(/\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4);
       document.getElementById('detailBullets').innerHTML = renderBullets(msgBullets.length ? msgBullets : ['메시지 내용을 불러올 수 없습니다.'], '', false);
       document.getElementById('detailRelevance').textContent = data.derived_relevance_note || '';
       document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
       document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
-      document.getElementById('detailBody').innerHTML = formatBodyParagraphs(bodyText, tab);
+      document.getElementById('detailBody').innerHTML = formatBodyParagraphs(rawBody, tab);
     } else {
       // Positions: extract "요 약" section from body, or use first meaningful paragraph
       const rawSummary = extractPositionSummary(data) || truncate(data.summary || '', 200);
