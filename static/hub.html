@@ -169,7 +169,7 @@ function renderHome(hub) {
   const overview = hub.overview || {};
   const messages = hub.messages || {};
   const positions = (overview.curated_positions || []).slice(0, 3);
-  const messageItems = (overview.latest_messages || messages.featured || []).slice(0, 5);
+  const messageItems = (overview.latest_messages || messages.featured || []).slice(0, 10);
   const polls = state.datasets.polls.slice(0, 10);
   const featuredPoll = polls[0] || null;
 
