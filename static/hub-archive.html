@@ -220,16 +220,20 @@ function renderDetail(data, tab) {
   if (data.role) meta.push(data.role);
   document.getElementById('detailMeta').innerHTML = meta.map(v => `<span class="meta-pill">${safe(v)}</span>`).join('');
 
-  // Links
-  const links = [];
-  if (data.source_url) links.push(`<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>`);
-  if ((md.attachments || []).length) {
-    md.attachments.forEach(att => {
-      const attUrl = att?.download_url || att?.url;
-      if (attUrl) links.push(`<a class="link" href="${safe(decodeURIComponent(attUrl))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || att.name || '첨부 자료')}</a>`);
-    });
+  // Links — polls handle their own links inside renderPollBody
+  if (tab !== 'polls') {
+    const links = [];
+    if (data.source_url) links.push(`<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>`);
+    if ((md.attachments || []).length) {
+      md.attachments.forEach(att => {
+        const attUrl = att?.download_url || att?.url;
+        if (attUrl) links.push(`<a class="link" href="${safe(decodeURIComponent(attUrl))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || att.name || '첨부 자료')}</a>`);
+      });
+    }
+    document.getElementById('detailLinks').innerHTML = links.join('');
+  } else {
+    document.getElementById('detailLinks').innerHTML = '';
   }
-  document.getElementById('detailLinks').innerHTML = links.join('');
 
   // Body — polls get special rendering
   const bodyEl = document.getElementById('detailBody');
