@@ -416,26 +416,33 @@ async function loadDetailFromState(tab, key) {
       const bodyEl = document.getElementById('detailBody');
       bodyEl.innerHTML = '<div class="muted">여론조사 원문은 상단 원문 보기 링크 또는 첨부 PDF를 참고하세요.</div>';
     } else if (tab === 'messages') {
-      // Messages: speaker + date, body as main content
+      // Messages: speaker + date, body as main content (no bullets — show body directly)
       const speaker = data.speaker_name || data.speaker || '';
       const date = data.published_at || '';
       document.getElementById('detailSummary').textContent = [speaker, date].filter(Boolean).join(' · ');
       let rawBody = data.body || data.summary || '';
-      // Clean up header/signature for bullet extraction
+      // Clean up header/signature
       let cleaned = rawBody
         .replace(/^\[\d{6}_[^\]]+\]\s*/, '')
-        .replace(/^■\s*"[^"]*"\s*/, '')
+        .replace(/^■\s*[""][^""]*[""]\s*/g, '')
+        .replace(/■\s*/g, '')
         .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*대변인[\s\S]*$/, '');
-      // Split single-block body into sentences
+      // Split into paragraphs for readable body
       if (!cleaned.includes('\n') || cleaned.split('\n').filter(l => l.trim().length > 10).length < 3) {
-        cleaned = cleaned.replace(/(다|요|죠|음)\.\s+/g, '$1.\n').replace(/([.!?])\s+/g, '$1\n');
+        cleaned = cleaned.replace(/(다|요|죠|음)\.\s+/g, '$1.\n\n').replace(/([.!?])\s+/g, '$1\n');
       }
-      const msgBullets = cleaned.split(/\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4);
-      document.getElementById('detailBullets').innerHTML = renderBullets(msgBullets.length ? msgBullets : ['메시지 내용을 불러올 수 없습니다.'], '', false);
-      document.getElementById('detailRelevance').textContent = data.derived_relevance_note || '';
+      // No bullets for messages — show the full body directly as paragraphs
+      document.getElementById('detailBullets').innerHTML = '';
+      document.getElementById('detailRelevance').textContent = '';
       document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
       document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
-      document.getElementById('detailBody').innerHTML = formatBodyParagraphs(rawBody, tab);
+      // Show body as the main content (not hidden in details toggle)
+      const paras = cleaned.split(/\n+/).map(p => p.trim()).filter(p => p.length > 10);
+      document.getElementById('detailBody').parentElement.open = true;
+      document.getElementById('detailBody').parentElement.querySelector('summary').textContent = '전문';
+      document.getElementById('detailBody').innerHTML = paras.length
+        ? paras.map(p => `<div class="body-paragraph">${safe(p)}</div>`).join('')
+        : '<div class="muted">메시지 내용을 불러올 수 없습니다.</div>';
     } else {
       // Positions: extract "요 약" section from body, or use first meaningful paragraph
       const rawSummary = extractPositionSummary(data) || truncate(data.summary || '', 200);
