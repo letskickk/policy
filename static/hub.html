@@ -144,6 +144,27 @@ function attachInternalNavigation(root = document) {
   });
 }
 
+function cardSummary(item, type) {
+  if (!item) return '';
+  if (type === 'polls') {
+    const m = item.metadata || {};
+    return [m.pollster, m.region_name, m.survey_method, item.published_at].filter(Boolean).join(' · ');
+  }
+  if (type === 'messages') {
+    const speaker = item.speaker_name || item.speaker || '';
+    const date = item.published_at || '';
+    const bodyLine = String(item.body || '').split('\n').find(l => l.trim().length > 20) || '';
+    return [speaker, date].filter(Boolean).join(' · ') + (bodyLine ? ' — ' + truncate(bodyLine.trim(), 100) : '');
+  }
+  // positions — try to find "요 약" in body, else first meaningful line
+  const body = String(item.body || item.summary || '');
+  const summaryMatch = body.match(/요\s*약[)\s]*\n([\s\S]{20,300}?)(?=\n\d+\.|$)/);
+  if (summaryMatch) return truncate(summaryMatch[1].replace(/\n/g, ' ').trim(), 140);
+  const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 25);
+  const meaningful = lines.filter(l => !l.match(/^(제\d+대|선거대책|공약\s*설명|이준석|설명자료|\[공약|\[정책)/));
+  return meaningful.length ? truncate(meaningful[0], 140) : truncate(item.summary || item.title || '', 140);
+}
+
 function renderHome(hub) {
   const overview = hub.overview || {};
   const messages = hub.messages || {};
@@ -153,9 +174,9 @@ function renderHome(hub) {
   const featuredPoll = polls[0] || null;
 
   const briefing = [
-    { kicker: '정책', tab: 'positions', key: positions[0]?.slug, title: positions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(positions[0]) || '핵심 정책을 먼저 보여줍니다.' },
-    { kicker: '메시지', tab: 'messages', key: String(messageItems[0]?.id || ''), title: messageItems[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(messageItems[0]) || '최근 메시지 중 먼저 볼 항목을 추립니다.' },
-    { kicker: '여론조사', tab: 'polls', key: String(featuredPoll?.id || ''), title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 빠르게 요약합니다.' }
+    { kicker: '정책', tab: 'positions', key: positions[0]?.slug, title: positions[0]?.title || '정책 브리핑 준비 중', summary: cardSummary(positions[0], 'positions') || '핵심 정책을 먼저 보여줍니다.' },
+    { kicker: '메시지', tab: 'messages', key: String(messageItems[0]?.id || ''), title: messageItems[0]?.title || '메시지 브리핑 준비 중', summary: cardSummary(messageItems[0], 'messages') || '최근 메시지 중 먼저 볼 항목을 추립니다.' },
+    { kicker: '여론조사', tab: 'polls', key: String(featuredPoll?.id || ''), title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: cardSummary(featuredPoll, 'polls') || '최신 조사 핵심만 빠르게 요약합니다.' }
   ];
 
   document.getElementById('briefingGrid').innerHTML = briefing.map(item =>
@@ -165,21 +186,21 @@ function renderHome(hub) {
 
   document.getElementById('featuredPoll').innerHTML = featuredPoll
     ? internalAnchor('polls', String(featuredPoll.id),
-        `<div class="mini-card"><div class="muted">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div><strong>${safe(featuredPoll.title)}</strong><div class="muted">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 보여줍니다.')}</div></div>`)
+        `<div class="mini-card"><div class="muted">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div><strong>${safe(featuredPoll.title)}</strong><div class="muted">${safe(cardSummary(featuredPoll, 'polls'))}</div></div>`)
     : '<div class="muted">표시할 여론조사가 없습니다.</div>';
 
   document.getElementById('topPolicy').innerHTML = positions.map(item =>
-    internalAnchor('positions', item.slug, `<strong>${safe(item.title)}</strong><div class="muted">${safe(firstMeaningfulText(item))}</div>`)
+    internalAnchor('positions', item.slug, `<strong>${safe(item.title)}</strong><div class="muted">${safe(cardSummary(item, 'positions'))}</div>`)
   ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 정책이 없습니다.</div>';
 
   document.getElementById('topMessage').innerHTML = messageItems.map(item =>
-    internalAnchor('messages', String(item.id), `<strong>${safe(item.title)}</strong><div class="muted">${safe(firstMeaningfulText(item))}</div>`)
+    internalAnchor('messages', String(item.id), `<strong>${safe(item.title)}</strong><div class="muted">${safe(cardSummary(item, 'messages'))}</div>`)
   ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 메시지가 없습니다.</div>';
 
   const issues = [
-    { title: '지금 봐야 할 정책', summary: firstMeaningfulText(positions[0]) || '중요 정책을 앞에 노출합니다.', tab: 'positions', key: positions[0]?.slug },
-    { title: '최근 메시지', summary: firstMeaningfulText(messageItems[0]) || '최근 공개 메시지 중 중요한 것만 추립니다.', tab: 'messages', key: String(messageItems[0]?.id || '') },
-    { title: '최신 여론 흐름', summary: firstMeaningfulText(featuredPoll) || '최신 여론조사 핵심만 빠르게 요약합니다.', tab: 'polls', key: String(featuredPoll?.id || '') }
+    { title: '지금 봐야 할 정책', summary: cardSummary(positions[0], 'positions') || '중요 정책을 앞에 노출합니다.', tab: 'positions', key: positions[0]?.slug },
+    { title: '최근 메시지', summary: cardSummary(messageItems[0], 'messages') || '최근 공개 메시지 중 중요한 것만 추립니다.', tab: 'messages', key: String(messageItems[0]?.id || '') },
+    { title: '최신 여론 흐름', summary: cardSummary(featuredPoll, 'polls') || '최신 여론조사 핵심만 빠르게 요약합니다.', tab: 'polls', key: String(featuredPoll?.id || '') }
   ];
   document.getElementById('issuesGrid').innerHTML = issues.map(item =>
     internalAnchor(item.tab, item.key, `<div class="panel issue-card"><strong>${safe(item.title)}</strong><div class="muted">${safe(item.summary)}</div></div>`)
