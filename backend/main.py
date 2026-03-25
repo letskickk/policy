@@ -3456,11 +3456,6 @@ def share_pledge_page(pledge_id: int, request: Request):
       {f'<a class="button" href="{_html.escape(profile.support_url)}" target="_blank" rel="noopener noreferrer">후원하기</a>' if profile and profile.support_url else ''}
     </div>
   </main>
-  <script>
-    setTimeout(function() {{
-      window.location.replace({json.dumps(target_url)});
-    }}, 1200);
-  </script>
 </body>
 </html>"""
     return Response(content=html, media_type="text/html; charset=utf-8")
