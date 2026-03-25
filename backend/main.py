@@ -2076,7 +2076,7 @@ def _is_public_nomination_status(status_note: Optional[str], applicant_match_id:
 
 def _public_candidate_sql_condition() -> str:
     return """
-        c.approval_status = 'APPROVED'
+        c.approval_status IN ('APPROVED', 'MIXED')
         AND EXISTS (
             SELECT 1 FROM candidate_pledges cp
             WHERE cp.candidate_id = c.id
@@ -2820,7 +2820,7 @@ def get_regions():
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
-            WHERE c.approval_status = 'APPROVED'
+            WHERE c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -2862,7 +2862,7 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 FROM candidates c
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
-                WHERE c.approval_status = 'APPROVED'
+                WHERE c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -2881,7 +2881,7 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 FROM candidates c
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
-                WHERE c.approval_status = 'APPROVED'
+                WHERE c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -2917,7 +2917,7 @@ def get_districts(
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
-              AND c.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -3000,7 +3000,7 @@ def get_candidates(
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
-              AND c.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -3070,7 +3070,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.id = ?
-              AND c.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
@@ -3234,7 +3234,7 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
             WHERE cp.id = ?
               AND cp.approval_status = 'APPROVED'
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
-              AND c.approval_status = 'APPROVED'
+              AND c.approval_status IN ('APPROVED', 'MIXED')
             LIMIT 1
             """,
             (pledge_id,),
