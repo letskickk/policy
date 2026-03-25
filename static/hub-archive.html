@@ -47,6 +47,10 @@
     .meta-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-size:13px; color:var(--muted); }
 
     /* Poll-specific */
+    .poll-info-card { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:1px; background:var(--border); border-radius:14px; overflow:hidden; margin-top:12px; }
+    .poll-info-row { display:flex; flex-direction:column; gap:2px; padding:12px 16px; background:rgba(255,255,255,0.04); }
+    .poll-info-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+    .poll-info-value { font-size:14px; font-weight:600; color:#fff; }
     .poll-result-grid { display:grid; gap:10px; }
     .poll-result-row { display:grid; grid-template-columns:minmax(88px,140px) minmax(0,1fr) auto; gap:10px; align-items:center; }
     .poll-result-label { font-size:13px; color:#e2e8f0; line-height:1.4; }
@@ -197,7 +201,11 @@ function renderDetail(data, tab) {
   const md = data.metadata || {};
   document.getElementById('detailType').textContent = tab === 'positions' ? '정책' : tab === 'messages' ? '메시지' : tab === 'bills' ? '법안' : tab === 'people' ? '인물' : tab === 'rules' ? '규정' : tab === 'polls' ? '여론조사' : '문서';
   document.getElementById('detailTitle').textContent = data.title || data.name || '';
-  document.getElementById('detailSummary').textContent = data.summary || data.official_summary || firstMeaningfulText(data) || '';
+  // Show summary only if different from title
+  const rawSummary = data.summary || data.official_summary || '';
+  const title = data.title || data.name || '';
+  const summaryText = (rawSummary && rawSummary !== title && rawSummary.length > title.length + 10) ? rawSummary : firstMeaningfulText(data) || '';
+  document.getElementById('detailSummary').textContent = summaryText;
 
   // Meta pills
   const meta = [];
@@ -248,28 +256,51 @@ function renderDetail(data, tab) {
 
 function renderPollBody(data) {
   const md = data.metadata || {};
-  const lines = (md.support_lines || []);
   const parts = [];
 
+  // Visual info card
+  const fields = [
+    ['조사기관', md.pollster],
+    ['의뢰', md.client_name],
+    ['조사방법', md.survey_method],
+    ['표본추출', md.sample_frame],
+    ['조사지역', md.region_name],
+    ['등록일', md.registered_at],
+    ['등록번호', md.registration_no],
+  ].filter(([, v]) => v);
+
+  if (fields.length) {
+    parts.push('<div class="poll-info-card">' + fields.map(([label, val]) =>
+      `<div class="poll-info-row"><span class="poll-info-label">${safe(label)}</span><span class="poll-info-value">${safe(val)}</span></div>`
+    ).join('') + '</div>');
+  }
+
+  // Support lines bar chart (if available)
+  const lines = (md.support_lines || []);
   if (lines.length) {
-    parts.push('<div class="poll-result-grid">' + lines.map(line => {
+    parts.push('<div style="margin-top:16px;"><strong style="color:#fff;">정당 지지율</strong></div>');
+    parts.push('<div class="poll-result-grid" style="margin-top:8px;">' + lines.map(line => {
       const match = line.match(/^(.+?)\s+([\d.]+)%?$/);
       if (!match) return `<div class="poll-result-row"><span class="poll-result-label">${safe(line)}</span><span></span><span></span></div>`;
       const label = match[1], pct = parseFloat(match[2]);
-      return `<div class="poll-result-row"><span class="poll-result-label">${safe(label)}</span><div class="poll-result-bar"><span style="width:${Math.min(pct, 100)}%"></span></div><span class="poll-result-value">${pct}%</span></div>`;
+      const isReform = label.includes('개혁신당');
+      const barColor = isReform ? 'background:linear-gradient(90deg,#ff7a1a 0%,#ffb37a 100%)' : '';
+      return `<div class="poll-result-row"><span class="poll-result-label"${isReform ? ' style="color:#ff7a1a;font-weight:800;"' : ''}>${safe(label)}</span><div class="poll-result-bar"><span style="width:${Math.min(pct, 100)}%;${barColor}"></span></div><span class="poll-result-value"${isReform ? ' style="color:#ff7a1a;"' : ''}>${pct}%</span></div>`;
     }).join('') + '</div>');
   }
 
-  const info = [];
-  if (md.pollster) info.push(`조사기관: ${md.pollster}`);
-  if (md.client_name) info.push(`의뢰: ${md.client_name}`);
-  if (md.survey_period) info.push(`조사기간: ${md.survey_period}`);
-  if (md.survey_method) info.push(`조사방법: ${md.survey_method}`);
-  if (md.sample_size) info.push(`표본: ${md.sample_size}`);
-  if (info.length) parts.push('<div class="muted" style="margin-top:12px;">' + info.map(v => safe(v)).join('<br>') + '</div>');
+  // Attachments
+  const atts = md.attachments || [];
+  if (atts.length) {
+    parts.push('<div style="margin-top:16px;">' + atts.map(att => {
+      const url = att.download_url || att.url;
+      return url ? `<a class="link" href="${safe(decodeURIComponent(url))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || '첨부 자료')}</a>` : '';
+    }).filter(Boolean).join(' ') + '</div>');
+  }
 
-  // Don't show raw nesdc body — it's all survey methodology noise
+  // Source link
   if (data.source_url) parts.push(`<div style="margin-top:12px;"><a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기 ↗</a></div>`);
+
   return parts.join('') || '<div class="muted">조사 상세 정보가 없습니다.</div>';
 }
 
