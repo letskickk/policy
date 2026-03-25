@@ -196,7 +196,7 @@ function truncate(text, maxLen) {
   return s.slice(0, maxLen).replace(/[.,;:\s]+$/, '') + '…';
 }
 
-const NESDC_NOISE = /^(용어설명|선거여론조사 관련|표본의 크기|가중값 적용|조사완료 사례수|조사방법$|전화면접조사|ARS\(|인터넷조사|표본추출틀|휴대전화 가상번호|RDD\(|패널$|피조사자 접촉현황|접촉률|응답률|AAPOR|가중값 산출|셀가중|림가중|표본오차|Copyright|본 홈페이지|중앙여심위|중앙선거여론조사|국번없이|e\s*-\s*mail|nesdc@|서울시 관악구|Fax|대표전화|이메일|선거법질의|선거관리위원회$|개인정보처리|저작권정책|사이트맵|이용안내|TOP$)/;
+const NESDC_NOISE = /^(용어설명|선거여론조사 관련|표본의 크기|가중값 적용|조사완료 사례수|조사방법|전화면접조사|ARS\(|인터넷조사|표본추출틀|휴대전화 가상번호|RDD\(|패널$|피조사자 접촉|접촉률|접촉실패|접촉 후|응답률|AAPOR|가중값 산출|셀가중|림가중|표본오차|Copyright|본 홈페이지|중앙여심위|중앙선거여론조사|국번없이|e\s*-\s*mail|nesdc@|서울시 관악구|Fax|대표전화|이메일|선거법질의|선거관리위원회$|개인정보처리|저작권정책|사이트맵|이용안내|TOP$|조사대상 추출|추출틀|구축방법|피조사자 선정|가상번호 구축|가중값 적용 기준|\(통화중|사업체번호|비적격|결번|그 외의 비적격|사용규모|조사일시|표본추출방법|통신사제공|구성 비율|권고 무선|전체 접촉|전체 응답|공개 문서 맥락)/;
 const REFORM_HIGHLIGHT_RE = /개혁신당/g;
 
 function highlightReform(text) {
@@ -241,6 +241,44 @@ function formatBodyParagraphs(body, tab) {
     .filter(p => !NESDC_NOISE.test(p));
   if (!paras.length) return '<div class="body-paragraph muted">표시할 상세 내용이 없습니다.</div>';
   return paras.slice(0, 50).map(p => `<div class="body-paragraph">${highlightReform(p)}</div>`).join('');
+}
+
+function extractPollEssentials(body) {
+  const text = String(body || '');
+  const start = text.indexOf('여론조사 기본');
+  if (start < 0) return '';
+  // Extract key fields from the "여론조사 기본" section
+  const section = text.slice(start, start + 2000);
+  const fields = {};
+  const patterns = [
+    [/여론조사 명칭\n(.+)/m, '명칭'],
+    [/선거구분\n(.+)/m, '선거구분'],
+    [/지역\n(.+)/m, '지역'],
+    [/선거명\n(.+)/m, '선거명'],
+    [/조사의뢰자\n(.+)/m, '의뢰자'],
+    [/조사기관명\n(.+)/m, '조사기관'],
+    [/조사지역\n(.+)/m, '조사지역'],
+    [/조사일시\n(.+)/m, '조사일시'],
+  ];
+  for (const [re, label] of patterns) {
+    const m = section.match(re);
+    if (m) fields[label] = m[1].trim();
+  }
+  if (!Object.keys(fields).length) return '';
+  return Object.entries(fields)
+    .map(([k, v]) => `<div class="body-paragraph"><strong style="color:var(--muted);font-size:12px;">${safe(k)}</strong><br>${highlightReform(v)}</div>`)
+    .join('');
+}
+
+function extractPositionSummary(data) {
+  const body = String(data.body || '');
+  // PDF structure: look for "요 약" or "요약" section
+  const summaryMatch = body.match(/요\s*약[)\s]*\n([\s\S]{30,500}?)(?=\n\d+\.|$)/);
+  if (summaryMatch) return summaryMatch[1].replace(/\n/g, ' ').trim().slice(0, 250);
+  // Fallback: skip header lines, take first meaningful paragraph
+  const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 30);
+  const meaningful = lines.filter(l => !l.match(/^(제\d+대|선거대책|공약\s*설명|이준석 대통령|설명자료|\[공약|\[정책)/));
+  return meaningful.length ? truncate(meaningful[0], 250) : '';
 }
 
 function renderBullets(items, fallback) {
@@ -317,32 +355,51 @@ async function loadDetailFromState(tab, key) {
     document.getElementById('detailType').textContent = typeLabels[tab] || '브리핑';
     document.getElementById('detailTitle').textContent = data.title || '';
 
-    // Summary — truncate long PDF pastes
-    const rawSummary = data.summary || firstMeaningfulText(data) || '';
-    document.getElementById('detailSummary').textContent = truncate(rawSummary, 200);
-
-    // Bullets — extract from key_points, or parse body
-    let bullets;
+    // ── Type-specific rendering ──
     if (tab === 'polls') {
-      const supportLines = (data.metadata || {}).support_lines || [];
-      bullets = supportLines.length ? supportLines.slice(0, 5)
-        : extractKeyBullets(data.body, '여론조사 상세 데이터는 원문 링크를 참고하세요.', 4);
+      // Polls: meta card + source link only, no body dump
+      const m = data.metadata || {};
+      const summaryParts = [m.region_name, m.pollster, m.survey_method, data.published_at].filter(Boolean);
+      document.getElementById('detailSummary').textContent = summaryParts.join(' · ') || '여론조사 상세 정보';
       renderPollInfoCard(data);
+      const supportLines = (m.support_lines || []).filter(Boolean);
+      if (supportLines.length) {
+        document.getElementById('detailBullets').innerHTML = renderBullets(supportLines.slice(0, 5));
+      } else {
+        document.getElementById('detailBullets').innerHTML = '<div class="bullet muted">정당 지지율 데이터는 첨부 PDF 또는 원문 링크를 참고하세요.</div>';
+      }
+      document.getElementById('detailRelevance').textContent = '';
+      document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
+      document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
+      // Poll body: only show the "여론조사 기본" essentials, not the full nesdc dump
+      const bodyEl = document.getElementById('detailBody');
+      const pollEssentials = extractPollEssentials(data.body || '');
+      bodyEl.innerHTML = pollEssentials || '<div class="muted">원문 링크에서 전체 조사 결과를 확인하세요.</div>';
+    } else if (tab === 'messages') {
+      // Messages: speaker + date, body as main content
+      const speaker = data.speaker_name || data.speaker || '';
+      const date = data.published_at || '';
+      document.getElementById('detailSummary').textContent = [speaker, date].filter(Boolean).join(' · ');
+      const bodyText = data.body || data.summary || '';
+      const msgBullets = bodyText.split(/\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4);
+      document.getElementById('detailBullets').innerHTML = renderBullets(msgBullets.length ? msgBullets : ['메시지 내용을 불러올 수 없습니다.']);
+      document.getElementById('detailRelevance').textContent = data.derived_relevance_note || '';
+      document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
+      document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
+      document.getElementById('detailBody').innerHTML = formatBodyParagraphs(bodyText, tab);
     } else {
+      // Positions: extract "요 약" section from body, or use first meaningful paragraph
+      const rawSummary = extractPositionSummary(data) || truncate(data.summary || '', 200);
+      document.getElementById('detailSummary').textContent = rawSummary;
       const keyPts = data.derived_key_points || data.key_points || '';
-      bullets = keyPts ? String(keyPts).split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 5)
+      const bullets = keyPts ? String(keyPts).split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 5)
         : extractKeyBullets(data.body || data.summary, null, 4);
+      document.getElementById('detailBullets').innerHTML = renderBullets(bullets);
+      document.getElementById('detailRelevance').textContent = data.derived_relevance_note || data.relevance_note || '';
+      document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
+      document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
+      document.getElementById('detailBody').innerHTML = formatBodyParagraphs(data.body || data.summary || '', tab);
     }
-    document.getElementById('detailBullets').innerHTML = renderBullets(bullets);
-
-    document.getElementById('detailRelevance').textContent = data.derived_relevance_note || data.relevance_note || '';
-    document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
-    document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
-
-    // Body — formatted paragraphs with truncation
-    const bodyEl = document.getElementById('detailBody');
-    const bodyHtml = formatBodyParagraphs(data.body || data.summary || '', tab);
-    bodyEl.innerHTML = bodyHtml;
   } catch (err) {
     console.error('loadDetail error:', err);
     document.getElementById('detailTitle').textContent = '해당 항목을 찾을 수 없습니다';
