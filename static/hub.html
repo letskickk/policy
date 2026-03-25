@@ -3,1337 +3,258 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>개혁신당 정책 허브</title>
+  <title>개혁신당 브리핑 허브</title>
   <style>
-    :root {
-      --bg: #071826;
-      --panel: rgba(255, 255, 255, 0.08);
-      --border: rgba(255, 255, 255, 0.12);
-      --text: #e6edf5;
-      --muted: #a9bbcb;
-      --brand: #ff7a1a;
-      --brand-soft: rgba(255, 122, 26, 0.16);
-      --shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Pretendard", "Noto Sans KR", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(900px 500px at 10% 10%, rgba(255, 122, 26, 0.14), transparent 60%),
-        radial-gradient(700px 450px at 90% 15%, rgba(29, 155, 240, 0.12), transparent 58%),
-        linear-gradient(160deg, #04111d 0%, #082238 52%, #0b3152 100%);
-      padding: 24px 16px 40px;
-    }
-
-    a { color: inherit; text-decoration: none; }
-    main { max-width: 1320px; margin: 0 auto; display: grid; gap: 16px; }
-    .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
-    .topbar, .hero, .sidebar, .detail, .curation-card { padding: 18px; }
-    .brand strong { display: block; font-size: 20px; color: #fff; }
-    .brand span { color: #ffbf93; font-size: 13px; }
-    .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr); gap: 16px; }
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--brand-soft); border: 1px solid rgba(255, 122, 26, 0.24); color: #ffbf93; font-size: 12px; font-weight: 800; padding: 8px 12px; }
-    h1 { margin: 14px 0 0; font-size: 34px; line-height: 1.12; color: #fff; }
-    p, .muted { color: var(--muted); line-height: 1.7; }
-    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
-    .stat { border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); border-radius: 20px; padding: 14px 16px; }
-    .stat .label { color: var(--muted); font-size: 12px; }
-    .stat strong { display: block; margin-top: 8px; font-size: 28px; color: #fff; }
-    .curation-grid { display: none; }
-    .section-title { margin: 0 0 12px; font-size: 17px; color: #fff; }
-    .shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
-    .sidebar { position: sticky; top: 16px; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-    .tab { border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); color: var(--text); border-radius: 999px; padding: 10px 14px; font: inherit; font-weight: 700; cursor: pointer; }
-    .tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .search { width: 100%; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); color: var(--text); padding: 12px 14px; font: inherit; }
-    .search::placeholder { color: var(--muted); }
-    .list, .mini-list, .timeline { display: grid; gap: 10px; }
-    .list { max-height: calc(100vh - 210px); overflow: auto; padding-right: 4px; margin-top: 14px; }
-    .item, .mini-item { padding: 14px; border-radius: 18px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.05); }
-    .item { cursor: pointer; }
-    .item.selected { border-color: var(--brand); background: rgba(255, 122, 26, 0.14); }
-    .item strong, .mini-item strong { display: block; line-height: 1.45; overflow-wrap: anywhere; }
-    .meta { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-    .detail-grid { display: grid; gap: 16px; min-width: 0; }
-    .split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr); gap: 14px; }
-    .box { padding: 16px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.05); min-width: 0; }
-    .box h3 { margin: 0 0 10px; font-size: 16px; color: #fff; }
-    .detail-title { margin: 12px 0 0; font-size: 30px; line-height: 1.15; color: #fff; overflow-wrap: anywhere; }
-    .body { min-height: 360px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .body.poll-layout { white-space: normal; }
-    .links, .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .link, .chip { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-    .chip.subtle { background: rgba(29, 155, 240, 0.12); }
-    .empty { padding: 18px; border-radius: 18px; border: 1px dashed var(--border); background: rgba(255, 255, 255, 0.04); color: var(--muted); }
-    .poll-layout { display: grid; gap: 16px; }
-    .poll-overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .poll-card { padding: 16px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.05); }
-    .poll-card h3 { margin: 0 0 10px; font-size: 16px; color: #fff; }
-    .poll-card strong { display: block; font-size: 22px; color: #fff; }
-    .poll-card .label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-    .poll-card .sub { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-    .poll-method-list, .poll-copy-list { display: grid; gap: 10px; }
-    .poll-method-row { display: grid; gap: 6px; }
-    .poll-method-row .meta { margin-top: 0; }
-    .poll-bar { width: 100%; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
-    .poll-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff7a1a 0%, #ffbf93 100%); }
-    .poll-copy-list p { margin: 0; }
-.poll-result-grid { display:grid; gap:10px; }
-    .poll-result-row { display:grid; grid-template-columns: minmax(88px, 140px) minmax(0,1fr) auto; gap:10px; align-items:center; }
-    .poll-result-label { font-size:13px; color:#e2e8f0; line-height:1.4; }
-    .poll-result-value { font-weight:800; color:#fff; font-variant-numeric: tabular-nums; }
-    .poll-result-bar { width:100%; height:14px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
-    .poll-result-bar > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#60a5fa 0%, #a78bfa 100%); }
-
-    
-    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); }
-    .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; letter-spacing:.02em; }
-    .briefing-card strong { display:block; margin-top:8px; color:#fff; line-height:1.45; }
-    .briefing-card p { margin:8px 0 0; font-size:14px; line-height:1.6; }
-    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.3fr) minmax(0,0.7fr); gap:12px; }
-    .poll-focus-main { padding:18px; border-radius:22px; border:1px solid rgba(96,165,250,.22); background:linear-gradient(180deg, rgba(96,165,250,.12), rgba(255,255,255,.04)); }
-    .poll-focus-side { display:grid; gap:12px; }
-    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); }
-    .compact-card h3 { margin:0 0 8px; font-size:16px; color:#fff; }
-    .compact-card .meta { margin-top:6px; }
-    .archive-summary { display:flex; gap:8px; flex-wrap:wrap; }
-    .archive-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.06); font-size:13px; color:var(--muted); }
-    .shell.stage1 { grid-template-columns: 1fr; }
-    .detail-grid .panel.detail:nth-child(2), .detail-grid .panel.detail:nth-child(4) { display:none; }
-    
-    .archive-toggle-wrap { display:flex; justify-content:flex-end; margin-top:10px; }
-    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--muted); border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .archive-collapsed .sidebar,
-    .archive-collapsed .detail-grid { display:none; }
-    .archive-shell { display:grid; gap:16px; }
-    .archive-shell.open .sidebar,
-    .archive-shell.open .detail-grid { display:grid; }
-    .archive-shell:not(.open) .sidebar,
-    .archive-shell:not(.open) .detail-grid { display:none; }
-    .poll-focus-side .panel.curation-card:last-child { display:none; }
-
-
-    .brand span { color:#ffd2b6; }
-    .hero { align-items:stretch; }
-    .summary-grid { align-self:stretch; }
-    .briefing-grid .panel { height:100%; }
-    .briefing-card { display:flex; flex-direction:column; justify-content:space-between; min-height:190px; }
-    .briefing-card strong { font-size:18px; }
-    .briefing-card p { color:var(--muted); }
-    .poll-focus-main { min-height: 100%; }
-    .poll-focus-main .mini-item strong { font-size:24px; line-height:1.35; }
-    .poll-focus-side .mini-item, .compact-card .mini-item { min-height: 116px; display:flex; flex-direction:column; justify-content:center; }
-    .compact-grid { align-items:stretch; }
-    .compact-card { min-height: 220px; }
-    .archive-summary { margin-top:10px; }
-    .archive-pill { color:#d7e4ef; background:rgba(255,255,255,.05); }
-    .ghost-btn { color:#fff; }
-    .ghost-btn:hover { background:rgba(255,255,255,.08); }
-    .section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .section-sub { color:var(--muted); font-size:12px; font-weight:600; }
-    .hero .muted { max-width: 58ch; }
-    .poll-focus-grid .section-title { margin-bottom: 14px; }
-    .mini-item .meta { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .mini-item strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .detail-title { font-size: 26px; }
-    .detail .split { align-items:start; }
-    @media (max-width: 720px) {
-      .briefing-card { min-height:auto; }
-      .compact-card { min-height:auto; }
-      .poll-focus-main .mini-item strong { font-size:20px; }
-      .hero .muted { max-width:none; }
-    }
-
-
-    .briefing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .briefing-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); display:flex; flex-direction:column; gap:8px; min-height:180px; }
+    :root { --bg:#071826; --panel:rgba(255,255,255,0.08); --border:rgba(255,255,255,0.12); --text:#e6edf5; --muted:#a9bbcb; --brand:#ff7a1a; --brand-soft:rgba(255,122,26,0.16); --shadow:0 18px 40px rgba(0,0,0,0.25); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:"Pretendard","Noto Sans KR",sans-serif; color:var(--text); background:radial-gradient(900px 500px at 10% 10%, rgba(255,122,26,0.14), transparent 60%), radial-gradient(700px 450px at 90% 15%, rgba(29,155,240,0.12), transparent 58%), linear-gradient(160deg, #04111d 0%, #082238 52%, #0b3152 100%); padding:24px 16px 40px; }
+    a { color:inherit; text-decoration:none; }
+    main { max-width:1200px; margin:0 auto; display:grid; gap:16px; }
+    .panel { border:1px solid var(--border); background:var(--panel); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(12px); }
+    .topbar,.hero,.card,.detail { padding:18px; }
+    .brand strong { display:block; font-size:24px; color:#fff; }
+    .brand span { color:#ffd2b6; font-size:13px; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; border-radius:999px; background:var(--brand-soft); border:1px solid rgba(255,122,26,0.24); color:#ffbf93; font-size:12px; font-weight:800; padding:8px 12px; }
+    h1 { margin:14px 0 0; font-size:34px; line-height:1.15; color:#fff; }
+    .muted { color:var(--muted); line-height:1.7; }
+    .hero { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,0.7fr); gap:16px; }
+    .summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .stat { border:1px solid var(--border); background:rgba(255,255,255,0.06); border-radius:20px; padding:14px 16px; }
+    .stat .label { color:var(--muted); font-size:12px; }
+    .stat strong { display:block; margin-top:8px; font-size:28px; color:#fff; }
+    .briefing-grid,.issues-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .briefing-card,.issue-card,.mini-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); display:grid; gap:10px; align-content:start; min-height:100%; }
     .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; }
-    .poll-focus-grid { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,0.85fr); gap:12px; }
-    .poll-focus-side { display:grid; gap:12px; }
-    .compact-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    .compact-card { padding:16px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,.05); min-height:180px; }
-    .archive-toggle-wrap { display:flex; justify-content:flex-start; margin-top:14px; }
-    .ghost-btn { border:1px solid var(--border); background:rgba(255,255,255,.04); color:#fff; border-radius:999px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .archive-shell:not(.open) .sidebar, .archive-shell:not(.open) .detail-grid { display:none; }
-    .archive-shell.open .sidebar, .archive-shell.open .detail-grid { display:grid; }
-    .detail-bullets { display:grid; gap:10px; }
-    .detail-bullet { padding:14px 16px; border-radius:18px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); line-height:1.6; }
-    .detail-section-toggle { margin-top:14px; }
-    .detail-section-toggle summary { cursor:pointer; color:#ffbf93; font-weight:700; }
-    .body.compact { min-height:0; }
-
-    @media (max-width: 1180px) {
-      .briefing-grid, .compact-grid, .poll-focus-grid, .shell.stage1 { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 720px) {
-      .briefing-grid { grid-template-columns: 1fr; }
-      .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .curation-grid { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 1180px) {
-      .curation-grid, .shell, .split, .hero { grid-template-columns: 1fr; }
-      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .sidebar { position: static; }
-      .list { max-height: none; }
-      .poll-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    .topbar {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 16px;
-      align-items: center;
-      padding: 18px 0 4px;
-      border: none;
-      background: transparent;
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-    .brand strong {
-      font-size: clamp(24px, 4vw, 40px);
-      letter-spacing: -0.04em;
-    }
-    .brand span {
-      display: inline-block;
-      max-width: 56ch;
-      margin-top: 8px;
-      color: rgba(226, 236, 244, 0.72);
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .topbar-meta {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: rgba(226, 236, 244, 0.76);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .hero {
-      position: relative;
-      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-      gap: 28px;
-      padding: 34px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background:
-        radial-gradient(circle at top left, rgba(255, 122, 26, 0.24), transparent 28%),
-        radial-gradient(circle at 80% 18%, rgba(96, 165, 250, 0.22), transparent 24%),
-        linear-gradient(135deg, rgba(7, 24, 38, 0.88) 0%, rgba(8, 34, 56, 0.94) 50%, rgba(4, 17, 29, 0.98) 100%);
-    }
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-      background-size: 120px 120px;
-      opacity: 0.08;
-      mask-image: linear-gradient(180deg, rgba(0,0,0,1), rgba(0,0,0,0.1));
-      pointer-events: none;
-    }
-    .hero-copy,
-    .hero-visual {
-      position: relative;
-      z-index: 1;
-    }
-    .hero-copy {
-      display: grid;
-      align-content: space-between;
-      min-height: min(70svh, 680px);
-      gap: 26px;
-    }
-    .hero-copy h1 {
-      max-width: 9ch;
-      margin-top: 18px;
-      font-size: clamp(48px, 7vw, 82px);
-      line-height: 0.94;
-      letter-spacing: -0.06em;
-    }
-    .hero-copy .muted {
-      max-width: 44ch;
-      font-size: 16px;
-      color: rgba(226, 236, 244, 0.78);
-    }
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .hero-action {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 48px;
-      padding: 0 18px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.05);
-      color: #fff;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
-    }
-    .hero-action.primary {
-      border-color: rgba(255, 122, 26, 0.4);
-      background: linear-gradient(135deg, rgba(255, 122, 26, 0.94), rgba(255, 173, 102, 0.92));
-      color: #09111b;
-    }
-    .hero-action:hover {
-      transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.1);
-    }
-    .hero-action.primary:hover {
-      background: linear-gradient(135deg, rgba(255, 140, 55, 0.98), rgba(255, 195, 135, 0.96));
-    }
-    .hero-strip {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .signal-chip {
-      padding: 14px 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.18);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-    }
-    .signal-chip span {
-      display: block;
-      color: rgba(226, 236, 244, 0.62);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .signal-chip strong {
-      display: block;
-      margin-top: 8px;
-      font-size: 17px;
-      line-height: 1.35;
-      color: #fff;
-    }
-    .hero-visual {
-      display: grid;
-      align-content: stretch;
-      gap: 14px;
-    }
-    .hero-note {
-      display: grid;
-      gap: 8px;
-      padding: 16px 18px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 22px;
-      background: rgba(4, 17, 29, 0.46);
-      color: rgba(226, 236, 244, 0.76);
-    }
-    .hero-note strong {
-      font-size: 13px;
-      color: #fff;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .summary-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .stat {
-      min-height: 148px;
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
-      backdrop-filter: blur(18px);
-      transition: transform 180ms ease, border-color 180ms ease;
-    }
-    .stat:hover {
-      transform: translateY(-3px);
-      border-color: rgba(255, 255, 255, 0.18);
-    }
-    .stat .label {
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 11px;
-    }
-    .stat strong {
-      margin-top: 10px;
-      font-size: clamp(32px, 5vw, 52px);
-      line-height: 1;
-      letter-spacing: -0.05em;
-    }
-    .briefing-grid {
-      gap: 14px;
-    }
-    .briefing-card {
-      position: relative;
-      min-height: 240px;
-      padding: 22px;
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
-    }
-    .briefing-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(255, 255, 255, 0.18);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-    }
-    .briefing-card::after {
-      content: "";
-      position: absolute;
-      inset: auto 22px 22px;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(255, 122, 26, 0.9), rgba(255, 255, 255, 0));
-      opacity: 0.7;
-    }
-    .briefing-card strong {
-      font-size: 24px;
-      line-height: 1.2;
-      letter-spacing: -0.04em;
-    }
-    .briefing-card p {
-      max-width: 34ch;
-    }
-    .poll-focus-grid {
-      gap: 14px;
-    }
-    .poll-focus-main,
-    .curation-card,
-    .compact-card,
-    .sidebar,
-    .detail {
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-    }
-    .poll-focus-main {
-      padding: 26px;
-      background:
-        radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 28%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-    }
-    .featured-poll {
-      display: grid;
-      gap: 22px;
-      color: #fff;
-    }
-    .featured-poll-head {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-    }
-    .featured-poll-label {
-      display: inline-flex;
-      align-items: center;
-      padding: 7px 11px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(226, 236, 244, 0.76);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .featured-poll-title {
-      margin: 0;
-      max-width: 18ch;
-      font-size: clamp(28px, 4vw, 40px);
-      line-height: 1.02;
-      letter-spacing: -0.05em;
-    }
-    .featured-poll-copy {
-      max-width: 48ch;
-      color: rgba(226, 236, 244, 0.76);
-      font-size: 15px;
-      line-height: 1.7;
-    }
-    .featured-poll-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .featured-metric {
-      padding: 14px 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(4, 17, 29, 0.34);
-    }
-    .featured-metric span {
-      display: block;
-      color: rgba(226, 236, 244, 0.58);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .featured-metric strong {
-      display: block;
-      margin-top: 8px;
-      font-size: 18px;
-      line-height: 1.35;
-    }
-    .featured-points {
-      display: grid;
-      gap: 10px;
-    }
-    .featured-point {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 10px;
-      align-items: start;
-      color: rgba(226, 236, 244, 0.82);
-      font-size: 14px;
-      line-height: 1.55;
-    }
-    .featured-point::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      margin-top: 8px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ff7a1a, #60a5fa);
-    }
-    .mini-item,
-    .item {
-      border-radius: 22px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
-    }
-    .mini-item:hover,
-    .item:hover {
-      transform: translateY(-2px);
-      border-color: rgba(255, 255, 255, 0.16);
-      background: rgba(255, 255, 255, 0.06);
-    }
-    .item.selected {
-      border-color: rgba(255, 122, 26, 0.45);
-      background: linear-gradient(180deg, rgba(255, 122, 26, 0.18), rgba(255, 255, 255, 0.03));
-    }
-    .compact-card h3,
-    .section-title {
-      font-size: 15px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(226, 236, 244, 0.72);
-    }
-    .archive-pill {
-      border-color: rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-    }
-    .detail-title {
-      font-size: clamp(32px, 4vw, 52px);
-      line-height: 0.98;
-      letter-spacing: -0.05em;
-    }
-    .detail-bullet {
-      border-radius: 22px;
-      border-color: rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
-    }
-    .body.compact,
-    .poll-card {
-      border-radius: 24px;
-    }
-    .hero,
-    .briefing-card,
-    .poll-focus-main,
-    .curation-card,
-    .compact-card,
-    .sidebar,
-    .detail {
-      animation: rise-in 520ms ease both;
-    }
-    .briefing-grid .briefing-card:nth-child(2) { animation-delay: 80ms; }
-    .briefing-grid .briefing-card:nth-child(3) { animation-delay: 160ms; }
-    @keyframes rise-in {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    @media (max-width: 1180px) {
-      .topbar,
-      .hero,
-      .poll-focus-grid,
-      .shell {
-        grid-template-columns: 1fr;
-      }
-      .hero-copy {
-        min-height: auto;
-      }
-      .hero-strip,
-      .featured-poll-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-    @media (max-width: 720px) {
-      body { padding-inline: 12px; }
-      .topbar {
-        gap: 10px;
-      }
-      .hero {
-        padding: 22px;
-      }
-      h1,
-      .hero-copy h1 {
-        font-size: 42px;
-      }
-      .summary-grid,
-      .poll-overview-grid {
-        grid-template-columns: 1fr;
-      }
-      .briefing-grid,
-      .compact-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .briefing-card strong,.issue-card strong,.mini-card strong { font-size:18px; line-height:1.45; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .briefing-card .muted,.issue-card .muted,.mini-card .muted { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .poll-focus { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,0.8fr); gap:12px; align-items:stretch; }
+    .poll-card { padding:18px; border-radius:22px; border:1px solid rgba(96,165,250,.22); background:linear-gradient(180deg, rgba(96,165,250,.12), rgba(255,255,255,.04)); min-height:100%; }
+    .mini-stack { display:grid; gap:12px; }
+    .detail { display:grid; gap:14px; scroll-margin-top:16px; }
+    .detail-title { font-size:28px; color:#fff; line-height:1.2; }
+    .bullet-list { display:grid; gap:10px; }
+    .bullet { padding:14px 16px; border-radius:18px; border:1px solid var(--border); background:rgba(255,255,255,0.04); line-height:1.6; }
+    details { border:1px solid var(--border); border-radius:18px; padding:14px 16px; background:rgba(255,255,255,0.04); }
+    summary { cursor:pointer; font-weight:700; color:#ffbf93; }
+    .detail-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .meta-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-size:13px; color:var(--muted); }
+    .detail-links { display:grid; gap:8px; margin-top:8px; }
+    .detail-links a { color:#ffd2b6; text-decoration:underline; text-underline-offset:3px; }
+    .archive-link { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; transition:background 180ms ease; }
+    .archive-link:hover { background:rgba(255,255,255,0.12); }
+    @media (max-width:980px) { .hero,.briefing-grid,.poll-focus,.issues-grid { grid-template-columns:1fr; } }
+    @media (max-width:720px) { body { padding-inline:12px; } h1 { font-size:28px; } }
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
 <body class="rf-workspace-page">
   <main>
-    <section class="topbar">
+    <section class="panel topbar">
       <div class="brand">
-        <div class="topbar-meta">Policy Signal Desk</div>
-        <strong>개혁신당 정책 허브</strong>
-        <span>정책, 메시지, 법안, 규정, 여론조사를 문서 더미가 아니라 바로 판단 가능한 운영 화면으로 다시 묶었습니다.</span>
+        <strong>오늘의 개혁신당 브리핑</strong>
+        <span>오늘 중요한 이슈와 여론 흐름만 빠르게 확인</span>
       </div>
-      <a class="hero-action" href="#archiveShell">아카이브 바로가기</a>
     </section>
 
     <section class="panel hero">
-      <div class="hero-copy">
-        <div>
-        <span class="eyebrow">오늘의 브리핑</span>
-          <h1>오늘 중요한 흐름부터 먼저 잡습니다.</h1>
-          <p class="muted">정책과 메시지, 여론조사와 규정을 같은 비중으로 늘어놓지 않고, 지금 바로 판단에 필요한 신호를 앞에 세웁니다. 깊은 자료는 아래 아카이브에서 이어서 확인합니다.</p>
-        </div>
-        <div>
-          <div class="hero-actions">
-            <a class="hero-action primary" id="heroPrimaryLink" href="#archiveShell">최신 여론조사 보기</a>
-            <a class="hero-action" href="#briefingGrid">오늘의 브리핑</a>
-          </div>
-          <div class="hero-strip" id="heroStrip"></div>
-        </div>
+      <div>
+        <span class="eyebrow">브리핑 허브</span>
+        <h1>오늘 꼭 봐야 할 흐름만 먼저 보여줍니다.</h1>
+        <p class="muted">자료실처럼 전부 펼쳐두지 않고, 중요한 정책·메시지·여론조사만 먼저 요약합니다.</p>
+        <div style="margin-top:14px;"><a href="/hub/archive" class="archive-link">자료실 바로가기 →</a></div>
       </div>
-      <div class="hero-visual">
-        <div class="summary-grid" id="summaryGrid"></div>
-        <div class="hero-note">
-          <strong>Operating Note</strong>
-          <div>첫 화면은 브리핑과 핵심 수치에 집중시키고, 세부 원문과 연결 자료는 아래에서 단계적으로 열어보는 구조로 바꿨습니다.</div>
-        </div>
-      </div>
+      <div class="summary-grid" id="summaryGrid"></div>
     </section>
 
     <section class="briefing-grid" id="briefingGrid"></section>
 
-    <section class="poll-focus-grid">
-      <div class="panel poll-focus-main">
-        <h2 class="section-title">최신 여론조사 <span class="section-sub">핵심 수치부터 먼저</span></h2>
-        <div id="featuredPoll"></div>
-      </div>
-      <div class="poll-focus-side">
-        <div class="panel curation-card"><h2 class="section-title">지금 봐야 할 정책</h2><div class="mini-list" id="curatedPositions"></div></div>
-        <div class="panel curation-card"><h2 class="section-title">최근 메시지</h2><div class="mini-list" id="curatedMessages"></div></div>
+    <section class="poll-focus">
+      <article class="panel poll-card"><h2>최신 여론조사</h2><div id="featuredPoll"></div></article>
+      <div class="mini-stack">
+        <article class="panel mini-card"><h2>지금 봐야 할 정책</h2><div id="topPolicy"></div></article>
+        <article class="panel mini-card"><h2>최근 메시지</h2><div id="topMessage"></div></article>
       </div>
     </section>
 
-    <section class="compact-grid">
-      <div class="panel compact-card"><h3>자료실 요약</h3><div class="archive-summary" id="archiveSummary"></div><div class="archive-toggle-wrap"><button id="archiveToggle" class="ghost-btn" type="button">자료실 펼치기</button></div></div>
-      <div class="panel compact-card"><h3>최신 여론조사 더보기</h3><div class="mini-list" id="curatedPolls"></div></div>
-      <div class="panel compact-card"><h3>오늘 메모</h3><div class="muted">첫 화면은 브리핑 중심으로 줄이고, 세부 자료는 필요할 때만 펼쳐서 보도록 바꿨습니다.</div></div>
-    </section>
+    <section class="issues-grid" id="issuesGrid"></section>
 
-    <section class="shell stage1 archive-shell" id="archiveShell">
-      <aside class="panel sidebar">
-        <div class="tabs" id="tabs">
-          <button class="tab active" data-tab="positions">정책</button>
-          <button class="tab" data-tab="messages">메시지</button>
-          <button class="tab" data-tab="bills">법안</button>
-          <button class="tab" data-tab="people">인물</button>
-                    <button class="tab" data-tab="rules">규정</button>
-          <button class="tab" data-tab="polls">여론조사</button>
-        </div>
-        <input id="searchInput" class="search" placeholder="제목, 요약, 인물, 규정, 여론조사 검색" />
-        <div class="list" id="listPanel"></div>
-      </aside>
-
-      <section class="detail-grid">
-        <div class="panel detail">
-          <span class="eyebrow" id="detailType">브리핑</span>
-          <div class="detail-title" id="detailTitle">좌측 자료실에서 항목을 선택해 주세요.</div>
-          <p class="muted" id="detailSummary">선택한 항목의 왜 중요한지와 핵심 포인트를 먼저 보여줍니다.</p>
-          <div class="detail-bullets" id="detailBulletList" style="margin-top:14px;"></div>
-        </div>
-        <div class="panel detail">
-          <h2 class="section-title">왜 지금 중요한가</h2>
-          <div id="detailRelevance" class="muted">선택한 항목의 현재적 의미가 여기에 표시됩니다.</div>
-          <div style="margin-top:14px; font-weight:800; color:#fff;" id="detailStageLabel">-</div>
-          <div id="detailStageDesc" class="muted" style="margin-top: 6px;">-</div>
-          <div class="links" id="detailMeta" style="margin-top:14px;"></div>
-        </div>
-        <div class="panel detail">
-          <h2 class="section-title">브리핑 본문</h2>
-          <div class="body compact" id="detailBody">본문이 여기에 표시됩니다.</div>
-          <details class="detail-section-toggle">
-            <summary>연결 정보와 타임라인 보기</summary>
-            <h2 class="section-title" style="margin-top:14px;">연결 정보</h2><div class="chips" id="detailLinks"></div>
-            <h2 class="section-title" style="margin-top:16px;">타임라인</h2><div class="timeline" id="detailTimeline"></div>
-          </details>
-        </div>
-      </section>      </section>
+    <section class="panel detail" id="briefingDetail">
+      <span class="eyebrow" id="detailType">브리핑</span>
+      <div class="detail-title" id="detailTitle">항목을 선택하면 브리핑이 여기 나옵니다.</div>
+      <div class="muted" id="detailSummary">핵심만 먼저 읽히게 보여주고, 세부 자료는 아래에서 펼쳐봅니다.</div>
+      <div class="bullet-list" id="detailBullets"></div>
+      <div class="muted" id="detailRelevance"></div>
+      <div class="detail-meta" id="detailMeta"></div>
+      <div class="detail-links" id="detailLinks"></div>
+      <details><summary>세부 내용 보기</summary><div class="muted" id="detailBody" style="margin-top:12px; white-space:pre-wrap;"></div></details>
     </section>
   </main>
 
+  <script src="/static/js/hub-shared.js"></script>
   <script>
-    const safe = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const number = (value) => Number(value || 0).toLocaleString("ko-KR");
+const state = { datasets:{ positions:[], messages:[], polls:[] }, hub:null };
 
-    const DOC_TYPE_LABELS = {
-      bill: "??",
-      statement: "??",
-      press_release: "????",
-      briefing: "???",
-      pledge: "??",
-      policy: "?? ??",
-      party_rule: "??",
-      poll_result: "????",
-      research: "?? ??",
-      other: "??",
+async function api(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url);
+  return r.json();
+}
+
+function renderSummary(hub) {
+  const counts = (hub?.overview || {}).counts || {};
+  const items = [
+    ['정책', counts.positions], ['법안', counts.bills],
+    ['메시지', counts.messages || counts.statements],
+    ['인물', counts.people], ['여론조사', state.datasets.polls.length]
+  ];
+  document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) =>
+    `<div class="stat"><div class="label">${safe(label)}</div><strong>${number(value)}</strong></div>`
+  ).join('');
+}
+
+function internalAnchor(tab, key, inner) {
+  if (!key) return `<div>${inner}</div>`;
+  const href = hubUrl('/hub', tab, key);
+  return `<a href="${href}" data-tab="${safe(tab)}" data-key="${safe(key)}">${inner}</a>`;
+}
+
+function attachInternalNavigation(root = document) {
+  root.querySelectorAll('a[data-tab][data-key]').forEach(a => {
+    a.onclick = async (e) => {
+      e.preventDefault();
+      const tab = a.dataset.tab, key = a.dataset.key;
+      if (!tab || !key) return;
+      history.pushState({ tab, key }, '', hubUrl('/hub', tab, key));
+      await loadDetailFromState(tab, key);
+      document.getElementById('briefingDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
+  });
+}
 
-    const STATUS_LABELS = {
-      approved: "??",
-      review: "?? ?",
-      draft: "??",
-      active: "?? ?",
-      archived: "??",
-      superseded: "???",
-    };
+function renderHome(hub) {
+  const overview = hub.overview || {};
+  const messages = hub.messages || {};
+  const positions = (overview.curated_positions || []).slice(0, 2);
+  const messageItems = (overview.latest_messages || messages.featured || []).slice(0, 2);
+  const polls = state.datasets.polls.slice(0, 3);
+  const featuredPoll = polls[0] || null;
 
-    const state = {
-      tab: "positions",
-      search: "",
-      datasets: { positions: [], messages: [], people: [], bills: [], rules: [], polls: [] },
-      selected: { positions: null, messages: null, people: null, bills: null, rules: null, polls: null },
-    };
+  const briefing = [
+    { kicker: '정책', tab: 'positions', key: positions[0]?.slug, title: positions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(positions[0]) || '핵심 정책을 먼저 보여줍니다.' },
+    { kicker: '메시지', tab: 'messages', key: String(messageItems[0]?.id || ''), title: messageItems[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(messageItems[0]) || '최근 메시지 중 먼저 볼 항목을 추립니다.' },
+    { kicker: '여론조사', tab: 'polls', key: String(featuredPoll?.id || ''), title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 빠르게 요약합니다.' }
+  ];
 
-    function hubUrl(tab, key) {
-      const url = new URL("/hub", location.origin);
-      url.searchParams.set("tab", tab);
-      url.searchParams.set("key", key);
-      return url.pathname + url.search;
-    }
+  document.getElementById('briefingGrid').innerHTML = briefing.map(item =>
+    internalAnchor(item.tab, item.key,
+      `<div class="panel briefing-card"><div class="kicker">${safe(item.kicker)}</div><strong>${safe(item.title)}</strong><div class="muted">${safe(item.summary)}</div></div>`)
+  ).join('');
 
-    function docTypeLabel(value) {
-      return DOC_TYPE_LABELS[value] || "문서";
-    }
+  document.getElementById('featuredPoll').innerHTML = featuredPoll
+    ? internalAnchor('polls', String(featuredPoll.id),
+        `<div class="mini-card"><div class="muted">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div><strong>${safe(featuredPoll.title)}</strong><div class="muted">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 보여줍니다.')}</div></div>`)
+    : '<div class="muted">표시할 여론조사가 없습니다.</div>';
 
-    function statusLabel(value) {
-      return STATUS_LABELS[value] || value || "";
-    }
+  document.getElementById('topPolicy').innerHTML = positions.map(item =>
+    internalAnchor('positions', item.slug, `<strong>${safe(item.title)}</strong><div class="muted">${safe(firstMeaningfulText(item))}</div>`)
+  ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 정책이 없습니다.</div>';
 
-    function itemKeyForTab(tab, item) {
-      if (tab === "positions") return String(item.slug || item.id);
-      if (tab === "people") return String(item.person_name || "");
-      return String(item.id);
-    }
+  document.getElementById('topMessage').innerHTML = messageItems.map(item =>
+    internalAnchor('messages', String(item.id), `<strong>${safe(item.title)}</strong><div class="muted">${safe(firstMeaningfulText(item))}</div>`)
+  ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 메시지가 없습니다.</div>';
 
-    function itemKey(item) {
-      return itemKeyForTab(state.tab, item);
-    }
+  const issues = [
+    { title: '지금 봐야 할 정책', summary: firstMeaningfulText(positions[0]) || '중요 정책을 앞에 노출합니다.', tab: 'positions', key: positions[0]?.slug },
+    { title: '최근 메시지', summary: firstMeaningfulText(messageItems[0]) || '최근 공개 메시지 중 중요한 것만 추립니다.', tab: 'messages', key: String(messageItems[0]?.id || '') },
+    { title: '최신 여론 흐름', summary: firstMeaningfulText(featuredPoll) || '최신 여론조사 핵심만 빠르게 요약합니다.', tab: 'polls', key: String(featuredPoll?.id || '') }
+  ];
+  document.getElementById('issuesGrid').innerHTML = issues.map(item =>
+    internalAnchor(item.tab, item.key, `<div class="panel issue-card"><strong>${safe(item.title)}</strong><div class="muted">${safe(item.summary)}</div></div>`)
+  ).join('');
 
-    function syncUrl() {
-      const key = state.selected[state.tab];
-      const url = new URL(location.href);
-      url.searchParams.set("tab", state.tab);
-      if (key) url.searchParams.set("key", key);
-      else url.searchParams.delete("key");
-      history.replaceState({}, "", url);
-    }
+  attachInternalNavigation(document);
+}
 
-    function readInitialState() {
-      const params = new URLSearchParams(location.search);
-      const incomingTab = params.get("tab");
-      const tab = incomingTab === "commentary" ? "messages" : incomingTab;
-      const key = params.get("key");
-      if (tab && state.datasets[tab]) state.tab = tab;
-      if (key) state.selected[state.tab] = key;
-      document.querySelectorAll(".tab").forEach((node) => {
-        node.classList.toggle("active", node.dataset.tab === state.tab);
-      });
-    }
+function renderBullets(text, fallback) {
+  const bullets = String(text || '').split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
+  return (bullets.length ? bullets : [fallback]).map(v => `<div class="bullet">${safe(v)}</div>`).join('');
+}
 
-    function summarizeText(value, fallback = '') {
-      const txt = String(value || '').replace(/\s+/g, ' ').trim();
-      if (!txt) return fallback;
-      return txt.length > 110 ? txt.slice(0, 110).trim() + '…' : txt;
-    }
+function buildDetailMeta(data, tab) {
+  const meta = [];
+  if (data.published_at) meta.push(data.published_at);
+  if (tab === 'polls' && data.metadata?.pollster) meta.push(data.metadata.pollster);
+  if (tab === 'messages' && (data.speaker_name || data.speaker)) meta.push(data.speaker_name || data.speaker);
+  if (tab === 'positions' && data.category) meta.push(data.category);
+  return meta.map(v => `<span class="meta-pill">${safe(v)}</span>`).join('');
+}
 
-    function firstMeaningfulText(item) {
-      return summarizeText(item?.official_summary || item?.summary || item?.brief?.summary || item?.relevance_note || item?.body || '', '');
-    }
+function buildDetailLinks(data, tab) {
+  const links = [];
+  if (data.source_url) links.push(`<a href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>`);
+  if (tab === 'polls' && (data.metadata?.attachments || []).length) {
+    const first = data.metadata.attachments[0];
+    if (first?.url) links.push(`<a href="${safe(first.url)}" target="_blank" rel="noreferrer">첨부 자료</a>`);
+  }
+  return links.join('');
+}
 
-    function renderSummary(data) {
-      const overview = data.overview || {};
-      const messages = data.messages || {};
-      const counts = overview.counts || {};
-      const items = [
-        ['정책', counts.positions],
-        ['법안', counts.bills],
-        ['메시지', counts.messages || counts.statements],
-        ['규정', state.datasets.rules.length],
-      ];
-      document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) => `
-        <div class="stat"><div class="label">${safe(label)}</div><strong>${number(value)}</strong></div>
-      `).join('');
+async function loadDetailFromState(tab, key) {
+  if (!tab || !key) return;
+  const detail = document.getElementById('briefingDetail');
+  document.getElementById('detailTitle').textContent = '불러오는 중...';
+  document.getElementById('detailSummary').textContent = '';
+  document.getElementById('detailBullets').innerHTML = '';
+  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      const curatedPositions = (overview.curated_positions || []).slice(0, 2);
-      const curatedMessages = (overview.latest_messages || messages.featured || []).slice(0, 2);
-      const curatedPolls = (state.datasets.polls || []).slice(0, 3);
-      const featuredPoll = curatedPolls[0] || null;
-      const featuredPosition = curatedPositions[0] || null;
-      const featuredMessage = curatedMessages[0] || null;
-      const heroSignals = [
-        { label: '우선 정책', value: featuredPosition?.title || '정책 브리핑 준비 중' },
-        { label: '최근 메시지', value: featuredMessage?.title || '메시지 브리핑 준비 중' },
-        { label: '최신 여론조사', value: featuredPoll?.title || '여론조사 브리핑 준비 중' },
-      ];
-      document.getElementById('heroStrip').innerHTML = heroSignals.map((item) => `
-        <div class="signal-chip">
-          <span>${safe(item.label)}</span>
-          <strong>${safe(item.value)}</strong>
-        </div>
-      `).join('');
-      document.getElementById('heroPrimaryLink').href = featuredPoll ? hubUrl('polls', featuredPoll.id) : '#archiveShell';
+  try {
+    let data = null;
+    if (tab === 'positions') data = await api(`/api/policy/positions/${encodeURIComponent(key)}`);
+    else if (['messages', 'polls', 'rules', 'bills'].includes(tab)) data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
+    if (!data) return;
 
-      const briefings = [
-        { kicker:'정책', title: curatedPositions[0]?.title || '정책 브리핑 준비 중', summary: firstMeaningfulText(curatedPositions[0]) || '지금 먼저 볼 정책을 앞에 놓습니다.', href: curatedPositions[0] ? hubUrl('positions', curatedPositions[0].slug) : '#' },
-        { kicker:'메시지', title: curatedMessages[0]?.title || '메시지 브리핑 준비 중', summary: firstMeaningfulText(curatedMessages[0]) || '최근 발신 메시지 중 우선순위가 높은 항목을 먼저 보여줍니다.', href: curatedMessages[0] ? hubUrl('messages', curatedMessages[0].id) : '#' },
-        { kicker:'여론조사', title: featuredPoll?.title || '여론조사 브리핑 준비 중', summary: firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 빠르게 요약합니다.', href: featuredPoll ? hubUrl('polls', featuredPoll.id) : '#' },
-      ];
-      document.getElementById('briefingGrid').innerHTML = briefings.map(item => `
-        <a class="panel briefing-card" href="${item.href}">
-          <div class="kicker">${safe(item.kicker)}</div>
-          <strong>${safe(item.title)}</strong>
-          <p class="muted">${safe(item.summary)}</p>
-        </a>
-      `).join('');
+    document.getElementById('detailType').textContent = tab === 'positions' ? '정책 브리핑' : tab === 'messages' ? '메시지 브리핑' : tab === 'polls' ? '여론조사 브리핑' : '브리핑';
+    document.getElementById('detailTitle').textContent = data.title || '';
+    document.getElementById('detailSummary').textContent = data.summary || firstMeaningfulText(data) || '';
+    const bulletSource = tab === 'polls'
+      ? (((data.metadata || {}).support_lines || []).join('\n') || data.summary || '')
+      : (data.derived_key_points || data.key_points || data.summary || '');
+    document.getElementById('detailBullets').innerHTML = renderBullets(bulletSource, '핵심 요약을 준비 중입니다.');
+    document.getElementById('detailRelevance').textContent = data.derived_relevance_note || data.relevance_note || '';
+    document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
+    document.getElementById('detailLinks').innerHTML = buildDetailLinks(data, tab);
+    document.getElementById('detailBody').textContent = data.body || data.summary || '';
+  } catch (err) {
+    console.error('loadDetail error:', err);
+    document.getElementById('detailTitle').textContent = '해당 항목을 찾을 수 없습니다';
+    document.getElementById('detailSummary').textContent = '잠시 후 다시 시도해주세요.';
+  }
+}
 
-      document.getElementById('curatedPositions').innerHTML = curatedPositions.map(item => `
-        <a class="mini-item" href="${hubUrl('positions', item.slug)}">
-          <div class="meta">${safe(item.category || '정책')}</div>
-          <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
-        </a>
-      `).join('') || '<div class="empty">표시할 정책이 없습니다.</div>';
+async function init() {
+  const [hub, positions, messages, polls] = await Promise.all([
+    api('/api/policy/hub'), api('/api/policy/positions'),
+    api('/api/policy/messages?limit=20'), api('/api/policy/polls?limit=20')
+  ]);
+  state.hub = hub;
+  state.datasets.positions = positions.items || [];
+  state.datasets.messages = messages.items || [];
+  state.datasets.polls = polls.items || [];
+  renderSummary(hub);
+  renderHome(hub);
+  const params = new URLSearchParams(location.search);
+  if (params.get('tab') && params.get('key')) await loadDetailFromState(params.get('tab'), params.get('key'));
+}
 
-      document.getElementById('curatedMessages').innerHTML = curatedMessages.map(item => `
-        <a class="mini-item" href="${hubUrl('messages', item.id)}">
-          <div class="meta">${safe(docTypeLabel(item.doc_type || 'statement'))}</div>
-          <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item) || [item.published_at, item.speaker_name || item.speaker].filter(Boolean).join(' · '))}</div>
-        </a>
-      `).join('') || '<div class="empty">표시할 메시지가 없습니다.</div>';
+window.addEventListener('popstate', async () => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('tab') && params.get('key')) await loadDetailFromState(params.get('tab'), params.get('key'));
+});
 
-      document.getElementById('curatedPolls').innerHTML = curatedPolls.slice(1).map(item => `
-        <a class="mini-item" href="${hubUrl('polls', item.id)}">
-          <div class="meta">${safe((item.metadata || {}).pollster || '여론조사')}</div>
-          <strong>${safe(item.title)}</strong>
-          <div class="meta">${safe(firstMeaningfulText(item))}</div>
-        </a>
-      `).join('') || '<div class="empty">추가 여론조사가 없습니다.</div>';
-
-      document.getElementById('archiveSummary').innerHTML = items.map(([label, value]) => `<span class="archive-pill">${safe(label)} ${number(value)}</span>`).join('');
-
-      document.getElementById('featuredPoll').innerHTML = featuredPoll ? `
-        <a href="${hubUrl('polls', featuredPoll.id)}" class="featured-poll">
-          <div class="featured-poll-head">
-            <span class="featured-poll-label">${safe((featuredPoll.metadata || {}).pollster || '여론조사')}</span>
-            <span class="featured-poll-label">${safe(featuredPoll.published_at || '최신 공표')}</span>
-          </div>
-          <h3 class="featured-poll-title">${safe(featuredPoll.title || '')}</h3>
-          <div class="featured-poll-copy">${safe(firstMeaningfulText(featuredPoll) || '최신 조사 핵심만 먼저 확인할 수 있습니다.')}</div>
-          <div class="featured-poll-grid">
-            <div class="featured-metric">
-              <span>조사기관</span>
-              <strong>${safe((featuredPoll.metadata || {}).pollster || '미정리')}</strong>
-            </div>
-            <div class="featured-metric">
-              <span>의뢰자</span>
-              <strong>${safe((featuredPoll.metadata || {}).client_name || '미정리')}</strong>
-            </div>
-            <div class="featured-metric">
-              <span>조사기간</span>
-              <strong>${safe((featuredPoll.metadata || {}).survey_period || featuredPoll.published_at || '미정리')}</strong>
-            </div>
-          </div>
-          <div class="featured-points">
-            ${(((featuredPoll.metadata || {}).support_lines || []).slice(0, 3).map((line) => `<div class="featured-point">${safe(line)}</div>`).join('')) || '<div class="featured-point">수치형 하이라이트가 정리되지 않은 항목은 조사 개요와 원문 링크로 바로 이어집니다.</div>'}
-          </div>
-        </a>
-      ` : '<div class="empty">표시할 여론조사가 없습니다.</div>';
-    }
-
-    function currentItems() {
-      const query = state.search.trim().toLowerCase();
-      return (state.datasets[state.tab] || []).filter((item) => {
-        if (!query) return true;
-        return JSON.stringify(item).toLowerCase().includes(query);
-      });
-    }
-
-    function itemMeta(item) {
-      if (state.tab === "positions") return [item.category, item.official_summary || item.summary].filter(Boolean).join(" · ");
-      if (state.tab === "messages") {
-        const speakerLabel = item.speaker_name && item.speaker ? `${item.speaker} ${item.speaker_name}` : item.speaker_name || item.speaker;
-        return [item.published_at, speakerLabel, item.topic_label].filter(Boolean).join(" · ");
-      }
-      if (state.tab === "people") return [`대표발의 ${number(item.proposer_count)}건`, `전체 문서 ${number(item.document_count)}건`].join(" · ");
-            if (state.tab === "rules") return [item.metadata?.rule_kind_label || item.metadata?.rule_kind, item.metadata?.version_label, item.metadata?.effective_from || item.published_at].filter(Boolean).join(" · ");
-      if (state.tab === "polls") return [item.metadata?.pollster, item.metadata?.client_name, item.published_at].filter(Boolean).join(" · ");
-      return [item.published_at, (item.primary_people || []).map((person) => person.person_name).join(", "), (item.linked_positions || item.related_positions || []).map((link) => link.position_title).slice(0, 1).join(", ")].filter(Boolean).join(" · ");
-    }
-
-    function renderList() {
-      const root = document.getElementById("listPanel");
-      const items = currentItems();
-      if (!items.length) {
-        root.innerHTML = '<div class="empty">표시할 항목이 없습니다.</div>';
-        renderDetail(null);
-        return;
-      }
-
-      if (!items.some((entry) => itemKey(entry) === String(state.selected[state.tab]))) {
-        state.selected[state.tab] = itemKey(items[0]);
-      }
-
-      root.innerHTML = items.map((entry) => `
-        <div class="item${itemKey(entry) === String(state.selected[state.tab]) ? " selected" : ""}" data-key="${safe(itemKey(entry))}">
-          <strong>${safe(entry.title || entry.person_name || "")}</strong>
-          <div class="meta">${safe(itemMeta(entry))}</div>
-        </div>
-      `).join("");
-
-      root.querySelectorAll(".item").forEach((node) => {
-        node.addEventListener("click", () => {
-          state.selected[state.tab] = node.dataset.key;
-          syncUrl();
-          renderList();
-          loadDetail();
-        });
-      });
-
-      syncUrl();
-      loadDetail();
-    }
-
-    async function api(url) {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`request failed: ${url}`);
-      return response.json();
-    }
-
-    async function loadDetail() {
-      const key = state.selected[state.tab];
-      if (!key) {
-        renderDetail(null);
-        return;
-      }
-
-      let data = null;
-      if (state.tab === "positions") data = await api(`/api/policy/positions/${encodeURIComponent(key)}`);
-      else if (["messages", "bills", "rules", "polls"].includes(state.tab)) data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
-      else if (state.tab === "people") data = await api(`/api/policy/people/${encodeURIComponent(key)}`);
-      renderDetail(data);
-    }
-
-    function renderPolicyLinks(items, labelPrefix = "") {
-      if (!items || !items.length) return "";
-      return items.map((item) => `
-        <a class="chip${item.is_inferred ? " subtle" : ""}" href="${hubUrl("positions", item.position_slug || item.position_id)}">
-          ${safe(labelPrefix)}${safe(item.position_title)}
-        </a>
-      `).join("");
-    }
-
-    function renderDocLinks(items) {
-      if (!items || !items.length) return "";
-      return items.map((item) => `
-        <a class="chip" href="${safe(item.href)}"${item.href.startsWith("http") ? ' target="_blank" rel="noreferrer"' : ""}>${safe(item.label)}</a>
-      `).join("");
-    }
-
-    function renderTimeline(items) {
-      const root = document.getElementById("detailTimeline");
-      root.innerHTML = "";
-      for (const item of items || []) {
-        const label = item.kind === "version" ? "정책 버전" : item.kind === "bill_event" ? "법안 진행" : item.kind === "meeting_event" ? "회의" : item.kind === "rule_revision" ? "규정 개정" : docTypeLabel(item.doc_type || "other");
-        const el = document.createElement("article");
-        el.className = "mini-item";
-        el.style.borderLeft = "3px solid var(--brand)";
-        el.innerHTML = `<div class="meta">${safe(item.at || "-")} · ${safe(label)}</div><strong>${safe(item.title || "-")}</strong><div class="meta">${safe(item.summary || item.status || item.relation_type || "")}</div>`;
-        root.appendChild(el);
-      }
-      if (!root.children.length) root.innerHTML = '<div class="empty">표시할 타임라인이 없습니다.</div>';
-    }
-
-    function bodyLines(body) {
-      return String(body || "")
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-    }
-
-    function findLineValue(lines, label, options = {}) {
-      const startIndex = options.startIndex || 0;
-      const stopLabels = options.stopLabels || [];
-      const index = lines.findIndex((line, lineIndex) => lineIndex >= startIndex && line === label);
-      if (index < 0) return "";
-      const values = [];
-      for (let i = index + 1; i < lines.length; i += 1) {
-        const line = lines[i];
-        if (!line || line === label) continue;
-        if (stopLabels.includes(line) || /^[0-9]+\.$/.test(line)) break;
-        values.push(line);
-      }
-      return values.join(" ").trim();
-    }
-
-    function findRegexValue(text, pattern) {
-      const match = String(text || "").match(pattern);
-      return match ? match[1].trim() : "";
-    }
-
-    function extractPollSections(data) {
-      const body = String(data.body || "");
-      const metadata = data.metadata || {};
-      const lines = bodyLines(body);
-      const basicStart = Math.max(lines.indexOf("여론조사 기본"), 0);
-      const basicLines = lines.slice(basicStart);
-      const surveyDate = findLineValue(basicLines, "조사일시", {
-        stopLabels: ["조사일수", "조사시간", "조사대상", "표본의 크기"],
-      });
-      const sampleSize = findRegexValue(body, /조사완료 사례수\(명\)\s+전체\s+(\d+)/);
-      const margin = findRegexValue(body, /95% 신뢰수준에\s*±?([0-9.]+%P)/);
-      const responseRate = findRegexValue(body, /전체 응답률\s+([0-9.]+%)/);
-      const contactRate = findRegexValue(body, /전체 접촉률\s+([0-9.]+%)/);
-      const publication = findLineValue(lines, "최초 공표·보도 지정일시", {
-        stopLabels: ["전체질문지 자료", "결과분석 자료", "용어설명"],
-      });
-      const overview = {
-        pollster: metadata.pollster || findLineValue(basicLines, "조사기관명", { stopLabels: ["공동조사기관명", "조사지역"] }),
-        client: metadata.client_name || findLineValue(basicLines, "조사의뢰자", { stopLabels: ["조사기관명", "공동조사기관명"] }),
-        method: metadata.survey_method || findLineValue(basicLines, "조사방법", { stopLabels: ["피조사자 선정방법", "조사대상"] }),
-        sampleFrame: metadata.sample_frame || findLineValue(basicLines, "추출틀", { stopLabels: ["규모", "구축방법"] }),
-        region: metadata.title_region || findLineValue(basicLines, "지역", { stopLabels: ["선거명", "조사의뢰자"] }),
-        target: findLineValue(basicLines, "조사대상", { stopLabels: ["표본의 크기", "조사방법"] }),
-        surveyDate,
-        sampleSize,
-        margin,
-        responseRate,
-        contactRate,
-        publication: publication || data.published_at || metadata.registered_at || "",
-      };
-
-      const methodMix = [];
-      const wireless = findRegexValue(body, /무선\s+([0-9.]+)\s*%/);
-      const wired = findRegexValue(body, /유선\s+([0-9.]+)\s*%/);
-      if (wireless) methodMix.push({ label: "무선 비중", value: `${wireless}%` });
-      if (wired) methodMix.push({ label: "유선 비중", value: `${wired}%` });
-
-      const keyStats = [
-        { label: "표본 수", value: overview.sampleSize ? `${overview.sampleSize}명` : "미추출", sub: overview.margin ? `표본오차 ±${overview.margin}` : "표본오차 정보 없음" },
-        { label: "응답률", value: overview.responseRate || "미추출", sub: overview.contactRate ? `접촉률 ${overview.contactRate}` : "접촉률 정보 없음" },
-        { label: "조사 방식", value: overview.method || "미추출", sub: overview.sampleFrame || "표본추출틀 정보 없음" },
-        { label: "공표 시점", value: overview.publication || "미추출", sub: overview.surveyDate || "조사일시 정보 없음" },
-      ];
-
-      const cleanedBody = body.replace(/^여론조사결과 등록현황 상세보기[\s\S]*?여론조사 기본\s*/u, "").trim();
-      const bodyPreview = cleanedBody.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean).slice(0, 4);
-      return { overview, methodMix, keyStats, bodyPreview };
-    }
-
-    function renderPollBody(data) {
-      const { overview, methodMix, keyStats, bodyPreview } = extractPollSections(data);
-      const keyPoints = ((data.metadata || {}).support_lines || []).slice(0, 6);
-      const pointMarkup = keyPoints.length
-        ? keyPoints.map((item) => `<p>${safe(item)}</p>`).join("")
-        : '<p>본문에 개혁신당 관련 수치가 구조화되어 있지 않아, 우선 조사 개요와 응답 설계를 위주로 보여줍니다.</p>';
-      const graphMarkup = keyPoints.length
-        ? keyPoints.map((item) => {
-            const match = String(item).match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
-            const value = match ? Math.max(0, Math.min(100, Number(match[1]))) : 0;
-            const label = String(item).replace(/([0-9]+(?:\.[0-9]+)?)\s*%/, '').replace(/[:·-]+\s*$/, '').trim() || '지표';
-            return `
-              <div class="poll-result-row">
-                <div class="poll-result-label">${safe(label)}</div>
-                <div class="poll-result-bar"><span style="width:${value}%"></span></div>
-                <div class="poll-result-value">${value ? value.toFixed(value % 1 ? 1 : 0) : '-'}${value ? '%' : ''}</div>
-              </div>
-            `;
-          }).join('')
-        : '<div class="empty">그래프로 표시할 비율 데이터가 아직 충분하지 않습니다.</div>';
-      const methodMarkup = methodMix.length
-        ? methodMix.map((item) => {
-            const numeric = Number.parseFloat(String(item.value).replace("%", ""));
-            const width = Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0;
-            return `
-              <div class="poll-method-row">
-                <div class="meta">${safe(item.label)} · ${safe(item.value)}</div>
-                <div class="poll-bar"><span style="width:${width}%"></span></div>
-              </div>
-            `;
-          }).join("")
-        : '<div class="empty">유·무선 비중 등 비율 정보는 아직 추출되지 않았습니다.</div>';
-      const previewMarkup = bodyPreview.length
-        ? bodyPreview.map((item) => `<p>${safe(item)}</p>`).join("")
-        : `<p>${safe(data.summary || "보여줄 요약 본문이 없습니다.")}</p>`;
-
-      return `
-        <div class="poll-layout">
-          <section class="poll-overview-grid">
-            ${keyStats.map((item) => `
-              <article class="poll-card">
-                <div class="label">${safe(item.label)}</div>
-                <strong>${safe(item.value)}</strong>
-                <div class="sub">${safe(item.sub)}</div>
-              </article>
-            `).join("")}
-          </section>
-          <section class="poll-overview-grid">
-            <article class="poll-card">
-              <h3>조사 개요</h3>
-              <div class="poll-copy-list">
-                <p><strong>조사기관</strong><br>${safe(overview.pollster || "미추출")}</p>
-                <p><strong>의뢰자</strong><br>${safe(overview.client || "미추출")}</p>
-                <p><strong>조사 지역</strong><br>${safe(overview.region || data.title || "미추출")}</p>
-                <p><strong>조사대상</strong><br>${safe(overview.target || "미추출")}</p>
-              </div>
-            </article>
-            <article class="poll-card">
-              <h3>조사 설계</h3>
-              <div class="poll-copy-list">
-                <p><strong>조사 방식</strong><br>${safe(overview.method || "미추출")}</p>
-                <p><strong>표본추출틀</strong><br>${safe(overview.sampleFrame || "미추출")}</p>
-                <p><strong>조사일시</strong><br>${safe(overview.surveyDate || "미추출")}</p>
-              </div>
-            </article>
-            <article class="poll-card">
-              <h3>핵심 포인트</h3>
-              <div class="poll-copy-list">${pointMarkup}</div>
-            </article>
-            <article class="poll-card">
-              <h3>주요 수치 그래프</h3>
-              <div class="poll-result-grid">${graphMarkup}</div>
-            </article>
-            <article class="poll-card">
-              <h3>비율 요약</h3>
-              <div class="poll-method-list">${methodMarkup}</div>
-            </article>
-          </section>
-          <section class="poll-card">
-            <h3>정리된 본문</h3>
-            <div class="poll-copy-list">${previewMarkup}</div>
-          </section>
-          <section class="poll-card">
-            <h3>원문 안내</h3>
-            <div class="sub">선관위 설명문과 원문 본문은 하단 링크에서 확인하고, 상세 상단은 조사 개요와 핵심 지표가 먼저 보이도록 재배치했습니다.</div>
-          </section>
-        </div>
-      `;
-    }
-
-
-    function asBullets(value, fallback) {
-      const lines = String(value || '').split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 3);
-      const items = lines.length ? lines : [fallback];
-      return items.map(line => `<div class="detail-bullet">${safe(line)}</div>`).join('');
-    }
-
-    function renderEmptyDetail() {
-      document.getElementById("detailBody").classList.remove("poll-layout");
-      document.getElementById("detailType").textContent = "허브";
-      document.getElementById("detailTitle").textContent = "좌측 목록에서 항목을 선택해 주세요.";
-      document.getElementById("detailSummary").textContent = "선택한 항목의 핵심 브리핑이 여기에 표시됩니다.";
-      document.getElementById("detailBrief").textContent = "선택한 항목의 핵심 요약이 여기에 표시됩니다.";
-      document.getElementById("detailKeyPoints").textContent = "선택한 항목의 주요 포인트가 여기에 표시됩니다.";
-      document.getElementById("detailRelevance").textContent = "선택한 항목의 중요성이 여기에 표시됩니다.";
-      document.getElementById("detailStageLabel").textContent = "-";
-      document.getElementById("detailStageDesc").textContent = "-";
-      document.getElementById("detailBody").textContent = "브리핑 본문이 여기에 표시됩니다.";
-      document.getElementById("detailBulletList").innerHTML = '<div class="detail-bullet">선택한 항목의 핵심 포인트가 여기에 표시됩니다.</div>';
-      document.getElementById("detailMeta").innerHTML = "";
-      document.getElementById("detailLinks").innerHTML = '<div class="empty">연결 정보가 없습니다.</div>';
-      renderTimeline([]);
-    }
-    function renderDetail(data) {
-      const typeEl = document.getElementById("detailType");
-      const titleEl = document.getElementById("detailTitle");
-      const summaryEl = document.getElementById("detailSummary");
-      const bodyEl = document.getElementById("detailBody");
-      const metaEl = document.getElementById("detailMeta");
-      const linksEl = document.getElementById("detailLinks");
-      const bulletListEl = document.getElementById("detailBulletList");
-      const stageLabelEl = document.getElementById("detailStageLabel");
-      const stageDescEl = document.getElementById("detailStageDesc");
-      const relevanceEl = document.getElementById("detailRelevance");
-
-      if (!data) {
-        renderEmptyDetail();
-        return;
-      }
-      bodyEl.classList.remove("poll-layout");
-
-      if (state.tab === "positions") {
-        typeEl.textContent = "정책";
-        titleEl.textContent = data.title || "";
-        summaryEl.textContent = data.summary || "공식 정책 문서입니다.";
-        bulletListEl.innerHTML = asBullets(data.key_points || data.official_summary || data.summary, "핵심 포인트가 아직 정리되지 않았습니다.");
-        relevanceEl.textContent = data.relevance_note || "정책 문서와 연결된 공개 메시지, 법안, 회의 맥락을 함께 볼 수 있습니다.";
-        stageLabelEl.textContent = data.execution_stage?.label || "정책 정리";
-        stageDescEl.textContent = data.execution_stage?.description || "공식 문서와 연결 자료를 바탕으로 정책 상태를 추적합니다.";
-        bodyEl.textContent = data.body || data.summary || "";
-        metaEl.innerHTML = [data.category ? `<span class="link">${safe(data.category)}</span>` : "", data.status ? `<span class="link">${safe(statusLabel(data.status))}</span>` : "", data.version_label ? `<span class="link">${safe(data.version_label)}</span>` : ""].join("");
-        const documents = (data.documents || []).map((item) => ({ href: hubUrl(item.doc_type === "bill" ? "bills" : item.doc_type === "policy" ? "positions" : item.doc_type === "party_rule" ? "rules" : "messages", item.doc_type === "policy" ? data.slug : item.id), label: `${docTypeLabel(item.doc_type)} · ${item.title}` }));
-        linksEl.innerHTML = renderDocLinks(documents) || '<div class="empty">연결 문서가 없습니다.</div>';
-        renderTimeline(data.timeline || []);
-        return;
-      }
-
-      if (state.tab === "messages") {
-        typeEl.textContent = "메시지";
-        titleEl.textContent = data.title || "";
-        summaryEl.textContent = data.summary || `${docTypeLabel(data.doc_type || "statement")} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "메시지 핵심 포인트가 없습니다.");
-        relevanceEl.textContent = data.derived_relevance_note || "정책과의 연결성을 함께 검토할 수 있습니다.";
-        stageLabelEl.textContent = (data.linked_positions || []).length ? "정책 연결 확인" : "공개 메시지";
-        stageDescEl.textContent = data.source_url ? "원문 링크와 함께 확인할 수 있습니다." : "본문 중심으로 정리된 메시지입니다.";
-        bodyEl.textContent = data.body || data.summary || "";
-        metaEl.innerHTML = [data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "", (data.speaker_name || data.speaker) ? `<a class="link" href="${hubUrl("people", data.speaker_name || data.speaker || "")}">${safe(data.speaker_name || data.speaker)}</a>` : "", data.doc_type ? `<span class="link">${safe(docTypeLabel(data.doc_type))}</span>` : "", data.topic_label ? `<span class="link">${safe(data.topic_label)}</span>` : "", data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>` : ""].join("");
-        const official = renderPolicyLinks(data.linked_positions || [], "공식 연결 · ");
-        const inferred = renderPolicyLinks((data.related_positions || []).filter((item) => !(data.linked_positions || []).some((linked) => linked.position_id === item.position_id)), "추정 연결 · ");
-        linksEl.innerHTML = `${official}${inferred}` || '<div class="empty">연결 정책이 없습니다.</div>';
-        renderTimeline(data.timeline || []);
-        return;
-      }
-
-      if (state.tab === "rules") {
-        typeEl.textContent = "규정";
-        titleEl.textContent = data.title || "";
-        summaryEl.textContent = data.summary || `${(data.metadata || {}).rule_kind_label || "규정"} 문서입니다.`;
-        bulletListEl.innerHTML = asBullets(data.derived_key_points || ((data.metadata || {}).key_articles || []).join("\n") || data.summary, "핵심 조항 정보가 없습니다.");
-        relevanceEl.textContent = data.derived_relevance_note || "당 운영 기준과 의사결정 절차를 담고 있는 문서입니다.";
-        stageLabelEl.textContent = (data.metadata || {}).version_label || "규정 본문";
-        stageDescEl.textContent = (data.metadata || {}).effective_from ? `${(data.metadata || {}).effective_from} 시행` : "개정 이력과 본문을 함께 검토합니다.";
-        bodyEl.textContent = data.body || data.summary || "";
-        metaEl.innerHTML = [(data.metadata || {}).rule_kind_label ? `<span class="link">${safe((data.metadata || {}).rule_kind_label)}</span>` : "", (data.metadata || {}).version_label ? `<span class="link">${safe((data.metadata || {}).version_label)}</span>` : "", ((data.metadata || {}).effective_from || data.published_at) ? `<span class="link">${safe((data.metadata || {}).effective_from || data.published_at)}</span>` : "", data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>` : ""].join("");
-        const keyArticleLinks = ((data.metadata || {}).key_articles || []).slice(0, 8).map((item) => ({ href: "#", label: `핵심 조항 · ${item}` }));
-        const policyLinks = renderPolicyLinks(data.linked_positions || [], "연결 정책 · ");
-        linksEl.innerHTML = `${policyLinks}${renderDocLinks(keyArticleLinks)}` || '<div class="empty">연결 정보가 없습니다.</div>';
-        renderTimeline(data.timeline || []);
-        return;
-      }
-
-      if (state.tab === "polls") {
-        typeEl.textContent = "여론조사";
-        titleEl.textContent = data.title || "";
-        summaryEl.textContent = data.summary || `${(data.metadata || {}).pollster || "조사기관"} 자료입니다.`;
-        bulletListEl.innerHTML = asBullets(((data.metadata || {}).support_lines || []).join("\n") || data.summary, "핵심 수치를 먼저 요약해 보여줍니다.");
-        relevanceEl.textContent = data.derived_relevance_note || "개혁신당 또는 관련 후보가 포함된 여론조사 공표 자료입니다.";
-        stageLabelEl.textContent = (data.metadata || {}).election_label || "공표 자료";
-        stageDescEl.textContent = (data.metadata || {}).survey_period ? `조사기간 ${(data.metadata || {}).survey_period}` : "시각화 요약 → 정리된 본문 → 원문 링크 순서로 재배치했습니다.";
-        bodyEl.classList.add("poll-layout");
-        bodyEl.innerHTML = renderPollBody(data);
-        metaEl.innerHTML = [(data.metadata || {}).pollster ? `<span class="link">${safe((data.metadata || {}).pollster)}</span>` : "", (data.metadata || {}).client_name ? `<span class="link">${safe((data.metadata || {}).client_name)}</span>` : "", (data.metadata || {}).survey_method ? `<span class="link">${safe((data.metadata || {}).survey_method)}</span>` : "", data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "", data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">선관위 원문</a>` : ""].join("");
-        const attachmentLinks = ((data.metadata || {}).attachments || []).map((item) => ({ href: item.url, label: `첨부 · ${item.name || item.url}` }));
-        linksEl.innerHTML = renderDocLinks(attachmentLinks) || '<div class="empty">첨부 자료가 없습니다.</div>';
-        renderTimeline(data.timeline || []);
-        return;
-      }
-
-      const metadata = data.metadata || {};
-      const billProgress = data.bill_progress || null;
-      typeEl.textContent = "법안";
-      titleEl.textContent = data.title || "";
-      summaryEl.textContent = [data.summary || "", metadata.committee ? `소관 상임위 ${metadata.committee}` : "", billProgress?.raw ? `진행상태 ${billProgress.raw}` : ""].filter(Boolean).join(" · ") || "국회 법안입니다.";
-      bulletListEl.innerHTML = asBullets(data.derived_key_points || data.summary, "법안 핵심 포인트가 없습니다.");
-      relevanceEl.textContent = data.derived_relevance_note || "법안 요약과 진행 상황을 함께 확인합니다.";
-      stageLabelEl.textContent = billProgress?.label || "법안 발의";
-      stageDescEl.textContent = billProgress?.description || "소관 상임위와 현재 단계 정보를 함께 확인할 수 있습니다.";
-      bodyEl.textContent = data.body || data.summary || "";
-      metaEl.innerHTML = [data.published_at ? `<span class="link">${safe(data.published_at)}</span>` : "", metadata.bill_no ? `<span class="link">의안번호 ${safe(metadata.bill_no)}</span>` : "", metadata.committee ? `<span class="link">${safe(metadata.committee)}</span>` : "", billProgress?.raw ? `<span class="link">${safe(billProgress.raw)}</span>` : "", metadata.representative_member_name ? `<a class="link" href="${hubUrl("people", metadata.representative_member_name)}">${safe(metadata.representative_member_name)}</a>` : "", data.source_url ? `<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">국회 원문</a>` : ""].join("");
-      const official = renderPolicyLinks(data.linked_positions || [], "공식 연결 · ");
-      const inferred = renderPolicyLinks((data.related_positions || []).filter((item) => !(data.linked_positions || []).some((linked) => linked.position_id === item.position_id)), "추정 연결 · ");
-      linksEl.innerHTML = `${official}${inferred}` || '<div class="empty">연결 정책이 없습니다.</div>';
-      renderTimeline(data.timeline || []);
-    }
-
-    async function init() {
-      const [hub, positions, messages, people, bills, rules, polls] = await Promise.all([
-        api("/api/policy/hub"),
-        api("/api/policy/positions"),
-        api("/api/policy/messages?limit=150"),
-        api("/api/policy/people"),
-        api("/api/policy/documents?doc_type=bill&status=active"),
-        api("/api/policy/rules?limit=150"),
-        api("/api/policy/polls?limit=150"),
-      ]);
-
-      state.datasets.positions = positions.items || [];
-      state.datasets.messages = messages.items || [];
-      state.datasets.people = people.items || [];
-      state.datasets.bills = bills.items || [];
-      state.datasets.rules = rules.items || [];
-      state.datasets.polls = polls.items || [];
-
-      renderSummary(hub);
-      readInitialState();
-      renderList();
-    }
-
-    document.getElementById("tabs").addEventListener("click", (event) => {
-      const button = event.target.closest(".tab");
-      if (!button) return;
-      document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
-      button.classList.add("active");
-      state.tab = button.dataset.tab;
-      state.selected[state.tab] = null;
-      renderList();
-    });
-
-    document.getElementById("searchInput").addEventListener("input", (event) => {
-      state.search = event.target.value || "";
-      renderList();
-    });
-
-
-    document.addEventListener('click', (event) => {
-      const btn = event.target.closest('#archiveToggle');
-      if (!btn) return;
-      const shell = document.getElementById('archiveShell');
-      shell.classList.toggle('open');
-      btn.textContent = shell.classList.contains('open') ? '자료실 접기' : '자료실 펼치기';
-    });
-
-    init().catch((error) => {
-      console.error("hub init error", error);
-      document.getElementById("listPanel").innerHTML = '<div class="empty">허브 데이터를 불러오지 못했습니다.</div>';
-      renderEmptyDetail();
-    });
-  </script>
+init().catch(err => {
+  console.error(err);
+  document.body.innerHTML = '<main style="max-width:900px;margin:40px auto;color:white;font-family:sans-serif;"><h1>브리핑 허브를 불러오지 못했습니다.</h1><p>잠시 후 다시 시도해주세요.</p></main>';
+});
+</script>
 </body>
 </html>
