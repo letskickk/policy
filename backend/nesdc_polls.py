@@ -191,6 +191,9 @@ def _extract_support_lines(text: str) -> list[str]:
 
 def _contains_reform_party(text: str) -> bool:
     lowered = text.lower()
+    # "정당지지도" polls cover all parties including 개혁신당
+    if "정당지지도" in lowered:
+        return True
     return any(keyword.lower() in lowered for keyword in REFORM_KEYWORDS)
 
 

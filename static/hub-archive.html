@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>개혁신당 SSOT 자료실</title>
+  <title>개혁신당 자료 허브</title>
   <style>
     :root { --bg:#071826; --panel:rgba(255,255,255,0.08); --border:rgba(255,255,255,0.12); --text:#e6edf5; --muted:#a9bbcb; --brand:#ff7a1a; --brand-soft:rgba(255,122,26,0.16); --shadow:0 18px 40px rgba(0,0,0,0.25); }
     * { box-sizing:border-box; }
@@ -66,7 +66,7 @@
 <body class="rf-workspace-page">
   <main>
     <section class="panel topbar">
-      <div class="brand"><strong>SSOT 자료실</strong><span>정책·메시지·법안·인물·규정·여론조사 전체 아카이브</span></div>
+      <div class="brand"><strong>자료 허브</strong><span>정책·메시지·법안·인물·규정·여론조사 전체 아카이브</span></div>
       <a href="/hub" class="back-link">← 브리핑 허브</a>
     </section>
 
@@ -217,7 +217,8 @@ function renderDetail(data, tab) {
   if (data.source_url) links.push(`<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>`);
   if ((md.attachments || []).length) {
     md.attachments.forEach(att => {
-      if (att?.url) links.push(`<a class="link" href="${safe(att.url)}" target="_blank" rel="noreferrer">${safe(att.name || '첨부 자료')}</a>`);
+      const attUrl = att?.download_url || att?.url;
+      if (attUrl) links.push(`<a class="link" href="${safe(decodeURIComponent(attUrl))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || att.name || '첨부 자료')}</a>`);
     });
   }
   document.getElementById('detailLinks').innerHTML = links.join('');
@@ -229,7 +230,16 @@ function renderDetail(data, tab) {
   } else if (tab === 'people') {
     bodyEl.innerHTML = renderPersonBody(data);
   } else {
-    bodyEl.textContent = data.body || data.summary || '';
+    let bodyText = data.body || data.summary || '';
+    if (tab === 'messages') {
+      bodyText = bodyText
+        .replace(/^\[\d{6}_[^\]]+\]\s*/, '')
+        .replace(/^■\s*[""][^""]*[""]\s*/g, '')
+        .replace(/■\s*/g, '')
+        .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*대변인[\s\S]*$/, '')
+        .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*[^\n]*$/m, '');
+    }
+    bodyEl.textContent = bodyText;
   }
 
   document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -257,8 +267,9 @@ function renderPollBody(data) {
   if (md.sample_size) info.push(`표본: ${md.sample_size}`);
   if (info.length) parts.push('<div class="muted" style="margin-top:12px;">' + info.map(v => safe(v)).join('<br>') + '</div>');
 
-  if (data.body) parts.push(`<div style="margin-top:12px; white-space:pre-wrap;">${safe(data.body)}</div>`);
-  return parts.join('') || safe(data.summary || '');
+  // Don't show raw nesdc body — it's all survey methodology noise
+  if (data.source_url) parts.push(`<div style="margin-top:12px;"><a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기 ↗</a></div>`);
+  return parts.join('') || '<div class="muted">조사 상세 정보가 없습니다.</div>';
 }
 
 function renderPersonBody(data) {
