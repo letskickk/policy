@@ -1964,11 +1964,20 @@ def _fetch_candidate_pledges_current_public(
     candidate_id: int,
     limit: Optional[int] = None,
 ) -> list[CandidatePledgeResponse]:
+    """공개용 공약 목록.
+
+    - APPROVED 공약: 현재 내용을 그대로 반환.
+    - PENDING 공약(수정 후 재승인 대기): review_history에서 마지막 APPROVED
+      스냅샷의 내용을 대신 반환 → 관리자가 새 버전을 승인하기 전까지 이전
+      승인 버전이 계속 공개됨.
+    - REJECTED / 스냅샷 없는 PENDING: 반환하지 않음.
+    """
     from backend.database import get_connection
 
     conn = get_connection()
     try:
-        sql = """
+        # 1) 현재 APPROVED인 공약
+        sql_approved = """
             SELECT cp.id, cp.title, cp.content, cp.total_score,
                    COALESCE(prh.approved_reviewed_at, cp.created_at) AS created_at
             FROM candidate_pledges cp
@@ -1983,21 +1992,51 @@ def _fetch_candidate_pledges_current_public(
               AND cp.approval_status = 'APPROVED'
             ORDER BY cp.priority ASC, datetime(COALESCE(prh.approved_reviewed_at, cp.created_at)) DESC, cp.id DESC
         """
-        params: tuple = (candidate_id,)
+        params_approved: tuple = (candidate_id,)
         if limit is not None:
-            sql += " LIMIT ?"
-            params = (candidate_id, limit)
-        rows = conn.execute(sql, params).fetchall()
-        return [
-            CandidatePledgeResponse(
+            sql_approved += " LIMIT ?"
+            params_approved = (candidate_id, limit)
+        approved_rows = conn.execute(sql_approved, params_approved).fetchall()
+        approved_ids = {r["id"] for r in approved_rows}
+
+        # 2) PENDING인 공약 중 이전에 APPROVED 스냅샷이 있는 것 → 이전 버전으로 공개
+        sql_pending_fallback = """
+            SELECT cp.id AS pledge_id, h.title, h.content, h.total_score, h.reviewed_at AS created_at
+            FROM candidate_pledges cp
+            JOIN (
+                SELECT pledge_id, title, content, total_score, reviewed_at,
+                       ROW_NUMBER() OVER (PARTITION BY pledge_id ORDER BY reviewed_at DESC) AS rn
+                FROM candidate_pledge_review_history
+                WHERE approval_status = 'APPROVED'
+                  AND pledge_id IS NOT NULL
+            ) h ON h.pledge_id = cp.id AND h.rn = 1
+            WHERE cp.candidate_id = ?
+              AND cp.approval_status = 'PENDING'
+        """
+        pending_rows = conn.execute(sql_pending_fallback, (candidate_id,)).fetchall()
+
+        results: list[CandidatePledgeResponse] = []
+        for r in approved_rows:
+            results.append(CandidatePledgeResponse(
                 id=r["id"],
                 title=r["title"],
                 content=r["content"],
                 total_score=r["total_score"],
                 created_at=r["created_at"],
-            )
-            for r in rows
-        ]
+            ))
+        for r in pending_rows:
+            if r["pledge_id"] not in approved_ids:
+                results.append(CandidatePledgeResponse(
+                    id=r["pledge_id"],
+                    title=r["title"],
+                    content=r["content"],
+                    total_score=r["total_score"],
+                    created_at=r["created_at"],
+                ))
+
+        if limit is not None:
+            results = results[:limit]
+        return results
     finally:
         conn.close()
 
@@ -2080,7 +2119,10 @@ def _public_candidate_sql_condition() -> str:
         AND EXISTS (
             SELECT 1 FROM candidate_pledges cp
             WHERE cp.candidate_id = c.id
-              AND cp.approval_status = 'APPROVED'
+              AND (cp.approval_status = 'APPROVED'
+                   OR (cp.approval_status = 'PENDING'
+                       AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                   WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
         )
         AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
     """
@@ -2824,7 +2866,10 @@ def get_regions():
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
             GROUP BY c.region_code
@@ -2866,7 +2911,10 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                   AND c.region_code = ?
@@ -2885,7 +2933,10 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
@@ -2921,7 +2972,10 @@ def get_districts(
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
               AND c.district_name IS NOT NULL
@@ -3004,7 +3058,10 @@ def get_candidates(
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
               AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
@@ -3074,7 +3131,10 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
             """,
             (candidate_id,),
