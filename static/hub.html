@@ -27,6 +27,7 @@
     .briefing-card .kicker { color:#ffbf93; font-size:12px; font-weight:800; }
     .briefing-card strong,.issue-card strong,.mini-card strong { font-size:18px; line-height:1.45; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .briefing-card .muted,.issue-card .muted,.mini-card .muted { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .clamp2 { display:-webkit-box!important; -webkit-line-clamp:2!important; -webkit-box-orient:vertical!important; overflow:hidden!important; }
     .poll-focus { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:start; }
     .poll-card { padding:18px; border-radius:22px; border:1px solid rgba(96,165,250,.22); background:linear-gradient(180deg, rgba(96,165,250,.12), rgba(255,255,255,.04)); min-height:100%; }
     .mini-stack { display:grid; gap:12px; }
@@ -191,11 +192,11 @@ function renderHome(hub) {
     : '<div class="muted">표시할 여론조사가 없습니다.</div>';
 
   document.getElementById('topPolicy').innerHTML = positions.map(item =>
-    internalAnchor('positions', item.slug, `<strong>${safe(item.title)}</strong><div class="muted">${safe(cardSummary(item, 'positions'))}</div>`)
+    internalAnchor('positions', item.slug, `<strong>${safe(item.title)}</strong><div class="muted clamp2">${safe(cardSummary(item, 'positions'))}</div>`)
   ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 정책이 없습니다.</div>';
 
   document.getElementById('topMessage').innerHTML = messageItems.map(item =>
-    internalAnchor('messages', String(item.id), `<strong>${safe(item.title)}</strong><div class="muted">${safe(cardSummary(item, 'messages'))}</div>`)
+    internalAnchor('messages', String(item.id), `<strong>${safe(item.title)}</strong><div class="muted clamp2">${safe(cardSummary(item, 'messages'))}</div>`)
   ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0;">') || '<div class="muted">표시할 메시지가 없습니다.</div>';
 
   const issues = [
