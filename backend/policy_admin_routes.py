@@ -87,6 +87,19 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="hub.html not found")
 
+    @app.api_route("/hub/archive", methods=["GET", "HEAD"])
+    def public_hub_archive_page():
+        res = serve_html("hub-archive.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="hub-archive.html not found")
+
+    @app.get("/hub-briefing")
+    def public_hub_briefing_redirect():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/hub", status_code=301)
+
     @app.get("/api/admin/policy/summary", tags=["admin", "policy"])
     def api_admin_policy_summary(request: Request):
         require_admin(request)
