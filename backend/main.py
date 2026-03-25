@@ -3520,7 +3520,7 @@ def _snapshot_candidate_pledges(
 ):
     rows = conn.execute(
         """
-        SELECT id, title, content, priority, total_score, analysis_result, analyzed_at, created_at
+        SELECT id, title, content, priority, total_score, analysis_result, analyzed_at, created_at, approval_status
         FROM candidate_pledges
         WHERE candidate_id = ?
         ORDER BY priority ASC, id ASC
@@ -3533,6 +3533,8 @@ def _snapshot_candidate_pledges(
     snapshot_group = uuid.uuid4().hex
     reviewed_value = reviewed_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for row in rows:
+        # Use each pledge's own approval_status, not the candidate-level one
+        pledge_status = row["approval_status"] or approval_status or "PENDING"
         conn.execute(
             """
             INSERT INTO candidate_pledge_review_history (
@@ -3546,7 +3548,7 @@ def _snapshot_candidate_pledges(
                 candidate_id,
                 snapshot_group,
                 source_action,
-                (approval_status or "PENDING").upper(),
+                pledge_status.upper(),
                 rejection_reason or None,
                 reviewed_value,
                 row["id"],
