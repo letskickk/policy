@@ -1785,7 +1785,7 @@
 
     function normalizeShareText(text) {
       return String(text || '')
-        .replace(/[??"'`]/g, '')
+        .replace(/[\u201C\u201D\u2018\u2019"'`]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();
