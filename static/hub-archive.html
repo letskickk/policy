@@ -76,7 +76,8 @@
           <button class="tab active" data-tab="positions">정책</button>
           <button class="tab" data-tab="messages">메시지</button>
           <button class="tab" data-tab="bills">법안</button>
-          <button class="tab" data-tab="people">인물</button>
+          <!-- 인물 탭: policy_people 테이블 미구현, 추후 활성화 -->
+          <!-- <button class="tab" data-tab="people">인물</button> -->
           <button class="tab" data-tab="rules">규정</button>
           <button class="tab" data-tab="polls">여론조사</button>
         </div>
@@ -121,7 +122,7 @@ function renderList() {
   const items = state.data[state.tab] || [];
   const query = state.search.toLowerCase();
   const filtered = query
-    ? items.filter(i => (cfg.title(i) || '').toLowerCase().includes(query) || (firstMeaningfulText(i) || '').toLowerCase().includes(query))
+    ? items.filter(i => (cfg.title(i) || '').toLowerCase().includes(query) || (cfg.meta(i) || '').toLowerCase().includes(query) || (i.speaker_name || '').toLowerCase().includes(query) || (i.summary || '').toLowerCase().includes(query))
     : items;
 
   const panel = document.getElementById('listPanel');
