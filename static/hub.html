@@ -419,7 +419,6 @@ async function loadDetailFromState(tab, key) {
       // Messages: speaker + date, body as main content (no bullets — show body directly)
       const speaker = data.speaker_name || data.speaker || '';
       const date = data.published_at || '';
-      document.getElementById('detailSummary').textContent = [speaker, date].filter(Boolean).join(' · ');
       let rawBody = data.body || data.summary || '';
       // Clean up header/signature
       let cleaned = rawBody
@@ -430,6 +429,16 @@ async function loadDetailFromState(tab, key) {
       // Split into paragraphs for readable body
       if (!cleaned.includes('\n') || cleaned.split('\n').filter(l => l.trim().length > 10).length < 3) {
         cleaned = cleaned.replace(/(다|요|죠|음)\.\s+/g, '$1.\n\n').replace(/([.!?])\s+/g, '$1\n');
+      }
+      // Use DB summary if available, otherwise extract first 2 sentences
+      const dbSummary = (data.summary || '').trim();
+      const titleNorm = (data.title || '').trim();
+      const hasSummary = dbSummary && dbSummary !== titleNorm && dbSummary.length > 30;
+      if (hasSummary) {
+        document.getElementById('detailSummary').textContent = dbSummary;
+      } else {
+        const sentences = cleaned.split(/\n+/).map(s => s.trim()).filter(s => s.length > 15);
+        document.getElementById('detailSummary').textContent = sentences.slice(0, 2).join(' ') || [speaker, date].filter(Boolean).join(' · ');
       }
       // No bullets for messages — show the full body directly as paragraphs
       document.getElementById('detailBullets').innerHTML = '';
