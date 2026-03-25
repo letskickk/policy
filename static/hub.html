@@ -184,9 +184,10 @@ function renderHome(hub) {
       `<div class="panel briefing-card"><div class="kicker">${safe(item.kicker)}</div><strong>${safe(item.title)}</strong><div class="muted">${safe(item.summary)}</div></div>`)
   ).join('');
 
-  document.getElementById('featuredPoll').innerHTML = featuredPoll
-    ? internalAnchor('polls', String(featuredPoll.id),
-        `<div class="mini-card"><div class="muted">${safe((featuredPoll.metadata || {}).pollster || '여론조사')} · ${safe(featuredPoll.published_at || '')}</div><strong>${safe(featuredPoll.title)}</strong><div class="muted">${safe(cardSummary(featuredPoll, 'polls'))}</div></div>`)
+  document.getElementById('featuredPoll').innerHTML = polls.length
+    ? polls.map(p => internalAnchor('polls', String(p.id),
+        `<div class="mini-card" style="margin-bottom:8px;"><div class="muted">${safe((p.metadata || {}).pollster || '여론조사')} · ${safe(p.published_at || '')}</div><strong>${safe(p.title)}</strong><div class="muted">${safe((p.metadata||{}).region_name||'')} · ${safe((p.metadata||{}).survey_method||'')}</div></div>`
+      )).join('')
     : '<div class="muted">표시할 여론조사가 없습니다.</div>';
 
   document.getElementById('topPolicy').innerHTML = positions.map(item =>
@@ -227,16 +228,17 @@ function highlightReform(text) {
 function extractKeyBullets(body, fallback, maxBullets) {
   const n = maxBullets || 4;
   const text = String(body || '');
-  // Try numbered items first (1. xxx, ① xxx, - xxx, ■ xxx)
-  const numbered = text.match(/(?:^|\n)\s*(?:\d+[.)]\s*|[①②③④⑤⑥⑦⑧⑨⑩]\s*|[-·•■▲▶]\s+)(.+)/g);
+  // Try numbered items first (1. xxx, ① xxx)
+  const numbered = text.match(/(?:^|\n)\s*(?:\d+[.)]\s+|[①②③④⑤⑥⑦⑧⑨⑩]\s*)(.+)/g);
   if (numbered && numbered.length >= 2) {
-    return numbered.slice(0, n).map(v => v.replace(/^\s*(?:\d+[.)]\s*|[①②③④⑤⑥⑦⑧⑨⑩]\s*|[-·•■▲▶]\s+)/, '').trim()).filter(v => v.length > 10);
+    return numbered.slice(0, n).map(v => v.replace(/^\s*(?:\d+[.)]\s+|[①②③④⑤⑥⑦⑧⑨⑩]\s*)/, '').trim())
+      .filter(v => v.length > 10 && v.length < 200);
   }
-  // Fall back to meaningful sentences (>15 chars, not boilerplate)
+  // Fall back to meaningful sentences (>20 chars, not boilerplate/slogans)
   const sentences = text.split(/[.\n]+/)
     .map(s => s.trim())
-    .filter(s => s.length > 15 && s.length < 300)
-    .filter(s => !s.match(/^(제\d+대|선거대책|공약\s*설명|요\s*약|설명자료)/))
+    .filter(s => s.length > 20 && s.length < 300)
+    .filter(s => !s.match(/^(제\d+대|선거대책|공약\s*설명|요\s*약|설명자료|이준석\s*대통령|[—–]\s)/))
     .filter(s => !NESDC_NOISE.test(s));
   // Prioritize sentences mentioning 개혁신당
   const reformFirst = sentences.filter(s => s.includes('개혁신당'));
@@ -438,8 +440,14 @@ async function loadDetailFromState(tab, key) {
       const rawSummary = extractPositionSummary(data) || truncate(data.summary || '', 200);
       document.getElementById('detailSummary').textContent = rawSummary;
       const keyPts = data.derived_key_points || data.key_points || '';
-      const bullets = keyPts ? String(keyPts).split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 5)
-        : extractKeyBullets(data.body || data.summary, null, 4);
+      let bullets = keyPts ? String(keyPts).split(/\n+/).map(v => v.trim()).filter(Boolean).slice(0, 5)
+        : extractKeyBullets(data.body || data.summary, null, 6);
+      // Dedupe: remove bullets that overlap significantly with summary
+      const sumNorm = rawSummary.replace(/\s+/g, '').toLowerCase();
+      bullets = bullets.filter(b => {
+        const bNorm = b.replace(/\s+/g, '').toLowerCase();
+        return !sumNorm.includes(bNorm) && !bNorm.includes(sumNorm.slice(0, 30));
+      }).slice(0, 4);
       document.getElementById('detailBullets').innerHTML = renderBullets(bullets);
       document.getElementById('detailRelevance').textContent = data.derived_relevance_note || data.relevance_note || '';
       document.getElementById('detailMeta').innerHTML = buildDetailMeta(data, tab);
