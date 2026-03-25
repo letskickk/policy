@@ -241,12 +241,17 @@ function buildDetailMeta(data, tab) {
   return meta.map(v => `<span class="meta-pill">${safe(v)}</span>`).join('');
 }
 
+function fixNesdcUrl(url) {
+  // nesdc stores double-encoded URLs (%252F → %2F)
+  try { return decodeURIComponent(url); } catch { return url; }
+}
+
 function buildDetailLinks(data, tab) {
   const links = [];
   if (data.source_url) links.push(`<a href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기 ↗</a>`);
   if (tab === 'polls' && (data.metadata?.attachments || []).length) {
     for (const att of data.metadata.attachments) {
-      if (att?.download_url) links.push(`<a href="${safe(att.download_url)}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || '첨부파일')}</a>`);
+      if (att?.download_url) links.push(`<a href="${safe(fixNesdcUrl(att.download_url))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || '첨부파일')}</a>`);
     }
   }
   return links.join('');
@@ -267,7 +272,7 @@ function renderPollInfoCard(data) {
   const atts = (m.attachments || []).filter(a => a.download_url);
   let attHtml = '';
   if (atts.length) {
-    attHtml = `<div class="pi-item pi-attachment"><div class="pi-label">첨부파일</div>${atts.map(a => `<a href="${safe(a.download_url)}" target="_blank" rel="noreferrer">📎 ${safe(a.file_name || '결과 PDF')}</a>`).join(' ')}</div>`;
+    attHtml = `<div class="pi-item pi-attachment"><div class="pi-label">첨부파일</div>${atts.map(a => `<a href="${safe(fixNesdcUrl(a.download_url))}" target="_blank" rel="noreferrer">📎 ${safe(a.file_name || '결과 PDF')}</a>`).join(' ')}</div>`;
   }
   card.innerHTML = `<div class="poll-info">${items.map(([l,v]) => `<div class="pi-item"><div class="pi-label">${safe(l)}</div><div class="pi-value">${safe(v)}</div></div>`).join('')}${attHtml}</div>`;
   card.style.display = 'block';
