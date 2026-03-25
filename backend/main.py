@@ -1978,19 +1978,11 @@ def _fetch_candidate_pledges_current_public(
     try:
         # 1) 현재 APPROVED인 공약
         sql_approved = """
-            SELECT cp.id, cp.title, cp.content, cp.total_score,
-                   COALESCE(prh.approved_reviewed_at, cp.created_at) AS created_at
+            SELECT cp.id, cp.title, cp.content, cp.total_score, cp.created_at
             FROM candidate_pledges cp
-            LEFT JOIN (
-                SELECT pledge_id, MAX(reviewed_at) AS approved_reviewed_at
-                FROM candidate_pledge_review_history
-                WHERE approval_status = 'APPROVED'
-                  AND pledge_id IS NOT NULL
-                GROUP BY pledge_id
-            ) prh ON prh.pledge_id = cp.id
             WHERE cp.candidate_id = ?
               AND cp.approval_status = 'APPROVED'
-            ORDER BY cp.priority ASC, datetime(COALESCE(prh.approved_reviewed_at, cp.created_at)) DESC, cp.id DESC
+            ORDER BY cp.priority ASC, cp.id DESC
         """
         params_approved: tuple = (candidate_id,)
         if limit is not None:
