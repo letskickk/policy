@@ -665,15 +665,21 @@ textarea::placeholder {
 }
 
 /* ===== 공통 풋터 ===== */
+.shared-footer-shell{
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
 .site-footer{
-  margin-top: 2.5rem;
-  padding: 1.5rem 0 0.5rem;
+  margin-top: 1rem;
+  padding: 0.8rem 0 0.5rem;
   border-top: 1px solid rgba(255,255,255,0.06);
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
   flex-wrap: wrap;
   gap: 0.9rem;
+  width: 100%;
 }
 .site-footer .footer-left{
   display: flex;
