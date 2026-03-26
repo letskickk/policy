@@ -900,23 +900,34 @@
         margin-bottom: 0.55rem;
       }
       .top-bar .top-bar-left{
-        gap: 0.7rem;
+        width: 100%;
+        gap: 0.55rem;
+        align-items: center;
+      }
+      .top-bar .brand-logo img{
+        height: 22px;
+      }
+      .top-bar .page-heading{
+        min-width: 0;
+        flex: 1 1 auto;
       }
       .top-bar .page-heading h1{
-        font-size: 1.4rem;
+        font-size: 1.2rem;
         line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .top-bar .page-heading .subtitle{
-        font-size: 0.88rem;
-        line-height: 1.58;
+        display: none;
       }
       .nav{
         width: 100%;
         gap: 0.4rem;
       }
       .nav-link{
-        flex-basis: 100%;
-        min-height: 44px;
+        flex: 1 1 calc(50% - 0.2rem);
+        min-height: 42px;
       }
       .card{
         padding: 0.72rem;
