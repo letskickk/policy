@@ -50,8 +50,8 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/admin/issue-radar", methods=["GET", "HEAD"])
     def admin_issue_radar_page(request: Request):
-        """관리자 전용: 이슈 레이더 대시보드."""
-        _ = require_admin(request)
+        """이슈 레이더 대시보드 (개발 단계: 인증 없이 접근 가능)."""
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
         res = serve_html("admin/issue-radar.html")
         if res is not None:
             return res
@@ -549,7 +549,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """이슈 레이더 — 정책 사각지대 리포트."""
         ensure_db_ready()
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
 
         from backend.issue_radar import get_cached_scan, run_issue_scan, save_scan_result
 
@@ -571,7 +571,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """이슈 레이더 수동 스캔 트리거."""
         ensure_db_ready()
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
 
         from backend.issue_radar import run_issue_scan, save_scan_result
 
@@ -590,7 +590,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """리서치 어시스턴트 — 주제·지역별 관련 자료 수집."""
         ensure_db_ready()
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
 
         from backend.research_assistant import research_topic
 
@@ -611,7 +611,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def create_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 생성."""
         ensure_db_ready()
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
 
         from backend.policy_drafter import generate_policy_draft
 
@@ -629,7 +629,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def stream_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 스트리밍 생성."""
         ensure_db_ready()
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
 
         from fastapi.responses import StreamingResponse
         from backend.policy_drafter import generate_policy_draft
@@ -659,7 +659,11 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def save_policy_draft(request: Request, body: SaveDraftBody):
         """초안을 policy_positions(draft)로 저장."""
         ensure_db_ready()
-        user = require_admin(request)
+        # 개발 단계 — 인증 생략, user fallback
+        try:
+            user = require_admin(request)
+        except Exception:
+            user = {"id": None}
 
         from backend.policy_drafter import save_draft_as_position
 
@@ -686,8 +690,8 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/policy-create", methods=["GET", "HEAD"])
     def policy_create_page(request: Request):
-        """정책 생성 페이지."""
-        _ = require_admin(request)
+        """정책 생성 페이지 (개발 단계: 인증 없이 접근 가능)."""
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
         res = serve_html("policy-create.html")
         if res is not None:
             return res

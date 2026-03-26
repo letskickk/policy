@@ -248,9 +248,12 @@
       font-weight: 800;
     }
 
+    /* 개발 단계: admin-only 섹션도 표시 */
+    /*
     .admin-only {
       display: none;
     }
+    */
 
     .footer-links {
       margin-top: 1.8rem;
@@ -322,7 +325,7 @@
         </p>
         <div class="hero-actions">
           <a href="/proposals" class="btn">시민 제안 작성</a>
-          <a href="/policy-create" class="btn btn-secondary admin-only">AI 드래프트 생성</a>
+          <a href="/policy-create" class="btn btn-secondary">AI 드래프트 생성</a>
         </div>
         <div class="hero-meta">
           <span class="badge badge-green">공개 참여</span>
@@ -383,7 +386,7 @@
       </div>
     </section>
 
-    <section class="section admin-only reveal">
+    <section class="section reveal">
       <div class="section-head">
         <div>
           <div class="eyebrow">Operator Tools</div>
