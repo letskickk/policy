@@ -60,7 +60,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/admin/policy-ssot", methods=["GET", "HEAD"])
     def admin_policy_ssot_page(request: Request):
-        _ = require_admin(request)
+        # _ = require_admin(request)  # 개발 단계 — 인증 생략
         res = serve_html("admin/policy-ssot.html")
         if res is not None:
             return res
@@ -101,7 +101,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/summary", tags=["admin", "policy"])
     def api_admin_policy_summary(request: Request):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_ssot import get_policy_ssot_summary
         from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
@@ -124,21 +124,21 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/operations", tags=["admin", "policy"])
     def api_admin_policy_operations(request: Request):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_ssot import get_policy_operations_overview
         return get_policy_operations_overview()
 
     @app.get("/api/admin/policy/featured-issues", tags=["admin", "policy"])
     def api_admin_policy_featured_issues(request: Request, limit: int = Query(default=20, ge=1, le=100)):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_featured import get_current_featured_issue, list_featured_issues
         return {"current": get_current_featured_issue(), "items": list_featured_issues(limit=limit)}
 
     @app.get("/api/admin/policy/featured-issues/recommendations", tags=["admin", "policy"])
     def api_admin_policy_featured_issue_recommendations(request: Request, limit: int = Query(default=5, ge=1, le=20)):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_featured import recommend_featured_issues
         return {"items": recommend_featured_issues(limit=limit)}
@@ -159,7 +159,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/positions", tags=["admin", "policy"])
     def api_admin_policy_positions(request: Request, status: Optional[str] = Query(default=None), category: Optional[str] = Query(default=None)):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_ssot import list_policy_positions
         return {"items": list_policy_positions(status=status, category=category)}
@@ -224,7 +224,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/documents", tags=["admin", "policy"])
     def api_admin_policy_documents(request: Request, doc_type: Optional[str] = Query(default=None), status: Optional[str] = Query(default=None)):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_ssot import list_policy_documents
         return {"items": list_policy_documents(doc_type=doc_type, status=status)}
@@ -298,7 +298,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/suggestions", tags=["admin", "policy"])
     def api_admin_policy_suggestions(request: Request, status: Optional[str] = Query(default="pending"), limit: int = Query(default=100, ge=1, le=300)):
-        require_admin(request)
+        # require_admin(request)  # 개발 단계 — 인증 생략
         ensure_db_ready()
         from backend.policy_suggestions import list_link_suggestions
         return {"items": list_link_suggestions(status=status, limit=limit)}
