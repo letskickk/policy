@@ -210,7 +210,8 @@
   <main class="page-shell proposal-shell">
     <div class="topline">
       <div class="links">
-        <a href="/policy-lab" class="back-link">← 정책 허브로 돌아가기</a>
+        <a href="/" class="back-link">← 홈으로</a>
+        <a href="/policy-lab" class="back-link" id="hubBackLink" style="display:none;">← 정책 허브</a>
       </div>
       <div class="eyebrow">Public Input</div>
     </div>
@@ -394,6 +395,20 @@
       document.getElementById('titleCount').textContent = '0';
       document.getElementById('bodyCount').textContent = '0';
     }
+  </script>
+  <script>
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/me', { credentials: 'include' });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.role === 'admin') {
+            document.getElementById('hubBackLink').style.display = '';
+            document.querySelector('.links .back-link[href="/"]').style.display = 'none';
+          }
+        }
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>
