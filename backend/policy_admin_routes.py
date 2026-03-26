@@ -50,22 +50,30 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/admin/issue-radar", methods=["GET", "HEAD"])
     def admin_issue_radar_page(request: Request):
-        """이슈 레이더 대시보드 (개발 단계: 인증 없이 접근 가능)."""
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
-        res = serve_html("admin/issue-radar.html")
-        if res is not None:
-            return res
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="admin/issue-radar.html not found")
+        """이슈 레이더 → 정책 허브 리다이렉트."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/policy-lab?tab=radar", status_code=301)
 
     @app.api_route("/admin/policy-ssot", methods=["GET", "HEAD"])
     def admin_policy_ssot_page(request: Request):
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
         res = serve_html("admin/policy-ssot.html")
         if res is not None:
             return res
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="admin/policy-ssot.html not found")
+
+    @app.api_route("/admin/policy-review", methods=["GET", "HEAD"])
+    def admin_policy_review_page(request: Request):
+        """리뷰 관리 → 정책 허브 리다이렉트."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/policy-lab?tab=review", status_code=301)
+
+    @app.api_route("/admin/proposals", methods=["GET", "HEAD"])
+    def admin_proposals_page(request: Request):
+        """제안 관리 → 정책 허브 리다이렉트."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/policy-lab?tab=proposals", status_code=301)
 
     @app.api_route("/policies", methods=["GET", "HEAD"])
     def public_policy_hub_page():
@@ -114,7 +122,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/summary", tags=["admin", "policy"])
     def api_admin_policy_summary(request: Request):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_ssot import get_policy_ssot_summary
         from backend.policy_featured import get_current_featured_issue, recommend_featured_issues
@@ -137,21 +145,21 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/operations", tags=["admin", "policy"])
     def api_admin_policy_operations(request: Request):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_ssot import get_policy_operations_overview
         return get_policy_operations_overview()
 
     @app.get("/api/admin/policy/featured-issues", tags=["admin", "policy"])
     def api_admin_policy_featured_issues(request: Request, limit: int = Query(default=20, ge=1, le=100)):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_featured import get_current_featured_issue, list_featured_issues
         return {"current": get_current_featured_issue(), "items": list_featured_issues(limit=limit)}
 
     @app.get("/api/admin/policy/featured-issues/recommendations", tags=["admin", "policy"])
     def api_admin_policy_featured_issue_recommendations(request: Request, limit: int = Query(default=5, ge=1, le=20)):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_featured import recommend_featured_issues
         return {"items": recommend_featured_issues(limit=limit)}
@@ -172,7 +180,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/positions", tags=["admin", "policy"])
     def api_admin_policy_positions(request: Request, status: Optional[str] = Query(default=None), category: Optional[str] = Query(default=None)):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_ssot import list_policy_positions
         return {"items": list_policy_positions(status=status, category=category)}
@@ -237,7 +245,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/documents", tags=["admin", "policy"])
     def api_admin_policy_documents(request: Request, doc_type: Optional[str] = Query(default=None), status: Optional[str] = Query(default=None)):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_ssot import list_policy_documents
         return {"items": list_policy_documents(doc_type=doc_type, status=status)}
@@ -311,7 +319,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.get("/api/admin/policy/suggestions", tags=["admin", "policy"])
     def api_admin_policy_suggestions(request: Request, status: Optional[str] = Query(default="pending"), limit: int = Query(default=100, ge=1, le=300)):
-        # require_admin(request)  # 개발 단계 — 인증 생략
+        require_admin(request)
         ensure_db_ready()
         from backend.policy_suggestions import list_link_suggestions
         return {"items": list_link_suggestions(status=status, limit=limit)}
@@ -562,7 +570,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """이슈 레이더 — 정책 사각지대 리포트."""
         ensure_db_ready()
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
 
         from backend.issue_radar import get_cached_scan, run_issue_scan, save_scan_result
 
@@ -584,7 +592,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """이슈 레이더 수동 스캔 트리거."""
         ensure_db_ready()
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
 
         from backend.issue_radar import run_issue_scan, save_scan_result
 
@@ -603,7 +611,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     ):
         """리서치 어시스턴트 — 주제·지역별 관련 자료 수집."""
         ensure_db_ready()
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
 
         from backend.research_assistant import research_topic
 
@@ -624,7 +632,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def create_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 생성."""
         ensure_db_ready()
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
 
         from backend.policy_drafter import generate_policy_draft
 
@@ -642,7 +650,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def stream_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 스트리밍 생성."""
         ensure_db_ready()
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
+        _ = require_admin(request)
 
         from fastapi.responses import StreamingResponse
         from backend.policy_drafter import generate_policy_draft
@@ -693,8 +701,9 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     # ── 정책 연구소 진입점 + 정책 생성 페이지 + 시민 제안 페이지 라우트 ──
 
     @app.api_route("/policy-lab", methods=["GET", "HEAD"])
-    def policy_lab_page():
-        """정책 연구소 메인 (독립 진입점)."""
+    def policy_lab_page(request: Request):
+        """정책 허브 (관리자 전용)."""
+        _ = require_admin(request)
         res = serve_html("policy-lab.html")
         if res is not None:
             return res
@@ -703,13 +712,13 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/policy-create", methods=["GET", "HEAD"])
     def policy_create_page(request: Request):
-        """정책 생성 페이지 (개발 단계: 인증 없이 접근 가능)."""
-        # _ = require_admin(request)  # 개발 단계 — 인증 생략
-        res = serve_html("policy-create.html")
-        if res is not None:
-            return res
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="policy-create.html not found")
+        """정책 생성 → 정책 허브 리다이렉트."""
+        from fastapi.responses import RedirectResponse
+        qs = str(request.url.query)
+        target = "/policy-lab?tab=create"
+        if qs:
+            target += "&" + qs
+        return RedirectResponse(url=target, status_code=301)
 
     @app.api_route("/proposals", methods=["GET", "HEAD"])
     def proposals_page():
@@ -733,6 +742,36 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_chatbot import answer_policy_question
 
         return answer_policy_question(question=body.question)
+
+    @app.get("/api/policy/lab/dashboard", tags=["policy"])
+    def policy_lab_dashboard(request: Request):
+        """정책 허브 대시보드 요약 통계."""
+        ensure_db_ready()
+        _ = require_admin(request)
+        conn = get_connection()
+        try:
+            draft_count = conn.execute("SELECT COUNT(*) FROM policy_positions WHERE status = 'draft'").fetchone()[0]
+            review_count = conn.execute("SELECT COUNT(*) FROM policy_positions WHERE status = 'review'").fetchone()[0]
+            proposal_new = conn.execute("SELECT COUNT(*) FROM citizen_proposals WHERE status = 'new'").fetchone()[0]
+            # For gap count, try issue_radar_cache; if empty, return 0
+            try:
+                row = conn.execute("SELECT data FROM issue_radar_cache ORDER BY created_at DESC LIMIT 1").fetchone()
+                if row:
+                    import json
+                    cached = json.loads(row[0])
+                    gap_count = len(cached.get("gaps", []))
+                else:
+                    gap_count = 0
+            except Exception:
+                gap_count = 0
+            return {
+                "draft_count": draft_count,
+                "review_count": review_count,
+                "proposal_new": proposal_new,
+                "gap_count": gap_count,
+            }
+        finally:
+            conn.close()
 
     # ── 정책 워크플로 API (Phase 4) ──
 
@@ -759,6 +798,19 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.policy_ssot import update_policy_position_status
         update_policy_position_status(position_id, "approved")
         return {"status": "ok", "new_status": "approved"}
+
+    class StatusChangeBody(BaseModel):
+        status: str = Field(..., min_length=1, max_length=20)
+
+    @app.post("/api/policy/positions/{position_id}/status", tags=["policy", "workflow"])
+    def change_position_status(request: Request, position_id: int, body: StatusChangeBody):
+        """포지션 상태 변경 (범용). 상태 전이 가드가 적용됩니다."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.policy_ssot import update_policy_position_status
+        update_policy_position_status(position_id, body.status)
+        return {"status": "ok", "new_status": body.status}
 
     @app.post("/api/policy/positions/{position_id}/comments", tags=["policy", "workflow"])
     def add_review_comment(request: Request, position_id: int, body: ReviewCommentBody):
@@ -875,10 +927,26 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         author_name: str = Field(default="", max_length=50)
         author_email: str = Field(default="", max_length=100)
 
+    # 시민 제안 IP 기반 rate limit (10건/시간)
+    _proposal_rate: dict = {}  # {ip: [timestamps]}
+    _PROPOSAL_RATE_LIMIT = 10
+    _PROPOSAL_RATE_WINDOW = 3600  # seconds
+
     @app.post("/api/policy/proposals", tags=["policy", "citizen"])
     def submit_citizen_proposal(request: Request, body: CitizenProposalBody):
         """시민 정책 제안 제출."""
         ensure_db_ready()
+
+        # Rate limit check
+        import time as _time
+        client_ip = request.client.host if request.client else "unknown"
+        now = _time.time()
+        timestamps = _proposal_rate.get(client_ip, [])
+        timestamps = [t for t in timestamps if now - t < _PROPOSAL_RATE_WINDOW]
+        if len(timestamps) >= _PROPOSAL_RATE_LIMIT:
+            raise HTTPException(status_code=429, detail="제안 제출 한도 초과 (시간당 10건)")
+        timestamps.append(now)
+        _proposal_rate[client_ip] = timestamps
 
         from backend.policy_ssot import _classify_commentary_topic
 
@@ -915,5 +983,32 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             sql += " ORDER BY created_at DESC"
             rows = conn.execute(sql, tuple(params)).fetchall()
             return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    class ProposalStatusBody(BaseModel):
+        status: str = Field(..., min_length=1, max_length=20)
+        review_note: str = Field(default="", max_length=2000)
+
+    @app.post("/api/policy/proposals/{proposal_id}/status", tags=["policy", "citizen"])
+    def update_proposal_status(request: Request, proposal_id: int, body: ProposalStatusBody):
+        """시민 제안 상태 변경 (관리자)."""
+        ensure_db_ready()
+        user = require_admin(request)
+
+        valid = {"new", "reviewing", "adopted", "archived"}
+        if body.status not in valid:
+            raise HTTPException(status_code=400, detail=f"허용된 상태: {', '.join(sorted(valid))}")
+
+        conn = get_connection()
+        try:
+            conn.execute(
+                """UPDATE citizen_proposals
+                   SET status = ?, reviewed_by = ?, review_note = ?
+                   WHERE id = ?""",
+                (body.status, user.get("id"), body.review_note or None, proposal_id),
+            )
+            conn.commit()
+            return {"status": "ok", "new_status": body.status}
         finally:
             conn.close()

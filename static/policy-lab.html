@@ -6,475 +6,1392 @@
   <title>정책 허브 - 개혁신당</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
-    .lab-shell {
-      position: relative;
-    }
+    .lab-shell { position: relative; padding-bottom: 5rem; }
 
+    /* ── topbar ── */
     .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.25rem;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .topbar .brand-block { display: grid; gap: 0.25rem; }
+    .topbar .brand-title {
+      color: var(--brand-light); font-size: 0.78rem; font-weight: 900;
+      letter-spacing: 0.18em; text-transform: uppercase;
+    }
+    .topbar .brand-subtitle { color: var(--muted2); font-size: 0.88rem; }
+
+    /* ── dashboard strip ── */
+    .dash-strip {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem; margin-bottom: 1.25rem;
+    }
+    .dash-chip {
+      padding: 0.75rem 0.9rem; border-radius: 14px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.12);
+      text-align: center;
+    }
+    .dash-chip .num {
+      display: block; font-size: 1.55rem; font-weight: 900; line-height: 1; margin-bottom: 0.2rem;
+    }
+    .dash-chip .lbl { color: var(--muted2); font-size: 0.78rem; }
+    .num-orange { color: var(--brand-light); }
+    .num-yellow { color: #fbbf24; }
+    .num-purple { color: #c4b5fd; }
+    .num-blue { color: #60a5fa; }
+
+    /* ── tab bar ── */
+    .tab-bar {
+      display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(148,163,184,0.12); padding-bottom: 0.75rem;
+    }
+    .tab-btn {
+      padding: 0.5rem 1rem; border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.18);
+      background: rgba(255,255,255,0.05); color: var(--muted);
+      font: inherit; font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+    }
+    .tab-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+    .tab-btn.active {
+      background: var(--brand); color: #fff; border-color: var(--brand);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── shared panel styles ── */
+    .panel {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    }
+    .panel-header {
+      padding: 1.15rem 1.25rem 0;
+      display: flex; justify-content: space-between; gap: 0.75rem;
+      align-items: start; flex-wrap: wrap;
+    }
+    .panel-header h2 { margin-bottom: 0.35rem; }
+    .panel-header p { color: var(--muted2); font-size: 0.9rem; line-height: 1.5; max-width: 48ch; }
+    .panel-body { padding: 1.25rem; }
+
+    /* ── eyebrow badge ── */
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.25rem 0.7rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 800;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%;
+    }
+    .eyebrow-orange { background: rgba(255,114,16,0.16); color: var(--brand-light); }
+    .eyebrow-orange::before { background: var(--brand); box-shadow: 0 0 0 6px rgba(255,114,16,0.12); }
+    .eyebrow-blue { background: rgba(96,165,250,0.16); color: #93c5fd; }
+    .eyebrow-blue::before { background: #60a5fa; box-shadow: 0 0 0 6px rgba(96,165,250,0.12); }
+    .eyebrow-purple { background: rgba(168,85,247,0.16); color: #c4b5fd; }
+    .eyebrow-purple::before { background: #a855f7; box-shadow: 0 0 0 6px rgba(168,85,247,0.12); }
+    .eyebrow-green { background: rgba(74,222,128,0.16); color: #86efac; }
+    .eyebrow-green::before { background: #4ade80; box-shadow: 0 0 0 6px rgba(74,222,128,0.12); }
+
+    /* ── filter bar (shared for proposals + review) ── */
+    .filter-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .filter-bar button {
+      padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid rgba(148,163,184,0.2);
+      background: rgba(255,255,255,0.06); color: var(--muted); font: inherit; font-size: 0.82rem;
+      font-weight: 700; cursor: pointer; transition: all 0.15s ease;
+    }
+    .filter-bar button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    /* ── card list (shared) ── */
+    .card-list { display: grid; gap: 0.65rem; }
+    .list-card {
+      padding: 0.9rem 1rem; border-radius: 14px;
+      background: var(--card); border: 1px solid var(--border);
+      display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0.75rem; align-items: start;
+      cursor: pointer; transition: border-color 0.15s ease;
+    }
+    .list-card:hover { border-color: rgba(255,122,26,0.3); }
+    .list-card h3 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+    .list-card .meta { color: var(--muted2); font-size: 0.8rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    /* ── status badges ── */
+    .status-badge {
+      padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800;
+    }
+    .status-draft { background: rgba(148,163,184,0.2); color: #94a3b8; }
+    .status-review { background: rgba(250,204,21,0.2); color: #fde047; }
+    .status-approved { background: rgba(74,222,128,0.2); color: #86efac; }
+    .status-archived { background: rgba(148,163,184,0.12); color: #64748b; }
+    .status-new { background: rgba(96,165,250,0.2); color: #93c5fd; }
+    .status-reviewing { background: rgba(250,204,21,0.2); color: #fde047; }
+    .status-adopted { background: rgba(74,222,128,0.2); color: #86efac; }
+
+    /* ── shared slide-out detail panel ── */
+    .detail-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+    }
+    .detail-overlay.open { display: block; }
+    .detail-panel {
+      display: none; position: fixed; top: 0; right: 0; width: min(540px, 100vw);
+      height: 100vh; background: var(--card); border-left: 1px solid var(--border);
+      z-index: 1000; overflow-y: auto; box-shadow: -16px 0 50px rgba(0,0,0,0.3);
+    }
+    .detail-panel.open { display: block; }
+    .detail-header {
+      position: sticky; top: 0; padding: 1rem 1.25rem;
+      background: rgba(15,23,42,0.95); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(8px);
+    }
+    .detail-header button { border: none; background: transparent; color: var(--muted2); font-size: 1.2rem; cursor: pointer; }
+    .detail-body { padding: 1.25rem; }
+    .detail-body h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    .detail-body .content {
+      white-space: pre-wrap; font-size: 0.9rem; line-height: 1.7; color: var(--muted);
+      margin: 0.75rem 0; padding: 0.8rem; background: rgba(0,0,0,0.2); border-radius: 10px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+
+    /* ── drafter (tabCreate) ── */
+    .drafter-workspace {
+      display: grid; grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.35fr);
+      gap: 1.25rem; align-items: start;
+    }
+    .field { margin-top: 1rem; }
+    .field:first-child { margin-top: 0; }
+    .field label { margin-top: 0; font-size: 0.82rem; letter-spacing: 0.01em; }
+    .field-hint { margin-top: 0.35rem; color: var(--muted3); font-size: 0.8rem; line-height: 1.5; }
+    textarea { min-height: 92px; }
+    .btn-generate { width: 100%; margin-top: 1.25rem; }
+    .result-area {
+      white-space: pre-wrap; font-size: 0.96rem; line-height: 1.75;
+      padding: 1rem 1.05rem; background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(148,163,184,0.14); border-radius: 14px;
+      min-height: 260px; max-height: 600px; overflow-y: auto; color: var(--text);
+    }
+    .result-empty { color: var(--muted2); font-size: 0.92rem; }
+    .loading-spinner { color: var(--muted2); font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .err { color: #fecaca; margin-top: 0.7rem; font-size: 0.92rem; }
+    .draft-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
+    .draft-actions .btn { flex: 1; min-width: 130px; }
+
+    /* research panel */
+    .research-panel { margin-top: 1rem; border-top: 1px solid rgba(148,163,184,0.12); padding-top: 1rem; }
+    .research-list { display: grid; gap: 0.6rem; margin-top: 0.75rem; }
+    .research-item {
+      padding: 0.7rem 0.85rem; border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.1); background: rgba(255,255,255,0.04);
+      font-size: 0.88rem; line-height: 1.55;
+    }
+    .research-item .tag {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800; margin-right: 0.45rem;
+    }
+    .tag-blue { background: rgba(96,165,250,0.2); color: #93c5fd; }
+    .tag-green { background: rgba(74,222,128,0.2); color: #86efac; }
+    .tag-gray { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+    .summary-strip {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem; margin-bottom: 1rem;
+    }
+    .summary-chip {
+      padding: 0.8rem 0.9rem; border-radius: 14px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.12);
+    }
+    .summary-chip strong { display: block; font-size: 1.05rem; color: var(--text-strong); margin-bottom: 0.2rem; }
+    .summary-chip span { color: var(--muted2); font-size: 0.8rem; }
+    .section-title {
+      margin: 0 0 0.75rem; color: var(--muted2); font-size: 0.82rem;
+      font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
     }
 
-    .brand-block {
-      display: grid;
-      gap: 0.3rem;
+    /* ── radar (tabRadar) ── */
+    .radar-controls {
+      display: grid; grid-template-columns: 1.2fr 0.7fr auto;
+      gap: 0.75rem; align-items: end; margin-bottom: 1rem;
+    }
+    .control-group label { display: block; color: var(--muted2); font-size: 0.82rem; margin-bottom: 0.35rem; }
+    .control-group input, .control-group select {
+      width: 100%; background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(148,163,184,0.24); color: var(--text);
+      padding: 0.58rem 0.7rem; border-radius: 10px; font: inherit;
+    }
+    .radar-controls button {
+      min-height: 42px; border: none; border-radius: 10px; padding: 0.6rem 1rem;
+      background: var(--brand); color: #fff; font-weight: 800; cursor: pointer;
+    }
+    .radar-controls button:hover { background: var(--brand-hover); }
+    .radar-controls button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem; margin-bottom: 1.25rem;
+    }
+    .summary-card {
+      padding: 0.95rem 1rem; border-radius: 16px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.12);
+    }
+    .summary-card .num { display: block; font-size: 1.7rem; line-height: 1; font-weight: 900; margin-bottom: 0.25rem; }
+    .summary-card .lbl { color: var(--muted2); font-size: 0.82rem; }
+    .num-green { color: #4ade80; }
+    .num-red { color: #f87171; }
+    .heatmap-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;
+    }
+    .heatmap-cell {
+      padding: 0.85rem; border-radius: 14px; text-align: left;
+      border: 1px solid rgba(148,163,184,0.15);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      cursor: pointer; user-select: none;
+    }
+    .heatmap-cell:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(0,0,0,0.16); }
+    .heatmap-topic { font-size: 0.92rem; font-weight: 800; margin-bottom: 0.25rem; word-break: keep-all; }
+    .heatmap-count { color: rgba(255,255,255,0.76); font-size: 0.78rem; line-height: 1.45; }
+    .heat-green { background: rgba(74,222,128,0.18); }
+    .heat-yellow { background: rgba(251,191,36,0.18); }
+    .heat-red { background: rgba(248,113,113,0.22); }
+    .heat-gray { background: rgba(148,163,184,0.12); }
+    .gaps { display: grid; gap: 0.75rem; }
+    .gap-item {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 16px; padding: 1rem 1.1rem;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .gap-item.highlighted {
+      border-color: rgba(255,122,26,0.5);
+      box-shadow: 0 0 0 1px rgba(255,122,26,0.2), 0 8px 24px rgba(255,122,26,0.08);
+    }
+    .gap-header { display: flex; justify-content: space-between; align-items: start; gap: 0.75rem; flex-wrap: wrap; }
+    .gap-topic { font-size: 1.02rem; font-weight: 800; letter-spacing: -0.02em; }
+    .gap-badges { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    .gap-meta { margin-top: 0.55rem; color: var(--muted2); font-size: 0.84rem; }
+    .gap-action {
+      display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.65rem;
+      padding: 0.35rem 0.7rem; border-radius: 8px; background: rgba(255,122,26,0.15);
+      color: var(--brand-light); font-size: 0.82rem; font-weight: 800;
+      text-decoration: none; cursor: pointer; border: none; font: inherit;
+      transition: background 0.18s ease;
+    }
+    .gap-action:hover { background: rgba(255,122,26,0.28); }
+    .gap-docs { margin-top: 0.8rem; border-top: 1px solid rgba(148,163,184,0.1); padding-top: 0.65rem; }
+    .gap-docs summary { cursor: pointer; color: #cbd5e1; font-size: 0.84rem; margin-bottom: 0.3rem; }
+    .doc-item { padding: 0.4rem 0; border-bottom: 1px solid rgba(148,163,184,0.08); font-size: 0.84rem; line-height: 1.45; }
+    .doc-item:last-child { border-bottom: none; }
+    .doc-type { color: var(--muted2); }
+    .doc-score { color: #fbbf24; font-size: 0.78rem; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 1rem; color: var(--muted2); font-size: 0.85rem; }
+    .cache-badge {
+      display: inline-flex; align-items: center; padding: 0.12rem 0.45rem;
+      border-radius: 999px; background: rgba(148,163,184,0.16); color: #cbd5e1;
+      font-size: 0.74rem; font-weight: 700;
     }
 
-    .brand-title {
-      color: var(--brand-light);
-      font-size: 0.78rem;
-      font-weight: 900;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
+    /* ── proposals (tabProposals) ── */
+    .stats-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .stat-chip {
+      padding: 0.6rem 0.9rem; border-radius: 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.12); font-size: 0.85rem;
+    }
+    .stat-chip strong { color: var(--text-strong); margin-right: 0.3rem; }
+    .stat-chip span { color: var(--muted2); }
+    .note-section { margin-top: 1rem; }
+    .note-section textarea { width: 100%; min-height: 60px; margin-top: 0.5rem; font: inherit; font-size: 0.88rem; }
+
+    /* ── review comments ── */
+    .comment-section { margin-top: 1.25rem; border-top: 1px solid rgba(148,163,184,0.12); padding-top: 1rem; }
+    .comment-section h3 { font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .comment-item {
+      padding: 0.6rem 0.75rem; border-radius: 10px; background: rgba(255,255,255,0.04);
+      margin-bottom: 0.5rem; font-size: 0.85rem; line-height: 1.55;
+    }
+    .comment-item .comment-meta { color: var(--muted3); font-size: 0.75rem; margin-top: 0.2rem; }
+    .comment-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .comment-form textarea { flex: 1; min-height: 60px; font: inherit; font-size: 0.88rem; }
+
+    /* ── empty state ── */
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted2); font-size: 0.95rem; }
+
+    /* ── chatbot ── */
+    .chat-container {
+      position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1100;
+      display: flex; flex-direction: column; align-items: flex-end;
+    }
+    .chat-toggle {
+      width: 56px; height: 56px; border-radius: 50%; background: var(--brand);
+      color: #fff; border: none; font-size: 1.15rem; font-weight: 900;
+      box-shadow: 0 16px 30px rgba(0,0,0,0.32); cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .chat-toggle:hover { background: var(--brand-hover); transform: translateY(-1px); }
+    .chat-box {
+      display: none; width: min(380px, calc(100vw - 2rem)); max-height: 560px;
+      margin-bottom: 0.75rem; border-radius: 18px;
+      background: rgba(7,48,83,0.98); border: 1px solid rgba(148,163,184,0.2);
+      box-shadow: 0 24px 50px rgba(0,0,0,0.42); overflow: hidden; backdrop-filter: blur(12px);
+    }
+    .chat-box.open { display: flex; flex-direction: column; }
+    .chat-header {
+      padding: 0.9rem 1rem; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(148,163,184,0.14); background: rgba(255,255,255,0.05); font-weight: 800;
+    }
+    .chat-header button { border: none; background: transparent; color: var(--muted2); font-size: 1rem; cursor: pointer; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 0.85rem 0.95rem; min-height: 220px; max-height: 360px; }
+    .chat-msg { margin-bottom: 0.75rem; font-size: 0.86rem; line-height: 1.55; }
+    .chat-msg.user { text-align: right; }
+    .chat-msg .bubble { display: inline-block; max-width: 88%; padding: 0.6rem 0.75rem; border-radius: 14px; }
+    .chat-msg.user .bubble { background: rgba(255,114,16,0.2); }
+    .chat-msg.bot .bubble { background: rgba(255,255,255,0.08); }
+    .chat-input { display: flex; gap: 0.5rem; padding: 0.8rem; border-top: 1px solid rgba(148,163,184,0.14); }
+    .chat-input input {
+      flex: 1; background: rgba(255,255,255,0.08); color: var(--text);
+      border: 1px solid rgba(148,163,184,0.2); border-radius: 10px; padding: 0.6rem 0.75rem; font: inherit;
+    }
+    .chat-input button {
+      background: var(--brand); color: #fff; border: none; border-radius: 10px;
+      padding: 0.6rem 0.8rem; font: inherit; font-weight: 800; cursor: pointer;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
 
-    .brand-subtitle {
-      color: var(--muted2);
-      font-size: 0.88rem;
+    /* ── responsive ── */
+    @media (max-width: 960px) {
+      .dash-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .drafter-workspace { grid-template-columns: 1fr; }
+      .summary-strip { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .radar-controls { grid-template-columns: 1fr 1fr; }
+      .radar-controls button { grid-column: 1 / -1; }
     }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
-      gap: 1.2rem;
-      align-items: stretch;
-      margin-bottom: 1.3rem;
-    }
-
-    .hero-panel {
-      position: relative;
-      overflow: hidden;
-      padding: 2rem;
-    }
-
-    .hero-panel::after {
-      content: "";
-      position: absolute;
-      inset: auto -8% -16% auto;
-      width: 320px;
-      height: 320px;
-      border-radius: 999px;
-      background: radial-gradient(circle, rgba(255, 122, 26, 0.24), transparent 64%);
-      pointer-events: none;
-    }
-
-    .hero-kicker {
-      color: var(--brand-light);
-      font-size: 0.78rem;
-      font-weight: 900;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-
-    .hero-title {
-      font-size: clamp(2.2rem, 4.8vw, 4.1rem);
-      line-height: 1.03;
-      max-width: 11.5ch;
-      margin-bottom: 1rem;
-    }
-
-    .hero-lead {
-      max-width: 56ch;
-      color: var(--muted);
-      font-size: 1rem;
-      line-height: 1.7;
-      margin-bottom: 1.4rem;
-      word-break: keep-all;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-bottom: 1.1rem;
-    }
-
-    .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .hero-meta .badge {
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .flow-panel {
-      display: grid;
-      gap: 1rem;
-      height: 100%;
-      padding: 1.5rem;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
-    }
-
-    .flow-card {
-      padding: 1rem;
-      border-radius: var(--radius-md);
-      background: rgba(0, 0, 0, 0.18);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-    }
-
-    .flow-card strong {
-      display: block;
-      color: var(--text-strong);
-      font-size: 1.1rem;
-      margin-bottom: 0.2rem;
-    }
-
-    .flow-card span {
-      color: var(--muted2);
-      font-size: 0.92rem;
-    }
-
-    .flow-steps {
-      display: grid;
-      gap: 0.8rem;
-    }
-
-    .section {
-      margin-top: 1.4rem;
-    }
-
-    .section-note {
-      color: var(--muted2);
-      font-size: 0.95rem;
-      max-width: 58ch;
-    }
-
-    .hub-grid {
-      display: grid;
-      gap: 0.8rem;
-    }
-
-    .public-route {
-      display: grid;
-      grid-template-columns: 52px minmax(0, 1fr) auto;
-      gap: 1rem;
-      align-items: center;
-      text-decoration: none;
-      color: inherit;
-      padding: 1rem 1.1rem;
-      border-radius: var(--radius-lg);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-    }
-
-    .public-route:hover {
-      transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 122, 26, 0.34);
-    }
-
-    .public-route .route-index {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(180deg, rgba(255, 122, 26, 0.2), rgba(255, 122, 26, 0.08));
-      color: var(--brand-light);
-      font-size: 1.05rem;
-      font-weight: 900;
-    }
-
-    .public-route h3 {
-      margin-bottom: 0.25rem;
-      font-size: 1.08rem;
-    }
-
-    .public-route p {
-      color: var(--muted2);
-      font-size: 0.93rem;
-      line-height: 1.55;
-    }
-
-    .public-route .route-meta {
-      margin-top: 0.35rem;
-      color: var(--muted3);
-      font-size: 0.82rem;
-    }
-
-    .public-route .route-arrow {
-      color: var(--brand-light);
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .reference-grid {
-      display: grid;
-      gap: 0.65rem;
-    }
-
-    .reference-link {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.95rem 1rem;
-      border-radius: var(--radius-md);
-      text-decoration: none;
-      color: inherit;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
-    }
-
-    .reference-link:hover {
-      transform: translateY(-1px);
-      background: rgba(255, 255, 255, 0.07);
-      border-color: rgba(255, 122, 26, 0.28);
-    }
-
-    .reference-link strong {
-      display: block;
-      margin-bottom: 0.15rem;
-      color: var(--text-strong);
-    }
-
-    .reference-link span {
-      color: var(--muted2);
-      font-size: 0.9rem;
-    }
-
-    .reference-link em {
-      color: var(--brand-light);
-      font-style: normal;
-      font-weight: 800;
-    }
-
-    /* 개발 단계: admin-only 섹션도 표시 */
-    /*
-    .admin-only {
-      display: none;
-    }
-    */
-
-    .footer-links {
-      margin-top: 1.8rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      color: var(--muted3);
-      font-size: 0.85rem;
-    }
-
-    .footer-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-
-    .footer-actions a,
-    .footer-actions button {
-      color: var(--brand-light);
-      text-decoration: none;
-      font: inherit;
-    }
-
-    .footer-actions button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-    }
-
-    @media (max-width: 900px) {
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
-      .public-route {
-        grid-template-columns: 44px minmax(0, 1fr);
-      }
-
-      .public-route .route-arrow {
-        grid-column: 2;
-        justify-self: start;
-      }
+    @media (max-width: 640px) {
+      .dash-strip { grid-template-columns: 1fr 1fr; }
+      .panel-header, .panel-body { padding-left: 1rem; padding-right: 1rem; }
+      .detail-panel { width: 100vw; }
+      .chat-container { right: 0.75rem; bottom: 0.75rem; }
+      .draft-actions .btn { min-width: 100%; }
+      .radar-controls { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main class="page-shell lab-shell">
+    <!-- ════ TOPBAR ════ -->
     <div class="topbar">
       <div class="brand-block">
-        <div class="brand-title">POLICY LAB</div>
-        <div class="brand-subtitle">시민 참여와 인공지능 도구가 만나는 정책 진입점</div>
+        <div class="brand-title">POLICY HUB</div>
+        <div class="brand-subtitle">정책 허브 - 관리자 통합 대시보드</div>
       </div>
       <div class="links">
-        <a href="/pledge">기존 공약 분석</a>
-        <a href="/map">기존 지도</a>
+        <a href="/admin">관리자 홈</a>
+        <a href="/hub/archive">자료 허브</a>
       </div>
     </div>
 
-    <section class="hero reveal">
-      <div class="panel hero-panel">
-        <div class="hero-kicker">정책 진입점</div>
-        <h1 class="hero-title">정책을 보고, 제안하고, 검증하는 곳입니다.</h1>
-        <p class="hero-lead">
-          시민의 제안을 받아들이고, 인공지능과 AI 드래프터가 이슈 레이더로 우선순위를 빠르게 찾습니다.
-          기존 도구는 그대로 두고, 새 기능은 이 허브에서 자연스럽게 이어집니다.
-        </p>
-        <div class="hero-actions">
-          <a href="/proposals" class="btn">시민 제안 작성</a>
-          <a href="/policy-create" class="btn btn-secondary">AI 드래프트 생성</a>
-        </div>
-        <div class="hero-meta">
-          <span class="badge badge-green">공개 참여</span>
-          <span class="badge badge-blue">인공지능 도구</span>
-          <span class="badge">기존 도구 연동</span>
-        </div>
-      </div>
+    <!-- ════ DASHBOARD STRIP ════ -->
+    <div class="dash-strip" id="dashStrip">
+      <div class="dash-chip"><span class="num num-orange" id="dashDrafts">-</span><div class="lbl">초안</div></div>
+      <div class="dash-chip"><span class="num num-yellow" id="dashReview">-</span><div class="lbl">검토대기</div></div>
+      <div class="dash-chip"><span class="num num-purple" id="dashProposals">-</span><div class="lbl">신규제안</div></div>
+      <div class="dash-chip"><span class="num num-blue" id="dashGaps">-</span><div class="lbl">정책갭</div></div>
+    </div>
 
-      <div class="panel flow-panel">
-        <div class="flow-card">
-          <strong>오늘의 흐름</strong>
-          <span>제안 접수 → AI 초안 → 이슈 레이더</span>
-        </div>
-        <div class="flow-steps">
-          <div class="step">
-            <div class="step-num">1</div>
+    <!-- ════ TAB BAR ════ -->
+    <div class="tab-bar" id="tabBar">
+      <button class="tab-btn active" data-tab="create" onclick="Lab.switchTab('create')">AI 드래프터</button>
+      <button class="tab-btn" data-tab="radar" onclick="Lab.switchTab('radar')">이슈 레이더</button>
+      <button class="tab-btn" data-tab="proposals" onclick="Lab.switchTab('proposals')">제안 관리</button>
+      <button class="tab-btn" data-tab="review" onclick="Lab.switchTab('review')">리뷰 관리</button>
+    </div>
+
+    <!-- ════ TAB: AI DRAFTER ════ -->
+    <div class="tab-panel active" id="tabCreate">
+      <span class="eyebrow eyebrow-orange">AI Drafter</span>
+      <div class="drafter-workspace" style="margin-top:1rem;">
+        <!-- Input panel -->
+        <div class="panel">
+          <div class="panel-header">
             <div>
-              <div class="step-title">시민이 제안을 올립니다</div>
-              <div class="step-copy">제목과 본문만 있으면 접수할 수 있게 진입 장벽을 최소화했습니다.</div>
+              <h2>입력</h2>
+              <p>짧고 명확하게 넣을수록 초안 품질이 좋아집니다.</p>
             </div>
           </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <div>
-              <div class="step-title">인공지능이 초안을 만듭니다</div>
-              <div class="step-copy">AI 드래프터가 주제와 맥락을 정리해 검증 가능한 정책 초안을 준비합니다.</div>
+          <div class="panel-body">
+            <div class="field">
+              <label for="topic">정책 주제</label>
+              <input type="text" id="topic" placeholder="예: 청년 주거 지원, 지역 돌봄 강화">
+              <div class="field-hint">핵심 이슈 한 줄이면 충분합니다.</div>
+            </div>
+            <div class="field">
+              <label for="topicDetail">상세 설명 / 추가 코멘트</label>
+              <textarea id="topicDetail" rows="4" placeholder="배경, 원하는 방향, 포함할 내용 등 자유롭게 적어 주세요." maxlength="3000"></textarea>
+              <div class="field-hint">선택 입력입니다. 구체적일수록 초안 품질이 올라갑니다.</div>
+            </div>
+            <div class="field">
+              <label for="outputFormat">출력 형식</label>
+              <select id="outputFormat">
+                <option value="정책포지션">정책포지션</option>
+                <option value="지역공약">지역공약</option>
+                <option value="입법취지서">입법취지서</option>
+                <option value="논평">논평</option>
+                <option value="메시지">메시지</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="region">지역</label>
+              <input type="text" id="region" placeholder="예: 서울, 부산, 경기">
+              <div class="field-hint">지역성이 있는 주제에만 채우면 됩니다.</div>
+            </div>
+            <div class="field">
+              <label for="district">세부 지역</label>
+              <input type="text" id="district" placeholder="예: 강남구, 해운대구">
+            </div>
+            <div class="field">
+              <label for="electionType">선거 유형</label>
+              <select id="electionType">
+                <option value="">선택 안 함</option>
+                <option value="광역자치단체장">광역자치단체장</option>
+                <option value="기초자치단체장">기초자치단체장</option>
+                <option value="광역의원">광역의원</option>
+                <option value="기초의원">기초의원</option>
+                <option value="교육감">교육감</option>
+              </select>
+            </div>
+            <button class="btn btn-generate" id="generateBtn" onclick="Lab.drafter.generate()">초안 생성</button>
+          </div>
+        </div>
+
+        <!-- Result panel -->
+        <div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>결과</h2>
+                <p>생성된 초안과 참고 근거를 같은 화면에서 비교할 수 있습니다.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <p class="loading-spinner" id="loadingMsg" style="display:none;">초안을 생성하고 있습니다...</p>
+              <p class="err" id="errMsg" style="display:none;"></p>
+              <div class="result-area" id="resultArea"><span class="result-empty">주제를 입력하고 초안 생성 버튼을 누르면 결과가 표시됩니다.</span></div>
+
+              <div class="draft-actions" id="actionBar" style="display:none;">
+                <button class="btn btn-green" onclick="Lab.drafter.save()">초안 저장</button>
+                <button class="btn btn-secondary" onclick="Lab.drafter.copy()">복사</button>
+                <button class="btn btn-secondary" onclick="Lab.drafter.generate()">다시 생성</button>
+              </div>
+
+              <div class="research-panel" id="researchPanel" style="display:none;">
+                <div class="section-title">참고 근거</div>
+                <div id="researchContent"></div>
+              </div>
             </div>
           </div>
-          <div class="step">
-            <div class="step-num">3</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TAB: ISSUE RADAR ════ -->
+    <div class="tab-panel" id="tabRadar">
+      <span class="eyebrow eyebrow-blue">Issue Radar</span>
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header">
+          <div>
+            <h2>이슈 레이더</h2>
+            <p>문서와 공약의 커버리지를 집계해 비어 있는 주제와 약한 구간을 찾습니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="radar-controls">
+            <div class="control-group">
+              <label for="radarDocType">문서 유형</label>
+              <select id="radarDocType">
+                <option value="">전체 문서</option>
+                <option value="bill">법안</option>
+                <option value="statement">성명/발언</option>
+                <option value="press_release">보도자료</option>
+                <option value="message">메시지</option>
+                <option value="meeting">회의록</option>
+                <option value="rule">규정</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="radarDays">조회 기간 (일)</label>
+              <input type="number" id="radarDays" placeholder="예: 30" min="1" max="365">
+            </div>
+            <button id="radarScanBtn" onclick="Lab.radar.scan()">다시 스캔</button>
+          </div>
+          <p class="loading-spinner" id="radarLoading" style="display:none;">데이터를 불러오는 중입니다...</p>
+          <p class="err" id="radarErr" style="display:none;"></p>
+
+          <div id="radarResult" style="display:none;">
+            <div class="meta-row" id="radarMetaRow"></div>
+            <div class="summary-grid" id="radarSummaryCards"></div>
+            <div style="margin-bottom:1.25rem;">
+              <div class="section-title">주제별 커버리지</div>
+              <div id="radarHeatmap"></div>
+            </div>
             <div>
-              <div class="step-title">이슈 레이더로 빈곳을 찾습니다</div>
-              <div class="step-copy">어떤 주제가 비어 있는지 빠르게 확인하고 다음 작업을 정합니다.</div>
+              <div class="section-title">발견된 격차</div>
+              <div id="radarGapList" class="gaps"></div>
+              <p id="radarNoGaps" class="empty-state" style="display:none;">격차가 발견되지 않았습니다.</p>
             </div>
           </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section class="section reveal">
-      <div class="section-head">
-        <div>
-          <div class="eyebrow">Public Input</div>
-          <h2>시민이 바로 참여하는 경로</h2>
+    <!-- ════ TAB: PROPOSALS ════ -->
+    <div class="tab-panel" id="tabProposals">
+      <span class="eyebrow eyebrow-purple">Citizen Proposals</span>
+      <div style="margin-top:1rem;">
+        <div class="stats-bar" id="proposalStatsBar"></div>
+        <div class="filter-bar" id="proposalFilterBar">
+          <button class="active" data-status="">전체</button>
+          <button data-status="new">신규</button>
+          <button data-status="reviewing">검토중</button>
+          <button data-status="adopted">채택</button>
+          <button data-status="archived">보관</button>
         </div>
-        <p class="section-note">복잡한 메뉴 없이 제출부터 시작하는 두 가지 동선을 먼저 보여줍니다.</p>
-      </div>
-      <div class="hub-grid">
-        <a href="/proposals" class="public-route">
-          <div class="route-index">01</div>
-          <div>
-            <h3>시민 제안</h3>
-            <p>새 정책 아이디어를 접수하고, 제목과 본문을 기준으로 자동 분류됩니다.</p>
-            <div class="route-meta">공개 접수 · 누구나 참여 가능</div>
-          </div>
-          <div class="route-arrow">열기 →</div>
-        </a>
-      </div>
-    </section>
-
-    <section class="section reveal">
-      <div class="section-head">
-        <div>
-          <div class="eyebrow">Operator Tools</div>
-          <h2>인공지능 도구</h2>
+        <div class="card-list" id="proposalList">
+          <div class="empty-state">탭을 선택하면 데이터를 불러옵니다.</div>
         </div>
-        <p class="section-note">운영자만 보이는 작업 공간입니다. AI 초안과 이슈 레이더를 여기서 관리합니다.</p>
       </div>
-      <div class="hub-grid">
-        <a href="/policy-create" class="public-route">
-          <div class="route-index">A1</div>
-          <div>
-            <h3>AI 정책 드래프터</h3>
-            <p>주제와 지역을 입력하면 초안을 만들고, 필요한 경우 검증으로 이어집니다.</p>
-            <div class="route-meta">운영 전용 · 초안 생성 / 검토 / 검증</div>
-          </div>
-          <div class="route-arrow">열기 →</div>
-        </a>
-        <a href="/admin/issue-radar" class="public-route">
-          <div class="route-index">A2</div>
-          <div>
-            <h3>이슈 레이더</h3>
-            <p>커버하지 않은 주제를 찾아내고 다음 기획과 보강 우선순위를 정합니다.</p>
-            <div class="route-meta">운영 전용 · 커버리지 분석 / 갭 탐색</div>
-          </div>
-          <div class="route-arrow">열기 →</div>
-        </a>
-      </div>
-    </section>
+    </div>
 
-    <section class="section reveal">
-      <div class="section-head">
-        <div>
-          <div class="eyebrow">Reference</div>
-          <h2>기존 도구</h2>
+    <!-- ════ TAB: REVIEW ════ -->
+    <div class="tab-panel" id="tabReview">
+      <span class="eyebrow eyebrow-green">Review Workflow</span>
+      <div style="margin-top:1rem;">
+        <div class="filter-bar" id="reviewFilterBar">
+          <button class="active" data-status="">전체</button>
+          <button data-status="draft">초안</button>
+          <button data-status="review">검토중</button>
+          <button data-status="approved">승인됨</button>
+          <button data-status="archived">보관</button>
         </div>
-        <p class="section-note">운영 참고용 링크만 모아놓고 기존 흐름을 그대로 유지합니다.</p>
-      </div>
-      <div class="reference-grid">
-        <a href="/pledge" class="reference-link">
-          <div>
-            <strong>기존 공약 분석</strong>
-            <span>분석 결과를 확인하는 링크 진입점</span>
-          </div>
-          <em>열기</em>
-        </a>
-        <a href="/map" class="reference-link">
-          <div>
-            <strong>기존 지도</strong>
-            <span>지역 기반 공약 탐색 링크</span>
-          </div>
-          <em>열기</em>
-        </a>
-        <a href="/hub/archive" class="reference-link">
-          <div>
-            <strong>자료 허브</strong>
-            <span>논평, 법안, 여론조사 등 SSOT 자료 열람</span>
-          </div>
-          <em>열기</em>
-        </a>
-      </div>
-    </section>
-
-    <div class="footer-links">
-      <div>정책 허브는 새 기능의 진입점입니다.</div>
-      <div class="footer-actions">
-        <a href="/">홈</a>
-        <a href="/policy-lab">정책 허브</a>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit">로그아웃</button>
-        </form>
+        <div class="card-list" id="reviewList">
+          <div class="empty-state">탭을 선택하면 데이터를 불러옵니다.</div>
+        </div>
       </div>
     </div>
   </main>
 
+  <!-- ════ SHARED DETAIL PANEL ════ -->
+  <div class="detail-overlay" id="detailOverlay" onclick="Lab.closeDetail()"></div>
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <span id="detailTitle">상세 보기</span>
+      <button onclick="Lab.closeDetail()">x</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+  <!-- ════ CHATBOT ════ -->
+  <div class="chat-container">
+    <div class="chat-box" id="chatBox" aria-live="polite">
+      <div class="chat-header">
+        <span>정책 챗봇</span>
+        <button type="button" onclick="Lab.toggleChat()" aria-label="챗봇 닫기">x</button>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg bot"><div class="bubble">안녕하세요. 개혁신당 정책에 대해 궁금한 점을 물어보세요.</div></div>
+      </div>
+      <div class="chat-input">
+        <label class="sr-only" for="chatInput">질문 입력</label>
+        <input type="text" id="chatInput" placeholder="예: 청년 주거 정책이 있나요?" onkeydown="if(event.key==='Enter')Lab.sendChat()">
+        <button type="button" onclick="Lab.sendChat()">전송</button>
+      </div>
+    </div>
+    <button class="chat-toggle" onclick="Lab.toggleChat()" title="정책 챗봇">?</button>
+  </div>
+
   <script>
-    (async () => {
-      try {
-        const r = await fetch('/api/auth/me', { credentials: 'include' });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.role === 'admin') {
-            document.querySelectorAll('.admin-only').forEach((el) => {
-              el.style.display = '';
-            });
-          }
+    /* ═══════════════════════════════════════════════════
+       Lab namespace — consolidated policy hub JS
+       ═══════════════════════════════════════════════════ */
+    const Lab = {
+      _activeTab: 'create',
+      _loaded: {},   // track which tabs have loaded data
+
+      /* ── shared util ── */
+      escapeHtml(s) {
+        return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      },
+
+      /* ── tab switching ── */
+      switchTab(name) {
+        Lab._activeTab = name;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === name);
+        });
+        document.querySelectorAll('.tab-panel').forEach(p => {
+          p.classList.toggle('active', p.id === 'tab' + name.charAt(0).toUpperCase() + name.slice(1));
+        });
+        // Update URL
+        const url = new URL(location);
+        url.searchParams.set('tab', name);
+        history.pushState({ tab: name }, '', url);
+        // Lazy load
+        Lab._lazyLoad(name);
+      },
+
+      _lazyLoad(name) {
+        if (Lab._loaded[name]) return;
+        Lab._loaded[name] = true;
+        switch (name) {
+          case 'create': /* loaded immediately via URL prefill */ break;
+          case 'radar': Lab.radar.load(false); break;
+          case 'proposals': Lab.proposals.load(); break;
+          case 'review': Lab.review.load(); break;
         }
-      } catch (e) {}
-    })();
+      },
+
+      /* ── detail panel ── */
+      openDetail(title, htmlContent) {
+        document.getElementById('detailTitle').textContent = title;
+        document.getElementById('detailBody').innerHTML = htmlContent;
+        document.getElementById('detailOverlay').classList.add('open');
+        document.getElementById('detailPanel').classList.add('open');
+      },
+
+      closeDetail() {
+        document.getElementById('detailOverlay').classList.remove('open');
+        document.getElementById('detailPanel').classList.remove('open');
+      },
+
+      /* ── chatbot ── */
+      toggleChat() {
+        document.getElementById('chatBox').classList.toggle('open');
+      },
+
+      async sendChat() {
+        const input = document.getElementById('chatInput');
+        const q = input.value.trim();
+        if (!q) return;
+        input.value = '';
+        const msgs = document.getElementById('chatMessages');
+        msgs.innerHTML += '<div class="chat-msg user"><div class="bubble">' + Lab.escapeHtml(q) + '</div></div>';
+        msgs.scrollTop = msgs.scrollHeight;
+        try {
+          const r = await fetch('/api/policy/chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', body: JSON.stringify({ question: q }),
+          });
+          const data = await r.json();
+          const answer = data.answer || '답변을 생성하지 못했습니다.';
+          msgs.innerHTML += '<div class="chat-msg bot"><div class="bubble">' + Lab.escapeHtml(answer) + '</div></div>';
+        } catch (e) {
+          msgs.innerHTML += '<div class="chat-msg bot"><div class="bubble" style="color:#fecaca;">오류가 발생했습니다.</div></div>';
+        }
+        msgs.scrollTop = msgs.scrollHeight;
+      },
+
+      /* ═══════════════════════════════════════════
+         DRAFTER MODULE
+         ═══════════════════════════════════════════ */
+      drafter: {
+        _lastDraftText: '',
+        _lastResearch: null,
+
+        prefill() {
+          const p = new URLSearchParams(location.search);
+          const map = { topic: 'topic', detail: 'topicDetail', format: 'outputFormat', region: 'region', district: 'district', election_type: 'electionType' };
+          for (const [key, id] of Object.entries(map)) {
+            const v = p.get(key);
+            if (v) { const el = document.getElementById(id); if (el) el.value = v; }
+          }
+        },
+
+        async generate() {
+          const topic = document.getElementById('topic').value.trim();
+          if (!topic) { alert('정책 주제를 입력해 주세요.'); return; }
+
+          const btn = document.getElementById('generateBtn');
+          const loadingEl = document.getElementById('loadingMsg');
+          const errEl = document.getElementById('errMsg');
+          const resultEl = document.getElementById('resultArea');
+          const actionBar = document.getElementById('actionBar');
+
+          btn.disabled = true;
+          loadingEl.style.display = 'block';
+          errEl.style.display = 'none';
+          actionBar.style.display = 'none';
+          resultEl.textContent = '';
+          this._lastDraftText = '';
+          this._lastResearch = null;
+
+          const detail = document.getElementById('topicDetail').value.trim();
+          const fullTopic = detail ? topic + '\n\n' + detail : topic;
+          const regionVal = document.getElementById('region').value.trim();
+
+          const reqBody = {
+            topic: fullTopic,
+            output_format: document.getElementById('outputFormat').value,
+            region: regionVal || null,
+            election_type: document.getElementById('electionType').value,
+            region_province: regionVal,
+          };
+
+          const researchPromise = fetch('/api/policy/research?topic=' + encodeURIComponent(fullTopic) + (regionVal ? '&region=' + encodeURIComponent(regionVal) : ''), {
+            credentials: 'include',
+          }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+          try {
+            const r = await fetch('/api/policy/draft/stream', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              credentials: 'include', body: JSON.stringify(reqBody),
+            });
+
+            if (r.status === 401) {
+              window.location.href = '/login?next=' + encodeURIComponent(location.pathname);
+              return;
+            }
+            if (!r.ok) throw new Error('서버 오류 (' + r.status + ')');
+
+            const contentType = r.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              const data = await r.json();
+              if (data.error) {
+                errEl.textContent = data.draft_text || '초안 생성 중 오류가 발생했습니다.';
+                errEl.style.display = 'block';
+                return;
+              }
+            }
+
+            loadingEl.textContent = '초안을 생성하고 있습니다...';
+            const reader = r.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let chunks = [];
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const text = decoder.decode(value, { stream: true });
+              chunks.push(text);
+              resultEl.textContent = chunks.join('');
+              resultEl.scrollTop = resultEl.scrollHeight;
+            }
+
+            this._lastDraftText = chunks.join('');
+            if (!this._lastDraftText) {
+              resultEl.innerHTML = '<span class="result-empty">생성된 초안이 없습니다.</span>';
+            } else {
+              actionBar.style.display = 'flex';
+            }
+
+            const research = await researchPromise;
+            if (research) {
+              this._lastResearch = research;
+              this._renderResearch(research);
+            } else {
+              document.getElementById('researchPanel').style.display = 'none';
+            }
+          } catch (e) {
+            errEl.textContent = '오류: ' + (e.message || String(e));
+            errEl.style.display = 'block';
+          } finally {
+            loadingEl.style.display = 'none';
+            btn.disabled = false;
+          }
+        },
+
+        _renderResearch(research) {
+          const panel = document.getElementById('researchPanel');
+          const content = document.getElementById('researchContent');
+          const positions = (research.ssot || {}).related_positions || [];
+          const docs = (research.ssot || {}).related_documents || [];
+          let html = '';
+
+          html += '<div class="summary-strip" style="margin-bottom:0.9rem;">';
+          html += '<div class="summary-chip"><strong>분류</strong><span>' + Lab.escapeHtml(research.classified_topic || '미분류') + '</span></div>';
+          html += '<div class="summary-chip"><strong>참고 공약</strong><span>' + positions.length + '건</span></div>';
+          html += '<div class="summary-chip"><strong>참고 문서</strong><span>' + docs.length + '건</span></div>';
+          html += '</div>';
+
+          html += '<div class="research-list">';
+          if (positions.length > 0) {
+            for (const item of positions) {
+              html += '<div class="research-item"><span class="tag tag-green">공약</span>' + Lab.escapeHtml(item.title) + '</div>';
+            }
+          } else {
+            html += '<div class="research-item">관련 공약이 아직 없습니다.</div>';
+          }
+          if (docs.length > 0) {
+            for (const doc of docs.slice(0, 8)) {
+              html += '<div class="research-item"><span class="tag tag-blue">' + Lab.escapeHtml(doc.doc_type || '문서') + '</span>' + Lab.escapeHtml(doc.title || '제목 없음') + '</div>';
+            }
+          } else {
+            html += '<div class="research-item">참고 문서가 부족합니다.</div>';
+          }
+          if (research.assembly) {
+            html += '<div class="research-item"><span class="tag tag-gray">국회</span>';
+            html += research.assembly.available
+              ? '검색 결과 ' + Lab.escapeHtml(String(research.assembly.result_count || 0)) + '건을 불러왔습니다.'
+              : '국회 API를 사용할 수 없습니다.';
+            html += '</div>';
+          }
+          html += '</div>';
+
+          content.innerHTML = html;
+          panel.style.display = 'block';
+        },
+
+        async save() {
+          if (!this._lastDraftText) { alert('저장할 초안이 없습니다.'); return; }
+          const title = prompt('저장할 초안 제목을 입력해 주세요.', document.getElementById('topic').value);
+          if (!title) return;
+          try {
+            const r = await fetch('/api/policy/draft/save', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                title, summary: this._lastDraftText.substring(0, 500),
+                key_points: '', body: this._lastDraftText,
+                category: (this._lastResearch || {}).classified_topic || 'general',
+              }),
+            });
+            if (!r.ok) throw new Error('저장 실패');
+            const data = await r.json();
+            alert('초안이 저장되었습니다. (ID: ' + data.position_id + ')');
+            Lab._loadDashboard();
+          } catch (e) { alert('저장 오류: ' + (e.message || String(e))); }
+        },
+
+        copy() {
+          if (!this._lastDraftText) return;
+          navigator.clipboard.writeText(this._lastDraftText).then(() => alert('초안을 복사했습니다.'));
+        },
+      },
+
+      /* ═══════════════════════════════════════════
+         RADAR MODULE
+         ═══════════════════════════════════════════ */
+      radar: {
+        _data: null,
+
+        async load(refresh) {
+          const loadingEl = document.getElementById('radarLoading');
+          const errEl = document.getElementById('radarErr');
+          const resultEl = document.getElementById('radarResult');
+          const scanBtn = document.getElementById('radarScanBtn');
+
+          loadingEl.style.display = 'block';
+          errEl.style.display = 'none';
+          resultEl.style.display = 'none';
+          scanBtn.disabled = true;
+
+          try {
+            const params = new URLSearchParams();
+            if (refresh) params.set('refresh', 'true');
+            const days = document.getElementById('radarDays').value.trim();
+            const docType = document.getElementById('radarDocType').value;
+            if (days) params.set('days', days);
+            if (docType) params.set('doc_type', docType);
+
+            const r = await fetch('/api/policy/issue-radar?' + params.toString(), { credentials: 'include' });
+            if (r.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname); return; }
+            if (r.status === 403) { errEl.textContent = '관리자만 사용할 수 있습니다.'; errEl.style.display = 'block'; return; }
+            if (!r.ok) throw new Error('데이터를 불러오지 못했습니다. (' + r.status + ')');
+
+            this._data = await r.json();
+            this._render(this._data);
+            // Update dashboard gap count
+            document.getElementById('dashGaps').textContent = (this._data.gaps || []).length;
+          } catch (e) {
+            errEl.textContent = '오류: ' + (e.message || String(e));
+            errEl.style.display = 'block';
+          } finally {
+            loadingEl.style.display = 'none';
+            scanBtn.disabled = false;
+          }
+        },
+
+        scan() { this.load(true); },
+
+        _render(data) {
+          const resultEl = document.getElementById('radarResult');
+          const cs = data.coverage_summary || {};
+
+          // Meta row
+          const scanTime = data.scan_time ? data.scan_time.replace('T', ' ').substring(0, 19) : '-';
+          document.getElementById('radarMetaRow').innerHTML =
+            '<span>스캔 시각: ' + Lab.escapeHtml(scanTime) + '</span>' +
+            '<span>문서: ' + (data.total_documents || 0) + '건</span>' +
+            '<span>공약: ' + (data.total_positions || 0) + '건</span>' +
+            (data.from_cache ? '<span class="cache-badge">캐시 사용</span>' : '');
+
+          // Summary cards
+          document.getElementById('radarSummaryCards').innerHTML =
+            '<div class="summary-card"><span class="num num-green">' + (cs.well_covered || 0) + '</span><div class="lbl">충분히 덮인 주제</div></div>' +
+            '<div class="summary-card"><span class="num num-yellow">' + (cs.weak_coverage || 0) + '</span><div class="lbl">약한 커버리지</div></div>' +
+            '<div class="summary-card"><span class="num num-red">' + (cs.no_position || 0) + '</span><div class="lbl">무공약 주제</div></div>' +
+            '<div class="summary-card"><span class="num num-blue">' + ((data.gaps || []).length) + '</span><div class="lbl">발견된 격차</div></div>';
+
+          // Heatmap
+          this._renderHeatmap(data);
+
+          // Gap list
+          const gaps = data.gaps || [];
+          const gapListEl = document.getElementById('radarGapList');
+          const noGapsEl = document.getElementById('radarNoGaps');
+
+          if (gaps.length === 0) {
+            gapListEl.innerHTML = '';
+            noGapsEl.style.display = 'block';
+          } else {
+            noGapsEl.style.display = 'none';
+            let html = '';
+            for (const gap of gaps) {
+              const isNoPos = gap.gap_type === 'no_position';
+              const badgeClass = isNoPos ? 'badge-red' : 'badge-yellow';
+              const badgeLabel = isNoPos ? '무공약' : '약한 커버리지';
+              const topicText = gap.topic || '미분류 주제';
+
+              html += '<div class="gap-item" data-topic="' + Lab.escapeHtml(topicText) + '">';
+              html += '<div class="gap-header">';
+              html += '<span class="gap-topic">' + Lab.escapeHtml(topicText) + '</span>';
+              html += '<div class="gap-badges">';
+              html += '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
+              html += '<span class="badge badge-blue">우선순위 ' + Math.round(gap.priority_score || 0) + '</span>';
+              html += '</div></div>';
+              html += '<div class="gap-meta">';
+              html += '관련 문서 ' + (gap.document_count || 0) + '건';
+              if (gap.recent_bill_count) html += ' · 최근 법안 ' + gap.recent_bill_count + '건';
+              if (gap.recent_commentary_count) html += ' · 최근 발언 ' + gap.recent_commentary_count + '건';
+              html += '</div>';
+
+              html += '<button class="gap-action" onclick="Lab.radar.goToDrafter(\'' + Lab.escapeHtml(topicText).replace(/'/g, "\\'") + '\')">이 주제로 초안 생성 &rarr;</button>';
+
+              const docs = gap.documents || [];
+              if (docs.length > 0) {
+                html += '<details class="gap-docs"><summary>관련 문서 보기 (' + docs.length + '건)</summary>';
+                for (const doc of docs) {
+                  html += '<div class="doc-item">';
+                  html += '<span class="doc-type">[' + Lab.escapeHtml(doc.doc_type || '문서') + ']</span> ';
+                  html += Lab.escapeHtml(doc.title || '제목 없음');
+                  html += ' <span class="doc-score">매칭 ' + Lab.escapeHtml(String(doc.best_match_score ?? '-')) + '</span>';
+                  if (doc.best_match_title) html += ' · ' + Lab.escapeHtml(doc.best_match_title);
+                  html += '</div>';
+                }
+                html += '</details>';
+              }
+              html += '</div>';
+            }
+            gapListEl.innerHTML = html;
+          }
+
+          resultEl.style.display = 'block';
+        },
+
+        _renderHeatmap(data) {
+          const baseTopics = ['정책·제도', '정치참여', '경제', '복지', '교육', '과학기술', '안전·치안', '국방', '외교'];
+          const gaps = data.gaps || [];
+          const gapMap = new Map();
+          for (const gap of gaps) { if (gap && gap.topic) gapMap.set(gap.topic, gap); }
+
+          let html = '<div class="heatmap-grid">';
+          for (const topic of baseTopics) {
+            const gap = gapMap.get(topic);
+            let cls = 'heat-green', label = '충분히 커버됨', count = '';
+            if (gap) {
+              cls = gap.gap_type === 'no_position' ? 'heat-red' : 'heat-yellow';
+              label = gap.gap_type === 'no_position' ? '무공약' : '약한 커버리지';
+              count = '문서 ' + (gap.document_count || 0) + '건';
+            }
+            html += '<div class="heatmap-cell ' + cls + '" data-topic="' + Lab.escapeHtml(topic) + '" data-has-gap="' + (gap ? 'true' : 'false') + '" onclick="Lab.radar.onHeatmapClick(this)">';
+            html += '<div class="heatmap-topic">' + Lab.escapeHtml(topic) + '</div>';
+            html += '<div class="heatmap-count">' + label + (count ? ' · ' + count : '') + '</div>';
+            html += '</div>';
+          }
+          for (const gap of gaps) {
+            if (!gap || !gap.topic || baseTopics.includes(gap.topic)) continue;
+            const cls = gap.gap_type === 'no_position' ? 'heat-red' : 'heat-yellow';
+            const label = gap.gap_type === 'no_position' ? '무공약' : '약한 커버리지';
+            html += '<div class="heatmap-cell ' + cls + '" data-topic="' + Lab.escapeHtml(gap.topic) + '" data-has-gap="true" onclick="Lab.radar.onHeatmapClick(this)">';
+            html += '<div class="heatmap-topic">' + Lab.escapeHtml(gap.topic) + '</div>';
+            html += '<div class="heatmap-count">' + label + ' · 문서 ' + (gap.document_count || 0) + '건</div>';
+            html += '</div>';
+          }
+          html += '</div>';
+          document.getElementById('radarHeatmap').innerHTML = html;
+        },
+
+        onHeatmapClick(cell) {
+          const topic = cell.dataset.topic;
+          const hasGap = cell.dataset.hasGap === 'true';
+          if (hasGap) {
+            const gapItems = document.querySelectorAll('#radarGapList .gap-item');
+            for (const item of gapItems) {
+              item.classList.remove('highlighted');
+              if (item.dataset.topic === topic) {
+                item.classList.add('highlighted');
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => item.classList.remove('highlighted'), 2500);
+              }
+            }
+          } else {
+            this.goToDrafter(topic);
+          }
+        },
+
+        goToDrafter(topic) {
+          Lab.switchTab('create');
+          document.getElementById('topic').value = topic;
+          document.getElementById('topic').focus();
+        },
+      },
+
+      /* ═══════════════════════════════════════════
+         PROPOSALS MODULE
+         ═══════════════════════════════════════════ */
+      proposals: {
+        _all: [],
+        _filter: '',
+
+        async load() {
+          const listEl = document.getElementById('proposalList');
+          listEl.innerHTML = '<div class="empty-state">로딩 중...</div>';
+          try {
+            const r = await fetch('/api/policy/proposals', { credentials: 'include' });
+            if (!r.ok) throw new Error('Unauthorized');
+            this._all = await r.json();
+            this._renderStats();
+            this._renderList();
+            // Update dashboard
+            const newCount = this._all.filter(p => p.status === 'new').length;
+            document.getElementById('dashProposals').textContent = newCount;
+          } catch (e) {
+            listEl.innerHTML = '<div class="empty-state">데이터를 불러올 수 없습니다.</div>';
+          }
+        },
+
+        _renderStats() {
+          const counts = { new: 0, reviewing: 0, adopted: 0, archived: 0 };
+          for (const p of this._all) counts[p.status] = (counts[p.status] || 0) + 1;
+          let html = '';
+          html += '<div class="stat-chip"><strong>' + this._all.length + '</strong><span>전체</span></div>';
+          html += '<div class="stat-chip"><strong>' + counts.new + '</strong><span>신규</span></div>';
+          html += '<div class="stat-chip"><strong>' + counts.reviewing + '</strong><span>검토중</span></div>';
+          html += '<div class="stat-chip"><strong>' + counts.adopted + '</strong><span>채택</span></div>';
+          document.getElementById('proposalStatsBar').innerHTML = html;
+        },
+
+        _renderList() {
+          const listEl = document.getElementById('proposalList');
+          const filtered = this._filter ? this._all.filter(p => p.status === this._filter) : this._all;
+          if (!filtered.length) {
+            listEl.innerHTML = '<div class="empty-state">해당 상태의 제안이 없습니다.</div>';
+            return;
+          }
+          listEl.innerHTML = filtered.map(p =>
+            '<div class="list-card" onclick="Lab.proposals.openDetail(' + p.id + ')">' +
+            '<div><h3>' + Lab.escapeHtml(p.title) + '</h3>' +
+            '<div class="meta"><span class="status-badge status-' + p.status + '">' + p.status + '</span>' +
+            '<span>' + Lab.escapeHtml(p.topic || '미분류') + '</span>' +
+            '<span>' + Lab.escapeHtml(p.author_name || '익명') + '</span>' +
+            '<span>' + (p.created_at || '').slice(0, 10) + '</span></div></div>' +
+            '<div style="color:var(--brand-light);font-weight:800;">&rarr;</div></div>'
+          ).join('');
+        },
+
+        setFilter(status) {
+          this._filter = status;
+          document.querySelectorAll('#proposalFilterBar button').forEach(b => {
+            b.classList.toggle('active', b.dataset.status === status);
+          });
+          this._renderList();
+        },
+
+        openDetail(id) {
+          const p = this._all.find(x => x.id === id);
+          if (!p) return;
+
+          let html = '';
+          html += '<h2>' + Lab.escapeHtml(p.title) + '</h2>';
+          html += '<div class="meta" style="margin-bottom:0.5rem;">';
+          html += '<span class="status-badge status-' + p.status + '">' + p.status + '</span> ';
+          html += '<span style="color:var(--muted2);font-size:0.82rem;">' + Lab.escapeHtml(p.topic || '미분류') + ' · ' + Lab.escapeHtml(p.author_name || '익명') + ' · ' + (p.created_at || '').slice(0, 16) + '</span>';
+          html += '</div>';
+          if (p.author_email) html += '<p style="color:var(--muted3);font-size:0.82rem;">' + Lab.escapeHtml(p.author_email) + '</p>';
+          html += '<div class="content">' + Lab.escapeHtml(p.body) + '</div>';
+
+          if (p.review_note) {
+            html += '<div style="padding:0.6rem 0.75rem;border-radius:10px;background:rgba(74,222,128,0.08);font-size:0.88rem;margin-bottom:0.75rem;">';
+            html += '<strong style="font-size:0.78rem;color:var(--muted2);">검토 메모:</strong><br>' + Lab.escapeHtml(p.review_note);
+            html += '</div>';
+          }
+
+          html += '<div class="detail-actions">';
+          if (p.status === 'new') {
+            html += '<button class="btn btn-sm" onclick="Lab.proposals.changeStatus(' + id + ',\'reviewing\')">검토 시작</button>';
+            html += '<button class="btn btn-secondary btn-sm" onclick="Lab.proposals.changeStatus(' + id + ',\'archived\')">보관</button>';
+          }
+          if (p.status === 'reviewing') {
+            html += '<button class="btn btn-green btn-sm" onclick="Lab.proposals.changeStatus(' + id + ',\'adopted\')">채택</button>';
+            html += '<button class="btn btn-secondary btn-sm" onclick="Lab.proposals.changeStatus(' + id + ',\'archived\')">보관</button>';
+          }
+          if (p.status === 'archived') {
+            html += '<button class="btn btn-secondary btn-sm" onclick="Lab.proposals.changeStatus(' + id + ',\'new\')">신규로 복원</button>';
+          }
+          if (p.status === 'adopted') {
+            html += '<button class="btn btn-sm" onclick="Lab.proposals.goToDrafter(' + id + ')">AI 초안 생성</button>';
+          }
+          html += '</div>';
+
+          html += '<div class="note-section">';
+          html += '<label style="font-size:0.82rem;color:var(--muted2);">검토 메모</label>';
+          html += '<textarea id="proposalReviewNote" placeholder="상태 변경 시 함께 기록됩니다.">' + Lab.escapeHtml(p.review_note || '') + '</textarea>';
+          html += '</div>';
+
+          Lab.openDetail('제안 상세', html);
+        },
+
+        async changeStatus(id, newStatus) {
+          const noteEl = document.getElementById('proposalReviewNote');
+          const note = noteEl ? noteEl.value.trim() : '';
+          try {
+            const r = await fetch('/api/policy/proposals/' + id + '/status', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              credentials: 'include', body: JSON.stringify({ status: newStatus, review_note: note }),
+            });
+            if (!r.ok) { const d = await r.json().catch(() => ({})); alert(d.detail || '상태 변경 실패'); return; }
+            await this.load();
+            this.openDetail(id);
+          } catch (e) { alert('오류: ' + e.message); }
+        },
+
+        goToDrafter(id) {
+          const p = this._all.find(x => x.id === id);
+          if (!p) return;
+          Lab.closeDetail();
+          Lab.switchTab('create');
+          document.getElementById('topic').value = p.title;
+          document.getElementById('topicDetail').value = (p.body || '').substring(0, 500);
+          document.getElementById('topic').focus();
+        },
+      },
+
+      /* ═══════════════════════════════════════════
+         REVIEW MODULE
+         ═══════════════════════════════════════════ */
+      review: {
+        _all: [],
+        _filter: '',
+
+        async load() {
+          const listEl = document.getElementById('reviewList');
+          listEl.innerHTML = '<div class="empty-state">로딩 중...</div>';
+          try {
+            const [draft, review, approved, archived] = await Promise.all([
+              fetch('/api/policy/positions?status=draft', { credentials: 'include' }).then(r => r.json()),
+              fetch('/api/policy/positions?status=review', { credentials: 'include' }).then(r => r.json()),
+              fetch('/api/policy/positions?status=approved', { credentials: 'include' }).then(r => r.json()),
+              fetch('/api/policy/positions?status=archived', { credentials: 'include' }).then(r => r.json()).catch(() => ({ items: [] })),
+            ]);
+            this._all = [
+              ...(draft.items || []), ...(review.items || []),
+              ...(approved.items || []), ...(archived.items || []),
+            ].sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+            this._renderList();
+            // Update dashboard
+            const draftCount = (draft.items || []).length;
+            const reviewCount = (review.items || []).length;
+            document.getElementById('dashDrafts').textContent = draftCount;
+            document.getElementById('dashReview').textContent = reviewCount;
+          } catch (e) {
+            listEl.innerHTML = '<div class="empty-state">데이터를 불러올 수 없습니다.</div>';
+          }
+        },
+
+        _renderList() {
+          const listEl = document.getElementById('reviewList');
+          const filtered = this._filter ? this._all.filter(p => p.status === this._filter) : this._all;
+          if (!filtered.length) {
+            listEl.innerHTML = '<div class="empty-state">해당 상태의 포지션이 없습니다.</div>';
+            return;
+          }
+          listEl.innerHTML = filtered.map(p =>
+            '<div class="list-card" onclick="Lab.review.openDetail(' + p.id + ')">' +
+            '<div><h3>' + Lab.escapeHtml(p.title) + '</h3>' +
+            '<div class="meta"><span class="status-badge status-' + p.status + '">' + p.status + '</span>' +
+            '<span>' + Lab.escapeHtml(p.category || '미분류') + '</span>' +
+            '<span>' + (p.updated_at || p.created_at || '').slice(0, 10) + '</span></div></div>' +
+            '<div style="color:var(--brand-light);font-weight:800;">&rarr;</div></div>'
+          ).join('');
+        },
+
+        setFilter(status) {
+          this._filter = status;
+          document.querySelectorAll('#reviewFilterBar button').forEach(b => {
+            b.classList.toggle('active', b.dataset.status === status);
+          });
+          this._renderList();
+        },
+
+        async openDetail(id) {
+          const body = document.getElementById('detailBody');
+          Lab.openDetail('상세 보기', '<p style="color:var(--muted2)">로딩 중...</p>');
+
+          try {
+            const [detail, commentsRes] = await Promise.all([
+              fetch('/api/policy/positions/' + id, { credentials: 'include' }).then(r => r.json()),
+              fetch('/api/policy/positions/' + id + '/comments', { credentials: 'include' }).then(r => r.json()).catch(() => ({ comments: [] })),
+            ]);
+
+            const p = detail;
+            const comments = commentsRes.comments || [];
+
+            let html = '';
+            html += '<h2>' + Lab.escapeHtml(p.title) + '</h2>';
+            html += '<div class="meta" style="margin-bottom:0.75rem;">';
+            html += '<span class="status-badge status-' + p.status + '">' + p.status + '</span> ';
+            html += '<span style="color:var(--muted2);font-size:0.82rem;">' + Lab.escapeHtml(p.category || '') + ' · ' + (p.updated_at || p.created_at || '').slice(0, 16) + '</span>';
+            html += '</div>';
+            if (p.summary) html += '<p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin-bottom:0.5rem;">' + Lab.escapeHtml(p.summary) + '</p>';
+            html += '<div class="content">' + Lab.escapeHtml(p.body || p.key_points || '(본문 없음)') + '</div>';
+
+            html += '<div class="detail-actions">';
+            if (p.status === 'draft') {
+              html += '<button class="btn btn-sm" onclick="Lab.review.changeStatus(' + id + ',\'review\')">검토 요청</button>';
+            }
+            if (p.status === 'review') {
+              html += '<button class="btn btn-green btn-sm" onclick="Lab.review.changeStatus(' + id + ',\'approved\')">승인</button>';
+              html += '<button class="btn btn-secondary btn-sm" onclick="Lab.review.changeStatus(' + id + ',\'draft\')">초안으로 되돌리기</button>';
+            }
+            if (p.status !== 'archived') {
+              html += '<button class="btn btn-secondary btn-sm" onclick="Lab.review.changeStatus(' + id + ',\'archived\')">보관</button>';
+            }
+            if (p.status === 'archived') {
+              html += '<button class="btn btn-secondary btn-sm" onclick="Lab.review.changeStatus(' + id + ',\'draft\')">초안으로 복원</button>';
+            }
+            html += '</div>';
+
+            // Comments
+            html += '<div class="comment-section">';
+            html += '<h3>코멘트 (' + comments.length + ')</h3>';
+            for (const c of comments) {
+              html += '<div class="comment-item">' + Lab.escapeHtml(c.comment);
+              html += '<div class="comment-meta">' + Lab.escapeHtml(c.comment_type || 'review') + ' · ' + (c.created_at || '').slice(0, 16) + '</div>';
+              html += '</div>';
+            }
+            html += '<div class="comment-form">';
+            html += '<textarea id="reviewNewComment" placeholder="코멘트를 입력하세요..."></textarea>';
+            html += '<button class="btn btn-sm" onclick="Lab.review.addComment(' + id + ')">추가</button>';
+            html += '</div></div>';
+
+            document.getElementById('detailBody').innerHTML = html;
+          } catch (e) {
+            document.getElementById('detailBody').innerHTML = '<p class="err">상세 정보를 불러올 수 없습니다.</p>';
+          }
+        },
+
+        async changeStatus(id, newStatus) {
+          const endpoint = newStatus === 'review' ? '/submit-review'
+            : newStatus === 'approved' ? '/approve'
+            : null;
+
+          try {
+            if (endpoint) {
+              const r = await fetch('/api/policy/positions/' + id + endpoint, {
+                method: 'POST', credentials: 'include',
+              });
+              if (!r.ok) { const d = await r.json().catch(() => ({})); alert(d.detail || '상태 변경 실패'); return; }
+            } else {
+              const r = await fetch('/api/policy/positions/' + id + '/status', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                credentials: 'include', body: JSON.stringify({ status: newStatus }),
+              });
+              if (!r.ok) { const d = await r.json().catch(() => ({})); alert(d.detail || '상태 변경 실패'); return; }
+            }
+            await this.load();
+            this.openDetail(id);
+          } catch (e) { alert('오류: ' + e.message); }
+        },
+
+        async addComment(id) {
+          const textarea = document.getElementById('reviewNewComment');
+          const comment = textarea.value.trim();
+          if (!comment) return;
+          try {
+            const r = await fetch('/api/policy/positions/' + id + '/comments', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              credentials: 'include', body: JSON.stringify({ comment: comment, comment_type: 'review' }),
+            });
+            if (!r.ok) throw new Error('코멘트 추가 실패');
+            textarea.value = '';
+            this.openDetail(id);
+          } catch (e) { alert('오류: ' + e.message); }
+        },
+      },
+
+      /* ═══════════════════════════════════════════
+         DASHBOARD
+         ═══════════════════════════════════════════ */
+      async _loadDashboard() {
+        try {
+          const r = await fetch('/api/policy/lab/dashboard', { credentials: 'include' });
+          if (r.ok) {
+            const d = await r.json();
+            if (d.drafts != null) document.getElementById('dashDrafts').textContent = d.drafts;
+            if (d.review != null) document.getElementById('dashReview').textContent = d.review;
+            if (d.proposals != null) document.getElementById('dashProposals').textContent = d.proposals;
+            if (d.gaps != null) document.getElementById('dashGaps').textContent = d.gaps;
+          }
+        } catch (e) { /* silent fail — individual tabs will populate counts */ }
+      },
+
+      /* ═══════════════════════════════════════════
+         INIT
+         ═══════════════════════════════════════════ */
+      init() {
+        // Dashboard stats
+        Lab._loadDashboard();
+
+        // URL-based tab + drafter prefill
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        if (tab && ['create', 'radar', 'proposals', 'review'].includes(tab)) {
+          Lab.switchTab(tab);
+        } else {
+          // Mark create as loaded since it's the default active tab
+          Lab._loaded['create'] = true;
+        }
+
+        // Drafter URL prefill
+        Lab.drafter.prefill();
+
+        // Filter bar events — proposals
+        document.querySelectorAll('#proposalFilterBar button').forEach(btn => {
+          btn.addEventListener('click', () => Lab.proposals.setFilter(btn.dataset.status));
+        });
+
+        // Filter bar events — review
+        document.querySelectorAll('#reviewFilterBar button').forEach(btn => {
+          btn.addEventListener('click', () => Lab.review.setFilter(btn.dataset.status));
+        });
+
+        // Escape key closes detail
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') Lab.closeDetail(); });
+
+        // popstate
+        window.addEventListener('popstate', (e) => {
+          const st = e.state;
+          if (st && st.tab) {
+            Lab._activeTab = st.tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === st.tab));
+            document.querySelectorAll('.tab-panel').forEach(p => {
+              p.classList.toggle('active', p.id === 'tab' + st.tab.charAt(0).toUpperCase() + st.tab.slice(1));
+            });
+            Lab._lazyLoad(st.tab);
+          }
+        });
+      },
+    };
+
+    // Boot
+    Lab.init();
   </script>
 </body>
 </html>
