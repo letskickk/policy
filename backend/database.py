@@ -116,7 +116,13 @@ def init_db() -> None:
             title TEXT NOT NULL,
             category TEXT,
             priority INTEGER NOT NULL DEFAULT 100,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            share_summary_title TEXT,
+            share_summary_headline TEXT,
+            share_summary_bullets TEXT,
+            share_summary_version TEXT,
+            share_summary_source_hash TEXT,
+            share_summary_updated_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_candidate_pledges_candidate ON candidate_pledges(candidate_id);
         CREATE INDEX IF NOT EXISTS idx_candidate_pledges_candidate_priority_created
@@ -378,6 +384,12 @@ def init_db() -> None:
             "ALTER TABLE candidate_pledges ADD COLUMN analyzed_at TEXT",
             "ALTER TABLE candidate_pledges ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'PENDING'",
             "ALTER TABLE candidate_pledges ADD COLUMN rejection_reason TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_title TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_headline TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_bullets TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_version TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_source_hash TEXT",
+            "ALTER TABLE candidate_pledges ADD COLUMN share_summary_updated_at TEXT",
             "ALTER TABLE analysis_history ADD COLUMN total_score REAL",
             "ALTER TABLE candidates ADD COLUMN rejection_reason TEXT",
             "ALTER TABLE policy_documents ADD COLUMN speaker_name TEXT",
