@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>이슈 레이더 - 관리자</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <style>
+    h1 { margin-bottom: 1rem; }
+
+    /* Summary cards */
+    .summary { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .summary-card { flex: 1; min-width: 140px; background: rgba(255,255,255,0.08); border: 1px solid rgba(148,163,184,0.15); border-radius: 12px; padding: 1rem; text-align: center; }
+    .summary-card .num { font-size: 2rem; font-weight: 900; }
+    .summary-card .lbl { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+    .num-green { color: #4ade80; }
+    .num-yellow { color: #fbbf24; }
+    .num-red { color: #f87171; }
+    .num-blue { color: #60a5fa; }
+
+    /* Controls */
+    .controls { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+    .controls select, .controls input { background: rgba(255,255,255,0.1); border: 1px solid rgba(148,163,184,0.3); color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 8px; font-size: 0.9rem; }
+    .controls button { background: #ff7210; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
+    .controls button:hover { background: #e5650e; }
+    .controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Gap list */
+    .gap-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(148,163,184,0.12); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+    .gap-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .gap-topic { font-size: 1.05rem; font-weight: 700; }
+    .gap-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .badge { padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; }
+    .badge-red { background: rgba(248,113,113,0.2); color: #fca5a5; }
+    .badge-yellow { background: rgba(251,191,36,0.2); color: #fde047; }
+    .badge-blue { background: rgba(96,165,250,0.2); color: #93c5fd; }
+    .gap-meta { color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }
+    .gap-docs { margin-top: 0.75rem; }
+    .gap-docs summary { cursor: pointer; color: #94a3b8; font-size: 0.85rem; }
+    .gap-docs summary:hover { color: #e2e8f0; }
+    .doc-item { padding: 0.35rem 0; font-size: 0.85rem; border-bottom: 1px solid rgba(148,163,184,0.08); }
+    .doc-item:last-child { border-bottom: none; }
+    .doc-type { color: #94a3b8; }
+    .doc-score { color: #fbbf24; font-size: 0.8rem; }
+
+    /* Heatmap */
+    .heatmap-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .heatmap-cell { min-width: 100px; flex: 1; padding: 0.75rem; border-radius: 10px; text-align: center; cursor: default; transition: transform 0.15s; }
+    .heatmap-cell:hover { transform: scale(1.05); }
+    .heatmap-topic { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .heatmap-count { font-size: 0.78rem; color: rgba(255,255,255,0.7); }
+    .heat-green { background: rgba(74,222,128,0.25); border: 1px solid rgba(74,222,128,0.4); }
+    .heat-yellow { background: rgba(251,191,36,0.25); border: 1px solid rgba(251,191,36,0.4); }
+    .heat-red { background: rgba(248,113,113,0.3); border: 1px solid rgba(248,113,113,0.5); }
+    .heat-gray { background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.2); }
+
+    /* Meta info */
+    .meta-row { display: flex; gap: 1.5rem; flex-wrap: wrap; color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .meta-row span { white-space: nowrap; }
+    .cache-badge { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(148,163,184,0.2); color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrap-lg">
+    <h1>이슈 레이더</h1>
+    <div class="links" style="margin-bottom:1rem;">
+      <a href="/admin">← 관리자</a>
+      <a href="/admin/policy-ssot">정책 SSOT</a>
+    </div>
+
+    <div class="card">
+      <div class="controls">
+        <select id="docType">
+          <option value="">전체 문서 유형</option>
+          <option value="bill">법안</option>
+          <option value="statement">논평·성명</option>
+          <option value="press_release">보도자료</option>
+          <option value="message">메시지</option>
+          <option value="meeting">회의록</option>
+          <option value="rule">당규</option>
+        </select>
+        <input type="number" id="days" placeholder="최근 N일" min="1" max="365" style="width:100px;">
+        <button id="scanBtn" onclick="doScan()">새로 스캔</button>
+      </div>
+
+      <p class="loading" id="loadingMsg">데이터를 불러오는 중...</p>
+      <p class="err" id="errMsg" style="display:none;"></p>
+
+      <div id="result" style="display:none;">
+        <div class="meta-row" id="metaRow"></div>
+        <div class="summary" id="summaryCards"></div>
+        <h2>주제별 커버리지 히트맵</h2>
+        <div id="heatmap" style="margin-bottom:1.5rem;"></div>
+
+        <h2>발견된 사각지대</h2>
+        <div id="gapList"></div>
+        <p id="noGaps" style="display:none; color:#94a3b8;">사각지대가 발견되지 않았습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    }
+
+    async function loadRadar(refresh) {
+      const loadingEl = document.getElementById('loadingMsg');
+      const errEl = document.getElementById('errMsg');
+      const resultEl = document.getElementById('result');
+      const scanBtn = document.getElementById('scanBtn');
+
+      loadingEl.style.display = 'block';
+      errEl.style.display = 'none';
+      resultEl.style.display = 'none';
+      scanBtn.disabled = true;
+
+      try {
+        const params = new URLSearchParams();
+        if (refresh) params.set('refresh', 'true');
+        const days = document.getElementById('days').value;
+        const docType = document.getElementById('docType').value;
+        if (days) params.set('days', days);
+        if (docType) params.set('doc_type', docType);
+
+        const r = await fetch('/api/policy/issue-radar?' + params.toString(), { credentials: 'include' });
+        if (r.status === 401) {
+          window.location.href = '/login?next=' + encodeURIComponent(location.pathname);
+          return;
+        }
+        if (r.status === 403) {
+          errEl.textContent = '관리자만 접근할 수 있습니다.';
+          errEl.style.display = 'block';
+          loadingEl.style.display = 'none';
+          return;
+        }
+        if (!r.ok) {
+          errEl.textContent = '데이터를 불러오지 못했습니다. (' + r.status + ')';
+          errEl.style.display = 'block';
+          loadingEl.style.display = 'none';
+          return;
+        }
+
+        const data = await r.json();
+        renderReport(data);
+      } catch (e) {
+        errEl.textContent = '오류: ' + (e && e.message ? e.message : String(e));
+        errEl.style.display = 'block';
+      } finally {
+        loadingEl.style.display = 'none';
+        scanBtn.disabled = false;
+      }
+    }
+
+    function renderReport(data) {
+      const resultEl = document.getElementById('result');
+      const cs = data.coverage_summary || {};
+
+      // Meta row
+      const metaEl = document.getElementById('metaRow');
+      let metaHtml = '<span>스캔: ' + escapeHtml(data.scan_time ? data.scan_time.replace('T', ' ').substring(0, 19) : '-') + '</span>';
+      metaHtml += '<span>문서: ' + (data.total_documents || 0) + '건</span>';
+      metaHtml += '<span>포지션: ' + (data.total_positions || 0) + '건</span>';
+      if (data.from_cache) metaHtml += '<span class="cache-badge">캐시</span>';
+      metaEl.innerHTML = metaHtml;
+
+      // Summary cards
+      const summaryEl = document.getElementById('summaryCards');
+      summaryEl.innerHTML =
+        '<div class="summary-card"><div class="num num-green">' + (cs.well_covered || 0) + '</div><div class="lbl">충분히 커버됨</div></div>' +
+        '<div class="summary-card"><div class="num num-yellow">' + (cs.weak_coverage || 0) + '</div><div class="lbl">약한 커버리지</div></div>' +
+        '<div class="summary-card"><div class="num num-red">' + (cs.no_position || 0) + '</div><div class="lbl">사각지대</div></div>' +
+        '<div class="summary-card"><div class="num num-blue">' + (data.gaps || []).length + '</div><div class="lbl">주제</div></div>';
+
+      // Heatmap — 9개 주제별 커버리지 시각화
+      renderHeatmap(data);
+
+      // Gap list
+      const gaps = data.gaps || [];
+      const gapListEl = document.getElementById('gapList');
+      const noGapsEl = document.getElementById('noGaps');
+
+      if (gaps.length === 0) {
+        gapListEl.innerHTML = '';
+        noGapsEl.style.display = 'block';
+      } else {
+        noGapsEl.style.display = 'none';
+        let html = '';
+        for (const gap of gaps) {
+          const isNoPos = gap.gap_type === 'no_position';
+          const badgeClass = isNoPos ? 'badge-red' : 'badge-yellow';
+          const badgeLabel = isNoPos ? '사각지대' : '약한 커버리지';
+
+          html += '<div class="gap-item">';
+          html += '<div class="gap-header">';
+          html += '<span class="gap-topic">' + escapeHtml(gap.topic) + '</span>';
+          html += '<div class="gap-badges">';
+          html += '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
+          html += '<span class="badge badge-blue">우선순위 ' + Math.round(gap.priority_score) + '</span>';
+          html += '</div></div>';
+
+          html += '<div class="gap-meta">';
+          html += '관련 문서 ' + gap.document_count + '건';
+          if (gap.recent_bill_count) html += ' · 최근 법안 ' + gap.recent_bill_count + '건';
+          if (gap.recent_commentary_count) html += ' · 최근 논평 ' + gap.recent_commentary_count + '건';
+          html += '</div>';
+
+          // Expandable document list
+          const docs = gap.documents || [];
+          if (docs.length > 0) {
+            html += '<details class="gap-docs"><summary>관련 문서 보기 (' + docs.length + '건)</summary>';
+            for (const doc of docs) {
+              html += '<div class="doc-item">';
+              html += '<span class="doc-type">[' + escapeHtml(doc.doc_type) + ']</span> ';
+              html += escapeHtml(doc.title);
+              html += ' <span class="doc-score">매칭 ' + doc.best_match_score + '점';
+              if (doc.best_match_title) html += ' → ' + escapeHtml(doc.best_match_title);
+              html += '</span>';
+              html += '</div>';
+            }
+            html += '</details>';
+          }
+
+          html += '</div>';
+        }
+        gapListEl.innerHTML = html;
+      }
+
+      resultEl.style.display = 'block';
+    }
+
+    function doScan() {
+      loadRadar(true);
+    }
+
+    function renderHeatmap(data) {
+      const TOPICS = ['사법·검찰','정치개혁','경제','복지','교육','과학기술','안전·치안','국방','의료'];
+      const gaps = data.gaps || [];
+      const gapMap = {};
+      for (const g of gaps) gapMap[g.topic] = g;
+
+      const wellTotal = (data.coverage_summary || {}).well_covered || 0;
+      const el = document.getElementById('heatmap');
+      let html = '<div class="heatmap-grid">';
+
+      for (const topic of TOPICS) {
+        const gap = gapMap[topic];
+        let cls, label, count;
+        if (!gap) {
+          cls = 'heat-green';
+          label = '커버됨';
+          count = '';
+        } else if (gap.gap_type === 'no_position') {
+          cls = 'heat-red';
+          label = '사각지대';
+          count = gap.document_count + '건';
+        } else {
+          cls = 'heat-yellow';
+          label = '약한 커버리지';
+          count = gap.document_count + '건';
+        }
+        html += '<div class="heatmap-cell ' + cls + '">';
+        html += '<div class="heatmap-topic">' + escapeHtml(topic) + '</div>';
+        html += '<div class="heatmap-count">' + label + (count ? ' · ' + count : '') + '</div>';
+        html += '</div>';
+      }
+
+      // 기타 현안 (TOPIC_RULES에 없는 주제)
+      for (const g of gaps) {
+        if (!TOPICS.includes(g.topic)) {
+          const cls = g.gap_type === 'no_position' ? 'heat-red' : 'heat-yellow';
+          const label = g.gap_type === 'no_position' ? '사각지대' : '약한 커버리지';
+          html += '<div class="heatmap-cell ' + cls + '">';
+          html += '<div class="heatmap-topic">' + escapeHtml(g.topic) + '</div>';
+          html += '<div class="heatmap-count">' + label + ' · ' + g.document_count + '건</div>';
+          html += '</div>';
+        }
+      }
+
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    // Load cached data on page load
+    loadRadar(false);
+  </script>
+</body>
+</html>

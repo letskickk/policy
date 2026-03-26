@@ -4,32 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>관리자 - 정책 멘토링</title>
+  <link rel="stylesheet" href="/static/css/common.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; }
-    @media (max-width: 640px) { body { padding: 1rem; } .card { padding: 1rem; border-radius: 14px; } h1 { font-size: 1.25rem; } }
-    .wrap { max-width: 900px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
-    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem; }
-    .card a { color: #ffb37a; text-decoration: none; font-weight: 700; font-size: 1.1rem; }
+    h1 { margin-bottom: 1.5rem; }
+    .card a { color: var(--brand-light); text-decoration: none; font-weight: 700; font-size: 1.1rem; }
     .card a:hover { text-decoration: underline; }
-    .links a { margin-right: 1rem; }
     .links form { display: inline; }
-    .links button { background: none; border: none; color: #ffb37a; cursor: pointer; font-weight: 700; }
+    .links button { background: none; border: none; color: var(--brand-light); cursor: pointer; font-weight: 700; font-family: inherit; }
     #pendingCount { font-weight: 900; color: #fbbf24; }
     #pledgePendingCount { font-weight: 900; color: #fde047; }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap-md">
     <h1>관리자</h1>
     <div class="card">
       <p style="margin-bottom: 0.5rem;">사용자 승인 대기: <span id="pendingCount">0</span>명</p>
-      <p style="margin-bottom: 1rem;">공약 승인 대기: <span id="pledgePendingCount">0</span>건</p>
+      <p style="margin-bottom: 0.5rem;">공약 승인 대기: <span id="pledgePendingCount">0</span>건</p>
+      <p style="margin-bottom: 1rem;">시민 제안 (신규): <span id="proposalCount" style="font-weight:900;color:#a78bfa;">0</span>건</p>
       <div class="links">
         <a href="/admin/users">사용자 관리 (승인/거절)</a><br><br>
         <a href="/admin/candidates">출마자·공약 관리 (등록/승인/거절)</a><br><br>
         <a href="/admin/policy-ssot">정책 SSOT 관리</a><br><br>
+        <a href="/admin/issue-radar">이슈 레이더 (정책 사각지대)</a><br><br>
+        <a href="/policy-create">정책 생성 (AI 드래프터)</a><br><br>
+        <a href="/proposals">시민 정책 제안</a><br><br>
         <a href="/admin/usage">사용량 통계</a><br><br>
         <a href="/admin/ops">운영 상태 (벡터스토어·PDF)</a><br><br>
         <a href="/map">지역별 후보 지도</a><br><br>
@@ -53,6 +52,10 @@
           const pending = (Array.isArray(list) ? list : []).filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
           document.getElementById('pledgePendingCount').textContent = pending;
         }
+      } catch (e) {}
+      try {
+        const r3 = await fetch('/api/policy/proposals?status=new', { credentials: 'include' });
+        if (r3.ok) { const list = await r3.json(); document.getElementById('proposalCount').textContent = (Array.isArray(list) ? list : []).length; }
       } catch (e) {}
     })();
   </script>

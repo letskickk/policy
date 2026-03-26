@@ -595,6 +595,31 @@ def upsert_policy_position(
     return get_policy_position(position_id)
 
 
+def update_policy_position_status(position_id: int, new_status: str, actor_id: Optional[int] = None) -> dict:
+    """포지션 상태만 변경 (draft → review → approved)."""
+    status_clean = _normalize_enum(new_status, POLICY_STATUS, "status", "draft")
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="position not found")
+        old_status = row["status"]
+        if old_status == status_clean:
+            return dict(row)
+        conn.execute(
+            "UPDATE policy_positions SET status = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?",
+            (status_clean, actor_id, position_id),
+        )
+        _insert_position_version(conn, position_id, "update", f"status: {old_status} → {status_clean}", actor_id)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return get_policy_position(position_id)
+
+
 def upsert_policy_document(
     *,
     document_id: Optional[int],

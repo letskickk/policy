@@ -1,7 +1,9 @@
-﻿from typing import Optional
+from typing import Optional
 
 from fastapi import Query, Request
 from pydantic import BaseModel, Field
+
+from backend.database import get_connection
 
 
 def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
@@ -45,6 +47,16 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         document_id: int = Field(..., ge=1)
         relation_type: str = Field(default="references", min_length=1, max_length=40)
         notes: Optional[str] = Field(default=None, max_length=2000)
+
+    @app.api_route("/admin/issue-radar", methods=["GET", "HEAD"])
+    def admin_issue_radar_page(request: Request):
+        """관리자 전용: 이슈 레이더 대시보드."""
+        _ = require_admin(request)
+        res = serve_html("admin/issue-radar.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="admin/issue-radar.html not found")
 
     @app.api_route("/admin/policy-ssot", methods=["GET", "HEAD"])
     def admin_policy_ssot_page(request: Request):
@@ -525,3 +537,357 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
                 "recommendations": recommend_featured_issues(limit=5),
             },
         }
+
+    # ── 이슈 레이더 API ──
+
+    @app.get("/api/policy/issue-radar", tags=["policy", "issue-radar"])
+    def get_issue_radar(
+        request: Request,
+        refresh: bool = Query(default=False, description="캐시 무시하고 새로 스캔"),
+        days: Optional[int] = Query(default=None, description="최근 N일 문서만"),
+        doc_type: Optional[str] = Query(default=None, description="문서 유형 필터"),
+    ):
+        """이슈 레이더 — 정책 사각지대 리포트."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.issue_radar import get_cached_scan, run_issue_scan, save_scan_result
+
+        if not refresh:
+            cached = get_cached_scan(max_age_hours=6)
+            if cached:
+                cached["from_cache"] = True
+                return cached
+
+        report = run_issue_scan(days_back=days, doc_type_filter=doc_type)
+        save_scan_result(report)
+        report["from_cache"] = False
+        return report
+
+    @app.post("/api/policy/issue-radar/scan", tags=["policy", "issue-radar"])
+    def trigger_issue_radar_scan(
+        request: Request,
+        days: Optional[int] = Query(default=None, description="최근 N일 문서만"),
+    ):
+        """이슈 레이더 수동 스캔 트리거."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.issue_radar import run_issue_scan, save_scan_result
+
+        report = run_issue_scan(days_back=days)
+        save_scan_result(report)
+        return {"status": "ok", "gaps_found": len(report["gaps"]), "scan_time": report["scan_time"]}
+
+    # ── 리서치 어시스턴트 API ──
+
+    @app.get("/api/policy/research", tags=["policy", "research"])
+    def get_research_briefing(
+        request: Request,
+        topic: str = Query(..., min_length=1, max_length=200, description="정책 주제"),
+        region: Optional[str] = Query(default=None, max_length=100, description="지역명"),
+        years: int = Query(default=2, ge=1, le=5, description="검색 기간 (년)"),
+    ):
+        """리서치 어시스턴트 — 주제·지역별 관련 자료 수집."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.research_assistant import research_topic
+
+        return research_topic(topic=topic, region=region, years=years)
+
+    # ── 정책 드래프터 API ──
+
+    class DraftRequest(BaseModel):
+        topic: str = Field(..., min_length=1, max_length=200)
+        output_format: str = Field(default="정책포지션", max_length=20)
+        region: Optional[str] = Field(default=None, max_length=100)
+        election_type: str = Field(default="", max_length=40)
+        region_province: str = Field(default="", max_length=40)
+        region_city: str = Field(default="", max_length=40)
+        district_name: str = Field(default="", max_length=40)
+
+    @app.post("/api/policy/draft", tags=["policy", "drafter"])
+    def create_policy_draft(request: Request, body: DraftRequest):
+        """정책 초안 생성."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.policy_drafter import generate_policy_draft
+
+        return generate_policy_draft(
+            topic=body.topic,
+            output_format=body.output_format,
+            region=body.region,
+            election_type=body.election_type,
+            region_province=body.region_province,
+            region_city=body.region_city,
+            district_name=body.district_name,
+        )
+
+    @app.post("/api/policy/draft/stream", tags=["policy", "drafter"])
+    def stream_policy_draft(request: Request, body: DraftRequest):
+        """정책 초안 스트리밍 생성."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from fastapi.responses import StreamingResponse
+        from backend.policy_drafter import generate_policy_draft
+
+        gen = generate_policy_draft(
+            topic=body.topic,
+            output_format=body.output_format,
+            region=body.region,
+            election_type=body.election_type,
+            region_province=body.region_province,
+            region_city=body.region_city,
+            district_name=body.district_name,
+            stream=True,
+        )
+        if isinstance(gen, dict):
+            return gen  # error case
+        return StreamingResponse(gen, media_type="text/plain; charset=utf-8")
+
+    class SaveDraftBody(BaseModel):
+        title: str = Field(..., min_length=1, max_length=200)
+        summary: str = Field(default="", max_length=5000)
+        key_points: str = Field(default="", max_length=4000)
+        body: str = Field(..., min_length=1, max_length=50000)
+        category: str = Field(default="general", max_length=80)
+
+    @app.post("/api/policy/draft/save", tags=["policy", "drafter"])
+    def save_policy_draft(request: Request, body: SaveDraftBody):
+        """초안을 policy_positions(draft)로 저장."""
+        ensure_db_ready()
+        user = require_admin(request)
+
+        from backend.policy_drafter import save_draft_as_position
+
+        pos_id = save_draft_as_position(
+            title=body.title,
+            summary=body.summary,
+            key_points=body.key_points,
+            body=body.body,
+            category=body.category,
+            created_by=user.get("id"),
+        )
+        return {"status": "ok", "position_id": pos_id}
+
+    # ── 정책 생성 페이지 + 챗봇 페이지 라우트 ──
+
+    @app.api_route("/policy-create", methods=["GET", "HEAD"])
+    def policy_create_page(request: Request):
+        """정책 생성 페이지."""
+        _ = require_admin(request)
+        res = serve_html("policy-create.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="policy-create.html not found")
+
+    @app.api_route("/proposals", methods=["GET", "HEAD"])
+    def proposals_page():
+        """시민 정책 제안 페이지 (공개)."""
+        res = serve_html("proposals.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="proposals.html not found")
+
+    # ── AI 정책 챗봇 API (Phase 3.5) ──
+
+    class ChatRequest(BaseModel):
+        question: str = Field(..., min_length=1, max_length=2000)
+
+    @app.post("/api/policy/chat", tags=["policy", "chatbot"])
+    def policy_chatbot(request: Request, body: ChatRequest):
+        """AI 정책 챗봇 — 당 정책에 대한 시민 질문 답변."""
+        ensure_db_ready()
+
+        from backend.policy_chatbot import answer_policy_question
+
+        return answer_policy_question(question=body.question)
+
+    # ── 정책 워크플로 API (Phase 4) ──
+
+    class ReviewCommentBody(BaseModel):
+        comment: str = Field(..., min_length=1, max_length=5000)
+        comment_type: str = Field(default="review", max_length=20)
+
+    @app.post("/api/policy/positions/{position_id}/submit-review", tags=["policy", "workflow"])
+    def submit_for_review(request: Request, position_id: int):
+        """초안을 검토 상태로 전환."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.policy_ssot import update_policy_position_status
+        update_policy_position_status(position_id, "review")
+        return {"status": "ok", "new_status": "review"}
+
+    @app.post("/api/policy/positions/{position_id}/approve", tags=["policy", "workflow"])
+    def approve_position(request: Request, position_id: int):
+        """포지션 승인."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        from backend.policy_ssot import update_policy_position_status
+        update_policy_position_status(position_id, "approved")
+        return {"status": "ok", "new_status": "approved"}
+
+    @app.post("/api/policy/positions/{position_id}/comments", tags=["policy", "workflow"])
+    def add_review_comment(request: Request, position_id: int, body: ReviewCommentBody):
+        """검토 코멘트 추가."""
+        ensure_db_ready()
+        user = require_admin(request)
+
+        conn = get_connection()
+        try:
+            conn.execute(
+                """INSERT INTO policy_review_comments (position_id, author_id, comment, comment_type)
+                   VALUES (?, ?, ?, ?)""",
+                (position_id, user.get("id"), body.comment, body.comment_type),
+            )
+            conn.commit()
+            return {"status": "ok"}
+        finally:
+            conn.close()
+
+    @app.get("/api/policy/positions/{position_id}/comments", tags=["policy", "workflow"])
+    def get_review_comments(request: Request, position_id: int):
+        """검토 코멘트 목록."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                """SELECT rc.*, u.name as author_name
+                   FROM policy_review_comments rc
+                   LEFT JOIN users u ON rc.author_id = u.id
+                   WHERE rc.position_id = ?
+                   ORDER BY rc.created_at ASC""",
+                (position_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    @app.get("/api/policy/positions/{position_id}/timeline", tags=["policy", "workflow"])
+    def get_position_timeline(request: Request, position_id: int):
+        """포지션 타임라인 (버전 이력 + 코멘트)."""
+        ensure_db_ready()
+
+        conn = get_connection()
+        try:
+            # 버전 이력
+            versions = conn.execute(
+                """SELECT id, snapshot_type, changed_fields, created_at
+                   FROM policy_position_versions
+                   WHERE position_id = ?
+                   ORDER BY created_at ASC""",
+                (position_id,),
+            ).fetchall()
+
+            # 코멘트
+            comments = conn.execute(
+                """SELECT rc.id, rc.comment, rc.comment_type, rc.created_at,
+                          u.name as author_name
+                   FROM policy_review_comments rc
+                   LEFT JOIN users u ON rc.author_id = u.id
+                   WHERE rc.position_id = ?
+                   ORDER BY rc.created_at ASC""",
+                (position_id,),
+            ).fetchall()
+
+            # 근거 문서 링크
+            links = conn.execute(
+                """SELECT dl.id, dl.relation_type, dl.notes, dl.created_at,
+                          pd.title as document_title, pd.doc_type
+                   FROM policy_document_links dl
+                   JOIN policy_documents pd ON dl.document_id = pd.id
+                   WHERE dl.position_id = ?
+                   ORDER BY dl.created_at ASC""",
+                (position_id,),
+            ).fetchall()
+
+            # Merge into timeline
+            timeline = []
+            for v in versions:
+                timeline.append({
+                    "type": "version",
+                    "timestamp": v["created_at"],
+                    "snapshot_type": v["snapshot_type"],
+                    "changed_fields": v["changed_fields"],
+                })
+            for c in comments:
+                timeline.append({
+                    "type": "comment",
+                    "timestamp": c["created_at"],
+                    "comment": c["comment"],
+                    "comment_type": c["comment_type"],
+                    "author": c["author_name"],
+                })
+            for lk in links:
+                timeline.append({
+                    "type": "link",
+                    "timestamp": lk["created_at"],
+                    "relation_type": lk["relation_type"],
+                    "document_title": lk["document_title"],
+                    "doc_type": lk["doc_type"],
+                })
+
+            timeline.sort(key=lambda x: x.get("timestamp") or "")
+            return {"position_id": position_id, "timeline": timeline}
+        finally:
+            conn.close()
+
+    # ── 시민 제안 API (Phase 6) ──
+
+    class CitizenProposalBody(BaseModel):
+        title: str = Field(..., min_length=1, max_length=200)
+        body: str = Field(..., min_length=10, max_length=5000)
+        author_name: str = Field(default="", max_length=50)
+        author_email: str = Field(default="", max_length=100)
+
+    @app.post("/api/policy/proposals", tags=["policy", "citizen"])
+    def submit_citizen_proposal(request: Request, body: CitizenProposalBody):
+        """시민 정책 제안 제출."""
+        ensure_db_ready()
+
+        from backend.policy_ssot import _classify_commentary_topic
+
+        topic = _classify_commentary_topic({"title": body.title, "summary": body.body, "body": ""})
+
+        conn = get_connection()
+        try:
+            cur = conn.execute(
+                """INSERT INTO citizen_proposals (title, body, author_name, author_email, topic)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (body.title, body.body, body.author_name or None, body.author_email or None, topic),
+            )
+            conn.commit()
+            return {"status": "ok", "proposal_id": cur.lastrowid, "classified_topic": topic}
+        finally:
+            conn.close()
+
+    @app.get("/api/policy/proposals", tags=["policy", "citizen"])
+    def list_citizen_proposals(
+        request: Request,
+        status: Optional[str] = Query(default=None, max_length=20),
+    ):
+        """시민 제안 목록 (관리자)."""
+        ensure_db_ready()
+        _ = require_admin(request)
+
+        conn = get_connection()
+        try:
+            sql = "SELECT * FROM citizen_proposals"
+            params = []
+            if status:
+                sql += " WHERE status = ?"
+                params.append(status)
+            sql += " ORDER BY created_at DESC"
+            rows = conn.execute(sql, tuple(params)).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()

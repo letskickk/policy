@@ -446,6 +446,46 @@ def init_db() -> None:
                 if "duplicate column" not in str(e).lower():
                     raise
 
+        # ── 이슈 레이더 캐시 ──
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS issue_radar_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            result_json TEXT NOT NULL,
+            scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS policy_review_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,
+            author_id INTEGER REFERENCES users(id),
+            comment TEXT NOT NULL,
+            comment_type TEXT DEFAULT 'review',
+            resolved INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_review_comments_position
+            ON policy_review_comments(position_id, created_at);
+        """)
+
+        # ── 시민 제안 (Phase 6) ──
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS citizen_proposals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            author_name TEXT,
+            author_email TEXT,
+            topic TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            cluster_id INTEGER,
+            status TEXT DEFAULT 'new',
+            reviewed_by INTEGER REFERENCES users(id),
+            review_note TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_citizen_proposals_status
+            ON citizen_proposals(status, created_at);
+        """)
+
         conn.commit()
         logger.info("DB 초기화 완료: %s", DB_PATH)
     finally:
