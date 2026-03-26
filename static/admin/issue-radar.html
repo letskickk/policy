@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>이슈 레이더 - 정책 랩</title>
+  <title>AI 정책 플랫폼 | 이슈 레이더</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
     .page-shell { padding-bottom: 3rem; }
@@ -13,7 +13,32 @@
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
-      margin-bottom: 1rem;
+      margin-bottom: 0.95rem;
+      padding: 0.1rem 0;
+    }
+    .topbar .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .topbar .links a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 0.78rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.22);
+      background: rgba(255,255,255,0.04);
+      color: #93c5fd;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+    .topbar .links a:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(148,163,184,0.28);
     }
     .hero {
       margin: 0.5rem 0 1.25rem;
@@ -331,13 +356,13 @@
     <div class="topbar">
       <div class="links">
         <a href="/admin">관리자 홈</a>
-        <a href="/hub/archive">자료 허브</a>
+        <a href="/hub/archive">정책 자료허브</a>
       </div>
       <span class="badge badge-blue">운영 대시보드</span>
     </div>
 
     <section class="hero">
-      <span class="eyebrow">issue radar</span>
+      <span class="eyebrow">AI 정책 플랫폼 | 이슈 레이더</span>
       <h1>지금 부족한 정책 주제를 한눈에 훑습니다.</h1>
       <p>문서와 공약의 커버리지를 집계해, 비어 있는 주제와 약한 구간을 빠르게 찾는 운영 화면입니다. 필터를 걸고 다시 스캔하면 우선순위가 즉시 갱신됩니다.</p>
       <div class="hero-meta">
@@ -530,15 +555,15 @@
 
     function renderHeatmap(data) {
       const baseTopics = [
-        '정책·제도',
-        '정치참여',
+        '사법·검찰',
+        '정치개혁',
         '경제',
         '복지',
         '교육',
         '과학기술',
         '안전·치안',
         '국방',
-        '외교'
+        '의료'
       ];
       const gaps = data.gaps || [];
       const gapMap = new Map();

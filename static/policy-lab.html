@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>정책 허브 - 개혁신당</title>
+  <title>정책 자료허브 - 개혁신당 AI 정책 플랫폼</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
     .lab-shell { position: relative; padding-bottom: 5rem; }
@@ -380,8 +380,8 @@
     <!-- ════ TOPBAR ════ -->
     <div class="topbar">
       <div class="brand-block">
-        <div class="brand-title">POLICY HUB</div>
-        <div class="brand-subtitle">정책 허브 - 관리자 통합 대시보드</div>
+        <div class="brand-title">POLICY ARCHIVE</div>
+        <div class="brand-subtitle">정책 자료허브 · 관리자 통합 대시보드</div>
       </div>
       <div class="links">
         <a href="/admin">관리자 홈</a>
@@ -730,6 +730,7 @@
             topic: fullTopic,
             output_format: document.getElementById('outputFormat').value,
             region: regionVal || null,
+            district_name: document.getElementById('district').value.trim() || '',
             election_type: document.getElementById('electionType').value,
             region_province: regionVal,
           };
@@ -773,6 +774,7 @@
               resultEl.textContent = chunks.join('');
               resultEl.scrollTop = resultEl.scrollHeight;
             }
+            chunks.push(decoder.decode());
 
             this._lastDraftText = chunks.join('');
             if (!this._lastDraftText) {
@@ -986,7 +988,7 @@
         },
 
         _renderHeatmap(data) {
-          const baseTopics = ['정책·제도', '정치참여', '경제', '복지', '교육', '과학기술', '안전·치안', '국방', '외교'];
+          const baseTopics = ['사법·검찰', '정치개혁', '경제', '복지', '교육', '과학기술', '안전·치안', '국방', '의료'];
           const gaps = data.gaps || [];
           const gapMap = new Map();
           for (const gap of gaps) { if (gap && gap.topic) gapMap.set(gap.topic, gap); }

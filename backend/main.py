@@ -1,4 +1,4 @@
-﻿"""
+"""
 개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
@@ -4868,23 +4868,26 @@ from backend.tools_routes import register_tools_routes
 register_tools_routes(app, require_approved, _client_ip)
 
 
-# ── 문의하기 ────────────────────────────────────────────────────
+
+
+
+
 class ContactRequest(BaseModel):
-    name: str = Field("", max_length=100)
+    name: str = Field('', max_length=100)
     email: str = Field(..., min_length=1, max_length=200)
     message: str = Field(..., min_length=1, max_length=5000)
 
-@app.post("/api/contact")
+@app.post('/api/contact')
 def api_contact(body: ContactRequest, request: Request):
-    import re
+    import re as _re
     email = body.email.strip()
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-        raise HTTPException(status_code=400, detail="올바른 이메일 주소를 입력해 주세요.")
+    if not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        raise HTTPException(status_code=400, detail='올바른 이메일 주소를 입력해 주세요.')
     ip = _client_ip(request)
     from backend.quota_rate import check_rate_limit_ip
     ok, msg = check_rate_limit_ip(ip)
     if not ok:
-        raise HTTPException(status_code=429, detail="잠시 후 다시 시도해 주세요.")
+        raise HTTPException(status_code=429, detail='잠시 후 다시 시도해 주세요.')
     from backend.email_sender import send_contact_email
     success = send_contact_email(
         sender_name=body.name.strip(),
@@ -4892,9 +4895,8 @@ def api_contact(body: ContactRequest, request: Request):
         message=body.message.strip(),
     )
     if not success:
-        raise HTTPException(status_code=500, detail="메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.")
-    return {"ok": True}
-
+        raise HTTPException(status_code=500, detail='메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    return {'ok': True}
 
 @app.get("/hub-briefing", include_in_schema=False)
 def hub_briefing_page():

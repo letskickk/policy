@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>회원가입 - 정책 멘토링</title>
+    <link rel="stylesheet" href="/static/css/common.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -11,18 +12,17 @@
       background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%);
       min-height: 100vh;
       color: #e2e8f0;
-      padding: 2rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      padding: 1.5rem 1rem 0;
+    }
+    .signup-shell {
+      width: min(100%, 420px);
+      margin: 0 auto;
     }
     .card {
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(148,163,184,0.18);
       border-radius: 18px;
       padding: 2rem;
-      max-width: 420px;
       width: 100%;
     }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; word-break: keep-all; }
@@ -50,9 +50,6 @@
       cursor: pointer;
     }
     select option { background: #0f172a; color: #fff; }
-    .footer { margin-top: auto; padding-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #94a3b8; line-height: 1.8; }
-    .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
-    .footer a:hover { text-decoration: underline; }
     input {
       width: 100%;
       padding: 0.75rem;
@@ -118,7 +115,7 @@
       min-width: 0;
     }
     @media (max-width: 480px) {
-      body { padding: 1.5rem 1rem; }
+      body { padding: 1rem 0.75rem 0; }
       .card { padding: 1.5rem; border-radius: 16px; }
       h1 { font-size: 1.35rem; }
       .hint { font-size: 0.85rem; }
@@ -129,6 +126,7 @@
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
 <body class="rf-auth-page">
+  <main class="signup-shell">
   <div class="card">
     <h1>회원가입</h1>
     <p class="hint">
@@ -191,61 +189,7 @@
       이미 계정이 있으신가요? <a href="/login">로그인</a>
     </div>
   </div>
-  <style>
-  .site-footer{margin-top:2.5rem;padding:1.5rem 0 0.5rem;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;}
-  .site-footer .footer-left{display:flex;align-items:center;gap:0.55rem;font-size:0.82rem;color:rgba(203,213,225,0.55);}
-  .site-footer .footer-org{font-weight:800;color:rgba(203,213,225,0.75);}
-  .site-footer .footer-dot{color:rgba(255,255,255,0.15);}
-  .site-footer .footer-right button{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;color:rgba(203,213,225,0.45);padding:0.3rem 0.7rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06);background:none;cursor:pointer;transition:all 0.2s;}
-  .site-footer .footer-right button:hover{color:rgba(203,213,225,0.75);border-color:rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);}
-  .contact-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,1);backdrop-filter:blur(6px);justify-content:center;align-items:center;}
-  .contact-overlay.open{display:flex;}
-  .contact-modal{background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:1.8rem;width:90%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
-  .contact-modal h3{font-size:1.15rem;margin-bottom:0.2rem;color:#f1f5f9;}
-  .contact-modal .sub{font-size:0.82rem;color:rgba(203,213,225,0.6);margin-bottom:1.2rem;}
-  .contact-modal label{display:block;font-size:0.82rem;font-weight:700;color:rgba(203,213,225,0.6);margin-bottom:0.25rem;margin-top:0.8rem;}
-  .contact-modal input,.contact-modal textarea{width:100%;padding:0.55rem 0.7rem;font-size:0.92rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#f1f5f9;outline:none;transition:border-color 0.2s;}
-  .contact-modal input:focus,.contact-modal textarea:focus{border-color:#f97316;}
-  .contact-modal textarea{resize:vertical;min-height:100px;}
-  .contact-actions{display:flex;gap:0.5rem;margin-top:1.2rem;justify-content:flex-end;}
-  .contact-actions button{padding:0.5rem 1.1rem;border-radius:10px;font-size:0.88rem;font-weight:700;cursor:pointer;border:none;}
-  .contact-btn-cancel{background:rgba(255,255,255,0.06);color:rgba(203,213,225,0.6);}
-  .contact-btn-send{background:#f97316;color:#fff;}
-  .contact-btn-send:disabled{opacity:0.5;cursor:not-allowed;}
-  .contact-err{color:#f87171;font-size:0.82rem;margin-top:0.5rem;display:none;}
-  .contact-ok{color:#4ade80;font-size:0.92rem;text-align:center;padding:2rem 0;}
-  </style>
-  <footer class="site-footer">
-    <div class="footer-left">
-      <span class="footer-org">개혁신당 정책국</span>
-      <span class="footer-dot">·</span>
-      <span>정책 허브</span>
-    </div>
-    <div class="footer-right">
-      <button onclick="openContactModal()">✉ 문의하기</button>
-    </div>
-  </footer>
-  <div class="contact-overlay" id="contactOverlay" onclick="if(event.target===this)this.classList.remove('open')">
-    <div class="contact-modal" onclick="event.stopPropagation()">
-      <div id="contactForm">
-        <h3>문의하기</h3>
-        <p class="sub">개혁신당 정책국에 문의 사항을 보내주세요.</p>
-        <label>이름</label><input type="text" id="contactName" placeholder="이름" maxlength="100">
-        <label>이메일 <span style="color:#f87171">*</span></label><input type="email" id="contactEmail" placeholder="답변 받으실 이메일" maxlength="200">
-        <label>문의 내용 <span style="color:#f87171">*</span></label><textarea id="contactMsg" placeholder="문의 내용을 입력해 주세요." maxlength="5000" rows="4"></textarea>
-        <p class="contact-err" id="contactErr"></p>
-        <div class="contact-actions">
-          <button class="contact-btn-cancel" onclick="document.getElementById('contactOverlay').classList.remove('open')">취소</button>
-          <button class="contact-btn-send" id="contactSendBtn" onclick="sendContact()">보내기</button>
-        </div>
-      </div>
-      <div id="contactOk" class="contact-ok" style="display:none">문의가 전송되었습니다.<br>빠른 시일 내 답변드리겠습니다.<div style="margin-top:1rem"><button class="contact-btn-cancel" onclick="document.getElementById('contactOverlay').classList.remove('open')">닫기</button></div></div>
-    </div>
-  </div>
-  <script>
-  function openContactModal(){document.getElementById('contactOverlay').classList.add('open');document.getElementById('contactForm').style.display='';document.getElementById('contactOk').style.display='none';document.getElementById('contactErr').style.display='none';}
-  async function sendContact(){var e=document.getElementById('contactEmail').value.trim(),m=document.getElementById('contactMsg').value.trim(),n=document.getElementById('contactName').value.trim(),err=document.getElementById('contactErr');if(!e||!m){err.textContent='이메일과 문의 내용을 입력해 주세요.';err.style.display='block';return;}var btn=document.getElementById('contactSendBtn');btn.disabled=true;btn.textContent='전송 중...';err.style.display='none';try{var r=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,email:e,message:m}),credentials:'include'});if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.detail||'전송에 실패했습니다.');}document.getElementById('contactForm').style.display='none';document.getElementById('contactOk').style.display='';}catch(ex){err.textContent=ex.message;err.style.display='block';}finally{btn.disabled=false;btn.textContent='보내기';}}
-  </script>
+  </main>
   <script>
     document.querySelectorAll('.pw-wrap').forEach(wrap => {
       const input = wrap.querySelector('input');
@@ -422,5 +366,7 @@
       } catch (e) { msg.textContent = '서버 연결 실패'; msg.style.display = 'block'; }
     });
   </script>
+  <div data-shared-footer></div>
+  <script src="/static/js/shared-footer.js"></script>
 </body>
 </html>

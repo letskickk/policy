@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>내 기록 - 정책 멘토링</title>
+  <title>MY PAGE - 개혁신당 AI 정책 플랫폼</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -34,24 +34,25 @@
       justify-content: space-between;
       flex-wrap: nowrap;
       gap: 0.75rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.85rem;
+      padding: 0.15rem 0;
     }
     .top-bar .nav-links { flex-shrink: 0; }
     .top-bar .brand { display: inline-flex; align-items: center; gap: 0.75rem; }
     .top-bar .brand-logo {
-      display: inline-flex; align-items: center; gap: 0.75rem;
+      display: inline-flex; align-items: center; gap: 0.55rem;
       text-decoration: none; color: inherit; line-height: 1; margin: 0;
     }
     .top-bar .brand-logo:hover { color: inherit; opacity: 0.95; }
     .top-bar .brand-logo img {
-      height: 30px; width: auto; display: inline-block;
-      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.25));
+      height: 24px; width: auto; display: inline-block;
+      filter: none;
     }
     .top-bar .brand-title {
-      font-size: 1.05rem; font-weight: 900; letter-spacing: -0.02em; color: var(--text-strong);
+      font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; color: rgba(255,255,255,0.92);
     }
     .top-bar .brand-tag {
-      display: block; margin-top: 0.35rem; font-size: 0.84rem;
+      display: block; margin-top: 0.22rem; font-size: 0.76rem;
       color: #ffb37a; letter-spacing: -0.01em; font-weight: 800; opacity: 0.95;
     }
     .top-bar .nav-links { margin: 0; padding: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
@@ -82,12 +83,12 @@
     .stat-item .l { font-size: 0.9rem; color: var(--muted); }
     .nav-link {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 36px; padding: 0 0.9rem;
+      min-height: 32px; padding: 0 0.85rem;
       color: var(--text); text-decoration: none;
-      font-size: 0.875rem; font-weight: 700;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
+      font-size: 0.82rem; font-weight: 700;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(148,163,184,0.22);
       transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     .nav-link:hover { background: rgba(255,255,255,0.10); color: var(--text-strong); border-color: rgba(148,163,184,0.28); }
@@ -195,8 +196,8 @@
         <a href="/" class="brand-logo">
           <img src="/static/logo.svg" alt="개혁신당 로고">
           <span class="brand-inner">
-            <span class="brand-title">개혁신당 정책 멘토링</span>
-            <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+            <span class="brand-title">AI 정책 플랫폼</span>
+            <span class="brand-tag">MY PAGE | 분석 기록과 사용 현황</span>
           </span>
         </a>
       </div>
@@ -205,13 +206,13 @@
         <form action="/api/auth/logout" method="POST" style="display:inline">
           <button type="submit" class="logout-link">로그아웃</button>
         </form>
-        <a href="/dashboard" class="nav-link" data-nav-page="dashboard" style="display:none;">내 기록</a>
+    <a href="/dashboard" class="nav-link" data-nav-page="dashboard" style="display:none;">MY PAGE</a>
         <a href="/pledge" class="nav-link">공약 분석</a>
         <a href="/map" class="nav-link">지역 공약</a>
       </div>
     </div>
-    <h1>내 기록</h1>
-    <p class="page-desc">공약 분석 결과가 저장됩니다. 열기로 상세 확인·복사·저장·인쇄 가능.</p>
+    <h1>MY PAGE</h1>
+    <p class="page-desc">공약 분석 기록과 사용 현황을 확인하는 개인 페이지입니다. 열기로 상세 확인·복사·저장·인쇄가 가능합니다.</p>
     <div class="card">
       <div class="stat" id="stats">
         <div class="stat-item"><span class="l">오늘 사용</span><div class="v" id="daily">-</div><span class="l">/ <span id="dailyLimit">-</span> 회</span></div>

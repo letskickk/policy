@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>정책 초안 생성 - 정책 랩</title>
+  <title>AI 정책 플랫폼 | 정책 초안 생성</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
     .page-shell { padding-bottom: 6rem; }
@@ -13,9 +13,34 @@
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
-      margin-bottom: 1.25rem;
+      margin-bottom: 0.95rem;
+      padding: 0.1rem 0;
     }
-    .topbar .links { margin: 0; }
+    .topbar .links {
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .topbar .links a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 0.78rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.22);
+      background: rgba(255,255,255,0.04);
+      color: var(--brand-light);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+    .topbar .links a:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(148,163,184,0.28);
+    }
     .hero {
       padding: 1.5rem 0 0.5rem;
       margin-bottom: 1.25rem;
@@ -328,13 +353,13 @@
       <div class="links">
         <a href="/admin">관리자 홈</a>
         <a href="/admin/issue-radar">이슈 레이더</a>
-        <a href="/hub/archive">자료 허브</a>
+        <a href="/hub/archive">정책 자료허브</a>
       </div>
       <span class="badge badge-orange">AI 드래프터</span>
     </div>
 
     <section class="hero">
-      <span class="eyebrow">policy create</span>
+      <span class="eyebrow">AI 정책 플랫폼 | 정책 초안 생성</span>
       <h1>정책 초안을 빠르게 잡고, 근거까지 함께 확인합니다.</h1>
       <p>주제를 입력하면 AI가 초안 문서를 만들고, 관련 SSOT와 참고 근거를 함께 보여줍니다. 오른쪽에는 결과를, 왼쪽에는 조건을 두어 작업 흐름을 한눈에 읽히게 했습니다.</p>
       <div class="hero-meta">
@@ -516,6 +541,7 @@
         topic: fullTopic,
         output_format: document.getElementById('outputFormat').value,
         region: regionVal || null,
+        district_name: document.getElementById('district').value.trim() || '',
         election_type: document.getElementById('electionType').value,
         region_province: regionVal,
       };
@@ -566,6 +592,7 @@
           resultEl.textContent = chunks.join('');
           resultEl.scrollTop = resultEl.scrollHeight;
         }
+        chunks.push(decoder.decode());
 
         _lastDraftText = chunks.join('');
         if (!_lastDraftText) {
