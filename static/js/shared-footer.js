@@ -12,7 +12,7 @@
         </div>
       </footer>
     </div>
-    <div class="contact-overlay" data-contact-overlay>
+    <div class="contact-overlay" data-contact-overlay style="display:none">
       <div class="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
         <div data-contact-form>
           <h3 id="contactModalTitle">문의하기</h3>
@@ -70,12 +70,14 @@
 
     const openModal = () => {
       resetState();
+      overlay.style.display = "flex";
       overlay.classList.add("open");
       document.body.style.overflow = "hidden";
     };
 
     const closeModal = () => {
       overlay.classList.remove("open");
+      overlay.style.display = "none";
       document.body.style.overflow = "";
     };
 
