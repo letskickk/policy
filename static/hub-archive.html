@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개혁신당 자료 허브</title>
+  <style>
+    :root { --bg:#071826; --panel:rgba(255,255,255,0.08); --border:rgba(255,255,255,0.12); --text:#e6edf5; --muted:#a9bbcb; --brand:#ff7a1a; --brand-soft:rgba(255,122,26,0.16); --shadow:0 18px 40px rgba(0,0,0,0.25); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:"Pretendard","Noto Sans KR",sans-serif; color:var(--text); background:radial-gradient(900px 500px at 10% 10%, rgba(255,122,26,0.14), transparent 60%), radial-gradient(700px 450px at 90% 15%, rgba(29,155,240,0.12), transparent 58%), linear-gradient(160deg, #04111d 0%, #082238 52%, #0b3152 100%); padding:24px 16px 40px; }
+    a { color:inherit; text-decoration:none; }
+    main { max-width:1320px; margin:0 auto; display:grid; gap:16px; }
+    .panel { border:1px solid var(--border); background:var(--panel); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(12px); }
+
+    /* Topbar */
+    .topbar { padding:18px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .brand strong { display:block; font-size:20px; color:#fff; }
+    .brand span { color:#ffd2b6; font-size:13px; }
+    .back-link { display:inline-flex; align-items:center; gap:6px; padding:10px 16px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff; font-size:13px; font-weight:700; }
+    .back-link:hover { background:rgba(255,255,255,0.12); }
+
+    /* Shell: sidebar + detail */
+    .shell { display:grid; grid-template-columns:340px minmax(0,1fr); gap:16px; align-items:start; }
+    .sidebar { position:sticky; top:16px; padding:18px; }
+    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .tab { border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--text); border-radius:999px; padding:10px 14px; font:inherit; font-weight:700; cursor:pointer; font-size:13px; }
+    .tab.active { background:var(--brand); border-color:var(--brand); color:#fff; }
+    .search { width:100%; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--text); padding:12px 14px; font:inherit; }
+    .search::placeholder { color:var(--muted); }
+    .list { display:grid; gap:10px; max-height:calc(100vh - 260px); overflow:auto; padding-right:4px; margin-top:14px; }
+    .item { padding:14px; border-radius:18px; border:1px solid var(--border); background:rgba(255,255,255,0.05); cursor:pointer; }
+    .item.selected { border-color:var(--brand); background:rgba(255,122,26,0.14); }
+    .item strong { display:block; line-height:1.45; overflow-wrap:anywhere; }
+    .meta { margin-top:8px; color:var(--muted); font-size:12px; line-height:1.6; }
+    .empty { padding:18px; border-radius:18px; border:1px dashed var(--border); background:rgba(255,255,255,0.04); color:var(--muted); }
+
+    /* Detail panel */
+    .detail-grid { display:grid; gap:16px; min-width:0; }
+    .detail { padding:18px; }
+    .detail-title { margin:12px 0 0; font-size:26px; line-height:1.15; color:#fff; overflow-wrap:anywhere; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; border-radius:999px; background:var(--brand-soft); border:1px solid rgba(255,122,26,0.24); color:#ffbf93; font-size:12px; font-weight:800; padding:8px 12px; }
+    .muted { color:var(--muted); line-height:1.7; }
+    .body { min-height:200px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .links { display:flex; flex-wrap:wrap; gap:8px; }
+    .link { display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-size:13px; font-weight:700; overflow-wrap:anywhere; }
+    .detail-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .meta-pill { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-size:13px; color:var(--muted); }
+
+    /* Poll-specific */
+    .poll-info-card { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:1px; background:var(--border); border-radius:14px; overflow:hidden; margin-top:12px; }
+    .poll-info-row { display:flex; flex-direction:column; gap:2px; padding:12px 16px; background:rgba(255,255,255,0.04); }
+    .poll-info-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+    .poll-info-value { font-size:14px; font-weight:600; color:#fff; }
+    .poll-result-grid { display:grid; gap:10px; }
+    .poll-result-row { display:grid; grid-template-columns:minmax(88px,140px) minmax(0,1fr) auto; gap:10px; align-items:center; }
+    .poll-result-label { font-size:13px; color:#e2e8f0; line-height:1.4; }
+    .poll-result-value { font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+    .poll-result-bar { width:100%; height:14px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
+    .poll-result-bar > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#60a5fa 0%,#a78bfa 100%); }
+
+    @media (max-width:1180px) {
+      .shell { grid-template-columns:1fr; }
+      .sidebar { position:static; }
+      .list { max-height:none; }
+    }
+    @media (max-width:720px) { body { padding-inline:12px; } }
+  </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
+</head>
+<body class="rf-workspace-page">
+  <main>
+    <section class="panel topbar">
+      <div class="brand"><strong>자료 허브</strong><span>정책·메시지·법안·인물·규정·여론조사 전체 아카이브</span></div>
+      <a href="/hub" class="back-link">← 브리핑 허브</a>
+    </section>
+
+    <div class="shell">
+      <section class="panel sidebar">
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="positions">정책</button>
+          <button class="tab" data-tab="messages">메시지</button>
+          <button class="tab" data-tab="bills">법안</button>
+          <button class="tab" data-tab="people">인물</button>
+          <button class="tab" data-tab="rules">규정</button>
+          <button class="tab" data-tab="polls">여론조사</button>
+        </div>
+        <input class="search" id="searchInput" type="text" placeholder="검색..." />
+        <div class="list" id="listPanel"></div>
+      </section>
+
+      <div class="detail-grid">
+        <section class="panel detail" id="detailPanel">
+          <span class="eyebrow" id="detailType">자료실</span>
+          <div class="detail-title" id="detailTitle">항목을 선택하면 상세 내용이 여기 나옵니다.</div>
+          <div class="muted" id="detailSummary">좌측 목록에서 항목을 선택하세요.</div>
+          <div class="detail-meta" id="detailMeta"></div>
+          <div class="links" id="detailLinks"></div>
+          <div class="body" id="detailBody"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/hub-shared.js"></script>
+  <script>
+const TAB_API = {
+  positions: { url: '/api/policy/positions', items: r => r.items || [], key: i => i.slug, title: i => i.title, meta: i => i.category || '' },
+  messages:  { url: '/api/policy/messages',  items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [i.speaker_name || i.speaker, i.published_at].filter(Boolean).join(' · ') },
+  bills:     { url: '/api/policy/documents?doc_type=bill&status=active', items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).bill_no, i.published_at].filter(Boolean).join(' · ') },
+  people:    { url: '/api/policy/people',    items: r => r.items || [], key: i => i.person_name, title: i => i.person_name, meta: i => `관련 문서 ${i.document_count || 0}건 · 대표발의 ${i.proposer_count || 0}건` },
+  rules:     { url: '/api/policy/rules',     items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).rule_kind_label, statusLabel(i.status)].filter(Boolean).join(' · ') },
+  polls:     { url: '/api/policy/polls',     items: r => r.items || [], key: i => String(i.id), title: i => i.title, meta: i => [(i.metadata||{}).pollster, i.published_at].filter(Boolean).join(' · ') },
+};
+
+const state = { tab: 'positions', search: '', data: {}, selected: null, abortCtrl: null };
+
+async function api(url, signal) {
+  const r = await fetch(url, signal ? { signal } : {});
+  if (!r.ok) throw new Error(url);
+  return r.json();
+}
+
+function renderList() {
+  const cfg = TAB_API[state.tab];
+  const items = state.data[state.tab] || [];
+  const query = state.search.toLowerCase();
+  const filtered = query
+    ? items.filter(i => (cfg.title(i) || '').toLowerCase().includes(query) || (cfg.meta(i) || '').toLowerCase().includes(query) || (i.speaker_name || '').toLowerCase().includes(query) || (i.summary || '').toLowerCase().includes(query))
+    : items;
+
+  const panel = document.getElementById('listPanel');
+  if (!filtered.length) {
+    panel.innerHTML = `<div class="empty">${query ? '검색 결과가 없습니다.' : '데이터가 없습니다.'}</div>`;
+    return;
+  }
+  panel.innerHTML = filtered.map(i => {
+    const k = cfg.key(i);
+    const sel = state.selected === k ? ' selected' : '';
+    return `<div class="item${sel}" data-key="${safe(k)}"><strong>${safe(cfg.title(i))}</strong><div class="meta">${safe(cfg.meta(i))}</div></div>`;
+  }).join('');
+
+  panel.querySelectorAll('.item').forEach(el => {
+    el.onclick = () => {
+      const key = el.dataset.key;
+      if (!key) return;
+      state.selected = key;
+      history.pushState({ tab: state.tab, key }, '', hubUrl('/hub/archive', state.tab, key));
+      renderList();
+      loadDetail(state.tab, key);
+    };
+  });
+}
+
+async function loadTab(tabName) {
+  if (state.abortCtrl) state.abortCtrl.abort();
+  state.abortCtrl = new AbortController();
+  const cfg = TAB_API[tabName];
+  if (!cfg) return;
+
+  if (state.data[tabName]) {
+    renderList();
+    return;
+  }
+
+  document.getElementById('listPanel').innerHTML = '<div class="empty">불러오는 중...</div>';
+  try {
+    const res = await api(cfg.url, state.abortCtrl.signal);
+    state.data[tabName] = cfg.items(res);
+    renderList();
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('loadTab error:', err);
+    document.getElementById('listPanel').innerHTML = '<div class="empty">데이터를 불러오지 못했습니다.</div>';
+  }
+}
+
+async function loadDetail(tab, key) {
+  document.getElementById('detailTitle').textContent = '불러오는 중...';
+  document.getElementById('detailSummary').textContent = '';
+  document.getElementById('detailBody').textContent = '';
+  document.getElementById('detailMeta').innerHTML = '';
+  document.getElementById('detailLinks').innerHTML = '';
+
+  try {
+    let data;
+    if (tab === 'positions') data = await api(`/api/policy/positions/${encodeURIComponent(key)}`);
+    else if (tab === 'people') data = await api(`/api/policy/people/${encodeURIComponent(key)}`);
+    else data = await api(`/api/policy/documents/${encodeURIComponent(key)}`);
+
+    if (!data) return;
+    renderDetail(data, tab);
+  } catch (err) {
+    console.error('loadDetail error:', err);
+    document.getElementById('detailTitle').textContent = '해당 항목을 찾을 수 없습니다';
+    document.getElementById('detailSummary').textContent = '잠시 후 다시 시도해주세요.';
+  }
+}
+
+function renderDetail(data, tab) {
+  const md = data.metadata || {};
+  document.getElementById('detailType').textContent = tab === 'positions' ? '정책' : tab === 'messages' ? '메시지' : tab === 'bills' ? '법안' : tab === 'people' ? '인물' : tab === 'rules' ? '규정' : tab === 'polls' ? '여론조사' : '문서';
+  document.getElementById('detailTitle').textContent = data.title || data.name || '';
+  // Show summary only if different from title
+  const rawSummary = data.summary || data.official_summary || '';
+  const title = data.title || data.name || '';
+  const summaryText = (rawSummary && rawSummary !== title && rawSummary.length > title.length + 10) ? rawSummary : firstMeaningfulText(data) || '';
+  document.getElementById('detailSummary').textContent = summaryText;
+
+  // Meta pills
+  const meta = [];
+  if (data.published_at) meta.push(data.published_at);
+  if (data.category) meta.push(data.category);
+  if (data.status) meta.push(statusLabel(data.status));
+  if (data.doc_type) meta.push(docTypeLabel(data.doc_type));
+  if (data.speaker_name || data.speaker) meta.push(data.speaker_name || data.speaker);
+  if (md.pollster) meta.push(md.pollster);
+  if (md.bill_no) meta.push('의안번호 ' + md.bill_no);
+  if (md.committee) meta.push(md.committee);
+  if (md.rule_kind_label) meta.push(md.rule_kind_label);
+  if (data.role) meta.push(data.role);
+  document.getElementById('detailMeta').innerHTML = meta.map(v => `<span class="meta-pill">${safe(v)}</span>`).join('');
+
+  // Links — polls handle their own links inside renderPollBody
+  if (tab !== 'polls') {
+    const links = [];
+    if (data.source_url) links.push(`<a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기</a>`);
+    if ((md.attachments || []).length) {
+      md.attachments.forEach(att => {
+        const attUrl = att?.download_url || att?.url;
+        if (attUrl) links.push(`<a class="link" href="${safe(decodeURIComponent(attUrl))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || att.name || '첨부 자료')}</a>`);
+      });
+    }
+    document.getElementById('detailLinks').innerHTML = links.join('');
+  } else {
+    document.getElementById('detailLinks').innerHTML = '';
+  }
+
+  // Body — polls get special rendering
+  const bodyEl = document.getElementById('detailBody');
+  if (tab === 'polls') {
+    bodyEl.innerHTML = renderPollBody(data);
+  } else if (tab === 'people') {
+    bodyEl.innerHTML = renderPersonBody(data);
+  } else {
+    let bodyText = data.body || data.summary || '';
+    if (tab === 'messages') {
+      bodyText = bodyText
+        .replace(/^\[\d{6}_[^\]]+\]\s*/, '')
+        .replace(/^■\s*[""][^""]*[""]\s*/g, '')
+        .replace(/■\s*/g, '')
+        .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*대변인[\s\S]*$/, '')
+        .replace(/\d{4}\.\s*\d{2}\.\s*\d{2}\.\s*개혁신당\s*[^\n]*$/m, '');
+    }
+    bodyEl.textContent = bodyText;
+  }
+
+  document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPollBody(data) {
+  const md = data.metadata || {};
+  const parts = [];
+
+  // Visual info card
+  const fields = [
+    ['조사기관', md.pollster],
+    ['의뢰', md.client_name],
+    ['조사방법', md.survey_method],
+    ['표본추출', md.sample_frame],
+    ['조사지역', md.region_name],
+    ['등록일', md.registered_at],
+    ['등록번호', md.registration_no],
+  ].filter(([, v]) => v);
+
+  if (fields.length) {
+    parts.push('<div class="poll-info-card">' + fields.map(([label, val]) =>
+      `<div class="poll-info-row"><span class="poll-info-label">${safe(label)}</span><span class="poll-info-value">${safe(val)}</span></div>`
+    ).join('') + '</div>');
+  }
+
+  // Support lines bar chart (if available)
+  const lines = (md.support_lines || []);
+  if (lines.length) {
+    parts.push('<div style="margin-top:16px;"><strong style="color:#fff;">정당 지지율</strong></div>');
+    parts.push('<div class="poll-result-grid" style="margin-top:8px;">' + lines.map(line => {
+      const match = line.match(/^(.+?)\s+([\d.]+)%?$/);
+      if (!match) return `<div class="poll-result-row"><span class="poll-result-label">${safe(line)}</span><span></span><span></span></div>`;
+      const label = match[1], pct = parseFloat(match[2]);
+      const isReform = label.includes('개혁신당');
+      const barColor = isReform ? 'background:linear-gradient(90deg,#ff7a1a 0%,#ffb37a 100%)' : '';
+      return `<div class="poll-result-row"><span class="poll-result-label"${isReform ? ' style="color:#ff7a1a;font-weight:800;"' : ''}>${safe(label)}</span><div class="poll-result-bar"><span style="width:${Math.min(pct, 100)}%;${barColor}"></span></div><span class="poll-result-value"${isReform ? ' style="color:#ff7a1a;"' : ''}>${pct}%</span></div>`;
+    }).join('') + '</div>');
+  }
+
+  // Attachments
+  const atts = md.attachments || [];
+  if (atts.length) {
+    parts.push('<div style="margin-top:16px;">' + atts.map(att => {
+      const url = att.download_url || att.url;
+      return url ? `<a class="link" href="${safe(decodeURIComponent(url))}" target="_blank" rel="noreferrer">📎 ${safe(att.file_name || '첨부 자료')}</a>` : '';
+    }).filter(Boolean).join(' ') + '</div>');
+  }
+
+  // Source link
+  if (data.source_url) parts.push(`<div style="margin-top:12px;"><a class="link" href="${safe(data.source_url)}" target="_blank" rel="noreferrer">원문 보기 ↗</a></div>`);
+
+  return parts.join('') || '<div class="muted">조사 상세 정보가 없습니다.</div>';
+}
+
+function renderPersonBody(data) {
+  const parts = [];
+  const roles = (data.roles || []).map(r => r === 'proposer' ? '대표발의' : r === 'policy_owner' ? '정책 소유자' : r).join(', ');
+  if (roles) parts.push(`<div style="margin-top:8px;"><span class="meta-pill">${safe(roles)}</span></div>`);
+  if (data.bio) parts.push(`<div style="margin-top:12px;">${safe(data.bio)}</div>`);
+  const docs = data.documents || [];
+  if (docs.length) {
+    const byType = {};
+    docs.forEach(d => { const t = docTypeLabel(d.doc_type); byType[t] = byType[t] || []; byType[t].push(d); });
+    Object.entries(byType).forEach(([typeName, items]) => {
+      parts.push(`<div style="margin-top:16px;"><strong style="color:#fff;">${safe(typeName)} (${items.length}건)</strong></div>`);
+      items.slice(0, 10).forEach(d => {
+        const date = d.published_at ? ` · ${d.published_at}` : '';
+        parts.push(`<div class="meta" style="margin-top:6px; cursor:pointer;" onclick="loadDetail('${d.doc_type === 'bill' ? 'bills' : 'messages'}','${d.id}')">· ${safe(d.title)}${date}</div>`);
+      });
+      if (items.length > 10) parts.push(`<div class="muted" style="margin-top:4px;">외 ${items.length - 10}건</div>`);
+    });
+  }
+  return parts.join('') || '<div class="muted">상세 정보가 없습니다.</div>';
+}
+
+// Tab switching
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  state.tab = btn.dataset.tab;
+  state.selected = null;
+  state.search = '';
+  document.getElementById('searchInput').value = '';
+  loadTab(state.tab);
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.search = e.target.value || '';
+  renderList();
+});
+
+// Init
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const initTab = params.get('tab');
+  const initKey = params.get('key');
+
+  if (initTab && TAB_API[initTab]) {
+    state.tab = initTab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === initTab));
+  }
+
+  await loadTab(state.tab);
+
+  if (initKey) {
+    state.selected = initKey;
+    renderList();
+    await loadDetail(state.tab, initKey);
+  }
+}
+
+window.addEventListener('popstate', async () => {
+  const params = new URLSearchParams(location.search);
+  const tab = params.get('tab');
+  const key = params.get('key');
+  if (tab && TAB_API[tab]) {
+    state.tab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    await loadTab(tab);
+    if (key) {
+      state.selected = key;
+      renderList();
+      await loadDetail(tab, key);
+    }
+  }
+});
+
+init().catch(err => {
+  console.error(err);
+  document.getElementById('listPanel').innerHTML = '<div class="empty">자료실을 불러오지 못했습니다.</div>';
+});
+</script>
+</body>
+</html>
