@@ -392,9 +392,10 @@ def test_main_page_has_admin_hub_button():
 
     html = Path("static/index.html").read_text(encoding="utf-8")
     assert 'id="btnPolicyHub"' in html
-    assert "display:none" in html  # hidden by default
     assert "policy-lab" in html
-    assert "role" in html and "admin" in html  # admin check in script
+    assert "role" in html and "admin" in html  # admin label update in script
+    # 시민 정책 제안 버튼도 존재
+    assert "/proposals" in html
 
 
 def test_admin_index_has_hub_link():
