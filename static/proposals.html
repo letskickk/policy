@@ -3,55 +3,333 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>정책 제안 - 개혁신당</title>
+  <title>시민 제안 - 개발자정당</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
-    .success { display: none; }
-    .btn-submit { width: 100%; margin-top: 1rem; }
+    .proposal-shell {
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .back-link {
+      color: var(--brand-light);
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    .hero-panel {
+      padding: 1.9rem;
+    }
+
+    .hero-kicker {
+      color: var(--brand-light);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 4.4vw, 3.5rem);
+      line-height: 1.05;
+      max-width: 13ch;
+      margin-bottom: 0.95rem;
+    }
+
+    .hero-lead {
+      max-width: 58ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      margin-bottom: 1.2rem;
+      word-break: keep-all;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .hero-meta .badge {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .how-it-works {
+      display: grid;
+      gap: 0.8rem;
+      padding: 1.4rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+    }
+
+    .how-it-works .step {
+      padding-top: 0.85rem;
+    }
+
+    .proposal-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .guide-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .guide-item strong {
+      display: block;
+      color: var(--text-strong);
+      margin-bottom: 0.2rem;
+    }
+
+    .guide-item p {
+      color: var(--muted2);
+      font-size: 0.93rem;
+      line-height: 1.6;
+    }
+
+    .form-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .form-intro {
+      color: var(--muted2);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .field-grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field-help {
+      color: var(--muted3);
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+    }
+
+    .success {
+      display: none;
+    }
+
+    .success strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .success p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .submit-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 1rem;
+    }
+
+    .submit-row .btn {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .form-card {
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .section-title {
+      color: var(--text-strong);
+      font-size: 1.1rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .section-note {
+      color: var(--muted2);
+      font-size: 0.94rem;
+    }
+
+    .notice strong {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: var(--text-strong);
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .proposal-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid.two {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap-sm">
-    <div class="links" style="margin-bottom:1rem;">
-      <a href="/">홈</a>
-    </div>
-    <h1>정�� 제안</h1>
-    <p class="subtitle">개혁신당에 필요한 정책을 제안해 주세요. 제안은 정책국에서 검토합니다.</p>
-
-    <div class="info-box">
-      제안은 AI가 자동으로 주제를 분류하고, 정책국 검토 큐�� 등록됩니다. 채택된 제안은 정책 생성 파이프라인에 투입됩니다.
+  <main class="page-shell proposal-shell">
+    <div class="topline">
+      <div class="links">
+        <a href="/policy-lab" class="back-link">???뺤콉 ?덈툕濡??뚯븘媛湲?/a>
+      </div>
+      <div class="eyebrow">Public Input</div>
     </div>
 
-    <div class="card" id="formCard">
-      <label>제안 제목 <span class="required">*</span></label>
-      <input type="text" id="title" placeholder="예: 청년 전세 사기 방지 제도 강화" maxlength="200">
-      <div class="char-count"><span id="titleCount">0</span>/200</div>
+    <section class="hero reveal">
+      <div class="panel hero-panel">
+        <div class="hero-kicker">?쒕? ?쒖븞</div>
+        <h1 class="hero-title">?뺤콉?쇰줈 ?④만 ?쒖븞???곸뼱 二쇱꽭??</h1>
+        <p class="hero-lead">
+          ?쒕ぉ? 吏㏐퀬 紐낇솗?섍쾶, 蹂몃Ц? 臾몄젣? ?댁쑀, 湲곕??섎뒗 蹂?붾? 以묒떖?쇰줈 ?곸뼱 二쇱꽭??
+          ?묒닔???쒖븞? ?먮룞 遺꾨쪟???쒖슜?섏뼱 寃???먮쫫?쇰줈 ?댁뼱吏묐땲??
+        </p>
+        <div class="hero-meta">
+          <span class="badge badge-green">怨듦컻 ?묒닔</span>
+          <span class="badge badge-blue">?먮룞 遺꾨쪟</span>
+          <span class="badge">?좏깮 ?낅젰 ?뺣낫 ?ы븿</span>
+        </div>
+      </div>
 
-      <label>제안 내용 <span class="required">*</span></label>
-      <textarea id="body" placeholder="어떤 문제가 있고, 어떤 정책이 필요한지 설명해 주세요." maxlength="5000"></textarea>
-      <div class="char-count"><span id="bodyCount">0</span>/5000</div>
+      <div class="panel how-it-works">
+        <div class="eyebrow">How it works</div>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">?쒕ぉ??癒쇱? ?곸뒿?덈떎</div>
+            <div class="step-copy">??以꾨줈??異⑸텇?⑸땲?? 二쇱젣媛 諛붾줈 ?쏀엳???쒗쁽??醫뗭뒿?덈떎.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">???꾩슂?쒖? ?ㅻ챸?⑸땲??/div>
+            <div class="step-copy">臾몄젣, 諛곌꼍, 湲곕? ?④낵瑜?吏㏃? 臾몃떒?쇰줈 ?뺣━??二쇱꽭??</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-title">?좏깮 ?뺣낫???섏쨷??梨꾩썎?덈떎</div>
+            <div class="step-copy">?대쫫怨??대찓?쇱? ?좏깮 ?낅젰?낅땲?? 寃곌낵 ?뚮┝???꾩슂???뚮쭔 ?④꺼 二쇱꽭??</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      <label>이름 (선택, 익명 가능)</label>
-      <input type="text" id="authorName" placeholder="홍길동" maxlength="50">
+    <section class="proposal-layout reveal">
+      <aside class="panel guide-panel">
+        <div>
+          <div class="eyebrow">?묒꽦 媛?대뱶</div>
+          <h2>醫뗭? ?쒖븞? ?대젃寃??쏀옓?덈떎</h2>
+        </div>
+        <div class="guide-item">
+          <strong>臾댁뾿??諛붽씀?ㅻ뒗吏</strong>
+          <p>?뺤콉 ??곴낵 踰붿쐞瑜?癒쇱? ?곸뼱 二쇱꽭?? ?덈Т ?볦쑝硫?寃?좉? ?대젮?뚯쭛?덈떎.</p>
+        </div>
+        <div class="guide-item">
+          <strong>??吏湲??꾩슂?쒖?</strong>
+          <p>?꾩옱 臾몄젣? ?볦튂怨??덈뒗 ?먯쓣 媛꾨떒???ㅻ챸??二쇱꽭??</p>
+        </div>
+        <div class="guide-item">
+          <strong>臾댁뾿???щ씪吏?붿?</strong>
+          <p>?ㅽ뻾?섎㈃ ?쒕???泥닿컧??蹂?붾? ?쒕몢 臾몄옣?쇰줈 ?곸뼱 二쇱꽭??</p>
+        </div>
+        <div class="notice">
+          <strong>李멸퀬</strong>
+          ?묒닔 ?꾩뿉???쒖븞 踰덊샇媛 諛쒓툒?⑸땲?? 怨듦컻???뺣낫??遺꾨쪟? 寃???먮쫫???쒖슜?⑸땲??
+        </div>
+      </aside>
 
-      <label>이메일 (선택, 검토 결과 수신용)</label>
-      <input type="email" id="authorEmail" placeholder="example@email.com" maxlength="100">
+      <section class="panel form-panel" id="formCard">
+        <div>
+          <div class="eyebrow">Submission</div>
+          <h2>?쒖븞 ?묒꽦</h2>
+          <p class="form-intro">?꾨옒 ??ぉ留?梨꾩슦硫??묒닔媛 媛?ν빀?덈떎. ?낅젰??吏㏃븘??愿쒖갖吏留? 諛곌꼍 ?ㅻ챸? 援ъ껜?곸씪?섎줉 醫뗭뒿?덈떎.</p>
+        </div>
 
-      <p class="err" id="errMsg"></p>
-      <button class="btn btn-full" id="submitBtn" onclick="submitProposal()">제안 제출</button>
-    </div>
+        <div class="form-card">
+          <label for="title">?쒖븞 ?쒕ぉ <span class="required">*</span></label>
+          <input type="text" id="title" placeholder="?? ?숇꽕 怨듭썝 ?쇨컙 議곕챸 ?뺤땐" maxlength="200">
+          <div class="char-count"><span id="titleCount">0</span>/200</div>
 
-    <div class="success-box success" id="successMsg">
-      <p style="font-weight:700; margin-bottom:0.5rem;">제안이 접수되었습니다!</p>
+          <label for="body">?쒖븞 ?댁슜 <span class="required">*</span></label>
+          <textarea id="body" placeholder="?대뼡 臾몄젣媛 ?덈뒗吏, ???꾩슂?쒖?, ?대뼡 蹂?붽? 湲곕??섎뒗吏 ?곸뼱 二쇱꽭??" maxlength="5000"></textarea>
+          <div class="char-count"><span id="bodyCount">0</span>/5000</div>
+
+          <div class="field-grid two">
+            <div>
+              <label for="authorName">?대쫫 <span class="footnote">(?좏깮, ?듬챸 媛??</span></label>
+              <input type="text" id="authorName" placeholder="?좏깮 ?낅젰" maxlength="50">
+              <div class="field-help">寃곌낵 ?뚮┝???꾩슂?섏? ?딆쑝硫?鍮꾩썙 ?먯뀛???⑸땲??</div>
+            </div>
+            <div>
+              <label for="authorEmail">?대찓??<span class="footnote">(?좏깮, 寃곌낵 ?덈궡??</span></label>
+              <input type="email" id="authorEmail" placeholder="example@email.com" maxlength="100">
+              <div class="field-help">?묒닔 寃곌낵瑜?諛쏆븘蹂닿퀬 ?띠쓣 ?뚮쭔 ?낅젰??二쇱꽭??</div>
+            </div>
+          </div>
+
+          <p class="err" id="errMsg"></p>
+
+          <div class="submit-row">
+            <button class="btn btn-full" id="submitBtn" onclick="submitProposal()">?쒖븞 ?묒닔?섍린</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel success reveal" id="successMsg">
+      <strong>?쒖븞???묒닔?섏뿀?듬땲??</strong>
       <p id="successDetail"></p>
-      <button class="btn" style="margin-top:0.75rem;" onclick="resetForm()">새 제안 작성</button>
-    </div>
-  </div>
+      <button class="btn" style="margin-top: 0.9rem;" onclick="resetForm()">???쒖븞 ?곌린</button>
+    </section>
+  </main>
 
   <script>
     document.getElementById('title').addEventListener('input', function() {
       document.getElementById('titleCount').textContent = this.value.length;
     });
+
     document.getElementById('body').addEventListener('input', function() {
       document.getElementById('bodyCount').textContent = this.value.length;
     });
@@ -61,8 +339,18 @@
       const body = document.getElementById('body').value.trim();
       const errEl = document.getElementById('errMsg');
 
-      if (!title) { errEl.textContent = '제목을 입력해 주세요.'; errEl.style.display = 'block'; return; }
-      if (body.length < 10) { errEl.textContent = '내용을 10자 이�� 입력해 주세요.'; errEl.style.display = 'block'; return; }
+      if (!title) {
+        errEl.textContent = '?쒕ぉ???낅젰??二쇱꽭??';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      if (body.length < 10) {
+        errEl.textContent = '?댁슜? 10???댁긽 ?낅젰??二쇱꽭??';
+        errEl.style.display = 'block';
+        return;
+      }
+
       errEl.style.display = 'none';
 
       const btn = document.getElementById('submitBtn');
@@ -80,16 +368,16 @@
           }),
         });
 
-        if (!r.ok) throw new Error('제출 실패 (' + r.status + ')');
+        if (!r.ok) throw new Error('?쒖텧 ?ㅽ뙣 (' + r.status + ')');
         const data = await r.json();
 
         document.getElementById('formCard').style.display = 'none';
         const successEl = document.getElementById('successMsg');
         document.getElementById('successDetail').textContent =
-          '제안 번호: #' + data.proposal_id + ' | 자동 분류: ' + data.classified_topic;
+          '?쒖븞 踰덊샇 #' + data.proposal_id + ' | ?먮룞 遺꾨쪟: ' + data.classified_topic;
         successEl.style.display = 'block';
       } catch (e) {
-        errEl.textContent = '오류: ' + (e.message || String(e));
+        errEl.textContent = '?ㅻ쪟: ' + (e.message || String(e));
         errEl.style.display = 'block';
       } finally {
         btn.disabled = false;
@@ -97,10 +385,12 @@
     }
 
     function resetForm() {
-      document.getElementById('formCard').style.display = 'block';
+      document.getElementById('formCard').style.display = 'grid';
       document.getElementById('successMsg').style.display = 'none';
       document.getElementById('title').value = '';
       document.getElementById('body').value = '';
+      document.getElementById('authorName').value = '';
+      document.getElementById('authorEmail').value = '';
       document.getElementById('titleCount').textContent = '0';
       document.getElementById('bodyCount').textContent = '0';
     }

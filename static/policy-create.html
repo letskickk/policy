@@ -3,131 +3,457 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>정책 생성 - 개혁신당</title>
+  <title>정책 초안 생성 - 정책 랩</title>
   <link rel="stylesheet" href="/static/css/common.css">
   <style>
-    /* Layout */
-    .layout { display: grid; grid-template-columns: 340px 1fr; gap: 1.5rem; }
-    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
-    textarea { min-height: 60px; }
-    .btn-generate { width: 100%; margin-top: 1rem; }
-
-    /* Result */
-    .result-area { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 12px; min-height: 200px; max-height: 600px; overflow-y: auto; }
-    .loading-spinner { color: #94a3b8; font-size: 0.9rem; }
-    .err { color: #fca5a5; margin-top: 0.5rem; }
-
-    /* Research panel */
-    .research-item { padding: 0.4rem 0; border-bottom: 1px solid rgba(148,163,184,0.08); font-size: 0.85rem; }
-    .research-item:last-child { border-bottom: none; }
-    .tag { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-right: 0.3rem; }
+    .page-shell { padding-bottom: 6rem; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .topbar .links { margin: 0; }
+    .hero {
+      padding: 1.5rem 0 0.5rem;
+      margin-bottom: 1.25rem;
+      animation: fadeUp 420ms ease-out both;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 114, 16, 0.16);
+      color: var(--brand-light);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 0 6px rgba(255, 114, 16, 0.12);
+    }
+    .hero h1 {
+      margin-top: 0.8rem;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      max-width: 12ch;
+    }
+    .hero p {
+      margin-top: 0.8rem;
+      max-width: 60ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .hero-meta .badge { background: rgba(255,255,255,0.08); color: var(--muted); }
+    .badge-orange { background: rgba(255,114,16,0.16); color: #ffb37a; }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.35fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .panel-header {
+      padding: 1.2rem 1.25rem 0;
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .panel-header h2 { margin-bottom: 0.35rem; }
+    .panel-header p {
+      color: var(--muted2);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      max-width: 42ch;
+    }
+    .panel-body { padding: 1.25rem; }
+    .field { margin-top: 1rem; }
+    .field:first-child { margin-top: 0; }
+    .field label { margin-top: 0; font-size: 0.82rem; letter-spacing: 0.01em; }
+    .field-hint {
+      margin-top: 0.35rem;
+      color: var(--muted3);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    textarea { min-height: 92px; }
+    .btn-generate { width: 100%; margin-top: 1.25rem; }
+    .result-area {
+      white-space: pre-wrap;
+      font-size: 0.96rem;
+      line-height: 1.75;
+      padding: 1rem 1.05rem;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(148,163,184,0.14);
+      border-radius: 14px;
+      min-height: 260px;
+      max-height: 600px;
+      overflow-y: auto;
+      color: var(--text);
+    }
+    .result-empty {
+      color: var(--muted2);
+      font-size: 0.92rem;
+    }
+    .loading-spinner {
+      color: var(--muted2);
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+    .err {
+      color: #fecaca;
+      margin-top: 0.7rem;
+      font-size: 0.92rem;
+    }
+    .section-title {
+      margin: 0 0 0.7rem;
+      font-size: 0.82rem;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+    }
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .summary-chip {
+      padding: 0.8rem 0.9rem;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(148,163,184,0.12);
+    }
+    .summary-chip strong {
+      display: block;
+      font-size: 1.05rem;
+      color: var(--text-strong);
+      margin-bottom: 0.2rem;
+    }
+    .summary-chip span {
+      color: var(--muted2);
+      font-size: 0.8rem;
+    }
+    .research-panel {
+      margin-top: 1rem;
+      border-top: 1px solid rgba(148,163,184,0.12);
+      padding-top: 1rem;
+    }
+    .research-list {
+      display: grid;
+      gap: 0.6rem;
+      margin-top: 0.75rem;
+    }
+    .research-item {
+      padding: 0.7rem 0.85rem;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.1);
+      background: rgba(255,255,255,0.04);
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+    .research-item:last-child { border-bottom: 0; }
+    .research-item .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      margin-right: 0.45rem;
+    }
     .tag-blue { background: rgba(96,165,250,0.2); color: #93c5fd; }
     .tag-green { background: rgba(74,222,128,0.2); color: #86efac; }
-    .tag-gray { background: rgba(148,163,184,0.15); color: #94a3b8; }
-
-    /* Actions bar */
-    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
-    .actions .btn { width: auto; flex: 1; min-width: 120px; }
-
-    /* Chatbot */
-    .chat-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000; }
-    .chat-toggle { width: 56px; height: 56px; border-radius: 50%; background: #ff7210; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-    .chat-toggle:hover { background: #e5650e; }
-    .chat-box { display: none; width: 360px; max-height: 500px; background: rgba(7,48,83,0.97); border: 1px solid rgba(148,163,184,0.25); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); margin-bottom: 0.75rem; overflow: hidden; }
+    .tag-gray { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+    .actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .actions .btn {
+      flex: 1;
+      min-width: 130px;
+    }
+    .chat-container {
+      position: fixed;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .chat-toggle {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      font-size: 1.15rem;
+      font-weight: 900;
+      box-shadow: 0 16px 30px rgba(0,0,0,0.32);
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .chat-toggle:hover { background: var(--brand-hover); transform: translateY(-1px); }
+    .chat-box {
+      display: none;
+      width: min(380px, calc(100vw - 2rem));
+      max-height: 560px;
+      margin-bottom: 0.75rem;
+      border-radius: 18px;
+      background: rgba(7, 48, 83, 0.98);
+      border: 1px solid rgba(148,163,184,0.2);
+      box-shadow: 0 24px 50px rgba(0,0,0,0.42);
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
     .chat-box.open { display: flex; flex-direction: column; }
-    @media (max-width: 480px) { .chat-box { width: calc(100vw - 2rem); right: 0; } }
-    .chat-header { padding: 0.75rem 1rem; background: rgba(255,255,255,0.06); font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid rgba(148,163,184,0.15); display: flex; justify-content: space-between; align-items: center; }
-    .chat-header button { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; }
-    .chat-messages { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; max-height: 340px; min-height: 200px; }
-    .chat-msg { margin-bottom: 0.75rem; font-size: 0.85rem; line-height: 1.5; }
+    .chat-header {
+      padding: 0.9rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(148,163,184,0.14);
+      background: rgba(255,255,255,0.05);
+      font-weight: 800;
+    }
+    .chat-header button {
+      border: none;
+      background: transparent;
+      color: var(--muted2);
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.85rem 0.95rem;
+      min-height: 220px;
+      max-height: 360px;
+    }
+    .chat-msg { margin-bottom: 0.75rem; font-size: 0.86rem; line-height: 1.55; }
     .chat-msg.user { text-align: right; }
-    .chat-msg .bubble { display: inline-block; padding: 0.5rem 0.75rem; border-radius: 12px; max-width: 85%; }
-    .chat-msg.user .bubble { background: rgba(255,114,16,0.25); }
+    .chat-msg .bubble {
+      display: inline-block;
+      max-width: 88%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 14px;
+    }
+    .chat-msg.user .bubble { background: rgba(255,114,16,0.2); }
     .chat-msg.bot .bubble { background: rgba(255,255,255,0.08); }
-    .chat-input { display: flex; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid rgba(148,163,184,0.15); }
-    .chat-input input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(148,163,184,0.25); color: #e2e8f0; padding: 0.5rem; border-radius: 8px; font-size: 0.85rem; }
-    .chat-input button { background: #ff7210; color: #fff; border: none; padding: 0.5rem 0.75rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+    .chat-input {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.8rem;
+      border-top: 1px solid rgba(148,163,184,0.14);
+    }
+    .chat-input input {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 10px;
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+    }
+    .chat-input button {
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.6rem 0.8rem;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 980px) {
+      .workspace { grid-template-columns: 1fr; }
+      .summary-strip { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .panel-header, .panel-body { padding-left: 1rem; padding-right: 1rem; }
+      .chat-container { right: 0.75rem; bottom: 0.75rem; }
+      .actions .btn { min-width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap-lg">
-    <div class="links" style="margin-bottom:1rem;">
-      <a href="/admin">← 관리자</a>
-      <a href="/admin/issue-radar">이슈 레이더</a>
-      <a href="/admin/policy-ssot">정책 SSOT</a>
+  <div class="wrap-xl page-shell">
+    <div class="topbar">
+      <div class="links">
+        <a href="/admin">관리자 홈</a>
+        <a href="/admin/issue-radar">이슈 레이더</a>
+        <a href="/admin/policy-ssot">정책 SSOT</a>
+      </div>
+      <span class="badge badge-orange">AI 드래프터</span>
     </div>
-    <h1>정책 생성</h1>
-    <p class="subtitle">주제와 지역을 입력하면 AI가 정책 초안을 생성합니다</p>
 
-    <div class="layout">
-      <!-- Left: Input form -->
-      <div>
-        <div class="card">
-          <h2>입력</h2>
-          <label>정책 주제</label>
-          <input type="text" id="topic" placeholder="예: 청년 주거 안정">
+    <section class="hero">
+      <span class="eyebrow">policy create</span>
+      <h1>정책 초안을 빠르게 잡고, 근거까지 함께 확인합니다.</h1>
+      <p>주제를 입력하면 AI가 초안 문서를 만들고, 관련 SSOT와 참고 근거를 함께 보여줍니다. 오른쪽에는 결과를, 왼쪽에는 조건을 두어 작업 흐름을 한눈에 읽히게 했습니다.</p>
+      <div class="hero-meta">
+        <span class="badge badge-blue">초안 생성</span>
+        <span class="badge badge-green">근거 패널</span>
+        <span class="badge badge-purple">챗봇 도움말</span>
+      </div>
+    </section>
 
-          <label>출력 형식</label>
-          <select id="outputFormat">
-            <option value="정책포지션">정책 포지션</option>
-            <option value="지역공약">지역 공약</option>
-            <option value="입법취지서">입법 취지서</option>
-          </select>
-
-          <label>지역 (선택)</label>
-          <input type="text" id="region" placeholder="예: 마포구">
-
-          <label>선거유형 (선택)</label>
-          <select id="electionType">
-            <option value="">선택 안 함</option>
-            <option value="광역단체장">광역단체장</option>
-            <option value="기초단체장">기초단체장</option>
-            <option value="광역의원">광역의원</option>
-            <option value="기초의원">기초의원</option>
-            <option value="교육감">교육감</option>
-          </select>
-
-          <button class="btn" id="generateBtn" onclick="generateDraft()">초안 생성</button>
+    <section class="workspace">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>입력</h2>
+            <p>짧고 명확하게 넣을수록 초안 품질이 좋아집니다. 지역, 선거 유형, 출력 형식은 필요할 때만 채워도 됩니다.</p>
+          </div>
         </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="topic">정책 주제</label>
+            <input type="text" id="topic" placeholder="예: 청년 주거 지원, 지역 돌봄 강화">
+            <div class="field-hint">핵심 이슈 한 줄이면 충분합니다.</div>
+          </div>
 
-        <!-- Research panel -->
-        <div class="card" id="researchPanel" style="display:none;">
-          <h2>리서치 결과</h2>
-          <div id="researchContent"></div>
+          <div class="field">
+            <label for="outputFormat">출력 형식</label>
+            <select id="outputFormat">
+              <option value="정책 제안서">정책 제안서</option>
+              <option value="지역 공약">지역 공약</option>
+              <option value="선거용 발표문">선거용 발표문</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="region">지역</label>
+            <input type="text" id="region" placeholder="예: 서울, 부산, 경기">
+            <div class="field-hint">선택 입력입니다. 지역성이 있는 주제에만 채워도 됩니다.</div>
+          </div>
+
+          <div class="field">
+            <label for="district">세부 지역</label>
+            <input type="text" id="district" placeholder="예: 강남구, 해운대구">
+            <div class="field-hint">URL 프리필과 저장 흐름을 위해 남겨둔 보조 필드입니다.</div>
+          </div>
+
+          <div class="field">
+            <label for="electionType">선거 유형</label>
+            <select id="electionType">
+              <option value="">선택 안 함</option>
+              <option value="광역자치단체장">광역자치단체장</option>
+              <option value="기초자치단체장">기초자치단체장</option>
+              <option value="광역의원">광역의원</option>
+              <option value="기초의원">기초의원</option>
+              <option value="교육감">교육감</option>
+            </select>
+          </div>
+
+          <button class="btn btn-generate" id="generateBtn" onclick="generateDraft()">초안 생성</button>
         </div>
       </div>
 
-      <!-- Right: Output -->
       <div>
-        <div class="card">
-          <h2>생성된 초안</h2>
-          <p class="loading-spinner" id="loadingMsg" style="display:none;">초안을 생성하고 있습니다...</p>
-          <p class="err" id="errMsg" style="display:none;"></p>
-          <div class="result-area" id="resultArea">주제를 입력하고 "초안 생성" 버튼을 누르세요.</div>
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>결과</h2>
+              <p>생성된 초안과 참고 근거를 같은 화면에서 바로 비교할 수 있습니다.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <p class="loading-spinner" id="loadingMsg" style="display:none;">초안을 생성하고 있습니다...</p>
+            <p class="err" id="errMsg" style="display:none;"></p>
+            <div class="result-area" id="resultArea"><span class="result-empty">주제를 입력하고 초안 생성 버튼을 누르면 결과가 표시됩니다.</span></div>
 
-          <div class="actions" id="actionBar" style="display:none;">
-            <button class="btn btn-green" onclick="saveDraft()">초안 저장 (draft)</button>
-            <button class="btn btn-secondary" onclick="copyDraft()">복사</button>
-            <button class="btn btn-secondary" onclick="generateDraft()">재생성</button>
+            <div class="actions" id="actionBar" style="display:none;">
+              <button class="btn btn-green" onclick="saveDraft()">초안 저장</button>
+              <button class="btn btn-secondary" onclick="copyDraft()">복사</button>
+              <button class="btn btn-secondary" onclick="generateDraft()">다시 생성</button>
+            </div>
+
+            <div class="research-panel" id="researchPanel" style="display:none;">
+              <div class="section-title">참고 근거</div>
+              <div id="researchContent"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:1rem;">
+          <div class="panel-header">
+            <div>
+              <h2>작업 안내</h2>
+              <p>초안, 저장, 챗봇이 한 흐름으로 이어지도록 구성했습니다. 필요한 순간에만 참고하면 됩니다.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="summary-strip">
+              <div class="summary-chip"><strong>1. 주제 입력</strong><span>핵심 이슈를 짧게 적습니다.</span></div>
+              <div class="summary-chip"><strong>2. 초안 생성</strong><span>AI가 정책 구조를 만들고 분류합니다.</span></div>
+              <div class="summary-chip"><strong>3. 저장 또는 복사</strong><span>결과를 바로 다음 작업으로 넘깁니다.</span></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 
-  <!-- Chatbot widget -->
   <div class="chat-container">
-    <div class="chat-box" id="chatBox">
+    <div class="chat-box" id="chatBox" aria-live="polite">
       <div class="chat-header">
         <span>정책 챗봇</span>
-        <button onclick="toggleChat()">X</button>
+        <button type="button" onclick="toggleChat()" aria-label="챗봇 닫기">×</button>
       </div>
       <div class="chat-messages" id="chatMessages">
-        <div class="chat-msg bot"><div class="bubble">안녕하세요! 개혁신당 정책에 대해 궁금한 점을 물어보세요.</div></div>
+        <div class="chat-msg bot"><div class="bubble">안녕하세요. 정책 초안 작성에서 헷갈리는 점을 물어보세요.</div></div>
       </div>
       <div class="chat-input">
-        <input type="text" id="chatInput" placeholder="질문을 입력하세요" onkeydown="if(event.key==='Enter')sendChat()">
-        <button onclick="sendChat()">전송</button>
+        <label class="sr-only" for="chatInput">질문 입력</label>
+        <input type="text" id="chatInput" placeholder="예: 출력 형식은 어떻게 고르나요?" onkeydown="if(event.key==='Enter')sendChat()">
+        <button type="button" onclick="sendChat()">전송</button>
       </div>
     </div>
     <button class="chat-toggle" onclick="toggleChat()" title="정책 챗봇">?</button>
@@ -135,31 +461,30 @@
 
   <script>
     function escapeHtml(s) {
-      return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+      return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
     }
 
     let _lastDraftText = '';
     let _lastResearch = null;
 
-    // Phase 5: URL 파라미터로 폼 프리필 (출마자 셀프서비스)
     (function prefillFromUrl() {
       const p = new URLSearchParams(location.search);
-      if (p.get('format')) {
-        const fmt = document.getElementById('outputFormat');
-        if (fmt) { for (const opt of fmt.options) { if (opt.value === p.get('format')) { fmt.value = p.get('format'); break; } } }
+      const fields = ['format', 'election_type', 'region', 'district', 'topic'];
+      for (const key of fields) {
+        const value = p.get(key);
+        if (!value) continue;
+        const id = key === 'format' ? 'outputFormat' : key;
+        const el = document.getElementById(id);
+        if (el) el.value = value;
       }
-      if (p.get('election_type')) {
-        const el = document.getElementById('electionType');
-        if (el) { for (const opt of el.options) { if (opt.value === p.get('election_type')) { el.value = p.get('election_type'); break; } } }
-      }
-      if (p.get('region')) { const el = document.getElementById('region'); if (el) el.value = p.get('region'); }
-      if (p.get('district')) { const el = document.getElementById('district'); if (el) el.value = p.get('district'); }
-      if (p.get('topic')) { const el = document.getElementById('topic'); if (el) el.value = p.get('topic'); }
     })();
 
     async function generateDraft() {
       const topic = document.getElementById('topic').value.trim();
-      if (!topic) { alert('정책 주제를 입력하세요.'); return; }
+      if (!topic) {
+        alert('정책 주제를 입력해 주세요.');
+        return;
+      }
 
       const btn = document.getElementById('generateBtn');
       const loadingEl = document.getElementById('loadingMsg');
@@ -171,7 +496,7 @@
       loadingEl.style.display = 'block';
       errEl.style.display = 'none';
       actionBar.style.display = 'none';
-      resultEl.textContent = '';
+      resultEl.innerHTML = '<span class="result-empty">초안을 생성하는 중입니다...</span>';
 
       try {
         const body = {
@@ -189,25 +514,30 @@
           body: JSON.stringify(body),
         });
 
-        if (r.status === 401) { window.location.href = '/login?next=' + encodeURIComponent(location.pathname); return; }
-        if (!r.ok) { throw new Error('서버 오류 (' + r.status + ')'); }
+        if (r.status === 401) {
+          window.location.href = '/login?next=' + encodeURIComponent(location.pathname);
+          return;
+        }
+        if (!r.ok) {
+          throw new Error('서버 오류 (' + r.status + ')');
+        }
 
         const data = await r.json();
-
         if (data.error) {
-          errEl.textContent = data.draft_text || '오류가 발생했습니다.';
+          errEl.textContent = data.draft_text || '초안 생성 중 오류가 발생했습니다.';
           errEl.style.display = 'block';
           return;
         }
 
-        _lastDraftText = data.draft_text;
-        _lastResearch = data.research;
-        resultEl.textContent = data.draft_text;
+        _lastDraftText = data.draft_text || '';
+        _lastResearch = data.research || null;
+        resultEl.textContent = _lastDraftText || '생성된 초안이 없습니다.';
         actionBar.style.display = 'flex';
 
-        // Show research panel
-        if (data.research && data.research.ssot) {
-          renderResearch(data.research);
+        if (_lastResearch && _lastResearch.ssot) {
+          renderResearch(_lastResearch);
+        } else {
+          document.getElementById('researchPanel').style.display = 'none';
         }
       } catch (e) {
         errEl.textContent = '오류: ' + (e.message || String(e));
@@ -221,46 +551,53 @@
     function renderResearch(research) {
       const panel = document.getElementById('researchPanel');
       const content = document.getElementById('researchContent');
+      const positions = (research.ssot || {}).related_positions || [];
+      const docs = (research.ssot || {}).related_documents || [];
       let html = '';
 
-      html += '<h3>분류: ' + escapeHtml(research.classified_topic) + '</h3>';
+      html += '<div class="summary-strip" style="margin-bottom:0.9rem;">';
+      html += '<div class="summary-chip"><strong>분류</strong><span>' + escapeHtml(research.classified_topic || '미분류') + '</span></div>';
+      html += '<div class="summary-chip"><strong>참고 공약</strong><span>' + positions.length + '건</span></div>';
+      html += '<div class="summary-chip"><strong>참고 문서</strong><span>' + docs.length + '건</span></div>';
+      html += '</div>';
 
-      // Positions
-      const positions = (research.ssot || {}).related_positions || [];
+      html += '<div class="research-list">';
       if (positions.length > 0) {
-        html += '<h3>기존 포지션 ' + positions.length + '건</h3>';
-        for (const p of positions) {
-          html += '<div class="research-item"><span class="tag tag-green">포지션</span>' + escapeHtml(p.title) + '</div>';
+        for (const item of positions) {
+          html += '<div class="research-item"><span class="tag tag-green">공약</span>' + escapeHtml(item.title) + '</div>';
         }
       } else {
-        html += '<div class="research-item" style="color:#fca5a5;">관련 포지션 없음 (정책 사각지대)</div>';
+        html += '<div class="research-item">관련 공약이 아직 없습니다. 이 주제는 새 초안 기준점이 될 수 있습니다.</div>';
       }
 
-      // Documents
-      const docs = (research.ssot || {}).related_documents || [];
       if (docs.length > 0) {
-        html += '<h3>관련 문서 ' + docs.length + '건</h3>';
-        for (const d of docs.slice(0, 8)) {
-          html += '<div class="research-item"><span class="tag tag-blue">' + escapeHtml(d.doc_type) + '</span>' + escapeHtml(d.title) + '</div>';
+        for (const doc of docs.slice(0, 8)) {
+          html += '<div class="research-item"><span class="tag tag-blue">' + escapeHtml(doc.doc_type || '문서') + '</span>' + escapeHtml(doc.title || '제목 없음') + '</div>';
         }
+      } else {
+        html += '<div class="research-item">참고 문서가 부족합니다.</div>';
       }
 
-      // Assembly
       if (research.assembly) {
-        html += '<h3>지방의회</h3>';
-        html += '<div class="research-item"><span class="tag tag-gray">' +
-          (research.assembly.available ? research.assembly.result_count + '건' : '미연동') +
-          '</span>' + (research.assembly.available ? '데이터 확인됨' : 'API 키 미설정') + '</div>';
+        html += '<div class="research-item"><span class="tag tag-gray">국회</span>';
+        html += research.assembly.available
+          ? '검색 결과 ' + escapeHtml(String(research.assembly.result_count || 0)) + '건을 불러왔습니다.'
+          : '국회 API를 사용할 수 없습니다.';
+        html += '</div>';
       }
+      html += '</div>';
 
       content.innerHTML = html;
       panel.style.display = 'block';
     }
 
     async function saveDraft() {
-      if (!_lastDraftText) { alert('저장할 초안이 없습니다.'); return; }
+      if (!_lastDraftText) {
+        alert('저장할 초안이 없습니다.');
+        return;
+      }
 
-      const title = prompt('정책 제목을 입력하세요:', document.getElementById('topic').value);
+      const title = prompt('저장할 초안 제목을 입력해 주세요.', document.getElementById('topic').value);
       if (!title) return;
 
       try {
@@ -279,19 +616,17 @@
 
         if (!r.ok) throw new Error('저장 실패');
         const data = await r.json();
-        alert('초안이 저장되었습니다. (ID: ' + data.position_id + ')\n정책 SSOT에서 확인할 수 있습니다.');
+        alert('초안이 저장되었습니다. (ID: ' + data.position_id + ')');
       } catch (e) {
         alert('저장 오류: ' + (e.message || String(e)));
       }
     }
 
     function copyDraft() {
-      if (_lastDraftText) {
-        navigator.clipboard.writeText(_lastDraftText).then(() => alert('복사되었습니다.'));
-      }
+      if (!_lastDraftText) return;
+      navigator.clipboard.writeText(_lastDraftText).then(() => alert('초안을 복사했습니다.'));
     }
 
-    // ── Chatbot ──
     function toggleChat() {
       document.getElementById('chatBox').classList.toggle('open');
     }
@@ -317,8 +652,9 @@
         const answer = data.answer || '답변을 생성하지 못했습니다.';
         messages.innerHTML += '<div class="chat-msg bot"><div class="bubble">' + escapeHtml(answer) + '</div></div>';
       } catch (e) {
-        messages.innerHTML += '<div class="chat-msg bot"><div class="bubble" style="color:#fca5a5;">오류가 발생했습니다.</div></div>';
+        messages.innerHTML += '<div class="chat-msg bot"><div class="bubble" style="color:#fecaca;">오류가 발생했습니다.</div></div>';
       }
+
       messages.scrollTop = messages.scrollHeight;
     }
   </script>
