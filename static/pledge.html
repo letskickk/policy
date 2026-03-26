@@ -987,24 +987,26 @@
       }
       .site-footer{
         display: grid !important;
-        grid-template-columns: 1fr auto;
-        align-items: center !important;
-        gap: 0.5rem;
+        grid-template-columns: 1fr;
+        align-items: stretch !important;
+        gap: 0.45rem;
         padding-top: 0.2rem;
         padding-bottom: 0.15rem;
       }
       .site-footer .footer-left{
-        width: auto;
-        justify-content: flex-start;
+        width: 100%;
+        justify-content: center;
         flex-wrap: wrap;
-        text-align: left;
+        text-align: center;
         gap: 0.35rem;
         min-width: 0;
       }
       .site-footer .footer-right{
-        width: auto;
+        width: 100%;
         margin-left: 0;
-        justify-self: end;
+        justify-self: stretch;
+        display: flex;
+        justify-content: center;
       }
       .site-footer .footer-right button{
         min-height: 38px;
