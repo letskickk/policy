@@ -338,6 +338,44 @@ def send_proposal_confirmation(to_email: str, proposal_id: int, title: str, body
         return False
 
 
+def send_contact_email(sender_name: str, sender_email: str, message: str) -> bool:
+    """문의하기 폼에서 전송된 메시지를 관리자에게 발송."""
+    if not SMTP_HOST or not SMTP_USER or not ADMIN_NOTIFY_EMAIL:
+        logger.warning("SMTP 또는 ADMIN_NOTIFY_EMAIL 미설정. 문의 메일 건너뜀.")
+        return False
+
+    display = sender_name or "익명"
+    subject = f"[정책멘토링] 문의: {display} ({sender_email})"
+    body = f"""홈페이지에서 문의가 접수되었습니다.
+
+이름: {display}
+이메일: {sender_email}
+
+[문의 내용]
+{message[:3000]}{"..." if len(message) > 3000 else ""}
+
+---
+이 메일에 직접 회신하면 문의자({sender_email})에게 답장됩니다.
+"""
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = ADMIN_NOTIFY_EMAIL
+    msg["Reply-To"] = sender_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [ADMIN_NOTIFY_EMAIL], msg.as_string())
+        logger.info("문의 메일 발송: %s → %s", sender_email, ADMIN_NOTIFY_EMAIL)
+        return True
+    except Exception as e:
+        logger.exception("문의 메일 발송 실패: %s", e)
+        return False
+
+
 def send_proposal_admin_notification(proposal_id: int, title: str, body_text: str, author_name: str, classified_topic: str) -> bool:
     """새 시민 제안이 접수되면 관리자에게 알림."""
     if not SMTP_HOST or not SMTP_USER or not ADMIN_NOTIFY_EMAIL:

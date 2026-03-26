@@ -663,3 +663,87 @@ textarea::placeholder {
     flex-direction: column;
   }
 }
+
+/* ===== 공통 풋터 ===== */
+.site-footer{
+  margin-top: 2.5rem;
+  padding: 1.5rem 0 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.site-footer .footer-left{
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  color: rgba(203,213,225,0.55);
+}
+.site-footer .footer-org{
+  font-weight: 800;
+  color: rgba(203,213,225,0.75);
+  letter-spacing: 0.02em;
+}
+.site-footer .footer-dot{
+  color: rgba(255,255,255,0.15);
+}
+.site-footer .footer-right button{
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: rgba(203,213,225,0.45);
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.site-footer .footer-right button:hover{
+  color: rgba(203,213,225,0.75);
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+}
+
+/* ===== 문의 모달 ===== */
+.contact-overlay{
+  display:none; position:fixed; inset:0; z-index:9000;
+  background:rgba(0,0,0,1); backdrop-filter:blur(6px);
+  justify-content:center; align-items:center;
+}
+.contact-overlay.open{ display:flex; }
+.contact-modal{
+  background:#1e293b; border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px; padding:1.8rem; width:90%; max-width:420px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.contact-modal h3{ font-size:1.15rem; margin-bottom:0.2rem; }
+.contact-modal .sub{ font-size:0.82rem; color:var(--muted); margin-bottom:1.2rem; }
+.contact-modal label{
+  display:block; font-size:0.82rem; font-weight:700;
+  color:var(--muted); margin-bottom:0.25rem; margin-top:0.8rem;
+}
+.contact-modal input, .contact-modal textarea{
+  width:100%; padding:0.55rem 0.7rem; font-size:0.92rem;
+  background:rgba(255,255,255,0.04); border:1px solid var(--border);
+  border-radius:10px; color:var(--text-strong); outline:none;
+  transition:border-color 0.2s;
+}
+.contact-modal input:focus, .contact-modal textarea:focus{ border-color:var(--brand-light); }
+.contact-modal textarea{ resize:vertical; min-height:100px; }
+.contact-actions{
+  display:flex; gap:0.5rem; margin-top:1.2rem; justify-content:flex-end;
+}
+.contact-actions button{
+  padding:0.5rem 1.1rem; border-radius:10px; font-size:0.88rem;
+  font-weight:700; cursor:pointer; border:none;
+}
+.contact-btn-cancel{ background:rgba(255,255,255,0.06); color:var(--muted); }
+.contact-btn-send{ background:var(--brand-light); color:#fff; }
+.contact-btn-send:disabled{ opacity:0.5; cursor:not-allowed; }
+.contact-err{ color:#f87171; font-size:0.82rem; margin-top:0.5rem; display:none; }
+.contact-ok{ color:#4ade80; font-size:0.92rem; text-align:center; padding:2rem 0; }

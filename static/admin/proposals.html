@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제안 관리 - 정책 랩</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <style>
+    .page-shell { padding-bottom: 3rem; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .hero { margin: 0.5rem 0 1.25rem; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.25rem 0.7rem; border-radius: 999px;
+      background: rgba(168,85,247,0.16); color: #c4b5fd;
+      font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%;
+      background: #a855f7; box-shadow: 0 0 0 6px rgba(168,85,247,0.12);
+    }
+    .hero h1 { margin-top: 0.75rem; font-size: clamp(1.8rem, 3.5vw, 2.8rem); letter-spacing: -0.04em; line-height: 1.05; }
+    .hero p { margin-top: 0.6rem; color: var(--muted); font-size: 0.95rem; max-width: 52ch; line-height: 1.65; }
+    .stats-bar {
+      display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+    .stat-chip {
+      padding: 0.6rem 0.9rem; border-radius: 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.12);
+      font-size: 0.85rem;
+    }
+    .stat-chip strong { color: var(--text-strong); margin-right: 0.3rem; }
+    .stat-chip span { color: var(--muted2); }
+    .filter-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .filter-bar button {
+      padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid rgba(148,163,184,0.2);
+      background: rgba(255,255,255,0.06); color: var(--muted); font: inherit; font-size: 0.82rem;
+      font-weight: 700; cursor: pointer; transition: all 0.15s ease;
+    }
+    .filter-bar button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .proposal-list { display: grid; gap: 0.6rem; }
+    .proposal-card {
+      padding: 0.9rem 1rem; border-radius: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0.75rem; align-items: start;
+      cursor: pointer; transition: border-color 0.15s ease;
+    }
+    .proposal-card:hover { border-color: rgba(168,85,247,0.3); }
+    .proposal-card h3 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+    .proposal-card .meta { color: var(--muted2); font-size: 0.8rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .status-badge {
+      padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800;
+    }
+    .status-new { background: rgba(96,165,250,0.2); color: #93c5fd; }
+    .status-reviewing { background: rgba(250,204,21,0.2); color: #fde047; }
+    .status-adopted { background: rgba(74,222,128,0.2); color: #86efac; }
+    .status-archived { background: rgba(148,163,184,0.12); color: #64748b; }
+    .detail-panel {
+      display: none; position: fixed; top: 0; right: 0; width: min(520px, 100vw);
+      height: 100vh; background: var(--card); border-left: 1px solid var(--border);
+      z-index: 1000; overflow-y: auto; box-shadow: -16px 0 50px rgba(0,0,0,0.3);
+    }
+    .detail-panel.open { display: block; }
+    .detail-header {
+      position: sticky; top: 0; padding: 1rem 1.25rem;
+      background: rgba(15,23,42,0.95); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(8px);
+    }
+    .detail-header button { border: none; background: transparent; color: var(--muted2); font-size: 1.2rem; cursor: pointer; }
+    .detail-body { padding: 1.25rem; }
+    .detail-body h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .detail-body .content {
+      white-space: pre-wrap; font-size: 0.9rem; line-height: 1.7; color: var(--muted);
+      margin: 0.75rem 0; padding: 0.8rem; background: rgba(0,0,0,0.2); border-radius: 10px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+    .note-section { margin-top: 1rem; }
+    .note-section textarea { width: 100%; min-height: 60px; margin-top: 0.5rem; font: inherit; font-size: 0.88rem; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted2); font-size: 0.95rem; }
+    @media (max-width: 640px) {
+      .detail-panel { width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap-xl page-shell">
+    <div class="topbar">
+      <div class="links">
+        <a href="/admin">관리자 홈</a>
+        <a href="/policy-lab">정책 허브</a>
+        <a href="/admin/policy-review">리뷰 관리</a>
+      </div>
+      <span class="badge badge-purple">제안 관리</span>
+    </div>
+
+    <section class="hero">
+      <span class="eyebrow">citizen proposals</span>
+      <h1>시민 제안 관리</h1>
+      <p>시민이 제출한 정책 제안을 검토하고 상태를 관리합니다. 채택된 제안은 정책 생성 파이프라인으로 이어집니다.</p>
+    </section>
+
+    <div class="stats-bar" id="statsBar"></div>
+
+    <div class="filter-bar" id="filterBar">
+      <button class="active" data-status="">전체</button>
+      <button data-status="new">신규</button>
+      <button data-status="reviewing">검토중</button>
+      <button data-status="adopted">채택</button>
+      <button data-status="archived">보관</button>
+    </div>
+
+    <div class="proposal-list" id="proposalList">
+      <div class="empty-state">로딩 중...</div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <span>제안 상세</span>
+      <button onclick="closeDetail()">×</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
+
+    let _currentFilter = '';
+    let _allProposals = [];
+
+    document.querySelectorAll('#filterBar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filterBar button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _currentFilter = btn.dataset.status;
+        renderList();
+      });
+    });
+
+    async function loadProposals() {
+      try {
+        const r = await fetch('/api/policy/proposals', { credentials: 'include' });
+        if (!r.ok) throw new Error('Unauthorized');
+        _allProposals = await r.json();
+        renderStats();
+        renderList();
+      } catch (e) {
+        document.getElementById('proposalList').innerHTML = '<div class="empty-state">데이터를 불러올 수 없습니다. 관리자 로그인이 필요합니다.</div>';
+      }
+    }
+
+    function renderStats() {
+      const counts = { new: 0, reviewing: 0, adopted: 0, archived: 0 };
+      const topics = {};
+      for (const p of _allProposals) {
+        counts[p.status] = (counts[p.status] || 0) + 1;
+        topics[p.topic] = (topics[p.topic] || 0) + 1;
+      }
+      const topTopics = Object.entries(topics).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+      let html = '';
+      html += '<div class="stat-chip"><strong>' + _allProposals.length + '</strong><span>전체</span></div>';
+      html += '<div class="stat-chip"><strong>' + counts.new + '</strong><span>신규</span></div>';
+      html += '<div class="stat-chip"><strong>' + counts.reviewing + '</strong><span>검토중</span></div>';
+      html += '<div class="stat-chip"><strong>' + counts.adopted + '</strong><span>채택</span></div>';
+      if (topTopics.length) {
+        html += '<div class="stat-chip"><strong>주요 주제:</strong><span>' + topTopics.map(t => t[0] + '(' + t[1] + ')').join(', ') + '</span></div>';
+      }
+      document.getElementById('statsBar').innerHTML = html;
+    }
+
+    function renderList() {
+      const list = document.getElementById('proposalList');
+      const filtered = _currentFilter
+        ? _allProposals.filter(p => p.status === _currentFilter)
+        : _allProposals;
+
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty-state">해당 상태의 제안이 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = filtered.map(p => `
+        <div class="proposal-card" onclick="openDetail(${p.id})">
+          <div>
+            <h3>${escapeHtml(p.title)}</h3>
+            <div class="meta">
+              <span class="status-badge status-${p.status}">${p.status}</span>
+              <span>${escapeHtml(p.topic || '미분류')}</span>
+              <span>${escapeHtml(p.author_name || '익명')}</span>
+              <span>${(p.created_at || '').slice(0, 10)}</span>
+            </div>
+          </div>
+          <div style="color:var(--brand-light);font-weight:800;">→</div>
+        </div>
+      `).join('');
+    }
+
+    function openDetail(id) {
+      const p = _allProposals.find(x => x.id === id);
+      if (!p) return;
+
+      const panel = document.getElementById('detailPanel');
+      const body = document.getElementById('detailBody');
+      panel.classList.add('open');
+
+      let html = '';
+      html += '<h2>' + escapeHtml(p.title) + '</h2>';
+      html += '<div class="meta" style="margin-bottom:0.5rem;">';
+      html += '<span class="status-badge status-' + p.status + '">' + p.status + '</span> ';
+      html += '<span style="color:var(--muted2);font-size:0.82rem;">' + escapeHtml(p.topic || '미분류') + ' · ' + escapeHtml(p.author_name || '익명') + ' · ' + (p.created_at || '').slice(0, 16) + '</span>';
+      html += '</div>';
+      if (p.author_email) html += '<p style="color:var(--muted3);font-size:0.82rem;">' + escapeHtml(p.author_email) + '</p>';
+      html += '<div class="content">' + escapeHtml(p.body) + '</div>';
+
+      if (p.review_note) {
+        html += '<div style="padding:0.6rem 0.75rem;border-radius:10px;background:rgba(74,222,128,0.08);font-size:0.88rem;margin-bottom:0.75rem;">';
+        html += '<strong style="font-size:0.78rem;color:var(--muted2);">검토 메모:</strong><br>' + escapeHtml(p.review_note);
+        html += '</div>';
+      }
+
+      html += '<div class="detail-actions">';
+      if (p.status === 'new') {
+        html += '<button class="btn btn-sm" onclick="changeStatus(' + id + ',\'reviewing\')">검토 시작</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'archived\')">보관</button>';
+      }
+      if (p.status === 'reviewing') {
+        html += '<button class="btn btn-green btn-sm" onclick="changeStatus(' + id + ',\'adopted\')">채택</button>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'archived\')">보관</button>';
+      }
+      if (p.status === 'archived') {
+        html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'new\')">신규로 복원</button>';
+      }
+      if (p.status === 'adopted') {
+        html += '<a href="/policy-create?topic=' + encodeURIComponent(p.title) + '&detail=' + encodeURIComponent(p.body.substring(0, 500)) + '" class="btn btn-sm">AI 초안 생성</a>';
+      }
+      html += '</div>';
+
+      html += '<div class="note-section">';
+      html += '<label style="font-size:0.82rem;color:var(--muted2);">검토 메모</label>';
+      html += '<textarea id="reviewNote" placeholder="상태 변경 시 함께 기록됩니다.">' + escapeHtml(p.review_note || '') + '</textarea>';
+      html += '</div>';
+
+      body.innerHTML = html;
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPanel').classList.remove('open');
+    }
+
+    async function changeStatus(id, newStatus) {
+      const noteEl = document.getElementById('reviewNote');
+      const note = noteEl ? noteEl.value.trim() : '';
+
+      try {
+        const r = await fetch('/api/policy/proposals/' + id + '/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ status: newStatus, review_note: note }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          alert(d.detail || '상태 변경 실패');
+          return;
+        }
+        await loadProposals();
+        openDetail(id);
+      } catch (e) {
+        alert('오류: ' + e.message);
+      }
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+    loadProposals();
+  </script>
+</body>
+</html>

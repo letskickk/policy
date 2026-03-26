@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 정책 도구 - 개혁신당</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <style>
+    .tools-shell {
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .back-link {
+      color: var(--brand-light);
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    .profile-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .hero-panel {
+      padding: 1.9rem;
+    }
+
+    .hero-kicker {
+      color: var(--brand-light);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .hero-title {
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 1.1;
+      max-width: 16ch;
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-lead {
+      max-width: 58ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    .form-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .form-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .guide-side {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .guide-text {
+      color: var(--muted2);
+      font-size: 0.92rem;
+      line-height: 1.65;
+      word-break: keep-all;
+    }
+
+    .guide-text strong {
+      display: block;
+      color: var(--text-strong);
+      margin-bottom: 0.15rem;
+    }
+
+    .format-guide {
+      min-height: 3.2rem;
+    }
+
+    .result-area {
+      display: none;
+    }
+
+    .result-content {
+      white-space: pre-wrap;
+      word-break: keep-all;
+      line-height: 1.75;
+      color: var(--text-strong);
+      font-size: 0.97rem;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 0.8rem;
+    }
+
+    .loading-msg {
+      display: none;
+      color: var(--muted);
+      font-size: 0.93rem;
+      padding: 1rem 0;
+    }
+
+    .loading-msg::before {
+      content: '';
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--muted3);
+      border-top-color: var(--brand-light);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .history-section {
+      display: none;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.7rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .history-item:last-child { border-bottom: none; }
+
+    .history-topic {
+      font-size: 0.93rem;
+      color: var(--text-strong);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .history-meta {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--muted3);
+      white-space: nowrap;
+    }
+
+    .char-count {
+      text-align: right;
+      font-size: 0.78rem;
+      color: var(--muted3);
+      margin-top: 0.2rem;
+    }
+
+    @media (max-width: 720px) {
+      .form-layout {
+        grid-template-columns: 1fr;
+      }
+      .guide-side { order: -1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell tools-shell">
+    <!-- 상단 바 -->
+    <div class="topbar">
+      <a href="/" class="back-link">← 홈으로</a>
+      <div class="profile-bar" id="profileBar"></div>
+    </div>
+
+    <!-- 히어로 -->
+    <section class="panel hero-panel reveal">
+      <div class="hero-kicker">AI Policy Tools</div>
+      <h1 class="hero-title">AI로 정책 콘텐츠를 직접 만드세요.</h1>
+      <p class="hero-lead">
+        주제와 형식만 입력하면 지역·선거유형에 맞는 정책포지션, 지역공약, 논평, 메시지를 자동 생성합니다.
+      </p>
+    </section>
+
+    <!-- 폼 + 가이드 -->
+    <section class="form-layout reveal">
+      <div class="panel form-panel" id="formPanel">
+        <div>
+          <div class="eyebrow">Generate</div>
+          <h2>콘텐츠 생성</h2>
+        </div>
+
+        <div>
+          <label for="outputFormat">출력 형식 <span class="required">*</span></label>
+          <select id="outputFormat">
+            <option value="정책포지션">정책포지션</option>
+            <option value="지역공약">지역공약</option>
+            <option value="논평">논평</option>
+            <option value="메시지">메시지</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="topic">주제 <span class="required">*</span></label>
+          <input type="text" id="topic" placeholder="예: 청년 주거 안정 대책" maxlength="500">
+          <div class="char-count"><span id="topicCount">0</span>/500</div>
+        </div>
+
+        <div>
+          <label for="description">상세 설명 <span class="footnote">(선택)</span></label>
+          <textarea id="description" placeholder="주제에 대한 배경, 방향, 강조하고 싶은 포인트를 적어 주세요." maxlength="2000" rows="4"></textarea>
+          <div class="char-count"><span id="descCount">0</span>/2000</div>
+        </div>
+
+        <p class="err" id="errMsg"></p>
+
+        <div>
+          <button class="btn btn-full" id="generateBtn" onclick="doGenerate()">생성하기</button>
+        </div>
+
+        <div class="loading-msg" id="loadingMsg">생성 준비 중... 주제 분석과 자료 조회에 잠시 시간이 걸립니다.</div>
+      </div>
+
+      <aside class="guide-side">
+        <div class="panel">
+          <div class="eyebrow">Quota</div>
+          <div id="quotaBadge" style="color:var(--muted2); font-size:0.9rem;">불러오는 중...</div>
+        </div>
+
+        <div class="panel">
+          <div class="eyebrow">Guide</div>
+          <div class="guide-text format-guide" id="formatGuide">
+            <strong>정책포지션</strong>
+            특정 이슈에 대한 당·후보자의 공식 입장을 정리한 문서입니다.
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- 결과 영역 -->
+    <section class="panel result-area reveal" id="resultArea">
+      <div class="eyebrow">Result</div>
+      <h2 id="resultTitle">생성 결과</h2>
+      <div class="result-content" id="resultContent"></div>
+      <div class="result-actions">
+        <button class="btn" onclick="copyResult()">복사</button>
+        <button class="btn" onclick="resetForm()">새로 생성</button>
+      </div>
+    </section>
+
+    <!-- 최근 이력 -->
+    <section class="panel history-section reveal" id="historySection">
+      <div class="eyebrow">Recent</div>
+      <h2>최근 생성 이력</h2>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="footer-left">
+        <span class="footer-org">개혁신당 정책국</span>
+        <span class="footer-dot">·</span>
+        <span>정책 허브</span>
+      </div>
+      <div class="footer-right">
+        <button onclick="openContactModal()">✉ 문의하기</button>
+      </div>
+    </footer>
+  </main>
+
+  <div class="contact-overlay" id="contactOverlay" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="contact-modal" onclick="event.stopPropagation()">
+      <div id="contactForm">
+        <h3>문의하기</h3>
+        <p class="sub">개혁신당 정책국에 문의 사항을 보내주세요.</p>
+        <label>이름</label><input type="text" id="contactName" placeholder="이름" maxlength="100">
+        <label>이메일 <span style="color:#f87171">*</span></label><input type="email" id="contactEmail" placeholder="답변 받으실 이메일" maxlength="200">
+        <label>문의 내용 <span style="color:#f87171">*</span></label><textarea id="contactMsg" placeholder="문의 내용을 입력해 주세요." maxlength="5000" rows="4"></textarea>
+        <p class="contact-err" id="contactErr"></p>
+        <div class="contact-actions">
+          <button class="contact-btn-cancel" onclick="document.getElementById('contactOverlay').classList.remove('open')">취소</button>
+          <button class="contact-btn-send" id="contactSendBtn" onclick="sendContact()">보내기</button>
+        </div>
+      </div>
+      <div id="contactOk" class="contact-ok" style="display:none">문의가 전송되었습니다.<br>빠른 시일 내 답변드리겠습니다.<div style="margin-top:1rem"><button class="contact-btn-cancel" onclick="document.getElementById('contactOverlay').classList.remove('open')">닫기</button></div></div>
+    </div>
+  </div>
+
+  <script>
+    function openContactModal(){document.getElementById('contactOverlay').classList.add('open');document.getElementById('contactForm').style.display='';document.getElementById('contactOk').style.display='none';document.getElementById('contactErr').style.display='none';}
+    async function sendContact(){var e=document.getElementById('contactEmail').value.trim(),m=document.getElementById('contactMsg').value.trim(),n=document.getElementById('contactName').value.trim(),err=document.getElementById('contactErr');if(!e||!m){err.textContent='이메일과 문의 내용을 입력해 주세요.';err.style.display='block';return;}var btn=document.getElementById('contactSendBtn');btn.disabled=true;btn.textContent='전송 중...';err.style.display='none';try{var r=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,email:e,message:m}),credentials:'include'});if(!r.ok){var d=await r.json().catch(function(){return{};});throw new Error(d.detail||'전송에 실패했습니다.');}document.getElementById('contactForm').style.display='none';document.getElementById('contactOk').style.display='';}catch(ex){err.textContent=ex.message;err.style.display='block';}finally{btn.disabled=false;btn.textContent='보내기';}}
+
+    function safe(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // 형식별 가이드 텍스트
+    const FORMAT_GUIDES = {
+      '정책포지션': '<strong>정책포지션</strong>특정 이슈에 대한 당·후보자의 공식 입장을 정리한 문서입니다.',
+      '지역공약': '<strong>지역공약</strong>해당 지역의 현안과 주민 수요에 맞춘 구체적인 공약을 작성합니다.',
+      '논평': '<strong>논평</strong>특정 사안·이슈에 대해 당의 입장을 밝히는 공식 논평문입니다.',
+      '메시지': '<strong>메시지</strong>유권자에게 전달하는 핵심 메시지를 작성합니다. SNS·보도자료 등에 활용됩니다.',
+    };
+
+    document.getElementById('outputFormat').addEventListener('change', function() {
+      document.getElementById('formatGuide').innerHTML = FORMAT_GUIDES[this.value] || '';
+    });
+
+    document.getElementById('topic').addEventListener('input', function() {
+      document.getElementById('topicCount').textContent = this.value.length;
+    });
+
+    document.getElementById('description').addEventListener('input', function() {
+      document.getElementById('descCount').textContent = this.value.length;
+    });
+
+    // 프로필 + 쿼터 로드
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!r.ok) return;
+        const d = await r.json();
+        const bar = document.getElementById('profileBar');
+        const parts = [];
+        if (d.region_name) parts.push(d.region_name);
+        if (d.district_name) parts.push(d.district_name);
+        if (d.election_position) {
+          const labels = { metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원', local_council:'기초의원', party_official:'당직자' };
+          parts.push(labels[d.election_position] || d.election_position);
+        }
+        if (parts.length) {
+          bar.innerHTML = parts.map(p => '<span class="badge">' + safe(p) + '</span>').join('');
+        }
+      } catch(e) {}
+    })();
+
+    async function loadQuota() {
+      try {
+        const r = await fetch('/api/tools/quota', { credentials: 'include' });
+        if (!r.ok) return;
+        const d = await r.json();
+        const el = document.getElementById('quotaBadge');
+        el.textContent = '오늘 ' + d.daily_used + '/' + d.daily_limit + '회 사용 · 이번 달 ' + d.monthly_used + '/' + d.monthly_limit + '회';
+      } catch(e) {}
+    }
+    loadQuota();
+
+    async function loadHistory() {
+      try {
+        const r = await fetch('/api/tools/history?limit=10', { credentials: 'include' });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!d.items || !d.items.length) return;
+        const section = document.getElementById('historySection');
+        const list = document.getElementById('historyList');
+        list.innerHTML = d.items.map(function(item) {
+          const date = item.created_at ? item.created_at.replace('T', ' ').slice(0, 16) : '';
+          return '<div class="history-item">'
+            + '<div class="history-topic">' + safe(item.topic_preview) + '</div>'
+            + '<div class="history-meta">'
+            + '<span class="badge badge-blue">' + safe(item.output_format) + '</span>'
+            + '<span>' + safe(date) + '</span>'
+            + '</div></div>';
+        }).join('');
+        section.style.display = 'block';
+      } catch(e) {}
+    }
+    loadHistory();
+
+    // 생성
+    async function doGenerate() {
+      const topic = document.getElementById('topic').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const outputFormat = document.getElementById('outputFormat').value;
+      const errEl = document.getElementById('errMsg');
+
+      if (!topic) {
+        errEl.textContent = '주제를 입력해 주세요.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+
+      const btn = document.getElementById('generateBtn');
+      const loading = document.getElementById('loadingMsg');
+      btn.disabled = true;
+      loading.style.display = 'block';
+
+      document.getElementById('resultArea').style.display = 'none';
+      document.getElementById('resultContent').textContent = '';
+
+      let res;
+      try {
+        res = await fetch('/api/tools/generate/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: topic, description: description, output_format: outputFormat }),
+          credentials: 'include'
+        });
+      } catch(e) {
+        errEl.textContent = '서버 연결에 실패했습니다.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        loading.style.display = 'none';
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.detail || '요청에 실패했습니다. (' + res.status + ')';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        loading.style.display = 'none';
+        return;
+      }
+
+      // SSE 스트리밍
+      const resultArea = document.getElementById('resultArea');
+      const resultContent = document.getElementById('resultContent');
+      resultArea.style.display = 'block';
+      document.getElementById('resultTitle').textContent = outputFormat + ' — ' + topic;
+      resultContent.textContent = '';
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let streamStarted = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith('data:')) continue;
+          const jsonStr = line.slice(5).trim();
+          let msg;
+          try { msg = JSON.parse(jsonStr); } catch { continue; }
+
+          if (msg.type === 'chunk') {
+            if (!streamStarted) {
+              loading.style.display = 'none';
+              streamStarted = true;
+            }
+            resultContent.textContent += msg.text;
+          } else if (msg.type === 'final') {
+            loading.style.display = 'none';
+            resultContent.textContent = msg.text;
+          } else if (msg.type === 'done') {
+            // 완료
+          } else if (msg.type === 'error') {
+            loading.style.display = 'none';
+            errEl.textContent = msg.detail || '생성 중 오류가 발생했습니다.';
+            errEl.style.display = 'block';
+          }
+        }
+      }
+
+      btn.disabled = false;
+      loading.style.display = 'none';
+      resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // 쿼터 + 이력 갱신
+      loadQuota();
+      loadHistory();
+    }
+
+    function copyResult() {
+      const text = document.getElementById('resultContent').textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function() {
+        const btn = event.target;
+        btn.textContent = '복사됨!';
+        setTimeout(function() { btn.textContent = '복사'; }, 1500);
+      });
+    }
+
+    function resetForm() {
+      document.getElementById('resultArea').style.display = 'none';
+      document.getElementById('resultContent').textContent = '';
+      document.getElementById('topic').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('topicCount').textContent = '0';
+      document.getElementById('descCount').textContent = '0';
+      document.getElementById('errMsg').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

@@ -42,7 +42,7 @@ def add_history(
     """
     Save analysis result to history, keeping only recent keep_per_user per user.
     """
-    if kind not in ("check", "verify"):
+    if kind not in ("check", "verify", "draft"):
         kind = "check"
 
     input_text_s = _truncate((input_text or "").strip(), 20000)

@@ -434,6 +434,24 @@ def pledge_page(request: Request):
     raise HTTPException(status_code=404, detail="pledge.html not found")
 
 
+@app.api_route("/tools", methods=["GET", "HEAD"])
+def tools_page(request: Request):
+    """후보자 AI 정책 도구 페이지. (승인 사용자 전용)"""
+    user = get_current_user(request)
+    if not user:
+        return _login_redirect(request.url.path)
+    if (
+        user["status"] != STATUS_APPROVED
+        and user["email"] not in ADMIN_EMAILS
+        and user["role"] != ROLE_ADMIN
+    ):
+        return RedirectResponse(url="/pending", status_code=302)
+    res = _serve_html("tools.html")
+    if res is not None:
+        return res
+    raise HTTPException(status_code=404, detail="tools.html not found")
+
+
 @app.api_route("/signup", methods=["GET", "HEAD"])
 def signup_page():
     res = _serve_html("signup.html")
@@ -4845,6 +4863,37 @@ def api_admin_repair_pledge_scores(request: Request):
 
 from backend.policy_admin_routes import register_policy_routes
 register_policy_routes(app, require_admin, _ensure_db_ready, _serve_html)
+
+from backend.tools_routes import register_tools_routes
+register_tools_routes(app, require_approved, _client_ip)
+
+
+# ── 문의하기 ────────────────────────────────────────────────────
+class ContactRequest(BaseModel):
+    name: str = Field("", max_length=100)
+    email: str = Field(..., min_length=1, max_length=200)
+    message: str = Field(..., min_length=1, max_length=5000)
+
+@app.post("/api/contact")
+def api_contact(body: ContactRequest, request: Request):
+    import re
+    email = body.email.strip()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise HTTPException(status_code=400, detail="올바른 이메일 주소를 입력해 주세요.")
+    ip = _client_ip(request)
+    from backend.quota_rate import check_rate_limit_ip
+    ok, msg = check_rate_limit_ip(ip)
+    if not ok:
+        raise HTTPException(status_code=429, detail="잠시 후 다시 시도해 주세요.")
+    from backend.email_sender import send_contact_email
+    success = send_contact_email(
+        sender_name=body.name.strip(),
+        sender_email=email,
+        message=body.message.strip(),
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    return {"ok": True}
 
 
 @app.get("/hub-briefing", include_in_schema=False)

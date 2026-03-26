@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>리뷰 관리 - 정책 랩</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <style>
+    .page-shell { padding-bottom: 3rem; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .hero { margin: 0.5rem 0 1.25rem; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.25rem 0.7rem; border-radius: 999px;
+      background: rgba(74,222,128,0.16); color: #86efac;
+      font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%;
+      background: #4ade80; box-shadow: 0 0 0 6px rgba(74,222,128,0.12);
+    }
+    .hero h1 { margin-top: 0.75rem; font-size: clamp(1.8rem, 3.5vw, 2.8rem); letter-spacing: -0.04em; line-height: 1.05; }
+    .hero p { margin-top: 0.6rem; color: var(--muted); font-size: 0.95rem; max-width: 52ch; line-height: 1.65; }
+    .filter-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .filter-bar button {
+      padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid rgba(148,163,184,0.2);
+      background: rgba(255,255,255,0.06); color: var(--muted); font: inherit; font-size: 0.82rem;
+      font-weight: 700; cursor: pointer; transition: all 0.15s ease;
+    }
+    .filter-bar button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .position-list { display: grid; gap: 0.7rem; }
+    .position-card {
+      padding: 1rem 1.1rem; border-radius: 14px;
+      background: var(--card); border: 1px solid var(--border);
+      display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 1rem; align-items: start;
+      cursor: pointer; transition: border-color 0.15s ease;
+    }
+    .position-card:hover { border-color: rgba(255,122,26,0.3); }
+    .position-card h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .position-card .meta { color: var(--muted2); font-size: 0.82rem; display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .status-badge {
+      padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+    }
+    .status-draft { background: rgba(148,163,184,0.2); color: #94a3b8; }
+    .status-review { background: rgba(250,204,21,0.2); color: #fde047; }
+    .status-approved { background: rgba(74,222,128,0.2); color: #86efac; }
+    .status-archived { background: rgba(148,163,184,0.12); color: #64748b; }
+    .detail-panel {
+      display: none; position: fixed; top: 0; right: 0; width: min(520px, 100vw);
+      height: 100vh; background: var(--card); border-left: 1px solid var(--border);
+      z-index: 1000; overflow-y: auto; box-shadow: -16px 0 50px rgba(0,0,0,0.3);
+    }
+    .detail-panel.open { display: block; }
+    .detail-header {
+      position: sticky; top: 0; padding: 1rem 1.25rem;
+      background: rgba(15,23,42,0.95); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(8px);
+    }
+    .detail-header button { border: none; background: transparent; color: var(--muted2); font-size: 1.2rem; cursor: pointer; }
+    .detail-body { padding: 1.25rem; }
+    .detail-body h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    .detail-body .content { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.7; color: var(--muted); margin: 1rem 0; padding: 0.8rem; background: rgba(0,0,0,0.2); border-radius: 10px; max-height: 300px; overflow-y: auto; }
+    .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+    .comment-section { margin-top: 1.25rem; border-top: 1px solid rgba(148,163,184,0.12); padding-top: 1rem; }
+    .comment-section h3 { font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .comment-item { padding: 0.6rem 0.75rem; border-radius: 10px; background: rgba(255,255,255,0.04); margin-bottom: 0.5rem; font-size: 0.85rem; line-height: 1.55; }
+    .comment-item .comment-meta { color: var(--muted3); font-size: 0.75rem; margin-top: 0.2rem; }
+    .comment-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .comment-form textarea { flex: 1; min-height: 60px; font: inherit; font-size: 0.88rem; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted2); font-size: 0.95rem; }
+    @media (max-width: 640px) {
+      .detail-panel { width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap-xl page-shell">
+    <div class="topbar">
+      <div class="links">
+        <a href="/admin">관리자 홈</a>
+        <a href="/policy-lab">정책 허브</a>
+        <a href="/policy-create">AI 드래프터</a>
+      </div>
+      <span class="badge badge-green">리뷰 관리</span>
+    </div>
+
+    <section class="hero">
+      <span class="eyebrow">review workflow</span>
+      <h1>정책 초안 리뷰 관리</h1>
+      <p>초안 목록을 확인하고 상태를 전환합니다. 검토 요청, 승인, 코멘트를 한 화면에서 관리합니다.</p>
+    </section>
+
+    <div class="filter-bar" id="filterBar">
+      <button class="active" data-status="">전체</button>
+      <button data-status="draft">초안</button>
+      <button data-status="review">검토중</button>
+      <button data-status="approved">승인됨</button>
+      <button data-status="archived">보관</button>
+    </div>
+
+    <div class="position-list" id="positionList">
+      <div class="empty-state">로딩 중...</div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <span id="detailTitle">상세 보기</span>
+      <button onclick="closeDetail()">×</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+  <script>
+    function escapeHtml(s) {
+      return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
+
+    let _currentFilter = '';
+    let _allPositions = [];
+
+    document.querySelectorAll('#filterBar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filterBar button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _currentFilter = btn.dataset.status;
+        renderList();
+      });
+    });
+
+    async function loadPositions() {
+      try {
+        // Load all statuses
+        const [draft, review, approved, archived] = await Promise.all([
+          fetch('/api/policy/positions?status=draft', { credentials: 'include' }).then(r => r.json()),
+          fetch('/api/policy/positions?status=review', { credentials: 'include' }).then(r => r.json()),
+          fetch('/api/policy/positions?status=approved', { credentials: 'include' }).then(r => r.json()),
+          fetch('/api/policy/positions?status=archived', { credentials: 'include' }).then(r => r.json()).catch(() => ({ items: [] })),
+        ]);
+        _allPositions = [
+          ...(draft.items || []),
+          ...(review.items || []),
+          ...(approved.items || []),
+          ...(archived.items || []),
+        ].sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+        renderList();
+      } catch (e) {
+        document.getElementById('positionList').innerHTML = '<div class="empty-state">데이터를 불러올 수 없습니다.</div>';
+      }
+    }
+
+    function renderList() {
+      const list = document.getElementById('positionList');
+      const filtered = _currentFilter
+        ? _allPositions.filter(p => p.status === _currentFilter)
+        : _allPositions;
+
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty-state">해당 상태의 포지션이 없습니다.</div>';
+        return;
+      }
+
+      list.innerHTML = filtered.map(p => `
+        <div class="position-card" onclick="openDetail(${p.id})">
+          <div>
+            <h3>${escapeHtml(p.title)}</h3>
+            <div class="meta">
+              <span class="status-badge status-${p.status}">${p.status}</span>
+              <span>${escapeHtml(p.category || '미분류')}</span>
+              <span>${(p.updated_at || p.created_at || '').slice(0, 10)}</span>
+            </div>
+          </div>
+          <div style="color:var(--brand-light);font-weight:800;">→</div>
+        </div>
+      `).join('');
+    }
+
+    async function openDetail(id) {
+      const panel = document.getElementById('detailPanel');
+      const body = document.getElementById('detailBody');
+      panel.classList.add('open');
+      body.innerHTML = '<p style="color:var(--muted2)">로딩 중...</p>';
+
+      try {
+        const [detail, commentsRes] = await Promise.all([
+          fetch('/api/policy/positions/' + id, { credentials: 'include' }).then(r => r.json()),
+          fetch('/api/policy/positions/' + id + '/comments', { credentials: 'include' }).then(r => r.json()).catch(() => ({ comments: [] })),
+        ]);
+
+        const p = detail;
+        const comments = commentsRes.comments || [];
+        document.getElementById('detailTitle', escapeHtml(p.title));
+
+        let html = '';
+        html += '<h2>' + escapeHtml(p.title) + '</h2>';
+        html += '<div class="meta" style="margin-bottom:0.75rem;">';
+        html += '<span class="status-badge status-' + p.status + '">' + p.status + '</span> ';
+        html += '<span style="color:var(--muted2);font-size:0.82rem;">' + escapeHtml(p.category || '') + ' · ' + (p.updated_at || p.created_at || '').slice(0, 16) + '</span>';
+        html += '</div>';
+
+        if (p.summary) html += '<p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin-bottom:0.5rem;">' + escapeHtml(p.summary) + '</p>';
+
+        html += '<div class="content">' + escapeHtml(p.body || p.key_points || '(본문 없음)') + '</div>';
+
+        // Action buttons based on status
+        html += '<div class="detail-actions">';
+        if (p.status === 'draft') {
+          html += '<button class="btn btn-sm" onclick="changeStatus(' + id + ',\'review\')">검토 요청</button>';
+        }
+        if (p.status === 'review') {
+          html += '<button class="btn btn-green btn-sm" onclick="changeStatus(' + id + ',\'approved\')">승인</button>';
+          html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'draft\')">초안으로 되돌리기</button>';
+        }
+        if (p.status !== 'archived') {
+          html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'archived\')">보관</button>';
+        }
+        if (p.status === 'archived') {
+          html += '<button class="btn btn-secondary btn-sm" onclick="changeStatus(' + id + ',\'draft\')">초안으로 복원</button>';
+        }
+        html += '</div>';
+
+        // Comments
+        html += '<div class="comment-section">';
+        html += '<h3>코멘트 (' + comments.length + ')</h3>';
+        for (const c of comments) {
+          html += '<div class="comment-item">' + escapeHtml(c.comment);
+          html += '<div class="comment-meta">' + escapeHtml(c.comment_type || 'review') + ' · ' + (c.created_at || '').slice(0, 16) + '</div>';
+          html += '</div>';
+        }
+        html += '<div class="comment-form">';
+        html += '<textarea id="newComment" placeholder="코멘트를 입력하세요..."></textarea>';
+        html += '<button class="btn btn-sm" onclick="addComment(' + id + ')">추가</button>';
+        html += '</div></div>';
+
+        body.innerHTML = html;
+      } catch (e) {
+        body.innerHTML = '<p class="err">상세 정보를 불러올 수 없습니다.</p>';
+      }
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPanel').classList.remove('open');
+    }
+
+    async function changeStatus(id, newStatus) {
+      const endpoint = newStatus === 'review' ? '/submit-review'
+        : newStatus === 'approved' ? '/approve'
+        : null;
+
+      try {
+        if (endpoint) {
+          const r = await fetch('/api/policy/positions/' + id + endpoint, {
+            method: 'POST', credentials: 'include',
+          });
+          if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            alert(d.detail || '상태 변경 실패');
+            return;
+          }
+        } else {
+          // For archived/draft transitions, use a generic status update
+          const r = await fetch('/api/policy/positions/' + id + '/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status: newStatus }),
+          });
+          if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            alert(d.detail || '상태 변경 실패');
+            return;
+          }
+        }
+        await loadPositions();
+        openDetail(id);
+      } catch (e) {
+        alert('오류: ' + e.message);
+      }
+    }
+
+    async function addComment(id) {
+      const textarea = document.getElementById('newComment');
+      const comment = textarea.value.trim();
+      if (!comment) return;
+
+      try {
+        const r = await fetch('/api/policy/positions/' + id + '/comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ comment: comment, comment_type: 'review' }),
+        });
+        if (!r.ok) throw new Error('코멘트 추가 실패');
+        textarea.value = '';
+        openDetail(id);
+      } catch (e) {
+        alert('오류: ' + e.message);
+      }
+    }
+
+    // Escape key closes panel
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+    loadPositions();
+  </script>
+</body>
+</html>

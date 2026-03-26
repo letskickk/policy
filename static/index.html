@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>개혁신당 정책 멘토링</title>
+  <title>개혁신당 정책 허브</title>
   <meta name="description" content="지방선거 공약을 정강·정책 기준으로 점검하고, 지역/선거구별 후보 공약을 함께 비교합니다." />
   <link rel="canonical" href="https://policy.reformparty.kr/" />
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/css/common.css">
 
   <!-- Open Graph (KakaoTalk, etc.) -->
   <meta property="og:type" content="website" />
@@ -101,16 +102,31 @@
       margin-left: auto;
     }
     .top-bar .nav-login-row {
-      color: var(--muted); font-size: 0.88rem; margin-right: 0.5rem;
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-right: 0.5rem;
     }
-    .top-bar .nav-login-row .logout-link {
-      background: none; border: none; padding: 0; cursor: pointer;
-      color: var(--muted); font-size: 0.875rem; text-decoration: none;
-      margin-left: 0.5rem; font-family: inherit;
+    .top-bar .auth-email {
+      font-size: 0.8rem; color: var(--muted2); font-weight: 600;
+      padding: 0.2rem 0.6rem; border-radius: 999px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18);
     }
-    .top-bar .nav-login-row .logout-link:hover { color: var(--text-strong); }
-    .top-bar .nav-login-row .auth-links-inline { color: var(--muted); font-size: 0.875rem; }
-    .top-bar .nav-login-row .auth-links-inline a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .top-bar .auth-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: 700; padding: 0.22rem 0.7rem;
+      border-radius: 999px; text-decoration: none; cursor: pointer;
+      font-family: inherit; border: 1px solid; transition: background 0.2s, border-color 0.2s;
+    }
+    .top-bar .auth-btn-logout {
+      background: rgba(255,255,255,0.05); border-color: rgba(148,163,184,0.22); color: var(--muted);
+    }
+    .top-bar .auth-btn-logout:hover { background: rgba(255,255,255,0.1); color: var(--text-strong); }
+    .top-bar .auth-btn-signup {
+      background: rgba(255,179,122,0.12); border-color: rgba(255,179,122,0.35); color: #ffb37a;
+    }
+    .top-bar .auth-btn-signup:hover { background: rgba(255,179,122,0.2); }
+    .top-bar .auth-btn-login {
+      background: rgba(96,165,250,0.12); border-color: rgba(96,165,250,0.3); color: #93c5fd;
+    }
+    .top-bar .auth-btn-login:hover { background: rgba(96,165,250,0.2); }
     .top-bar .nav-btns { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .top-bar .nav-link {
       display: inline-flex; align-items: center; justify-content: center;
@@ -180,37 +196,40 @@
       background: var(--card2);
       border: 1px solid rgba(148,163,184,0.12);
       border-radius: 14px;
-      padding: 0.9rem 0.9rem;
-      min-height: 86px;
+      padding: 1.1rem 1rem;
     }
     .step .k{
       display:flex;
       align-items:center;
-      gap: 0.55rem;
-      font-size: 0.92rem;
-      font-weight: 800;
-      color: var(--text-strong);
-      margin-bottom: 0.35rem;
-      letter-spacing: -0.02em;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(148,163,184,0.10);
     }
     .badge{
-      width: 28px;
-      height: 28px;
-      border-radius: 10px;
-      display:flex;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display:inline-flex;
       align-items:center;
       justify-content:center;
-      background: #ffffff;
-      border: 1px solid rgba(255,255,255,0.5);
-      color: #0f172a;
+      background: var(--brand);
+      color: #fff;
       font-weight: 950;
-      font-size: 0.9rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+    .step .k span:not(.badge){
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: var(--text-strong);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
     }
     .step p{
       margin: 0;
-      font-size: 0.9rem;
-      line-height: 1.5;
+      font-size: 0.85rem;
+      line-height: 1.6;
       color: var(--muted);
       word-break: keep-all;
     }
@@ -307,19 +326,57 @@
       text-shadow: none;
     }
 
-    .footer{
-      margin-top: 2.3rem;
-      font-size: 0.88rem;
-      color: rgba(203,213,225,0.92);
-      line-height: 1.6;
-      opacity: 0.95;
+    /* ===== 공통 풋터 ===== */
+    .site-footer{
+      margin-top:2.5rem; padding:1.5rem 0 0.5rem;
+      border-top:1px solid rgba(255,255,255,0.06);
+      display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.6rem;
     }
-    .footer a{
-      color: #ffb37a;
-      text-decoration: none;
-      font-weight: 900;
+    .site-footer .footer-left{ display:flex; align-items:center; gap:0.55rem; font-size:0.82rem; color:rgba(203,213,225,0.55); }
+    .site-footer .footer-org{ font-weight:800; color:rgba(203,213,225,0.75); letter-spacing:0.02em; }
+    .site-footer .footer-dot{ color:rgba(255,255,255,0.15); }
+    .site-footer .footer-right button{
+      display:inline-flex; align-items:center; gap:0.3rem; font-size:0.78rem;
+      color:rgba(203,213,225,0.45); padding:0.3rem 0.7rem; border-radius:20px;
+      border:1px solid rgba(255,255,255,0.06); background:none; cursor:pointer; transition:all 0.2s;
     }
-    .footer a:hover{ text-decoration: underline; }
+    .site-footer .footer-right button:hover{
+      color:rgba(203,213,225,0.75); border-color:rgba(255,255,255,0.12); background:rgba(255,255,255,0.03);
+    }
+    /* ===== 문의 모달 ===== */
+    .contact-overlay{
+      display:none; position:fixed; inset:0; z-index:9000;
+      background:rgba(0,0,0,1); backdrop-filter:blur(6px);
+      justify-content:center; align-items:center;
+    }
+    .contact-overlay.open{ display:flex; }
+    .contact-modal{
+      background:#1e293b; border:1px solid rgba(255,255,255,0.08);
+      border-radius:18px; padding:1.8rem; width:90%; max-width:420px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.4);
+    }
+    .contact-modal h3{ font-size:1.15rem; margin-bottom:0.2rem; }
+    .contact-modal .sub{ font-size:0.82rem; color:var(--muted); margin-bottom:1.2rem; }
+    .contact-modal label{
+      display:block; font-size:0.82rem; font-weight:700;
+      color:var(--muted); margin-bottom:0.25rem; margin-top:0.8rem;
+    }
+    .contact-modal input, .contact-modal textarea{
+      width:100%; padding:0.55rem 0.7rem; font-size:0.92rem;
+      background:rgba(255,255,255,0.04); border:1px solid var(--border);
+      border-radius:10px; color:var(--text-strong); outline:none; transition:border-color 0.2s;
+    }
+    .contact-modal input:focus, .contact-modal textarea:focus{ border-color:var(--brand-light); }
+    .contact-modal textarea{ resize:vertical; min-height:100px; }
+    .contact-actions{ display:flex; gap:0.5rem; margin-top:1.2rem; justify-content:flex-end; }
+    .contact-actions button{
+      padding:0.5rem 1.1rem; border-radius:10px; font-size:0.88rem; font-weight:700; cursor:pointer; border:none;
+    }
+    .contact-btn-cancel{ background:rgba(255,255,255,0.06); color:var(--muted); }
+    .contact-btn-send{ background:var(--brand-light); color:#fff; }
+    .contact-btn-send:disabled{ opacity:0.5; cursor:not-allowed; }
+    .contact-err{ color:#f87171; font-size:0.82rem; margin-top:0.5rem; display:none; }
+    .contact-ok{ color:#4ade80; font-size:0.92rem; text-align:center; padding:2rem 0; }
 
     .cta-group{
       display:grid;
@@ -1163,8 +1220,8 @@
           <a href="/" class="brand-logo">
             <img src="/static/logo.svg" alt="개혁신당 로고" />
             <span class="brand-inner">
-              <span class="brand-title">개혁신당 정책 멘토링</span>
-              <span class="brand-tag">공약 점검 + 지역/선거구 후보 공약 비교</span>
+              <span class="brand-title">개혁신당 정책 허브</span>
+              <span class="brand-tag">정책 멘토링 + 지역/선거구 후보 공약 비교</span>
             </span>
           </a>
         </div>
@@ -1176,47 +1233,46 @@
     </div>
 
     <div class="hero">
-      <h1>공약 점검부터 지역 비교까지</h1>
+      <h1>출마자를 위한 AI 정책 플랫폼</h1>
 
       <p class="hero-desc">
-        공약을 입력하면 정강정책 부합 여부와 보완 포인트를 즉시 확인할 수 있습니다.<br>
-        지역·선거구별 후보 공약 비교도 한 화면에서 이어집니다.
+        공약 점검부터 지역 비교, AI 공약 생성까지<br>
+        선거 준비에 필요한 정책 도구를 한 곳에서 제공합니다.
       </p>
       <div class="trust-chips" aria-label="핵심 가치">
         <span class="trust-chip">정강·정책 근거 기반</span>
-        <span class="trust-chip">지역·선거구 비교 지원</span>
-        <span class="trust-chip">실행 보완점 즉시 제안</span>
+        <span class="trust-chip">지역·선거구 비교</span>
+        <span class="trust-chip">AI 콘텐츠 생성</span>
       </div>
 
-      <div class="flow" aria-label="이용 흐름">
+      <div class="flow" aria-label="주요 기능">
         <div class="step">
-          <div class="k"><span class="badge">1</span> 공약 입력</div>
-          <p>검토할 공약을 그대로 붙여넣습니다.</p>
+          <div class="k"><span class="badge">1</span><span>정책 멘토링</span></div>
+          <p>공약을 입력하면 정강정책 부합성, 중앙당 공약 유사도, 2022 당선인 비교, 타 후보 중복 검사를 거쳐 종합점수와 보완 제안을 제공합니다.</p>
         </div>
         <div class="step">
-          <div class="k"><span class="badge">2</span> 기준 대조</div>
-          <p>정강·정책 기준으로 적합도와 보완점을 확인합니다.</p>
+          <div class="k"><span class="badge">2</span><span>지역 비교</span></div>
+          <p>지도에서 같은 지역·선거구 후보들의 공약을 나란히 비교하고, 차별화 포인트를 파악합니다.</p>
         </div>
         <div class="step">
-          <div class="k"><span class="badge">3</span> 지역 비교</div>
-          <p>지도에서 지역·선거구별 후보 공약을 비교합니다.</p>
+          <div class="k"><span class="badge">3</span><span>AI 공약 생성</span></div>
+          <p>주제와 형식만 입력하면 지역·선거유형에 맞는 정책포지션, 지역공약, 논평, 메시지를 자동으로 생성합니다.</p>
         </div>
       </div>
 
       <div class="cta-group">
-        <a href="/pledge" class="cta" id="btnPledge">공약 분석하기</a>
-        <a href="/map" class="cta secondary" id="btnMap">지역·선거구 공약 보기</a>
-        <a href="/proposals" class="cta secondary" style="background:rgba(167,139,250,0.12);border-color:rgba(167,139,250,0.3);color:#c4b5fd;">시민 정책 제안</a>
-        <a href="/policy-lab" class="cta secondary" id="btnPolicyHub" style="background:rgba(167,139,250,0.15);border-color:rgba(167,139,250,0.35);color:#c4b5fd;">정책 허브</a>
+        <a href="/pledge" class="cta" id="btnPledge">정책 멘토링</a>
+        <a href="/map" class="cta secondary" style="background:rgba(96,165,250,0.12);border-color:rgba(96,165,250,0.3);color:#93c5fd;">지역·선거구 공약 보기</a>
+        <a href="/proposals" class="cta secondary" style="background:rgba(167,139,250,0.12);border-color:rgba(167,139,250,0.3);color:#c4b5fd;">정책 제안</a>
       </div>
-      <div class="sample-preview" aria-label="분석 결과 예시">
+      <div class="sample-preview" id="adminToolGroup" style="margin-top:0.8rem;">
         <div class="sample-head">
-          <span class="sample-title">분석 결과 예시</span>
-          <span class="sample-score">총점 82.0 · 양호</span>
+          <span class="sample-title">오픈 예정</span>
+          <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">준비 중</span>
         </div>
-        <div class="sample-body">
-          <div class="sample-item"><strong>1. 정강정책 부합성</strong><br/>핵심 방향은 부합하나 재원 계획 구체화 필요</div>
-          <div class="sample-item"><strong>4. 2022 당선인 공약 비교</strong><br/>유사 공약 1~2건 + 차별화 포인트 제안</div>
+        <div class="sample-body" style="display:flex;gap:0.45rem;flex-wrap:wrap;">
+          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">정책 자료실</a>
+          <a href="/tools" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">AI 공약 생성</a>
         </div>
       </div>
     </div>
@@ -1253,40 +1309,44 @@
       </div>
     </section>
 
-    <section class="features">
-      <h2>주요 기능</h2>
-      <ul class="feature-grid">
-        <li>
-          <span class="icon">✓</span>
-          <div class="txt">
-            <strong>공약 적합도 점검</strong> — 정강·정책 부합 여부 + 보완 체크리스트
-          </div>
-        </li>
-        <li>
-          <span class="icon">↔</span>
-          <div class="txt">
-            <strong>중복·유사 탐지</strong> — 타 후보 공약과 유사·중복 항목 파악
-          </div>
-        </li>
-        <li>
-          <span class="icon">🗳️</span>
-          <div class="txt">
-            <strong>지역·선거구 공약 조회</strong> — 시도·선거구·선거 타입별 후보 공약 비교
-          </div>
-        </li>
-        <li>
-          <span class="icon">🏆</span>
-          <div class="txt">
-            <strong>2022 당선인 공약 비교</strong> — 당선인 공약과 비교해 차별화 포인트 파악
-          </div>
-        </li>
-      </ul>
-    </section>
 
-    <p class="footer">
-      개혁신당 정책국<br>
-      문의: <a href="mailto:letskick@reformparty.kr">letskick@reformparty.kr</a>
-    </p>
+    <footer class="site-footer">
+      <div class="footer-left">
+        <span class="footer-org">개혁신당 정책국</span>
+        <span class="footer-dot">·</span>
+        <span>정책 허브</span>
+      </div>
+      <div class="footer-right">
+        <button onclick="openContactModal()">✉ 문의하기</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 문의하기 모달 -->
+  <div class="contact-overlay" id="contactOverlay" onclick="closeContactModal(event)">
+    <div class="contact-modal" onclick="event.stopPropagation()">
+      <div id="contactForm">
+        <h3>문의하기</h3>
+        <p class="sub">개혁신당 정책국에 문의 사항을 보내주세요.</p>
+        <label for="contactName">이름</label>
+        <input type="text" id="contactName" placeholder="이름" maxlength="100">
+        <label for="contactEmail">이메일 <span style="color:#f87171">*</span></label>
+        <input type="email" id="contactEmail" placeholder="답변 받으실 이메일" maxlength="200">
+        <label for="contactMsg">문의 내용 <span style="color:#f87171">*</span></label>
+        <textarea id="contactMsg" placeholder="문의 내용을 입력해 주세요." maxlength="5000" rows="4"></textarea>
+        <p class="contact-err" id="contactErr"></p>
+        <div class="contact-actions">
+          <button class="contact-btn-cancel" onclick="closeContactModal()">취소</button>
+          <button class="contact-btn-send" id="contactSendBtn" onclick="sendContact()">보내기</button>
+        </div>
+      </div>
+      <div id="contactOk" class="contact-ok" style="display:none;">
+        문의가 전송되었습니다.<br>빠른 시일 내 답변드리겠습니다.
+        <div style="margin-top:1rem;">
+          <button class="contact-btn-cancel" onclick="closeContactModal()">닫기</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 공약 상세 모달 (map.html 동일) -->
@@ -1336,27 +1396,30 @@
           const email = (d.email || '').trim();
           authRow.style.display = email ? '' : 'none';
           authRow.innerHTML = email
-            ? '<span>' + safe(email) + ' 로그인 중</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>'
-            : '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
+            ? '<span class="auth-email">' + safe(email) + '</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="auth-btn auth-btn-logout">로그아웃</button></form>'
+            : '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
-          // Update policy hub button for admin users
-          const hubBtn = document.getElementById('btnPolicyHub');
+          window._userEmail = email;
+          window._userName = d.name || '';
+          // Admin tools group gate
+          const adminStatus = document.getElementById('adminToolStatus');
+          const adminGroup = document.getElementById('adminToolGroup');
           if (d.is_admin) {
-            if (hubBtn) hubBtn.textContent = '정책 허브 (관리자)';
+            if (adminStatus) { adminStatus.textContent = '사용 가능'; adminStatus.style.color = '#86efac'; }
           } else {
-            if (hubBtn) hubBtn.addEventListener('click', function(e) {
-              e.preventDefault();
-              alert('관리자 전용 기능입니다. 관리자 계정으로 로그인해 주세요.');
+            if (adminGroup) adminGroup.addEventListener('click', function(e) {
+              const link = e.target.closest('a');
+              if (link) { e.preventDefault(); alert('아직 준비 중인 기능입니다. 곧 공개될 예정이에요!'); }
             });
           }
         } else {
           authRow.style.display = '';
-          authRow.innerHTML = '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
+          authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
-          const hubBtn2 = document.getElementById('btnPolicyHub');
-          if (hubBtn2) hubBtn2.addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('관리자 전용 기능입니다. 로그인 후 이용해 주세요.');
+          const adminGroup2 = document.getElementById('adminToolGroup');
+          if (adminGroup2) adminGroup2.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link) { e.preventDefault(); alert('아직 준비 중인 기능입니다. 곧 공개될 예정이에요!'); }
           });
         }
       } catch (e) {}
@@ -2340,6 +2403,64 @@
       });
     }
   })();
+
+  // ── 문의하기 모달 ──
+  function openContactModal() {
+    document.getElementById('contactOverlay').classList.add('open');
+    document.getElementById('contactForm').style.display = '';
+    document.getElementById('contactOk').style.display = 'none';
+    document.getElementById('contactErr').style.display = 'none';
+    // 로그인 사용자면 이메일 자동 채움
+    if (window._userEmail) {
+      document.getElementById('contactEmail').value = window._userEmail;
+    }
+    if (window._userName) {
+      document.getElementById('contactName').value = window._userName;
+    }
+  }
+  function closeContactModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('contactOverlay').classList.remove('open');
+  }
+  async function sendContact() {
+    var email = document.getElementById('contactEmail').value.trim();
+    var msg = document.getElementById('contactMsg').value.trim();
+    var name = document.getElementById('contactName').value.trim();
+    var errEl = document.getElementById('contactErr');
+    if (!email || !msg) {
+      errEl.textContent = '이메일과 문의 내용을 입력해 주세요.';
+      errEl.style.display = 'block';
+      return;
+    }
+    var btn = document.getElementById('contactSendBtn');
+    btn.disabled = true;
+    btn.textContent = '전송 중...';
+    errEl.style.display = 'none';
+    try {
+      var res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name: name, email: email, message: msg}),
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        var d = await res.json().catch(function(){return {};});
+        throw new Error(d.detail || '전송에 실패했습니다.');
+      }
+      document.getElementById('contactForm').style.display = 'none';
+      document.getElementById('contactOk').style.display = '';
+      // 폼 초기화
+      document.getElementById('contactName').value = '';
+      document.getElementById('contactEmail').value = '';
+      document.getElementById('contactMsg').value = '';
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '보내기';
+    }
+  }
   </script>
 </body>
 </html>
