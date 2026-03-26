@@ -163,8 +163,8 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
 # ---------------------------------------------------------------------------
 # Cache
 # ---------------------------------------------------------------------------
-def _draft_cache_key(topic: str, output_format: str, region: str = "") -> str:
-    raw = f"draft|{topic}|{output_format}|{region}"
+def _draft_cache_key(topic: str, output_format: str, region: str = "", election_type: str = "") -> str:
+    raw = f"draft|{topic}|{output_format}|{region}|{election_type}"
     return "draft_" + hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
@@ -172,7 +172,8 @@ def _get_cached_draft(key: str) -> Optional[str]:
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT result_payload FROM analysis_cache WHERE cache_key = ?", (key,)
+            "SELECT result_payload FROM analysis_cache WHERE cache_key = ? AND expires_at > datetime('now')",
+            (key,),
         ).fetchone()
         return row["result_payload"] if row else None
     except Exception:
@@ -242,10 +243,14 @@ def generate_policy_draft(
     region_str = " ".join(filter(None, [region_province, region_city, district_name])).strip()
 
     # Cache check
-    cache_key = _draft_cache_key(topic, output_format, region_str)
+    cache_key = _draft_cache_key(topic, output_format, region_str, election_type)
     if use_cache:
         cached = _get_cached_draft(cache_key)
         if cached:
+            if stream:
+                def _cached_gen():
+                    yield cached
+                return _cached_gen()
             return {
                 "draft_text": cached,
                 "research": {},

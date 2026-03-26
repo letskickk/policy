@@ -1339,15 +1339,25 @@
             ? '<span>' + safe(email) + ' 로그인 중</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>'
             : '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
-          // Update policy hub button label for admin users
+          // Update policy hub button for admin users
+          const hubBtn = document.getElementById('btnPolicyHub');
           if (d.role === 'admin') {
-            const hubBtn = document.getElementById('btnPolicyHub');
             if (hubBtn) hubBtn.textContent = '정책 허브 (관리자)';
+          } else {
+            if (hubBtn) hubBtn.addEventListener('click', function(e) {
+              e.preventDefault();
+              alert('관리자 전용 기능입니다. 관리자 계정으로 로그인해 주세요.');
+            });
           }
         } else {
           authRow.style.display = '';
           authRow.innerHTML = '<span class="auth-links-inline"><a href="/signup">회원가입</a> | <a href="/login">로그인</a></span>';
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
+          const hubBtn2 = document.getElementById('btnPolicyHub');
+          if (hubBtn2) hubBtn2.addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('관리자 전용 기능입니다. 로그인 후 이용해 주세요.');
+          });
         }
       } catch (e) {}
     })();

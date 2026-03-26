@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import Query, Request
+from fastapi import HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from backend.database import get_connection
@@ -568,7 +568,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
         from backend.issue_radar import get_cached_scan, run_issue_scan, save_scan_result
 
-        if not refresh:
+        if not refresh and not days and not doc_type:
             cached = get_cached_scan(max_age_hours=6)
             if cached:
                 cached["from_cache"] = True
@@ -749,7 +749,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             proposal_new = conn.execute("SELECT COUNT(*) FROM citizen_proposals WHERE status = 'new'").fetchone()[0]
             # For gap count, try issue_radar_cache; if empty, return 0
             try:
-                row = conn.execute("SELECT data FROM issue_radar_cache ORDER BY created_at DESC LIMIT 1").fetchone()
+                row = conn.execute("SELECT result_json FROM issue_radar_cache ORDER BY scanned_at DESC LIMIT 1").fetchone()
                 if row:
                     import json
                     cached = json.loads(row[0])
@@ -844,7 +844,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         finally:
             conn.close()
 
-    @app.get("/api/policy/positions/{position_id}/timeline", tags=["policy", "workflow"])
+    @app.get("/api/policy/positions/{position_id}/full-timeline", tags=["policy", "workflow"])
     def get_position_timeline(request: Request, position_id: int):
         """포지션 타임라인 (버전 이력 + 코멘트)."""
         ensure_db_ready()
