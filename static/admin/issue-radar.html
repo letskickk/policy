@@ -195,10 +195,15 @@
       text-align: left;
       border: 1px solid rgba(148,163,184,0.15);
       transition: transform 0.18s ease, box-shadow 0.18s ease;
+      cursor: pointer;
+      user-select: none;
     }
     .heatmap-cell:hover {
       transform: translateY(-2px);
       box-shadow: 0 14px 28px rgba(0,0,0,0.16);
+    }
+    .heatmap-cell:active {
+      transform: translateY(0);
     }
     .heatmap-topic {
       font-size: 0.92rem;
@@ -224,6 +229,28 @@
       border: 1px solid rgba(148,163,184,0.12);
       border-radius: 16px;
       padding: 1rem 1.1rem;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .gap-item.highlighted {
+      border-color: rgba(255,122,26,0.5);
+      box-shadow: 0 0 0 1px rgba(255,122,26,0.2), 0 8px 24px rgba(255,122,26,0.08);
+    }
+    .gap-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-top: 0.65rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 8px;
+      background: rgba(255,122,26,0.15);
+      color: var(--brand-light);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-decoration: none;
+      transition: background 0.18s ease;
+    }
+    .gap-action:hover {
+      background: rgba(255,122,26,0.28);
     }
     .gap-header {
       display: flex;
@@ -461,9 +488,10 @@
           const badgeClass = isNoPos ? 'badge-red' : 'badge-yellow';
           const badgeLabel = isNoPos ? '무공약' : '약한 커버리지';
 
-          html += '<div class="gap-item">';
+          const topicText = gap.topic || '미분류 주제';
+          html += '<div class="gap-item" data-topic="' + escapeHtml(topicText) + '">';
           html += '<div class="gap-header">';
-          html += '<span class="gap-topic">' + escapeHtml(gap.topic || '미분류 주제') + '</span>';
+          html += '<span class="gap-topic">' + escapeHtml(topicText) + '</span>';
           html += '<div class="gap-badges">';
           html += '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
           html += '<span class="badge badge-blue">우선순위 ' + Math.round(gap.priority_score || 0) + '</span>';
@@ -474,6 +502,9 @@
           if (gap.recent_bill_count) html += ' · 최근 법안 ' + gap.recent_bill_count + '건';
           if (gap.recent_commentary_count) html += ' · 최근 발언 ' + gap.recent_commentary_count + '건';
           html += '</div>';
+
+          const drafterUrl = '/policy-create?topic=' + encodeURIComponent(topicText);
+          html += '<a href="' + drafterUrl + '" class="gap-action">이 주제로 초안 생성 →</a>';
 
           const docs = gap.documents || [];
           if (docs.length > 0) {
@@ -534,7 +565,7 @@
           count = '문서 ' + (gap.document_count || 0) + '건';
         }
 
-        html += '<div class="heatmap-cell ' + cls + '">';
+        html += '<div class="heatmap-cell ' + cls + '" data-topic="' + escapeHtml(topic) + '" data-has-gap="' + (gap ? 'true' : 'false') + '" onclick="onHeatmapClick(this)">';
         html += '<div class="heatmap-topic">' + escapeHtml(topic) + '</div>';
         html += '<div class="heatmap-count">' + label + (count ? ' · ' + count : '') + '</div>';
         html += '</div>';
@@ -544,7 +575,7 @@
         if (!gap || !gap.topic || baseTopics.includes(gap.topic)) continue;
         const cls = gap.gap_type === 'no_position' ? 'heat-red' : 'heat-yellow';
         const label = gap.gap_type === 'no_position' ? '무공약' : '약한 커버리지';
-        html += '<div class="heatmap-cell ' + cls + '">';
+        html += '<div class="heatmap-cell ' + cls + '" data-topic="' + escapeHtml(gap.topic) + '" data-has-gap="true" onclick="onHeatmapClick(this)">';
         html += '<div class="heatmap-topic">' + escapeHtml(gap.topic) + '</div>';
         html += '<div class="heatmap-count">' + label + ' · 문서 ' + (gap.document_count || 0) + '건</div>';
         html += '</div>';
@@ -552,6 +583,27 @@
 
       html += '</div>';
       el.innerHTML = html;
+    }
+
+    function onHeatmapClick(cell) {
+      const topic = cell.dataset.topic;
+      const hasGap = cell.dataset.hasGap === 'true';
+
+      if (hasGap) {
+        // Scroll to the matching gap item and highlight it
+        const gapItems = document.querySelectorAll('.gap-item');
+        for (const item of gapItems) {
+          item.classList.remove('highlighted');
+          if (item.dataset.topic === topic) {
+            item.classList.add('highlighted');
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => item.classList.remove('highlighted'), 2500);
+          }
+        }
+      } else {
+        // Well-covered topic — go to drafter with topic pre-filled
+        window.location.href = '/policy-create?topic=' + encodeURIComponent(topic);
+      }
     }
 
     function doScan() {
