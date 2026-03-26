@@ -894,9 +894,27 @@
       font-weight: 700;
     }
     .modal-candidate-meta{
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
       color: #cbd5e1;
       font-size: 0.93rem;
       line-height: 1.55;
+      margin-top: 0.15rem;
+    }
+    .modal-candidate-meta-pill{
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0.22rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(148,163,184,0.16);
+      color: #dbeafe;
+      font-size: 0.8rem;
+      line-height: 1.35;
+      word-break: keep-all;
     }
     .modal-candidate-bio{
       margin-top: 0.55rem;
@@ -1177,6 +1195,14 @@
       .modal-candidate-bio{
         font-size: 0.92rem;
         line-height: 1.65;
+      }
+      .modal-candidate-meta{
+        gap: 0.35rem;
+      }
+      .modal-candidate-meta-pill{
+        min-height: 26px;
+        max-width: 100%;
+        white-space: normal;
       }
       .modal-candidate-links{
         display: grid;
@@ -2313,7 +2339,11 @@
       const badgeText = escapeHtml(electionTypeLabels[detail.election_type] || detail.election_type || '');
       const badge = badgeText ? `<span class="modal-candidate-badge">${badgeText}</span>` : '';
       const region = detail.district_name ? `${detail.region_name || ''} ${detail.district_name}` : (detail.region_name || '');
-      const pledgeCount = Array.isArray(detail.pledges) ? detail.pledges.length : 0;
+      const statusText = detail.status_note || detail.public_status || detail.version_label || '';
+      const metaParts = [region, statusText].filter(Boolean);
+      const metaHtml = metaParts.length
+        ? `<div class="modal-candidate-meta">${metaParts.map(part => `<span class="modal-candidate-meta-pill">${escapeHtml(part)}</span>`).join('')}</div>`
+        : '';
       const bioText = profile && profile.bio && !/\?\?+|�/.test(profile.bio) ? escapeHtml(profile.bio) : '';
       const links = [];
       if (profile && profile.profile_url) {
@@ -2330,7 +2360,7 @@
               <div class="modal-candidate-name">${escapeHtml(detail.name || '')}</div>
               ${badge}
             </div>
-            <div class="modal-candidate-meta">${escapeHtml(region)} · 공약 ${pledgeCount}개</div>
+            ${metaHtml}
             ${profile && profile.bio ? `<div class="modal-candidate-bio">${escapeHtml(profile.bio)}</div>` : ''}
             ${links.length ? `<div class="modal-candidate-links">${links.join('')}</div>` : ''}
           </div>
@@ -2343,7 +2373,11 @@
       const badgeText = escapeHtml(electionTypeLabels[detail.election_type] || detail.election_type || '');
       const badge = badgeText ? `<span class="modal-candidate-badge">${badgeText}</span>` : '';
       const region = detail.district_name ? `${detail.region_name || ''} ${detail.district_name}` : (detail.region_name || '');
-      const pledgeCount = Array.isArray(detail.pledges) ? detail.pledges.length : 0;
+      const statusText = detail.status_note || detail.public_status || detail.version_label || '';
+      const metaParts = [region, statusText].filter(Boolean);
+      const metaHtml = metaParts.length
+        ? `<div class="modal-candidate-meta">${metaParts.map(part => `<span class="modal-candidate-meta-pill">${escapeHtml(part)}</span>`).join('')}</div>`
+        : '';
       const bioText = profile && shouldDisplayExternalBio(profile.bio) ? escapeHtml(formatExternalBio(profile.bio)) : '';
       const links = [];
       const supportLink = profile && (profile.support_url || profile.profile_url);
@@ -2358,7 +2392,7 @@
               <div class="modal-candidate-name">${escapeHtml(detail.name || '')}</div>
               ${badge}
             </div>
-            <div class="modal-candidate-meta">${escapeHtml(region)} · 공약 ${pledgeCount}개</div>
+            ${metaHtml}
             ${bioText ? `<div class="modal-candidate-bio">${bioText}</div>` : ''}
             ${links.length ? `<div class="modal-candidate-links">${links.join('')}</div>` : ''}
           </div>
