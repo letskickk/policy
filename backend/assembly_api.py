@@ -88,7 +88,7 @@ def _set_cached(key: str, data: dict) -> None:
 # HTTP helper
 # ---------------------------------------------------------------------------
 def _http_get(url: str, params: dict, timeout: int = 10) -> Optional[dict]:
-    """HTTP GET → JSON. 실패 시 None."""
+    """HTTP GET → JSON. 실패 시 None. Rate limit(429) 시 캐시에 빈 결과 저장해 재시도 방지."""
     try:
         import urllib.request
         import urllib.error
@@ -98,9 +98,53 @@ def _http_get(url: str, params: dict, timeout: int = 10) -> Optional[dict]:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body)
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            logger.warning("assembly API rate limit exceeded (429): %s", url)
+            # Rate limit 시 30분간 빈 캐시를 저장해서 반복 호출 방지
+            _set_rate_limit_backoff(url)
+        else:
+            logger.warning("assembly API HTTP error %d: %s — %s", e.code, url, e)
+        return None
     except Exception as e:
         logger.warning("assembly API call failed: %s — %s", url, e)
         return None
+
+
+def _set_rate_limit_backoff(url: str) -> None:
+    """Rate limit 발생 시 30분간 해당 엔드포인트 호출을 억제."""
+    key = "ratelimit_" + hashlib.sha256(url.encode()).hexdigest()[:16]
+    expires = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT OR REPLACE INTO analysis_cache
+               (user_id, cache_key, request_fingerprint, result_payload, expires_at)
+               VALUES (0, ?, ?, ?, ?)""",
+            (key, "rate_limit_backoff", json.dumps({"url": url, "reason": "429"}), expires),
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
+def _is_rate_limited(url: str) -> bool:
+    """해당 엔드포인트가 rate limit 백오프 중인지 확인."""
+    key = "ratelimit_" + hashlib.sha256(url.encode()).hexdigest()[:16]
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT expires_at FROM analysis_cache WHERE cache_key = ?", (key,)
+        ).fetchone()
+        if not row:
+            return False
+        return row["expires_at"] > datetime.now(timezone.utc).isoformat()
+    except Exception:
+        return False
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -153,32 +197,38 @@ def search_local_assembly(
     bill_items = []
 
     # 1) 회의록 검색 (minutes.do)
-    minutes_params = {
-        "key": ASSEMBLY_API_KEY,
-        "type": "json",
-        "displayType": "list",
-        "startCount": "0",
-        "listCount": str(min(half, 100)),
-        "searchType": "ALL",
-        "searchKeyword": keyword_str,
-    }
-    minutes_data = _http_get(f"{CLIK_BASE_URL}/minutes.do", minutes_params)
-    if minutes_data:
-        minute_items = _parse_minutes_response(minutes_data)
+    minutes_url = f"{CLIK_BASE_URL}/minutes.do"
+    minutes_data = None
+    if not _is_rate_limited(minutes_url):
+        minutes_params = {
+            "key": ASSEMBLY_API_KEY,
+            "type": "json",
+            "displayType": "list",
+            "startCount": "0",
+            "listCount": str(min(half, 100)),
+            "searchType": "ALL",
+            "searchKeyword": keyword_str,
+        }
+        minutes_data = _http_get(minutes_url, minutes_params)
+        if minutes_data:
+            minute_items = _parse_minutes_response(minutes_data)
 
     # 2) 의안 검색 (bill.do) — BI_SJ 검색이 더 정확
-    bill_params = {
-        "key": ASSEMBLY_API_KEY,
-        "type": "json",
-        "displayType": "list",
-        "startCount": "0",
-        "listCount": str(min(half, 100)),
-        "searchType": "BI_SJ",
-        "searchKeyword": keyword_str,
-    }
-    bill_data = _http_get(f"{CLIK_BASE_URL}/bill.do", bill_params)
-    if bill_data:
-        bill_items = _parse_bill_response(bill_data)
+    bill_url = f"{CLIK_BASE_URL}/bill.do"
+    bill_data = None
+    if not _is_rate_limited(bill_url):
+        bill_params = {
+            "key": ASSEMBLY_API_KEY,
+            "type": "json",
+            "displayType": "list",
+            "startCount": "0",
+            "listCount": str(min(half, 100)),
+            "searchType": "BI_SJ",
+            "searchKeyword": keyword_str,
+        }
+        bill_data = _http_get(bill_url, bill_params)
+        if bill_data:
+            bill_items = _parse_bill_response(bill_data)
 
     if not minute_items and not bill_items and minutes_data is None and bill_data is None:
         return _empty_result("clik", region=region, keywords=keywords, reason="API 호출 실패")
@@ -305,7 +355,10 @@ def search_assembly_members(
         "searchKeyword": keyword,
     }
 
-    data = _http_get(f"{CLIK_BASE_URL}/assemblyinfo.do", params)
+    info_url = f"{CLIK_BASE_URL}/assemblyinfo.do"
+    if _is_rate_limited(info_url):
+        return _empty_result("assemblyinfo", reason="API rate limit 백오프 중")
+    data = _http_get(info_url, params)
     if data is None:
         return _empty_result("assemblyinfo", reason="API 호출 실패")
 
@@ -336,7 +389,10 @@ def search_policy_info(
         "searchKeyword": keyword_str,
     }
 
-    data = _http_get(f"{CLIK_BASE_URL}/policyinfoList.do", params)
+    policy_url = f"{CLIK_BASE_URL}/policyinfoList.do"
+    if _is_rate_limited(policy_url):
+        return _empty_result("policyinfo", reason="API rate limit 백오프 중")
+    data = _http_get(policy_url, params)
     if data is None:
         return _empty_result("policyinfo", reason="API 호출 실패")
 
@@ -389,7 +445,10 @@ def search_speeches(
     if region:
         params["localName"] = region
 
-    data = _http_get(f"{SPEECH_BASE_URL}/search", params)
+    speech_url = f"{SPEECH_BASE_URL}/search"
+    if _is_rate_limited(speech_url):
+        return _empty_result("speech", region=region, keywords=keywords, reason="API rate limit 백오프 중")
+    data = _http_get(speech_url, params)
 
     if data is None:
         return _empty_result("speech", region=region, keywords=keywords, reason="API 호출 실패")

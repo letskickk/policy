@@ -504,25 +504,33 @@
       loadingEl.style.display = 'block';
       errEl.style.display = 'none';
       actionBar.style.display = 'none';
-      resultEl.innerHTML = '<span class="result-empty">초안을 생성하는 중입니다...</span>';
+      resultEl.textContent = '';
+      _lastDraftText = '';
+      _lastResearch = null;
+
+      const detail = document.getElementById('topicDetail').value.trim();
+      const fullTopic = detail ? topic + '\n\n' + detail : topic;
+      const regionVal = document.getElementById('region').value.trim();
+
+      const reqBody = {
+        topic: fullTopic,
+        output_format: document.getElementById('outputFormat').value,
+        region: regionVal || null,
+        election_type: document.getElementById('electionType').value,
+        region_province: regionVal,
+      };
+
+      // Fire research request in parallel (non-blocking)
+      const researchPromise = fetch('/api/policy/research?topic=' + encodeURIComponent(fullTopic) + (regionVal ? '&region=' + encodeURIComponent(regionVal) : ''), {
+        credentials: 'include',
+      }).then(r => r.ok ? r.json() : null).catch(() => null);
 
       try {
-        const detail = document.getElementById('topicDetail').value.trim();
-        const fullTopic = detail ? topic + '\n\n' + detail : topic;
-
-        const body = {
-          topic: fullTopic,
-          output_format: document.getElementById('outputFormat').value,
-          region: document.getElementById('region').value.trim() || null,
-          election_type: document.getElementById('electionType').value,
-          region_province: document.getElementById('region').value.trim(),
-        };
-
-        const r = await fetch('/api/policy/draft', {
+        const r = await fetch('/api/policy/draft/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(body),
+          body: JSON.stringify(reqBody),
         });
 
         if (r.status === 401) {
@@ -533,20 +541,44 @@
           throw new Error('서버 오류 (' + r.status + ')');
         }
 
-        const data = await r.json();
-        if (data.error) {
-          errEl.textContent = data.draft_text || '초안 생성 중 오류가 발생했습니다.';
-          errEl.style.display = 'block';
-          return;
+        // Check if response is JSON (error case) or streaming text
+        const contentType = r.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await r.json();
+          if (data.error) {
+            errEl.textContent = data.draft_text || '초안 생성 중 오류가 발생했습니다.';
+            errEl.style.display = 'block';
+            return;
+          }
         }
 
-        _lastDraftText = data.draft_text || '';
-        _lastResearch = data.research || null;
-        resultEl.textContent = _lastDraftText || '생성된 초안이 없습니다.';
-        actionBar.style.display = 'flex';
+        // Stream text chunks
+        loadingEl.textContent = '초안을 생성하고 있습니다...';
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let chunks = [];
 
-        if (_lastResearch && (_lastResearch.ssot || data.rag_sources)) {
-          renderResearch(_lastResearch, data.rag_sources);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          chunks.push(text);
+          resultEl.textContent = chunks.join('');
+          resultEl.scrollTop = resultEl.scrollHeight;
+        }
+
+        _lastDraftText = chunks.join('');
+        if (!_lastDraftText) {
+          resultEl.innerHTML = '<span class="result-empty">생성된 초안이 없습니다.</span>';
+        } else {
+          actionBar.style.display = 'flex';
+        }
+
+        // Render research panel from parallel request
+        const research = await researchPromise;
+        if (research) {
+          _lastResearch = research;
+          renderResearch(research, null);
         } else {
           document.getElementById('researchPanel').style.display = 'none';
         }

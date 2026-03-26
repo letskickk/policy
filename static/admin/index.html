@@ -3,52 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>관리자 - 정책 멘토링</title>
-  <link rel="stylesheet" href="/static/css/common.css">
+  <title>관리자 홈 - 정책 멘토링</title>
   <style>
-    h1 { margin-bottom: 1.5rem; }
-    .card a { color: var(--brand-light); text-decoration: none; font-weight: 700; font-size: 1.1rem; }
-    .card a:hover { text-decoration: underline; }
-    .links form { display: inline; }
-    .links button { background: none; border: none; color: var(--brand-light); cursor: pointer; font-weight: 700; font-family: inherit; }
-    #pendingCount { font-weight: 900; color: #fbbf24; }
-    #pledgePendingCount { font-weight: 900; color: #fde047; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif; min-height: 100vh; padding: 2rem; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 640px) { body { padding: 1rem; } }
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
-<body>
-  <div class="wrap-md">
-    <h1>관리자</h1>
-    <div class="card">
-      <p style="margin-bottom: 0.5rem;">사용자 승인 대기: <span id="pendingCount">0</span>명</p>
-      <p style="margin-bottom: 0.5rem;">공약 승인 대기: <span id="pledgePendingCount">0</span>건</p>
-      <p style="margin-bottom: 1rem;">시민 제안 (신규): <span id="proposalCount" style="font-weight:900;color:#a78bfa;">0</span>건</p>
+<body class="rf-admin-page">
+  <div class="wrap">
+    <section class="hero">
+      <div class="section-title">관리자 데스크</div>
+      <h1>운영 우선순위부터 보는 관리자 홈</h1>
+      <p class="page-desc">승인 대기, 정책 기준 데이터 정리, 사용량, 런타임 상태를 한 화면에서 바로 이어서 처리합니다.</p>
+      <div class="summary-grid" style="margin-top:18px;">
+        <div class="stat-item">
+          <div class="meta">사용자 승인 대기</div>
+          <div id="pendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="meta">공약 승인 대기</div>
+          <div id="pledgePendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="meta">시민 제안 (신규)</div>
+          <div id="proposalCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <div class="section-title">정책 허브</div>
+      <div class="briefing-grid">
+        <a class="mini-item" href="/policy-lab" style="border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.06);">
+          <strong style="color:#c4b5fd;">정책 허브 (통합)</strong>
+          <div class="meta">AI 드래프터, 이슈 레이더, 제안 관리, 리뷰 관리를 한 화면에서 운영합니다.</div>
+        </a>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <div class="section-title">작업 큐</div>
+      <div class="briefing-grid">
+        <a class="mini-item" href="/admin/users">
+          <strong>사용자 관리</strong>
+          <div class="meta">승인, 거절, 정지, 일괄 업로드까지 한 곳에서 처리합니다.</div>
+        </a>
+        <a class="mini-item" href="/admin/candidates">
+          <strong>출마자·공약 관리</strong>
+          <div class="meta">공약 승인 인박스와 신규 등록 작업을 같은 화면에서 이어갑니다.</div>
+        </a>
+        <a class="mini-item" href="/admin/policy-ssot">
+          <strong>정책 SSOT 관리</strong>
+          <div class="meta">정책 원문, 논평, 법안, 규정의 기준 데이터를 정리합니다.</div>
+        </a>
+        <a class="mini-item" href="/admin/usage">
+          <strong>사용량 통계</strong>
+          <div class="meta">일간·월간 사용량 흐름과 과부하 징후를 먼저 확인합니다.</div>
+        </a>
+        <a class="mini-item" href="/admin/ops">
+          <strong>운영 상태</strong>
+          <div class="meta">벡터스토어, PDF 처리, 런타임 진단 상태를 점검합니다.</div>
+        </a>
+        <a class="mini-item" href="/map">
+          <strong>지역계 후보 지도</strong>
+          <div class="meta">실제 공개 화면으로 나가는 후보 지도를 바로 확인합니다.</div>
+        </a>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <div class="section-title">빠른 이동</div>
       <div class="links">
-        <a href="/admin/users">사용자 관리 (승인/거절)</a><br><br>
-        <a href="/admin/candidates">출마자·공약 관리 (등록/승인/거절)</a><br><br>
-        <a href="/admin/policy-ssot">정책 SSOT 관리</a><br><br>
-        <a href="/policy-lab" style="color:#a78bfa;font-size:1.15rem;">정책 허브 (드래프터·레이더·제안·리뷰 통합)</a><br><br>
-        <a href="/proposals">시민 정책 제안</a><br><br>
-        <a href="/admin/usage">사용량 통계</a><br><br>
-        <a href="/admin/ops">운영 상태 (벡터스토어·PDF)</a><br><br>
-        <a href="/map">지역별 후보 지도</a><br><br>
-        <a href="/my-pledges">내 공약 등록</a> · <a href="/dashboard">내 기록</a>
-        <form action="/api/auth/logout" method="POST" style="display:inline; margin-left:1rem">
-          <button type="submit">로그아웃</button>
+        <a class="nav-link" href="/proposals">시민 정책 제안</a>
+        <a class="nav-link" href="/my-pledges">내 공약 등록</a>
+        <a class="nav-link" href="/dashboard">내 기록</a>
+        <form action="/api/auth/logout" method="POST" style="display:inline-flex;">
+          <button type="submit" class="btn-secondary">로그아웃</button>
         </form>
       </div>
-    </div>
+    </section>
   </div>
   <script>
     (async () => {
       try {
         const r = await fetch('/api/admin/users/pending', { credentials: 'include' });
-        if (r.ok) { const d = await r.json(); document.getElementById('pendingCount').textContent = (d.users || []).length; }
+        if (r.ok) {
+          const d = await r.json();
+          document.getElementById('pendingCount').textContent = (d.users || []).length;
+        }
       } catch (e) {}
       try {
         const r2 = await fetch('/api/admin/candidates', { credentials: 'include' });
         if (r2.ok) {
           const list = await r2.json();
-          const pending = (Array.isArray(list) ? list : []).filter(c => (c.approval_status || 'PENDING') === 'PENDING').length;
+          const pending = (Array.isArray(list) ? list : []).filter((c) => (c.approval_status || 'PENDING') === 'PENDING').length;
           document.getElementById('pledgePendingCount').textContent = pending;
         }
       } catch (e) {}

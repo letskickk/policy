@@ -6,7 +6,7 @@
   <title>사용량 통계 - 정책 멘토링</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; }
+    body { font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; }
     .wrap { max-width: 1200px; margin: 0 auto; }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #f8fafc; }
     .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem; }
@@ -22,8 +22,9 @@
       h1 { font-size: 1.25rem; }
     }
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
-<body>
+<body class="rf-admin-page">
   <div class="wrap">
     <div class="links"><a href="/admin">← 관리자</a></div>
     <h1>사용량 통계</h1>
@@ -45,6 +46,7 @@
     </div>
   </div>
   <script>
+    function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     async function load() {
       const period = document.getElementById('period').value;
       const r = await fetch(`/api/admin/usage/stats?period=${period}`, { credentials: 'include' });
@@ -54,7 +56,7 @@
       tbody.innerHTML = '';
       for (const row of d.by_user || []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${row.email || row.user_id}</td><td>${row.count}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
+        tr.innerHTML = `<td>${esc(row.email || row.user_id)}</td><td>${esc(row.count)}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
         tbody.appendChild(tr);
       }
     }

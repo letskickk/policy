@@ -35,7 +35,7 @@
     }
 
     body{
-      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
       margin: 0;
       min-height: 100vh;
       background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
@@ -1129,9 +1129,75 @@
       font-weight: 700;
     }
     .footer a:hover{ text-decoration: underline; }
+  
+    @media (max-width: 640px){
+      .filter-row{
+        margin-bottom: 0.95rem;
+      }
+      .filter-select{
+        min-height: 46px;
+      }
+      .candidate-card{
+        border-radius: 16px;
+      }
+      .candidate-name{
+        font-size: 1rem;
+        line-height: 1.4;
+      }
+      .candidate-meta,
+      .candidate-position{
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .candidate-pledges{
+        padding: 0 0.9rem 1rem;
+      }
+      .pledge-item{
+        padding: 0.9rem;
+      }
+      .btn-detail{
+        min-height: 44px;
+      }
+      .modal-candidate-name-row{
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+      .modal-candidate-name{
+        font-size: 1.02rem;
+        line-height: 1.35;
+      }
+      .modal-candidate-badge{
+        max-width: 100%;
+        white-space: normal;
+        line-height: 1.35;
+      }
+      .modal-candidate-meta,
+      .modal-candidate-bio{
+        font-size: 0.92rem;
+        line-height: 1.65;
+      }
+      .modal-candidate-links{
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .modal-candidate-link{
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+        text-align: center;
+      }
+      .js-share-pledge{
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+      }
+    }
+
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
-<body>
+<body class="rf-workspace-page">
   <div class="top-bar">
     <div class="top-bar-left">
       <div class="brand">
@@ -2115,7 +2181,11 @@
         selectRegion(urlRegionCode, urlDistrictCode, urlElectionType);
       }
     }
-    initializePage();
+    initializePage().catch(err => {
+      console.error('map init error:', err);
+      const panel = document.getElementById('candidateList');
+      if (panel) panel.innerHTML = '<div style="padding:1rem;color:#f87171;">지도를 불러오지 못했습니다. 새로고침해주세요.</div>';
+    });
 
     districtSelect.addEventListener('change', function() {
       if (!selectedRegionCode) return;

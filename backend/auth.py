@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import secrets
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -349,26 +350,52 @@ def list_users_all() -> list[dict]:
         conn.close()
 
 
+SESSION_MAX_AGE_SECONDS = 7 * 24 * 3600  # 7 days
+
+
 def create_session_token(user: dict) -> str:
+    ts = int(time.time())
     data = f"{user['id']}:{user['email']}:{user['status']}:{user['role']}"
-    h = hashlib.sha256((SESSION_SECRET + data).encode()).hexdigest()
-    return f"{user['id']}.{h[:32]}"
+    h = hashlib.sha256((SESSION_SECRET + data + str(ts)).encode()).hexdigest()
+    return f"{user['id']}.{ts}.{h[:32]}"
 
 
 def verify_session_token(token: str) -> Optional[dict]:
     if not token:
         return None
     parts = token.split(".")
-    if len(parts) != 2:
-        return None
-    try:
-        uid = int(parts[0])
-    except ValueError:
-        return None
-    user = get_user(uid)
-    if not user:
-        return None
-    expected = create_session_token(user)
-    if not secrets.compare_digest(token, expected):
-        return None
-    return user
+    # Support both old format (id.hash) and new format (id.timestamp.hash)
+    if len(parts) == 2:
+        # Legacy token — no expiry, accept for backward compatibility
+        try:
+            uid = int(parts[0])
+        except ValueError:
+            return None
+        user = get_user(uid)
+        if not user:
+            return None
+        old_data = f"{user['id']}:{user['email']}:{user['status']}:{user['role']}"
+        old_h = hashlib.sha256((SESSION_SECRET + old_data).encode()).hexdigest()
+        old_expected = f"{user['id']}.{old_h[:32]}"
+        if not secrets.compare_digest(token, old_expected):
+            return None
+        return user
+    elif len(parts) == 3:
+        try:
+            uid = int(parts[0])
+            ts = int(parts[1])
+        except ValueError:
+            return None
+        if time.time() - ts > SESSION_MAX_AGE_SECONDS:
+            return None
+        user = get_user(uid)
+        if not user:
+            return None
+        # Recompute hash with the ORIGINAL timestamp from the token
+        data = f"{user['id']}:{user['email']}:{user['status']}:{user['role']}"
+        h = hashlib.sha256((SESSION_SECRET + data + str(ts)).encode()).hexdigest()
+        expected = f"{user['id']}.{ts}.{h[:32]}"
+        if not secrets.compare_digest(token, expected):
+            return None
+        return user
+    return None

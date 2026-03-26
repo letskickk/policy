@@ -24,7 +24,6 @@ from backend.config import (
     INDEX_CACHE_DIR,
     OPENAI_MODEL,
     CHAT_MODEL,
-    CARD_SUMMARY_MODEL,
     DEBUG_ENDPOINTS_ENABLED,
     PDF_S3_URI,
     USE_OPENAI_VECTOR_STORE,
@@ -631,6 +630,15 @@ def _extract_sub_from_sgg(sgg_name: str, wiw_name: str) -> str:
                     return sub
     return sgg
 
+
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    icon_path = ROOT_DIR / "static" / "favicon.ico"
+    if icon_path.exists():
+        return FileResponse(icon_path)
+    raise HTTPException(status_code=404, detail="favicon not found")
 
 @app.get("/api/signup/regions")
 def api_signup_regions():
@@ -1932,63 +1940,206 @@ def _clean_pledge_share_title(value: str) -> str:
     return text or "공약"
 
 
-def _fallback_pledge_share_summary(title: str, content: str) -> PledgeShareSummaryResponse:
+_PLEDGE_SHARE_SUMMARY_VERSION = "rule-v1"
+
+
+def _normalize_share_sentence(text: str, *, limit: int) -> str:
+    text = re.sub(r"<[^>]+>", " ", str(text or ""))
+    text = re.sub(r"\[[^\]]+\]", " ", text)
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" -:;,.")
+    if not text:
+        return ""
+    if re.search(r"(합니다|겠습니다|됩니다|입니다)$", text):
+        text = f"{text}."
+    elif re.search(r"(다|요|음|함|임|됨)$", text):
+        text = f"{text}."
+    elif not re.search(r"[.!?]$", text):
+        if text.endswith(("개선", "확대", "지원", "추진", "도입", "구축", "정비", "강화", "완화")):
+            text = f"{text}합니다."
+        else:
+            text = f"{text}입니다."
+    return _truncate_complete(text, limit)
+
+
+def _extract_share_summary_candidates(title: str, content: str) -> list[str]:
+    raw_lines = [line.strip() for line in str(content or "").replace("\r", "").split("\n") if line.strip()]
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def add(text: str) -> None:
+        normalized = _normalize_share_sentence(text, limit=120)
+        if not normalized:
+            return
+        key = re.sub(r"\W+", "", normalized)
+        if len(key) < 8 or key in seen:
+            return
+        seen.add(key)
+        candidates.append(normalized)
+
+    bullet_lines = []
+    for line in raw_lines:
+        cleaned = re.sub(r"^[-•·*\s]+|^\d+[.)]\s*|^[①-⑳]\s*", "", line).strip()
+        if cleaned != line or re.match(r"^[-•·*]|^\d+[.)]|^[①-⑳]", line):
+            bullet_lines.append(cleaned)
+    for line in bullet_lines:
+        add(line)
+
+    merged = " ".join(raw_lines)
+    for part in re.split(r"(?<=[.!?])\s+|\n+|(?<=다\.)\s+|(?<=요\.)\s+|(?<=니다\.)\s+", merged):
+        add(part)
+
+    add(title)
+    return candidates
+
+
+def _build_rule_based_pledge_share_summary(title: str, content: str) -> PledgeShareSummaryResponse:
     clean_title = _clean_pledge_share_title(title)
-    lines = [line.strip() for line in str(content or "").replace("\r", "").split("\n") if line.strip()]
-    merged = " ".join(lines)
-    headline = lines[0] if lines else merged or "핵심 내용을 준비 중입니다."
-    bullets = [
-        re.sub(r"^[-•·*\s]+|^\d+[.)]\s*|^[①-⑳]\s*", "", line).strip()
-        for line in lines
-        if re.match(r"^[-•·*]|^\d+[.)]|^[①-⑳]", line)
-    ]
-    if not bullets and merged:
-        bullets = [part.strip() for part in re.split(r"[.!?]\s+|다\.\s+|요\.\s+", merged) if part.strip()]
+    candidates = _extract_share_summary_candidates(clean_title, content)
+    headline = candidates[0] if candidates else "핵심 내용을 준비 중입니다."
+    bullets = [item for item in candidates[1:] if item != headline][:2]
     return PledgeShareSummaryResponse(
         title=_truncate_complete(clean_title, 12),
         headline=_truncate_complete(headline or clean_title, 55),
-        bullets=[_truncate_complete(item, 40) for item in bullets[:2]],
+        bullets=[_truncate_complete(item, 40) for item in bullets],
     )
+
+
+def _fallback_pledge_share_summary(title: str, content: str) -> PledgeShareSummaryResponse:
+    return _build_rule_based_pledge_share_summary(title, content)
+
+
+def _load_stored_share_summary(row) -> Optional[PledgeShareSummaryResponse]:
+    raw_bullets = row["share_summary_bullets"] if "share_summary_bullets" in row.keys() else None
+    bullets: list[str] = []
+    if raw_bullets:
+        try:
+            bullets = [str(item).strip() for item in json.loads(raw_bullets) if str(item).strip()][:2]
+        except Exception:
+            bullets = []
+    title = (row["share_summary_title"] if "share_summary_title" in row.keys() else "") or ""
+    headline = (row["share_summary_headline"] if "share_summary_headline" in row.keys() else "") or ""
+    if not title or not headline:
+        return None
+    return PledgeShareSummaryResponse(title=title, headline=headline, bullets=bullets)
+
+
+def _persist_pledge_share_summary(pledge_id: int, source_hash: str, summary: PledgeShareSummaryResponse) -> None:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE candidate_pledges
+            SET share_summary_title = ?,
+                share_summary_headline = ?,
+                share_summary_bullets = ?,
+                share_summary_version = ?,
+                share_summary_source_hash = ?,
+                share_summary_updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                summary.title,
+                summary.headline,
+                json.dumps(summary.bullets, ensure_ascii=False),
+                _PLEDGE_SHARE_SUMMARY_VERSION,
+                source_hash,
+                pledge_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _get_or_create_persisted_pledge_share_summary(payload: dict) -> PledgeShareSummaryResponse:
+    import hashlib
+
+    source_hash = hashlib.md5(f'{payload["title"]}|{payload["content"]}'.encode("utf-8")).hexdigest()
+    stored = payload.get("share_summary")
+    if (
+        stored is not None
+        and payload.get("share_summary_version") == _PLEDGE_SHARE_SUMMARY_VERSION
+        and payload.get("share_summary_source_hash") == source_hash
+    ):
+        return stored
+
+    summary = _build_rule_based_pledge_share_summary(payload["title"], payload["content"])
+    _persist_pledge_share_summary(int(payload["pledge_id"]), source_hash, summary)
+    return summary
 
 
 def _fetch_candidate_pledges_current_public(
     candidate_id: int,
     limit: Optional[int] = None,
 ) -> list[CandidatePledgeResponse]:
+    """공개용 공약 목록.
+
+    - APPROVED 공약: 현재 내용을 그대로 반환.
+    - PENDING 공약(수정 후 재승인 대기): review_history에서 마지막 APPROVED
+      스냅샷의 내용을 대신 반환 → 관리자가 새 버전을 승인하기 전까지 이전
+      승인 버전이 계속 공개됨.
+    - REJECTED / 스냅샷 없는 PENDING: 반환하지 않음.
+    """
     from backend.database import get_connection
 
     conn = get_connection()
     try:
-        sql = """
-            SELECT cp.id, cp.title, cp.content, cp.total_score,
-                   COALESCE(prh.approved_reviewed_at, cp.created_at) AS created_at
+        # 1) 현재 APPROVED인 공약
+        sql_approved = """
+            SELECT cp.id, cp.title, cp.content, cp.total_score, cp.created_at
             FROM candidate_pledges cp
-            LEFT JOIN (
-                SELECT pledge_id, MAX(reviewed_at) AS approved_reviewed_at
+            WHERE cp.candidate_id = ?
+              AND cp.approval_status = 'APPROVED'
+            ORDER BY cp.priority ASC, cp.id DESC
+        """
+        params_approved: tuple = (candidate_id,)
+        if limit is not None:
+            sql_approved += " LIMIT ?"
+            params_approved = (candidate_id, limit)
+        approved_rows = conn.execute(sql_approved, params_approved).fetchall()
+        approved_ids = {r["id"] for r in approved_rows}
+
+        # 2) PENDING인 공약 중 이전에 APPROVED 스냅샷이 있는 것 → 이전 버전으로 공개
+        sql_pending_fallback = """
+            SELECT cp.id AS pledge_id, h.title, h.content, h.total_score, h.reviewed_at AS created_at
+            FROM candidate_pledges cp
+            JOIN (
+                SELECT pledge_id, title, content, total_score, reviewed_at,
+                       ROW_NUMBER() OVER (PARTITION BY pledge_id ORDER BY reviewed_at DESC) AS rn
                 FROM candidate_pledge_review_history
                 WHERE approval_status = 'APPROVED'
                   AND pledge_id IS NOT NULL
-                GROUP BY pledge_id
-            ) prh ON prh.pledge_id = cp.id
+            ) h ON h.pledge_id = cp.id AND h.rn = 1
             WHERE cp.candidate_id = ?
-              AND cp.approval_status = 'APPROVED'
-            ORDER BY cp.priority ASC, datetime(COALESCE(prh.approved_reviewed_at, cp.created_at)) DESC, cp.id DESC
+              AND cp.approval_status = 'PENDING'
         """
-        params: tuple = (candidate_id,)
-        if limit is not None:
-            sql += " LIMIT ?"
-            params = (candidate_id, limit)
-        rows = conn.execute(sql, params).fetchall()
-        return [
-            CandidatePledgeResponse(
+        pending_rows = conn.execute(sql_pending_fallback, (candidate_id,)).fetchall()
+
+        results: list[CandidatePledgeResponse] = []
+        for r in approved_rows:
+            results.append(CandidatePledgeResponse(
                 id=r["id"],
                 title=r["title"],
                 content=r["content"],
                 total_score=r["total_score"],
                 created_at=r["created_at"],
-            )
-            for r in rows
-        ]
+            ))
+        for r in pending_rows:
+            if r["pledge_id"] not in approved_ids:
+                results.append(CandidatePledgeResponse(
+                    id=r["pledge_id"],
+                    title=r["title"],
+                    content=r["content"],
+                    total_score=r["total_score"],
+                    created_at=r["created_at"],
+                ))
+
+        if limit is not None:
+            results = results[:limit]
+        return results
     finally:
         conn.close()
 
@@ -2059,8 +2210,25 @@ def _weekly_snapshot_limit(candidate_id: int, as_of: str) -> Optional[int]:
         conn.close()
 
 
-def _is_public_nomination_status(status_note: Optional[str]) -> bool:
+def _is_public_nomination_status(status_note: Optional[str], applicant_match_id: Optional[int] = None) -> bool:
+    if applicant_match_id is not None:
+        return True
     return (status_note or "").strip() == "공천 확정"
+
+
+def _public_candidate_sql_condition() -> str:
+    return """
+        c.approval_status IN ('APPROVED', 'MIXED')
+        AND EXISTS (
+            SELECT 1 FROM candidate_pledges cp
+            WHERE cp.candidate_id = c.id
+              AND (cp.approval_status = 'APPROVED'
+                   OR (cp.approval_status = 'PENDING'
+                       AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                   WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
+        )
+        AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+    """
 
 
 def _leaderboard_reset_monday():
@@ -2801,9 +2969,12 @@ def get_regions():
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
             GROUP BY c.region_code
             """
         ).fetchall()
@@ -2840,13 +3011,16 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
-                  AND EXISTS (
-                      SELECT 1 FROM candidate_pledges cp
-                      WHERE cp.candidate_id = c.id
-                        AND cp.approval_status = 'APPROVED'
-                  )
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
+              )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                   AND c.region_code = ?
-                  AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
                 GROUP BY c.election_type
                 """,
                 (region_code,),
@@ -2859,12 +3033,15 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                 LEFT JOIN users u ON u.id = c.user_id
                 LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
                 WHERE c.approval_status IN ('APPROVED', 'MIXED')
-                  AND EXISTS (
-                      SELECT 1 FROM candidate_pledges cp
-                      WHERE cp.candidate_id = c.id
-                        AND cp.approval_status = 'APPROVED'
-                  )
-                  AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND EXISTS (
+                  SELECT 1 FROM candidate_pledges cp
+                  WHERE cp.candidate_id = c.id
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
+              )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                 GROUP BY c.election_type
                 """
             ).fetchall()
@@ -2888,20 +3065,24 @@ def get_districts(
     try:
         candidate_sql = """
             SELECT c.district_name, c.district_code, c.election_type,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
             WHERE c.region_code = ?
               AND c.approval_status IN ('APPROVED', 'MIXED')
-              AND c.district_name IS NOT NULL
-              AND TRIM(c.district_name) <> ''
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND c.district_name IS NOT NULL
+              AND TRIM(c.district_name) <> ''
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -2970,7 +3151,8 @@ def get_candidates(
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
@@ -2979,8 +3161,12 @@ def get_candidates(
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -3004,7 +3190,7 @@ def get_candidates(
 
     result: list[CandidateListItemResponse] = []
     for r in rows:
-        if not _is_public_nomination_status(r["applicant_status_note"]):
+        if not _is_public_nomination_status(r["applicant_status_note"], r["applicant_match_id"]):
             continue
         candidate_id = int(r["id"])
         resolved_district_code = _derive_district_code(code, r["district_code"], r["district_name"])
@@ -3038,7 +3224,8 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
             SELECT c.id, c.name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
                    c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status, c.user_id,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidates c
             LEFT JOIN users u ON u.id = c.user_id
             LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
@@ -3047,7 +3234,10 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
               AND EXISTS (
                   SELECT 1 FROM candidate_pledges cp
                   WHERE cp.candidate_id = c.id
-                    AND cp.approval_status = 'APPROVED'
+                    AND (cp.approval_status = 'APPROVED'
+                         OR (cp.approval_status = 'PENDING'
+                             AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
+                                         WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
             """,
             (candidate_id,),
@@ -3055,7 +3245,7 @@ def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default
     finally:
         conn.close()
 
-    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+    if row is None or not _is_public_nomination_status(row["applicant_status_note"], row["applicant_match_id"]):
         raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} 후보를 찾을 수 없습니다.")
 
     code = row["region_code"]
@@ -3117,66 +3307,15 @@ _share_summary_cache: dict[str, PledgeShareSummaryResponse] = {}
 
 @app.post("/api/pledge/share-summary", response_model=PledgeShareSummaryResponse, tags=["candidates"])
 def create_pledge_share_summary(body: PledgeShareSummaryRequest):
-    """공약 카드뉴스용 짧은 요약을 생성한다. 캐시 우선, 실패 시 규칙 기반 요약으로 대체한다."""
+    """공약 카드뉴스용 짧은 요약을 규칙 기반으로 생성한다."""
     import hashlib
-    cache_key = hashlib.md5((body.pledge_title or "") + "|" + (body.pledge_content or "")).hexdigest()
+    cache_key = hashlib.md5(f'{body.pledge_title or ""}|{body.pledge_content or ""}'.encode("utf-8")).hexdigest()
     if cache_key in _share_summary_cache:
         return _share_summary_cache[cache_key]
 
-    fallback = _fallback_pledge_share_summary(body.pledge_title, body.pledge_content)
-    try:
-        from openai import OpenAI
-        from backend.config import OPENAI_API_KEY
-
-        if not OPENAI_API_KEY:
-            return fallback
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        payload = {
-            "candidate_name": body.candidate_name,
-            "election_label": body.election_label or "",
-            "region": body.region or "",
-            "pledge_title": _clean_pledge_share_title(body.pledge_title),
-            "pledge_content": body.pledge_content,
-        }
-        response = client.chat.completions.create(
-            model=CARD_SUMMARY_MODEL,
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "당신은 선거 공약 카드뉴스 편집자다. "
-                        "원문에 없는 사실을 추가하지 말고, 유권자가 한눈에 읽히는 한국어 문장으로 짧게 정리하라. "
-                        "모든 항목은 반드시 완결된 문장이어야 한다. 문장이 중간에 끊기면 안 된다. "
-                        "글자 수를 초과하느니 내용을 과감히 줄여서라도 문장을 완성하라. "
-                        "반드시 JSON만 반환하고, 형식은 "
-                        '{"title":"12자 이내 핵심 키워드", "headline":"완결된 문장 55자 이내", '
-                        '"bullets":["완결된 문장 40자 이내", "완결된 문장 40자 이내"]} '
-                        "이다. bullets는 최대 2개다."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(payload, ensure_ascii=False),
-                },
-            ],
-        )
-        raw = response.choices[0].message.content or "{}"
-        data = json.loads(raw)
-        title = _truncate_complete(str(data.get("title") or fallback.title).strip(), 12)
-        headline = _truncate_complete(str(data.get("headline") or fallback.headline).strip(), 55)
-        bullets = [_truncate_complete(str(item).strip(), 40) for item in (data.get("bullets") or []) if str(item).strip()][:2]
-        if not headline:
-            headline = fallback.headline
-        if not bullets:
-            bullets = fallback.bullets
-        result = PledgeShareSummaryResponse(title=title, headline=headline, bullets=bullets)
-        _share_summary_cache[cache_key] = result
-        return result
-    except Exception:
-        _share_summary_cache[cache_key] = fallback
-        return fallback
+    result = _build_rule_based_pledge_share_summary(body.pledge_title, body.pledge_content)
+    _share_summary_cache[cache_key] = result
+    return result
 
 
 def _public_site_origin(request: Request) -> str:
@@ -3194,10 +3333,13 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
         row = conn.execute(
             """
             SELECT cp.id AS pledge_id, cp.title, cp.content, cp.total_score, cp.created_at,
+                   cp.share_summary_title, cp.share_summary_headline, cp.share_summary_bullets,
+                   cp.share_summary_version, cp.share_summary_source_hash,
                    c.id AS candidate_id, c.name AS candidate_name, c.election_type, c.election_level,
                    c.region_code, COALESCE(u.region_name, rc.region_name, c.region_code) AS region_name,
                    COALESCE(u.district_name, c.district_name) AS district_name,
-                   pa.status_note AS applicant_status_note
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
             FROM candidate_pledges cp
             JOIN candidates c ON c.id = cp.candidate_id
             LEFT JOIN users u ON u.id = c.user_id
@@ -3205,6 +3347,7 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             WHERE cp.id = ?
               AND cp.approval_status = 'APPROVED'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
               AND c.approval_status IN ('APPROVED', 'MIXED')
             LIMIT 1
             """,
@@ -3213,7 +3356,7 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
     finally:
         conn.close()
 
-    if row is None or not _is_public_nomination_status(row["applicant_status_note"]):
+    if row is None or not _is_public_nomination_status(row["applicant_status_note"], row["applicant_match_id"]):
         return None
 
     return {
@@ -3229,6 +3372,9 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
         "region_code": row["region_code"] or "",
         "region_name": row["region_name"] or "",
         "district_name": row["district_name"] or "",
+        "share_summary": _load_stored_share_summary(row),
+        "share_summary_version": row["share_summary_version"] or "",
+        "share_summary_source_hash": row["share_summary_source_hash"] or "",
     }
 
 
@@ -3239,13 +3385,19 @@ def share_pledge_page(pledge_id: int, request: Request):
         raise HTTPException(status_code=404, detail="공유할 공약을 찾을 수 없습니다.")
 
     profile = _fetch_candidate_external_profile(payload["candidate_id"])
-    election_label = ELECTION_LABELS.get(payload["election_type"], payload["election_type"] or "")
+    election_label_map = {
+        "metro_mayor": "광역단체장",
+        "local_mayor": "기초단체장",
+        "regional_council": "광역의원",
+        "local_council": "기초의원",
+    }
+    election_label = election_label_map.get(payload["election_type"], payload["election_type"] or "")
     region_label = (
         f'{payload["region_name"]} {payload["district_name"]}'.strip()
         if payload["district_name"]
         else payload["region_name"]
     ).strip()
-    summary = _fallback_pledge_share_summary(payload["title"], payload["content"])
+    summary = _get_or_create_persisted_pledge_share_summary(payload)
 
     origin = _public_site_origin(request)
     share_url = f"{origin}/share/pledges/{pledge_id}"
@@ -3369,11 +3521,6 @@ def share_pledge_page(pledge_id: int, request: Request):
       {f'<a class="button" href="{_html.escape(profile.support_url)}" target="_blank" rel="noopener noreferrer">후원하기</a>' if profile and profile.support_url else ''}
     </div>
   </main>
-  <script>
-    setTimeout(function() {{
-      window.location.replace({json.dumps(target_url)});
-    }}, 1200);
-  </script>
 </body>
 </html>"""
     return Response(content=html, media_type="text/html; charset=utf-8")
@@ -3425,7 +3572,7 @@ def _snapshot_candidate_pledges(
 ):
     rows = conn.execute(
         """
-        SELECT id, title, content, priority, total_score, analysis_result, analyzed_at, created_at
+        SELECT id, title, content, priority, total_score, analysis_result, analyzed_at, created_at, approval_status
         FROM candidate_pledges
         WHERE candidate_id = ?
         ORDER BY priority ASC, id ASC
@@ -3438,6 +3585,8 @@ def _snapshot_candidate_pledges(
     snapshot_group = uuid.uuid4().hex
     reviewed_value = reviewed_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for row in rows:
+        # Use each pledge's own approval_status, not the candidate-level one
+        pledge_status = row["approval_status"] or approval_status or "PENDING"
         conn.execute(
             """
             INSERT INTO candidate_pledge_review_history (
@@ -3451,7 +3600,7 @@ def _snapshot_candidate_pledges(
                 candidate_id,
                 snapshot_group,
                 source_action,
-                (approval_status or "PENDING").upper(),
+                pledge_status.upper(),
                 rejection_reason or None,
                 reviewed_value,
                 row["id"],
@@ -4502,8 +4651,8 @@ def api_leaderboard(
                     LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
                     WHERE cp.total_score IS NOT NULL
                       AND cp.approval_status = 'APPROVED'
-                      AND c.approval_status IN ('APPROVED', 'MIXED')
-                      AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+                      AND c.approval_status = 'APPROVED'
+                      AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ?
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?
                     GROUP BY c.id
@@ -4533,7 +4682,8 @@ def api_leaderboard(
                           wc.region_name,
                           COALESCE(u.district_name, wc.district_name) AS district_name,
                           wc.election_type, wc.avg_score, wc.scored_pledge_count,
-                          pa.status_note AS applicant_status_note
+                          pa.status_note AS applicant_status_note,
+                          u.applicant_match_id AS applicant_match_id
                    FROM weekly_champions wc
                    LEFT JOIN candidates c ON c.id = wc.candidate_id
                    LEFT JOIN users u ON u.id = c.user_id
@@ -4543,7 +4693,7 @@ def api_leaderboard(
                 (reset_monday.isoformat(),)
             ).fetchall()
         ]
-        champions = [champ for champ in champions if _is_public_nomination_status(champ.get("applicant_status_note"))]
+        champions = [champ for champ in champions if _is_public_nomination_status(champ.get("applicant_status_note"), champ.get("applicant_match_id"))]
         for champ in champions:
             try:
                 champ_week = _dt.date.fromisoformat(champ["week_start"])
@@ -4569,8 +4719,8 @@ def api_leaderboard(
             LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
             WHERE cp.total_score IS NOT NULL
               AND cp.approval_status = 'APPROVED'
-              AND c.approval_status IN ('APPROVED', 'MIXED')
-              AND TRIM(COALESCE(pa.status_note, '')) = '공천 확정'
+              AND c.approval_status = 'APPROVED'
+              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
         """
         params: list = []
 
@@ -4696,3 +4846,7 @@ def api_admin_repair_pledge_scores(request: Request):
 from backend.policy_admin_routes import register_policy_routes
 register_policy_routes(app, require_admin, _ensure_db_ready, _serve_html)
 
+
+@app.get("/hub-briefing", include_in_schema=False)
+def hub_briefing_page():
+    return FileResponse(ROOT_DIR / "static" / "hub-briefing.html")

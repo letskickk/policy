@@ -184,7 +184,7 @@ def _get_cached_draft(key: str) -> Optional[str]:
 def _set_cached_draft(key: str, result: str) -> None:
     from datetime import datetime, timedelta, timezone
 
-    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     conn = get_connection()
     try:
         conn.execute(

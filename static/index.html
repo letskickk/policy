@@ -52,7 +52,7 @@
     }
 
     body{
-      font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+      font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
       margin: 0;
       min-height: 100vh;
       background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
@@ -290,17 +290,21 @@
       align-items:center;
       justify-content:center;
       font-size: 1rem;
+      color: #f8fafc;
+      opacity: 1;
     }
     .feature-grid strong{
-      color: var(--text-strong);
+      color: #f8fafc;
       font-weight: 900;
+      opacity: 1;
     }
     .feature-grid .txt{
       font-size: 0.95rem;
       line-height: 1.55;
-      color: var(--text);
-      opacity: 0.95;
+      color: #e5edf7;
+      opacity: 1;
       word-break: keep-all;
+      text-shadow: none;
     }
 
     .footer{
@@ -1076,10 +1080,82 @@
         grid-template-columns: 1fr 1fr;
       }
     }
+  
+    @media (max-width: 640px){
+      .modal-candidate-name-row{
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+      .modal-candidate-name{
+        font-size: 1.02rem;
+        line-height: 1.35;
+      }
+      .modal-candidate-badge{
+        max-width: 100%;
+        white-space: normal;
+        line-height: 1.35;
+      }
+      .modal-candidate-meta,
+      .modal-candidate-bio{
+        font-size: 0.92rem;
+        line-height: 1.65;
+      }
+      .modal-candidate-links{
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .modal-candidate-link{
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+        text-align: center;
+      }
+      .pledge-item{
+        padding: 0.9rem;
+      }
+      .pledge-item h4{
+        font-size: 0.98rem;
+        line-height: 1.45;
+      }
+      .pledge-body{
+        font-size: 0.93rem;
+        line-height: 1.72;
+      }
+      .js-share-pledge{
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+      }
+    }
+
+    @media (max-width: 540px){
+      .leaderboard-card{
+        padding: 0.95rem;
+      }
+      .champion-item{
+        padding: 0.58rem;
+      }
+      .rank-row{
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 0.55rem;
+      }
+      .rank-actions,
+      .rank-score{
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .week-nav button,
+      .leaderboard-filters select{
+        min-height: 44px;
+      }
+    }
+
   </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
 
-<body>
+<body class="rf-landing-page">
   <div class="wrap">
     <div class="top-bar">
       <div class="top-bar-left">
@@ -1145,7 +1221,7 @@
     </div>
 
     <!-- ===== 리더보드 섹션 ===== -->
-    <section class="leaderboard-section" id="leaderboardSection" style="display:none;">
+    <section class="leaderboard-section" id="leaderboardSection">
       <div class="leaderboard-card">
         <div class="leaderboard-header">
           <div class="leaderboard-title" id="leaderboardTitle">
@@ -1715,7 +1791,7 @@
 
     function normalizeShareText(text) {
       return String(text || '')
-        .replace(/[??"'`]/g, '')
+        .replace(/[\u201C\u201D\u2018\u2019"'`]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();

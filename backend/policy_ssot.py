@@ -454,9 +454,9 @@ def upsert_policy_position(
 ) -> dict:
     title_clean = _normalize_text(title)
     if not title_clean:
-        raise HTTPException(status_code=400, detail="title? ?꾩닔?낅땲??")
+        raise HTTPException(status_code=400, detail="title은 필수입니다.")
     if len(title_clean) > 200:
-        raise HTTPException(status_code=400, detail="title 湲몄씠媛 ?덈Т 源곷땲??")
+        raise HTTPException(status_code=400, detail="title 길이가 너무 깁니다.")
     category_clean = _normalize_text(category) or "general"
     status_clean = _normalize_enum(status, POLICY_STATUS, "status", "draft")
     scope_clean = _normalize_enum(owner_scope, POLICY_OWNER_SCOPE, "owner_scope", "party")
@@ -468,7 +468,7 @@ def upsert_policy_position(
     effective_from_clean = _validate_date(effective_from, "effective_from")
     effective_to_clean = _validate_date(effective_to, "effective_to")
     if effective_from_clean and effective_to_clean and effective_from_clean > effective_to_clean:
-        raise HTTPException(status_code=400, detail="effective_from? effective_to蹂대떎 ??쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=400, detail="effective_from은 effective_to보다 앞을 수 없습니다.")
     version_clean = _normalize_optional_text(version_label)
     base_slug = slugify(title_clean)
     slug = _ensure_slug_unique("policy_positions", base_slug, position_id)
@@ -524,7 +524,7 @@ def upsert_policy_position(
         else:
             row = conn.execute("SELECT * FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
             if row is None:
-                raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
+                raise HTTPException(status_code=404, detail="정책 포지션을 찾을 수 없습니다.")
             previous = _row_to_position(row)
             conn.execute(
                 """
@@ -595,8 +595,16 @@ def upsert_policy_position(
     return get_policy_position(position_id)
 
 
+VALID_STATUS_TRANSITIONS = {
+    "draft": {"review", "archived"},
+    "review": {"draft", "approved", "archived"},
+    "approved": {"archived"},
+    "archived": {"draft"},
+}
+
+
 def update_policy_position_status(position_id: int, new_status: str, actor_id: Optional[int] = None) -> dict:
-    """포지션 상태만 변경 (draft → review → approved)."""
+    """포지션 상태만 변경. 허용된 전이만 가능 (draft→review→approved)."""
     status_clean = _normalize_enum(new_status, POLICY_STATUS, "status", "draft")
     conn = get_connection()
     try:
@@ -606,11 +614,36 @@ def update_policy_position_status(position_id: int, new_status: str, actor_id: O
         old_status = row["status"]
         if old_status == status_clean:
             return dict(row)
+        allowed = VALID_STATUS_TRANSITIONS.get(old_status, set())
+        if status_clean not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"상태 전이 불가: {old_status} → {status_clean} (허용: {', '.join(sorted(allowed))})",
+            )
         conn.execute(
             "UPDATE policy_positions SET status = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?",
             (status_clean, actor_id, position_id),
         )
-        _insert_position_version(conn, position_id, "update", f"status: {old_status} → {status_clean}", actor_id)
+        # Re-read the updated row for version snapshot
+        updated_row = dict(conn.execute("SELECT * FROM policy_positions WHERE id = ?", (position_id,)).fetchone())
+        _insert_position_version(
+            conn,
+            position_id=position_id,
+            version_label=None,
+            title=updated_row["title"],
+            category=updated_row["category"],
+            summary=updated_row.get("summary"),
+            official_summary=updated_row.get("official_summary"),
+            key_points=updated_row.get("key_points"),
+            relevance_note=updated_row.get("relevance_note"),
+            body=updated_row.get("body"),
+            status=status_clean,
+            owner_scope=updated_row["owner_scope"],
+            effective_from=updated_row.get("effective_from"),
+            effective_to=updated_row.get("effective_to"),
+            snapshot_type="update",
+            actor_id=actor_id,
+        )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -639,9 +672,9 @@ def upsert_policy_document(
 ) -> dict:
     title_clean = _normalize_text(title)
     if not title_clean:
-        raise HTTPException(status_code=400, detail="title? ?꾩닔?낅땲??")
+        raise HTTPException(status_code=400, detail="title은 필수입니다.")
     if len(title_clean) > 200:
-        raise HTTPException(status_code=400, detail="title 湲몄씠媛 ?덈Т 源곷땲??")
+        raise HTTPException(status_code=400, detail="title 길이가 너무 깁니다.")
     doc_type_clean = _normalize_enum(doc_type, DOC_TYPES, "doc_type", "other")
     status_clean = _normalize_enum(status, DOC_STATUS, "status", "active")
     summary_clean = _normalize_optional_text(summary)
@@ -689,7 +722,7 @@ def upsert_policy_document(
         else:
             row = conn.execute("SELECT id FROM policy_documents WHERE id = ?", (document_id,)).fetchone()
             if row is None:
-                raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
+                raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
             conn.execute(
                 """
                 UPDATE policy_documents
@@ -766,10 +799,10 @@ def link_policy_document(
     try:
         position = conn.execute("SELECT id FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
         if position is None:
-            raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="정책 포지션을 찾을 수 없습니다.")
         document = conn.execute("SELECT id FROM policy_documents WHERE id = ?", (document_id,)).fetchone()
         if document is None:
-            raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
         conn.execute(
             """
             INSERT INTO policy_document_links (position_id, document_id, relation_type, notes, created_by)
@@ -789,7 +822,7 @@ def link_policy_document(
     for item in links:
         if item["document_id"] == document_id and item["relation_type"] == rel_clean:
             return item
-    raise HTTPException(status_code=500, detail="?곌껐 ?????議고쉶???ㅽ뙣?덉뒿?덈떎.")
+    raise HTTPException(status_code=500, detail="관련 문서 조회에 실패했습니다.")
 
 
 def delete_policy_position(position_id: int) -> None:
@@ -797,7 +830,7 @@ def delete_policy_position(position_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_positions WHERE id = ?", (position_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="?뺤콉 ??ぉ??李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="정책 포지션을 찾을 수 없습니다.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -811,7 +844,7 @@ def delete_policy_document(document_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_documents WHERE id = ?", (document_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="臾몄꽌瑜?李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -917,7 +950,7 @@ def unlink_policy_document(link_id: int) -> None:
     try:
         cur = conn.execute("DELETE FROM policy_document_links WHERE id = ?", (link_id,))
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="?곌껐??李얠쓣 ???놁뒿?덈떎.")
+            raise HTTPException(status_code=404, detail="관련 정보를 찾을 수 없습니다.")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -2259,7 +2292,7 @@ def list_public_people() -> list[dict]:
 def get_public_person_detail(person_name: str) -> dict:
     target = _normalize_text(person_name)
     if not target or target in EXCLUDED_PUBLIC_PEOPLE:
-        raise HTTPException(status_code=404, detail="?몃Ъ??李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="인물을 찾을 수 없습니다.")
     conn = get_connection()
     try:
         rows = conn.execute(
@@ -2282,7 +2315,7 @@ def get_public_person_detail(person_name: str) -> dict:
     finally:
         conn.close()
     if not rows:
-        raise HTTPException(status_code=404, detail="?몃Ъ??李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="인물을 찾을 수 없습니다.")
 
     approved_positions = list_policy_positions(status="approved")
     documents: dict[int, dict] = {}
