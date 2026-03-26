@@ -9,10 +9,10 @@
 }
 
 :root {
-  --bg0: #04111d;
-  --bg1: #061a2d;
-  --bg2: #083252;
-  --bg3: #0f4a6d;
+  --bg0: #0a1929;
+  --bg1: #0d2240;
+  --bg2: #113a5c;
+  --bg3: #16587a;
 
   --text: #e8eef7;
   --text-strong: #ffffff;
@@ -25,16 +25,16 @@
   --brand-light: #ffd0a9;
   --brand-soft: rgba(255, 122, 26, 0.16);
 
-  --card: rgba(255, 255, 255, 0.07);
-  --card2: rgba(255, 255, 255, 0.04);
+  --card: rgba(255, 255, 255, 0.09);
+  --card2: rgba(255, 255, 255, 0.05);
   --border: rgba(148, 163, 184, 0.18);
   --border-strong: rgba(148, 163, 184, 0.3);
 
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.18);
 
-  --input-bg: rgba(0, 0, 0, 0.24);
-  --input-bg-focus: rgba(0, 0, 0, 0.32);
+  --input-bg: rgba(0, 0, 0, 0.18);
+  --input-bg-focus: rgba(0, 0, 0, 0.26);
   --input-border: rgba(148, 163, 184, 0.28);
 
   --cta-ring: rgba(255, 122, 26, 0.28);

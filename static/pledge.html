@@ -11,9 +11,9 @@
 
     /* --- [메인과 동일한 톤/팔레트] --- */
     :root{
-      --bg1:#04162b;
-      --bg2:#073053;
-      --bg3:#0a3b69;
+      --bg1:#0d2240;
+      --bg2:#113a5c;
+      --bg3:#16587a;
 
       --text:#f1f5f9;
       --text-strong:#ffffff;
@@ -110,6 +110,30 @@
       margin-bottom: 0.85rem;
       padding: 0.15rem 0;
     }
+    .top-bar .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .top-bar .page-heading {
+      margin: 0;
+    }
+    .top-bar .page-heading h1 {
+      font-size: 1.35rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin: 0 0 0.2rem 0;
+      letter-spacing: -0.03em;
+    }
+    .top-bar .page-heading .subtitle {
+      font-size: 0.9rem;
+      color: var(--text);
+      opacity: 0.9;
+      margin: 0;
+    }
     .brand {
       display: inline-flex;
       align-items: center;
@@ -151,7 +175,7 @@
     /* --- [헤더 / 히어로] --- */
     header, main { max-width: 880px; margin-left: auto; margin-right: auto; padding-left: 1.25rem; padding-right: 1.25rem; }
     .hero{
-      margin-bottom: 2.2rem; padding-top: 2rem;
+      margin-bottom: 1.2rem; padding-top: 1rem;
       text-align: center;
     }
     .hero h1{
@@ -880,38 +904,28 @@
 
 <body class="rf-workspace-page">
   <div class="top-bar">
-    <div class="brand">
-      <a href="/" class="brand-logo">
-        <img src="/static/logo.svg" alt="개혁신당 로고">
-        <span class="brand-inner">
-          <span class="brand-title">AI 정책 플랫폼</span>
-          <span class="brand-tag">정책 멘토링 | 공약 점검과 비교 분석</span>
-        </span>
-      </a>
-    </div>
-    <div class="nav-wrap">
-      <div id="loginRow" class="nav-login-row" style="display:none;"></div>
-      <div class="nav-btns">
-        <a href="/dashboard" class="nav-link">MY PAGE</a>
-        <a href="/pledge" class="nav-link" data-nav-page="pledge" style="display:none;">공약 분석</a>
-        <a href="/map" class="nav-link">지역 공약</a>
-
+    <div class="top-bar-left">
+      <div class="brand">
+        <a href="/" class="brand-logo">
+          <img src="/static/logo.svg" alt="개혁신당 로고">
+          <span class="brand-inner">
+            <span class="brand-title">AI 정책 플랫폼</span>
+            <span class="brand-tag">정책 멘토링 | 공약 점검과 비교 분석</span>
+          </span>
+        </a>
+      </div>
+      <div class="page-heading">
+        <h1>정책 멘토링</h1>
+        <p class="subtitle">AI가 공약을 종합 분석하고 보완 포인트를 제안합니다</p>
       </div>
     </div>
+    <nav class="nav">
+      <div id="loginRow" class="nav-login-row" style="display:none;"></div>
+      <a href="/dashboard" class="nav-link">MY PAGE</a>
+      <a href="/pledge" class="nav-link" data-nav-page="pledge" style="display:none;">공약 분석</a>
+      <a href="/map" class="nav-link">지역 공약</a>
+    </nav>
   </div>
-
-  <header class="hero">
-    <h1>
-      <span class="hero-title-line"><span class="hero-accent">AI 정책 멘토링</span>으로</span>
-      <span class="hero-title-line">공약의 완성도를 높이세요</span>
-    </h1>
-    <p class="subtitle">정강정책 부합성, 중앙당 공약 유사도, 당선인 비교, 중복 검사까지<br>AI가 종합 분석하고 보완 포인트를 제안합니다.</p>
-    <div class="hero-chips">
-      <span class="hero-chip">정강정책 부합 검사</span>
-      <span class="hero-chip">유사·중복 탐지</span>
-      <span class="hero-chip">종합점수 + 보완 제안</span>
-    </div>
-  </header>
 
   <main>
     <section class="card">
