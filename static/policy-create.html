@@ -360,6 +360,12 @@
           </div>
 
           <div class="field">
+            <label for="topicDetail">상세 설명 / 추가 코멘트</label>
+            <textarea id="topicDetail" rows="4" placeholder="배경, 원하는 방향, 포함할 내용 등 자유롭게 적어 주세요." maxlength="3000"></textarea>
+            <div class="field-hint">선택 입력입니다. 구체적일수록 초안 품질이 올라갑니다.</div>
+          </div>
+
+          <div class="field">
             <label for="outputFormat">출력 형식</label>
             <select id="outputFormat">
               <option value="정책 제안서">정책 제안서</option>
@@ -469,11 +475,11 @@
 
     (function prefillFromUrl() {
       const p = new URLSearchParams(location.search);
-      const fields = ['format', 'election_type', 'region', 'district', 'topic'];
+      const fields = ['format', 'election_type', 'region', 'district', 'topic', 'detail'];
       for (const key of fields) {
         const value = p.get(key);
         if (!value) continue;
-        const id = key === 'format' ? 'outputFormat' : key;
+        const id = key === 'format' ? 'outputFormat' : key === 'detail' ? 'topicDetail' : key;
         const el = document.getElementById(id);
         if (el) el.value = value;
       }
@@ -499,8 +505,11 @@
       resultEl.innerHTML = '<span class="result-empty">초안을 생성하는 중입니다...</span>';
 
       try {
+        const detail = document.getElementById('topicDetail').value.trim();
+        const fullTopic = detail ? topic + '\n\n' + detail : topic;
+
         const body = {
-          topic: topic,
+          topic: fullTopic,
           output_format: document.getElementById('outputFormat').value,
           region: document.getElementById('region').value.trim() || null,
           election_type: document.getElementById('electionType').value,
