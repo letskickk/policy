@@ -888,93 +888,129 @@
 
     @media (max-width: 540px){
       body{
-        padding: 0.7rem 0.28rem 1rem;
+        padding: 0.6rem 0.2rem 0.9rem;
+      }
+      header,
+      main{
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
       }
       .top-bar{
-        gap: 0.6rem;
+        gap: 0.5rem;
+        margin-bottom: 0.55rem;
+      }
+      .top-bar .top-bar-left{
+        gap: 0.7rem;
       }
       .top-bar .page-heading h1{
-        font-size: 1.45rem;
-        line-height: 1.22;
+        font-size: 1.4rem;
+        line-height: 1.2;
       }
       .top-bar .page-heading .subtitle{
-        font-size: 0.9rem;
-        line-height: 1.62;
+        font-size: 0.88rem;
+        line-height: 1.58;
+      }
+      .nav{
+        width: 100%;
+        gap: 0.4rem;
       }
       .nav-link{
         flex-basis: 100%;
         min-height: 44px;
       }
       .card{
-        padding: 0.82rem;
+        padding: 0.72rem;
+        border-radius: 15px;
+        margin-bottom: 1rem;
       }
       .form-label{
-        font-size: 1rem;
-        line-height: 1.45;
+        font-size: 0.98rem;
+        line-height: 1.42;
+        margin-bottom: 0.45rem;
       }
       .form-hint{
-        font-size: 0.9rem;
-        line-height: 1.7;
+        font-size: 0.88rem;
+        line-height: 1.62;
+        margin-bottom: 0.8rem;
       }
       .pledge-input-group{
-        border-radius: 14px;
+        border-radius: 13px;
       }
       .pledge-input-group .pledge-title-input{
-        padding: 0.8rem 0.82rem 0.5rem;
-        font-size: 1rem;
-        line-height: 1.4;
+        padding: 0.72rem 0.72rem 0.42rem;
+        font-size: 0.98rem;
+        line-height: 1.35;
       }
       .pledge-input-group .pledge-title-input::placeholder{
-        font-size: 0.96rem;
+        font-size: 0.92rem;
       }
       .pledge-input-group .pledge-divider{
-        margin: 0 0.82rem;
+        margin: 0 0.72rem;
       }
       .pledge-input-group .pledge-content-area,
       .pledge-input-group textarea{
-        min-height: 240px;
-        padding: 0.68rem 0.72rem 0.88rem;
-        font-size: 0.98rem;
-        line-height: 1.78;
+        min-height: 250px;
+        padding: 0.62rem 0.72rem 0.8rem;
+        font-size: 0.96rem;
+        line-height: 1.72;
       }
       .char-counter{
-        margin-top: 0.55rem;
-        font-size: 0.86rem;
+        margin-top: 0.45rem;
+        font-size: 0.84rem;
       }
       .btn-primary,
       #btn{
         min-height: 48px;
-        font-size: 1rem;
+        font-size: 0.98rem;
+        margin-top: 0.95rem;
+      }
+      .result-container,
+      .result-content,
+      .section-card-body,
+      .analysis-text{
+        font-size: 0.94rem;
+        line-height: 1.68;
       }
       .result-summary{
         flex-direction: column;
         align-items: flex-start;
       }
       .footer{
-        margin-top: 1.6rem;
-        padding-bottom: 4.5rem;
-        font-size: 0.82rem;
-        line-height: 1.7;
+        margin-top: 1.25rem;
+        padding-bottom: 3.8rem;
+        font-size: 0.8rem;
+        line-height: 1.65;
       }
       .shared-footer-shell,
       .site-footer{
         width: 100%;
       }
       .site-footer{
-        gap: 0.75rem;
-        padding-bottom: 0.25rem;
+        display: grid !important;
+        grid-template-columns: 1fr auto;
+        align-items: center !important;
+        gap: 0.5rem;
+        padding-top: 0.2rem;
+        padding-bottom: 0.15rem;
       }
       .site-footer .footer-left{
-        width: 100%;
-        justify-content: center;
+        width: auto;
+        justify-content: flex-start;
         flex-wrap: wrap;
-        text-align: center;
+        text-align: left;
+        gap: 0.35rem;
+        min-width: 0;
       }
       .site-footer .footer-right{
-        width: 100%;
+        width: auto;
+        margin-left: 0;
+        justify-self: end;
       }
       .site-footer .footer-right button{
-        min-height: 44px;
+        min-height: 38px;
+        width: auto;
+        padding: 0.25rem 0.72rem;
+        white-space: nowrap;
       }
     }
   </style>
