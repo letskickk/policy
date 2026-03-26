@@ -1055,8 +1055,76 @@
     }
 
     @media (max-width: 540px){
+      body{
+        padding: 1rem 0.7rem 1.5rem;
+      }
+      .hero-flow{
+        grid-template-columns: 1fr !important;
+      }
+      .top-bar{
+        gap: 0.6rem;
+      }
+      .top-bar .nav-wrap,
+      .top-bar .nav-btns,
+      .top-bar .nav-login-row{
+        width: 100%;
+      }
+      .top-bar .auth-email{
+        width: 100%;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .top-bar .auth-btn,
       .top-bar .nav-link{
+        width: 100%;
+        min-height: 44px;
         flex-basis: 100%;
+      }
+      .hero{
+        padding: 1.1rem;
+      }
+      h1{
+        font-size: 1.55rem;
+        line-height: 1.24;
+      }
+      .hero-desc{
+        font-size: 0.93rem;
+        line-height: 1.72;
+      }
+      .hero-desc br{
+        display: none;
+      }
+      .trust-chips{
+        gap: 0.35rem;
+      }
+      .trust-chip{
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+      .hero-step{
+        padding: 0.95rem 0.9rem;
+      }
+      .hero-step-title{
+        font-size: 0.95rem;
+      }
+      .hero-step p{
+        font-size: 0.84rem;
+      }
+      .sample-head{
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .feature-grid li{
+        align-items: flex-start;
+      }
+      .cta,
+      .cta.secondary{
+        min-height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
       .leaderboard-card{
         padding: 0.95rem;

@@ -887,11 +887,64 @@
     }
 
     @media (max-width: 540px){
+      body{
+        padding: 0.85rem 0.45rem 1.35rem;
+      }
+      .top-bar{
+        gap: 0.6rem;
+      }
+      .top-bar .page-heading h1{
+        font-size: 1.45rem;
+        line-height: 1.22;
+      }
+      .top-bar .page-heading .subtitle{
+        font-size: 0.9rem;
+        line-height: 1.62;
+      }
       .nav-link{
         flex-basis: 100%;
+        min-height: 44px;
       }
       .card{
-        padding: 1.05rem;
+        padding: 0.95rem;
+      }
+      .form-label{
+        font-size: 1rem;
+        line-height: 1.45;
+      }
+      .form-hint{
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+      .pledge-input-group{
+        border-radius: 14px;
+      }
+      .pledge-input-group .pledge-title-input{
+        padding: 0.8rem 0.82rem 0.5rem;
+        font-size: 1rem;
+        line-height: 1.4;
+      }
+      .pledge-input-group .pledge-title-input::placeholder{
+        font-size: 0.96rem;
+      }
+      .pledge-input-group .pledge-divider{
+        margin: 0 0.82rem;
+      }
+      .pledge-input-group .pledge-content-area,
+      .pledge-input-group textarea{
+        min-height: 240px;
+        padding: 0.72rem 0.82rem 0.92rem;
+        font-size: 0.98rem;
+        line-height: 1.78;
+      }
+      .char-counter{
+        margin-top: 0.55rem;
+        font-size: 0.86rem;
+      }
+      .btn-primary,
+      #btn{
+        min-height: 48px;
+        font-size: 1rem;
       }
       .result-summary{
         flex-direction: column;
@@ -937,7 +990,7 @@
         <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
       </div>
       <div class="pledge-input-group">
-        <input type="text" id="pledgeTitle" class="pledge-title-input" maxlength="100" placeholder="공약 제목을 입력하세요  (예: AI 기반 통학버스 안전 3대 혁신방안)" />
+        <input type="text" id="pledgeTitle" class="pledge-title-input" maxlength="100" placeholder="공약 제목을 입력하세요" />
         <div class="pledge-divider"></div>
         <textarea id="pledge" class="pledge-content-area" maxlength="3000" placeholder="공약 내용을 입력하세요&#13;&#10;&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축 ③ 교통안전공단 내 전담기구 설치&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소"></textarea>
       </div>

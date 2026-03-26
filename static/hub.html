@@ -56,7 +56,34 @@
     .body-truncated::after { content:''; position:absolute; bottom:0; left:0; right:0; height:80px; background:linear-gradient(transparent, rgba(7,24,38,0.95)); pointer-events:none; }
     .body-expand-btn { display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:8px 16px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#ffbf93; font-size:13px; font-weight:700; cursor:pointer; }
     @media (max-width:980px) { .hero,.briefing-grid,.poll-focus,.issues-grid { grid-template-columns:1fr; } }
-    @media (max-width:720px) { body { padding-inline:12px; } h1 { font-size:28px; } }
+    @media (max-width:720px) {
+      body { padding:16px 12px 28px; }
+      main { gap: 12px; }
+      .topbar,.hero,.card,.detail { padding:16px; }
+      .brand strong { font-size:20px; line-height:1.3; }
+      .brand span { font-size:12px; line-height:1.5; }
+      h1 { font-size:28px; line-height:1.2; }
+      .summary-grid { grid-template-columns:1fr; }
+      .stat strong { font-size:24px; }
+      .archive-link { width:100%; justify-content:center; }
+      .detail-title { font-size:24px; }
+      .detail-links a { word-break: break-word; }
+      .poll-info { grid-template-columns:1fr; }
+    }
+    @media (max-width:540px) {
+      body { padding:12px 10px 24px; }
+      .panel { border-radius:18px; }
+      .topbar,.hero,.card,.detail,.briefing-card,.issue-card,.mini-card,.poll-card { padding:14px; }
+      h1 { font-size:24px; }
+      .eyebrow { width:100%; justify-content:center; text-align:center; }
+      .briefing-card strong,.issue-card strong,.mini-card strong { font-size:16px; line-height:1.4; }
+      .muted { font-size:0.92rem; line-height:1.68; }
+      .detail-title { font-size:20px; }
+      .detail-meta { display:grid; grid-template-columns:1fr; }
+      .meta-pill { width:100%; text-align:center; }
+      details { padding:12px 14px; }
+      .body-expand-btn { width:100%; justify-content:center; min-height:44px; }
+    }
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>

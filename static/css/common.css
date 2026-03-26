@@ -788,3 +788,99 @@ textarea::placeholder {
     width: min(calc(100% - 1rem), var(--page-width));
   }
 }
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+iframe {
+  max-width: 100%;
+}
+
+pre,
+code,
+.table-scroll,
+.table-wrap {
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea,
+  button,
+  .btn,
+  .button,
+  a.btn,
+  a.button {
+    min-height: 44px;
+  }
+
+  .links {
+    gap: 0.65rem 0.75rem;
+  }
+
+  .subtitle {
+    font-size: 0.94rem;
+    line-height: 1.72;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  pre {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .site-footer {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .site-footer .footer-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .site-footer .footer-right button {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .contact-overlay {
+    padding: 0.75rem;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .contact-modal {
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+    padding: 1.15rem;
+    border-radius: 16px;
+  }
+
+  .contact-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .contact-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
