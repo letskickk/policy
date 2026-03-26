@@ -543,8 +543,8 @@
         resultEl.textContent = _lastDraftText || '생성된 초안이 없습니다.';
         actionBar.style.display = 'flex';
 
-        if (_lastResearch && _lastResearch.ssot) {
-          renderResearch(_lastResearch);
+        if (_lastResearch && (_lastResearch.ssot || data.rag_sources)) {
+          renderResearch(_lastResearch, data.rag_sources);
         } else {
           document.getElementById('researchPanel').style.display = 'none';
         }
@@ -557,17 +557,20 @@
       }
     }
 
-    function renderResearch(research) {
+    function renderResearch(research, ragSources) {
       const panel = document.getElementById('researchPanel');
       const content = document.getElementById('researchContent');
       const positions = (research.ssot || {}).related_positions || [];
       const docs = (research.ssot || {}).related_documents || [];
+      const rag = ragSources || {};
       let html = '';
 
       html += '<div class="summary-strip" style="margin-bottom:0.9rem;">';
       html += '<div class="summary-chip"><strong>분류</strong><span>' + escapeHtml(research.classified_topic || '미분류') + '</span></div>';
       html += '<div class="summary-chip"><strong>참고 공약</strong><span>' + positions.length + '건</span></div>';
       html += '<div class="summary-chip"><strong>참고 문서</strong><span>' + docs.length + '건</span></div>';
+      if (rag.winners2022) html += '<div class="summary-chip"><strong>2022 당선인</strong><span>참고됨</span></div>';
+      if (rag.platform) html += '<div class="summary-chip"><strong>정강정책</strong><span>참고됨</span></div>';
       html += '</div>';
 
       html += '<div class="research-list">';

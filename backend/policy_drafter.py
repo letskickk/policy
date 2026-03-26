@@ -339,6 +339,12 @@ def generate_policy_draft(
         "output_format": output_format,
         "from_cache": False,
         "model": CHAT_MODEL,
+        "rag_sources": {
+            "platform": bool(rag["platform"]),
+            "pledges": bool(rag["pledges"]),
+            "winners2022": bool(rag["winners2022"]),
+            "candidates": bool(rag["candidates"]),
+        },
     }
 
 
