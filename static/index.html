@@ -1341,7 +1341,7 @@
           if (pledgeBtn) pledgeBtn.href = '/pledge';
           // Update policy hub button for admin users
           const hubBtn = document.getElementById('btnPolicyHub');
-          if (d.role === 'admin') {
+          if (d.is_admin) {
             if (hubBtn) hubBtn.textContent = '정책 허브 (관리자)';
           } else {
             if (hubBtn) hubBtn.addEventListener('click', function(e) {

@@ -402,7 +402,7 @@
         const r = await fetch('/api/auth/me', { credentials: 'include' });
         if (r.ok) {
           const d = await r.json();
-          if (d.role === 'admin') {
+          if (d.is_admin) {
             document.getElementById('hubBackLink').style.display = '';
             document.querySelector('.links .back-link[href="/"]').style.display = 'none';
           }

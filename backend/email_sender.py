@@ -294,3 +294,83 @@ def send_signup_notification(
     except Exception as e:
         logger.exception("가입 알림 메일 발송 실패: %s", e)
         return False
+
+
+def send_proposal_confirmation(to_email: str, proposal_id: int, title: str, body_text: str, classified_topic: str) -> bool:
+    """시민 제안 접수 확인 이메일을 제출자에게 발송."""
+    if not SMTP_HOST or not SMTP_USER or not to_email:
+        return False
+
+    subject = f"[개혁신당] 시민 정책 제안이 접수되었습니다 (#{proposal_id})"
+    body = f"""안녕하세요.
+
+시민 정책 제안이 접수되었습니다. 검토 후 정책 흐름에 반영됩니다.
+
+[접수 정보]
+제안 번호: #{proposal_id}
+제목: {title}
+자동 분류: {classified_topic}
+
+[제안 내용]
+{body_text[:500]}{"..." if len(body_text) > 500 else ""}
+
+접수된 제안은 자동 분류를 거쳐 정책 검토 흐름으로 이어집니다.
+진행 상황은 추후 이메일로 안내드릴 수 있습니다.
+
+---
+이 메일은 발신 전용 주소에서 보내는 것으로, 회신은 되지 않습니다. 문의는 개혁신당 정책국(letskick@reformparty.kr)으로 연락해 주세요.
+"""
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+        logger.info("제안 접수 확인 메일 발송: %s (proposal #%d)", to_email, proposal_id)
+        return True
+    except Exception as e:
+        logger.exception("제안 접수 확인 메일 발송 실패: %s", e)
+        return False
+
+
+def send_proposal_admin_notification(proposal_id: int, title: str, body_text: str, author_name: str, classified_topic: str) -> bool:
+    """새 시민 제안이 접수되면 관리자에게 알림."""
+    if not SMTP_HOST or not SMTP_USER or not ADMIN_NOTIFY_EMAIL:
+        return False
+
+    display = author_name or "익명"
+    subject = f"[정책멘토링] 새 시민 제안: {title[:40]} ({display})"
+    body = f"""새로운 시민 정책 제안이 접수되었습니다.
+
+제안 번호: #{proposal_id}
+제출자: {display}
+제목: {title}
+자동 분류: {classified_topic}
+
+[제안 내용]
+{body_text[:800]}{"..." if len(body_text) > 800 else ""}
+
+정책 허브에서 검토하세요:
+{APP_BASE_URL}/policy-lab?tab=proposals
+"""
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = ADMIN_NOTIFY_EMAIL
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER and SMTP_PASS:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [ADMIN_NOTIFY_EMAIL], msg.as_string())
+        logger.info("제안 접수 관리자 알림 발송: proposal #%d → %s", proposal_id, ADMIN_NOTIFY_EMAIL)
+        return True
+    except Exception as e:
+        logger.exception("제안 접수 관리자 알림 발송 실패: %s", e)
+        return False

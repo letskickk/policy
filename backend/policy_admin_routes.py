@@ -954,9 +954,20 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
                 (body.title, body.body, body.author_name or None, body.author_email or None, topic),
             )
             conn.commit()
-            return {"status": "ok", "proposal_id": cur.lastrowid, "classified_topic": topic}
+            proposal_id = cur.lastrowid
         finally:
             conn.close()
+
+        # 이메일 알림 (비동기적으로 — 실패해도 접수는 성공)
+        try:
+            from backend.email_sender import send_proposal_confirmation, send_proposal_admin_notification
+            if body.author_email:
+                send_proposal_confirmation(body.author_email, proposal_id, body.title, body.body, topic)
+            send_proposal_admin_notification(proposal_id, body.title, body.body, body.author_name or "", topic)
+        except Exception:
+            pass  # 이메일 실패는 접수에 영향 없음
+
+        return {"status": "ok", "proposal_id": proposal_id, "classified_topic": topic}
 
     @app.get("/api/policy/proposals", tags=["policy", "citizen"])
     def list_citizen_proposals(
