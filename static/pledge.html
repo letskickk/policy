@@ -857,7 +857,7 @@
         <a href="/dashboard" class="nav-link">내 기록</a>
         <a href="/pledge" class="nav-link" data-nav-page="pledge" style="display:none;">공약 분석</a>
         <a href="/map" class="nav-link">지역 공약</a>
-        <a href="#" class="nav-link" id="navAiDraft" style="display:none;" onclick="openAiDraft()">AI 공약 생성</a>
+
       </div>
     </div>
   </div>
@@ -979,11 +979,6 @@
             row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
             row.style.display = 'block';
             fetchQuota();  // 로그인 확인 후 쿼터 표시
-          }
-          // Phase 5: AI 공약 생성 버튼 표시 (승인 사용자)
-          if (d.status === 'approved') {
-            const aiBtn = document.getElementById('navAiDraft');
-            if (aiBtn) aiBtn.style.display = '';
           }
         }
       } catch (e) {}
@@ -1750,15 +1745,6 @@
       }, 180000);
     });
 
-    // Phase 5: AI 공약 생성 — policy-create로 이동 (지역 정보 자동 전달)
-    function openAiDraft() {
-      const p = new URLSearchParams();
-      p.set('format', '지역공약');
-      if (meData.election_position || meData.election_type) p.set('election_type', meData.election_position || meData.election_type);
-      if (meData.region_name) p.set('region', meData.region_name);
-      if (meData.district_name) p.set('district', meData.district_name);
-      window.location.href = '/policy-create?' + p.toString();
-    }
 
   </script>
   <script src="/static/js/nec-form-modal.js"></script>

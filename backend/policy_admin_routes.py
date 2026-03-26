@@ -673,7 +673,16 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         )
         return {"status": "ok", "position_id": pos_id}
 
-    # ── 정책 생성 페이지 + 챗봇 페이지 라우트 ──
+    # ── 정책 연구소 진입점 + 정책 생성 페이지 + 시민 제안 페이지 라우트 ──
+
+    @app.api_route("/policy-lab", methods=["GET", "HEAD"])
+    def policy_lab_page():
+        """정책 연구소 메인 (독립 진입점)."""
+        res = serve_html("policy-lab.html")
+        if res is not None:
+            return res
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="policy-lab.html not found")
 
     @app.api_route("/policy-create", methods=["GET", "HEAD"])
     def policy_create_page(request: Request):
