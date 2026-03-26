@@ -99,10 +99,14 @@
     .top-bar .nav-login-row {
       display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin-right: 0.35rem;
     }
+    .top-bar .nav-login-row form {
+      margin: 0;
+    }
     .top-bar .auth-email {
       font-size: 0.8rem; color: var(--muted2); font-weight: 600;
       padding: 0.2rem 0.6rem; border-radius: 999px;
       background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18);
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .top-bar .auth-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -1069,13 +1073,24 @@
       .top-bar .nav-login-row{
         width: 100%;
       }
+      .top-bar .nav-login-row{
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.5rem;
+      }
       .top-bar .auth-email{
         width: 100%;
         min-height: 40px;
         display: inline-flex;
         align-items: center;
+        padding-right: 0.85rem;
       }
-      .top-bar .auth-btn,
+      .top-bar .auth-btn{
+        min-height: 40px;
+        flex-basis: auto;
+        width: auto;
+      }
       .top-bar .nav-link{
         width: 100%;
         min-height: 44px;
@@ -1372,9 +1387,10 @@
         if (r.ok) {
           const d = await r.json();
           const email = (d.email || '').trim();
+          const compactEmail = email.replace(/^([^@]{0,8})[^@]*(@.*)$/, '$1…$2');
           authRow.style.display = email ? '' : 'none';
           authRow.innerHTML = email
-            ? '<span class="auth-email">' + safe(email) + '</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="auth-btn auth-btn-logout">로그아웃</button></form>'
+            ? '<span class="auth-email" title="' + safe(email) + '">' + safe(compactEmail) + '</span><form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="auth-btn auth-btn-logout">로그아웃</button></form>'
             : '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
           window._userEmail = email;
