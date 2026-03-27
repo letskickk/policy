@@ -1710,7 +1710,8 @@
       lastDraftText = data.example || '';
     }
 
-    document.getElementById('draftHelperBtn').addEventListener('click', async function() {
+    const _draftHelperBtn = document.getElementById('draftHelperBtn');
+    if (_draftHelperBtn) _draftHelperBtn.addEventListener('click', async function() {
       const modal = document.getElementById('draftHelperModal');
       const content = document.getElementById('draftHelperContent');
       const adminRow = document.getElementById('draftHelperAdminRow');
