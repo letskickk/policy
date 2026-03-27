@@ -24,6 +24,13 @@ from backend.policy_ssot import (
 
 logger = logging.getLogger(__name__)
 
+DOC_TYPE_KO = {
+    "bill": "법안", "commentary": "논평", "poll": "여론조사",
+    "meeting": "회의록", "pledge": "공약", "platform": "정강정책",
+    "briefing": "브리핑", "position": "정책", "statement": "성명",
+    "press_release": "보도자료",
+}
+
 
 def research_topic(
     *,
@@ -231,7 +238,8 @@ def _build_briefing(
     if related_docs:
         lines.append(f"[관련 SSOT 문서] {len(related_docs)}건")
         for doc in related_docs[:10]:
-            lines.append(f"- [{doc['doc_type']}] {doc['title']} ({doc.get('published_at', '')})")
+            type_label = DOC_TYPE_KO.get(doc['doc_type'], doc['doc_type'])
+            lines.append(f"- ({type_label}) {doc['title']} ({doc.get('published_at', '')})")
             if doc.get("summary"):
                 lines.append(f"  {doc['summary'][:150]}")
         lines.append("")

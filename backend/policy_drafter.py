@@ -189,6 +189,13 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
         topic_results = f_topic.result()
         platform_results = f_platform.result()
 
+        logger.info(
+            "[drafter] VS search results: topic=%d, platform=%d",
+            len(topic_results), len(platform_results),
+        )
+        for fn, text in platform_results:
+            logger.debug("[drafter] platform result file=%s chars=%d", fn, len(text))
+
         # 정강정책 전용 결과 + 토픽 결과 중 정강 파일 합산
         platform_parts = [text for _, text in platform_results if text]
         pledge_parts = []
@@ -212,13 +219,19 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
         except Exception as e:
             logger.warning("drafter messages search failed: %s", e)
 
-        return {
+        result = {
             "platform": "\n\n".join(platform_parts)[:8000],
             "pledges": "\n\n".join(pledge_parts)[:8000],
             "winners2022": winners_text[:5000],
             "candidates": "",
             "messages": messages_text[:6000],
         }
+        logger.info(
+            "[drafter] RAG context sizes: platform=%d pledges=%d winners=%d messages=%d",
+            len(result["platform"]), len(result["pledges"]),
+            len(result["winners2022"]), len(result["messages"]),
+        )
+        return result
     except ImportError:
         return {"platform": "", "pledges": "", "winners2022": "", "candidates": "", "messages": ""}
 
