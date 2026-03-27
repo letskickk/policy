@@ -209,10 +209,8 @@ def chat_stream(session_id: str, user_message: str):
 
 
 def first_message_stream(session_id: str, topic: str):
-    """세션 시작 후 첫 AI 메시지 스트리밍."""
-    # 첫 유저 메시지로 주제를 넣어줌
-    first_user_msg = f"{topic}에 대한 공약을 만들고 싶습니다."
-    return chat_stream(session_id, first_user_msg)
+    """세션 시작 후 첫 AI 메시지 스트리밍. 유저 메시지를 그대로 전달."""
+    return chat_stream(session_id, topic)
 
 
 # ---------------------------------------------------------------------------

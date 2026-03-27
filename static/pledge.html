@@ -1081,24 +1081,31 @@
     .mentoring-tab:hover{color:var(--text);}
     .mentoring-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
     @media(max-width:640px){.mentoring-tab{padding:0.6rem 1rem;font-size:0.9rem;}}
-    /* ── 생성 탭 전용 ── */
-    .gen-profile-badge{display:inline-block;background:rgba(255,255,255,0.06);border:1px solid rgba(148,163,184,0.15);
-      border-radius:999px;padding:0.3rem 0.9rem;font-size:0.85rem;color:var(--muted);margin-bottom:1rem;}
-    .gen-form-label{display:block;font-weight:600;margin-bottom:0.4rem;color:var(--text);}
-    .gen-input{width:100%;padding:0.6rem 0.8rem;background:var(--input-bg,rgba(255,255,255,0.05));
-      border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;}
-    .gen-input:focus{outline:none;border-color:var(--brand);}
-    .gen-textarea{min-height:80px;resize:vertical;}
-    .gen-select{width:100%;padding:0.6rem 0.8rem;background:var(--input-bg,rgba(255,255,255,0.05));
-      border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;
-      appearance:none;-webkit-appearance:none;}
-    .gen-result{white-space:pre-wrap;line-height:1.75;font-size:0.95rem;min-height:120px;}
-    .gen-result.empty{color:var(--muted);text-align:center;padding:2rem 1rem;}
-    .gen-copy-btn{margin-top:0.75rem;padding:0.5rem 1.2rem;background:rgba(255,255,255,0.08);
-      border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:0.85rem;}
-    .gen-copy-btn:hover{background:rgba(255,255,255,0.12);}
-    .gen-error{color:#f87171;padding:1rem;text-align:center;}
-    .gen-field{margin-bottom:1rem;}
+    /* ── 공약 개발 챗봇 ── */
+    .chat-container{display:flex;flex-direction:column;min-height:480px;}
+    .chat-messages{flex:1;overflow-y:auto;max-height:500px;padding:1rem 0;display:flex;flex-direction:column;gap:0.6rem;}
+    .chat-msg{max-width:85%;padding:0.65rem 0.9rem;border-radius:12px;font-size:0.93rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+    .chat-msg.assistant{align-self:flex-start;background:rgba(255,255,255,0.07);color:var(--text);border-bottom-left-radius:4px;}
+    .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;}
+    .chat-msg.notice{align-self:center;background:rgba(96,165,250,0.1);color:var(--muted);font-size:0.82rem;max-width:90%;text-align:center;}
+    .chat-msg.streaming{opacity:0.85;}
+    .chat-input-bar{display:flex;gap:0.5rem;padding:0.75rem 0;border-top:1px solid var(--border);}
+    .chat-input-bar input{flex:1;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:0.93rem;}
+    .chat-input-bar input:focus{outline:none;border-color:var(--brand);background:var(--input-bg-focus);}
+    .chat-btn-send{padding:0.6rem 1rem;border:none;border-radius:8px;background:var(--brand);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;}
+    .chat-btn-send:hover{background:var(--brand-hover,#ec6710);}
+    .chat-btn-send:disabled{opacity:0.5;cursor:not-allowed;}
+    .chat-btn-finalize{padding:0.6rem 1rem;border:1px solid var(--brand);border-radius:8px;background:transparent;color:#ffb37a;font-weight:700;cursor:pointer;white-space:nowrap;font-size:0.85rem;}
+    .chat-btn-finalize:hover{background:rgba(255,122,26,0.1);}
+    .chat-btn-finalize:disabled{opacity:0.5;cursor:not-allowed;}
+    .chat-final-result{white-space:pre-wrap;line-height:1.75;font-size:0.95rem;min-height:120px;}
+    .chat-final-actions{display:flex;gap:0.5rem;margin-top:0.75rem;}
+    .chat-sessions-list{max-height:150px;overflow-y:auto;margin-bottom:0.5rem;display:none;}
+    .chat-sessions-list.open{display:block;}
+    .chat-session-item{padding:0.35rem 0.6rem;cursor:pointer;border-radius:6px;font-size:0.82rem;color:var(--muted);transition:background 0.15s;}
+    .chat-session-item:hover{background:rgba(255,255,255,0.06);color:var(--text);}
+    .chat-session-item .topic{color:var(--text);font-weight:600;}
+    .chat-session-item .meta{color:var(--muted);font-size:0.75rem;}
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1127,7 +1134,7 @@
   <main>
     <div class="mentoring-tab-bar" id="mentoringTabBar">
       <button class="mentoring-tab active" data-tab="check">공약 점검</button>
-      <button class="mentoring-tab" data-tab="generate" id="tabGenerate" style="display:none;">AI 초안 생성</button>
+      <button class="mentoring-tab" data-tab="generate" id="tabGenerate" style="display:none;">공약 개발</button>
     </div>
     <div id="paneCheck">
     <header class="hero">
@@ -1214,52 +1221,35 @@
     <div id="paneGenerate" style="display:none;">
       <header class="hero">
         <h1>
-          <span class="hero-title-line"><span class="hero-accent">AI 정책 초안</span></span>
-          <span class="hero-title-line">생성기</span>
+          <span class="hero-title-line"><span class="hero-accent">AI 공약 개발</span></span>
+          <span class="hero-title-line">챗봇</span>
         </h1>
-        <p class="subtitle">주제와 형식을 입력하면 당 정강정책·공약·법안을 참조한 맞춤형 정책 초안을 생성합니다.</p>
+        <p class="subtitle">AI 코치와 대화하면서 공약을 함께 만들어 보세요. 완성되면 정식 공약문을 자동 생성합니다.</p>
       </header>
-      <div id="genProfileBadge" class="gen-profile-badge" style="display:none;"></div>
-      <section class="card">
-        <div class="gen-field">
-          <label class="gen-form-label">정책 주제</label>
-          <input id="genTopic" class="gen-input" maxlength="500" placeholder="예: 청년 주거 안정 대책" />
+      <div style="text-align:right;margin-bottom:0.3rem;">
+        <span class="chat-sessions-toggle" style="color:var(--muted);font-size:0.82rem;cursor:pointer;text-decoration:underline;" onclick="chatToggleSessions()">이전 대화</span>
+      </div>
+      <div class="chat-sessions-list" id="chatSessionsList"></div>
+      <section class="card chat-container" id="chatContainer">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg notice">대화를 시작하세요. AI가 무엇을 만들지, 어떤 주제인지 물어봅니다.</div>
         </div>
-        <div class="gen-field">
-          <label class="gen-form-label">상세 설명 <span style="color:var(--muted);font-weight:400;">(선택)</span></label>
-          <textarea id="genDescription" class="gen-input gen-textarea" maxlength="2000" placeholder="배경, 대상, 기대효과 등을 자유롭게 적어주세요"></textarea>
-        </div>
-        <div class="gen-field">
-          <label class="gen-form-label">출력 형식</label>
-          <select id="genFormat" class="gen-select">
-            <option value="정책">정책</option>
-            <option value="지역공약">지역공약</option>
-            <option value="논평">논평</option>
-            <option value="메시지">메시지</option>
-          </select>
-        </div>
-        <button type="button" id="genBtn" class="btn-primary">AI 초안 생성</button>
-        <div id="genQuotaBar" class="quota-bar-wrap" style="display:none;">
-          <div class="quota-item">
-            <span class="quota-label">오늘</span>
-            <div class="quota-track"><div class="quota-fill" id="genQuotaDailyFill" style="width:0%"></div></div>
-            <span class="quota-count" id="genQuotaDailyText">-</span>
-          </div>
-          <div class="quota-item">
-            <span class="quota-label">이번달</span>
-            <div class="quota-track"><div class="quota-fill" id="genQuotaMonthlyFill" style="width:0%"></div></div>
-            <span class="quota-count" id="genQuotaMonthlyText">-</span>
-          </div>
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
+          <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
+          <button class="chat-btn-finalize" id="chatBtnFinalize" onclick="chatFinalize()" style="display:none;">공약문 생성</button>
         </div>
       </section>
-      <section class="card">
-        <h2 class="form-label">생성 결과</h2>
+      <section class="card" id="chatFinalSection" style="display:none;">
+        <h2 class="form-label">최종 공약문</h2>
         <div class="result-container">
-          <div id="genResult" class="gen-result empty">
-            주제를 입력하고 버튼을 눌러주세요.
-          </div>
+          <div id="chatFinalResult" class="chat-final-result"></div>
         </div>
-        <button type="button" id="genCopyBtn" class="gen-copy-btn" style="display:none;">결과 복사</button>
+        <div class="chat-final-actions">
+          <button type="button" class="btn-primary" onclick="chatCopyDraft()" id="chatCopyBtn">복사</button>
+          <button type="button" style="padding:0.5rem 1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;" onclick="chatBackToChat()">대화로 돌아가기</button>
+        </div>
       </section>
     </div><!-- /paneGenerate -->
   </main>
@@ -2108,174 +2098,248 @@
     });
 
     // ══════════════════════════════════════════════════════════
-    // ── AI 초안 생성 탭 핸들러 ──
+    // ── 공약 개발 챗봇 핸들러 ──
     // ══════════════════════════════════════════════════════════
     (function() {
-      var genBtn = document.getElementById('genBtn');
-      var genResult = document.getElementById('genResult');
-      var genCopyBtn = document.getElementById('genCopyBtn');
-      var genTopicEl = document.getElementById('genTopic');
-      var genDescEl = document.getElementById('genDescription');
-      var genFormatEl = document.getElementById('genFormat');
-      var genAbort = null;
-      var genFullText = '';
+      var chatSessionId = null;
+      var chatIsStreaming = false;
+      var chatMsgCount = 0;  // AI 응답 횟수 추적
+      var chatStarted = false;  // 첫 세션 시작 여부
 
-      function genShowError(msg) {
-        genResult.className = 'gen-result';
-        genResult.innerHTML = '<div class="gen-error">' + msg + '</div>';
-        genCopyBtn.style.display = 'none';
+      function chatAppendMsg(cls, text) {
+        var el = document.createElement('div');
+        el.className = 'chat-msg ' + cls;
+        el.textContent = text;
+        var msgs = document.getElementById('chatMessages');
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
       }
 
-      function genReset() {
-        genBtn.disabled = false;
-        genBtn.textContent = 'AI 초안 생성';
+      function chatSetEnabled(on) {
+        document.getElementById('chatInput').disabled = !on;
+        document.getElementById('chatBtnSend').disabled = !on;
+        var fin = document.getElementById('chatBtnFinalize');
+        if (fin) fin.disabled = !on;
       }
 
-      function genFetchQuota() {
-        fetch('/api/tools/quota', { credentials: 'include' }).then(function(r) {
-          if (!r.ok) return;
-          return r.json();
-        }).then(function(q) {
-          if (!q) return;
-          var bar = document.getElementById('genQuotaBar');
-          if (!bar) return;
-          var dp = Math.min(100, Math.round(q.daily_used / q.daily_limit * 100));
-          var mp = Math.min(100, Math.round(q.monthly_used / q.monthly_limit * 100));
-          document.getElementById('genQuotaDailyFill').style.width = dp + '%';
-          document.getElementById('genQuotaMonthlyFill').style.width = mp + '%';
-          document.getElementById('genQuotaDailyText').textContent = q.daily_used + '/' + q.daily_limit + '회';
-          document.getElementById('genQuotaMonthlyText').textContent = q.monthly_used + '/' + q.monthly_limit + '회';
-          bar.style.display = 'block';
-        }).catch(function(){});
-      }
-
-      genBtn.addEventListener('click', async function() {
-        var topic = (genTopicEl.value || '').trim();
-        if (!topic) {
-          genShowError('정책 주제를 입력해 주세요.');
-          genTopicEl.focus();
-          return;
-        }
-
-        genBtn.disabled = true;
-        genBtn.textContent = '생성 중...';
-        genResult.className = 'gen-result';
-        genResult.textContent = '';
-        genCopyBtn.style.display = 'none';
-        genFullText = '';
-
-        if (genAbort) genAbort.abort();
-        genAbort = new AbortController();
-        var timeout = setTimeout(function() {
-          genAbort.abort();
-          genShowError('응답 시간이 초과되었습니다. 다시 시도해주세요.');
-          genReset();
-        }, 60000);
-
-        var res;
-        try {
-          res = await fetch('/api/tools/generate/stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              topic: topic,
-              description: (genDescEl.value || '').trim(),
-              output_format: genFormatEl.value
-            }),
-            credentials: 'include',
-            signal: genAbort.signal
-          });
-        } catch(e) {
-          clearTimeout(timeout);
-          if (e.name === 'AbortError') return;
-          genShowError('서버 연결에 실패했습니다. 다시 시도해주세요.');
-          genReset();
-          return;
-        }
-
-        if (!res.ok) {
-          clearTimeout(timeout);
-          var data = {};
-          try { data = await res.json(); } catch(e) {}
-          var next = encodeURIComponent(location.pathname + location.search);
-          if (res.status === 401) { window.location.href = '/login?next=' + next; return; }
-          if (res.status === 403) { window.location.href = '/pending'; return; }
-          if (res.status === 429) {
-            genShowError((data.detail || '일일 사용 한도를 초과했습니다.') + '<br><a href="/dashboard" style="color:#ffb37a;">MY PAGE 확인</a>');
-          } else {
-            genShowError(data.detail || '서버 요청이 실패했습니다.');
-          }
-          genReset();
-          return;
-        }
-
-        var reader = res.body.getReader();
+      async function chatHandleSSE(resp, onSession) {
+        chatIsStreaming = true;
+        var reader = resp.body.getReader();
         var decoder = new TextDecoder();
         var buf = '';
+        var msgEl = null;
+
+        while (true) {
+          var r = await reader.read();
+          if (r.done) break;
+          buf += decoder.decode(r.value, { stream: true });
+          var lines = buf.split('\n');
+          buf = lines.pop();
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (!line.startsWith('data: ')) continue;
+            try {
+              var data = JSON.parse(line.slice(6));
+              if (data.type === 'session' && data.session_id) {
+                if (onSession) onSession(data.session_id);
+              } else if (data.type === 'chunk') {
+                if (!msgEl) msgEl = chatAppendMsg('assistant streaming', '');
+                msgEl.textContent += data.text;
+                var msgs = document.getElementById('chatMessages');
+                msgs.scrollTop = msgs.scrollHeight;
+              } else if (data.type === 'done') {
+                if (msgEl) msgEl.classList.remove('streaming');
+                msgEl = null;
+                chatMsgCount++;
+              } else if (data.type === 'error') {
+                chatAppendMsg('notice', '오류: ' + data.detail);
+              }
+            } catch(e) {}
+          }
+        }
+        chatIsStreaming = false;
+      }
+
+      // ── 메시지 전송 (세션 없으면 자동 시작) ──
+      window.chatSend = async function() {
+        if (chatIsStreaming) return;
+        var input = document.getElementById('chatInput');
+        var msg = (input.value || '').trim();
+        if (!msg) return;
+        input.value = '';
+
+        chatAppendMsg('user', msg);
+        chatSetEnabled(false);
 
         try {
-          while (true) {
-            var chunk = await reader.read();
-            if (chunk.done) break;
-            buf += decoder.decode(chunk.value, { stream: true });
-            var parts = buf.split('\n\n');
-            buf = parts.pop();
+          // 세션이 아직 없으면 → start API로 세션 시작
+          if (!chatSessionId) {
+            var resp = await fetch('/api/pledge-chat/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ topic: msg, output_format: '정책' }),
+              credentials: 'include'
+            });
 
-            for (var i = 0; i < parts.length; i++) {
-              var line = parts[i].trim();
-              if (!line.startsWith('data:')) continue;
-              var jsonStr = line.slice(5).trim();
-              var msg;
-              try { msg = JSON.parse(jsonStr); } catch(e) { continue; }
-
-              if (msg.type === 'chunk') {
-                genFullText += msg.text;
-                genResult.textContent = genFullText;
-              } else if (msg.type === 'final') {
-                genFullText = msg.text || genFullText;
-                genResult.textContent = genFullText;
-              } else if (msg.type === 'done') {
-                // 완료
-              } else if (msg.type === 'error') {
-                genShowError(msg.detail || '생성 중 오류가 발생했습니다.');
-                genReset();
-                clearTimeout(timeout);
-                return;
-              }
+            if (!resp.ok) {
+              var err = {};
+              try { err = await resp.json(); } catch(e) {}
+              var next = encodeURIComponent(location.pathname + location.search);
+              if (resp.status === 401) { window.location.href = '/login?next=' + next; return; }
+              if (resp.status === 403) { window.location.href = '/pending'; return; }
+              throw new Error(err.detail || resp.statusText);
             }
+
+            await chatHandleSSE(resp, function(sid) {
+              chatSessionId = sid;
+              chatStarted = true;
+              // 공약문 생성 버튼 표시
+              document.getElementById('chatBtnFinalize').style.display = '';
+            });
+          } else {
+            // 기존 세션에 메시지 전송
+            var resp = await fetch('/api/pledge-chat/' + chatSessionId + '/message', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: msg }),
+              credentials: 'include'
+            });
+
+            if (!resp.ok) {
+              var err = {};
+              try { err = await resp.json(); } catch(e) {}
+              throw new Error(err.detail || resp.statusText);
+            }
+
+            await chatHandleSSE(resp);
           }
         } catch(e) {
-          if (e.name === 'AbortError') return;
-          genShowError('연결이 끊어졌습니다. 다시 시도해주세요.');
-          genReset();
-          clearTimeout(timeout);
-          return;
+          chatAppendMsg('notice', '오류: ' + e.message);
+        } finally {
+          chatSetEnabled(true);
+          input.focus();
         }
+      };
 
-        clearTimeout(timeout);
-        genReset();
-        if (genFullText) {
-          genCopyBtn.style.display = '';
-          genResult.className = 'gen-result';
+      // ── 공약문 생성 ──
+      window.chatFinalize = async function() {
+        if (chatIsStreaming || !chatSessionId) return;
+        chatSetEnabled(false);
+        chatAppendMsg('notice', '공약문을 생성하고 있습니다...');
+
+        try {
+          var resp = await fetch('/api/pledge-chat/' + chatSessionId + '/finalize', {
+            method: 'POST',
+            credentials: 'include'
+          });
+
+          if (!resp.ok) {
+            var err = {};
+            try { err = await resp.json(); } catch(e) {}
+            throw new Error(err.detail || resp.statusText);
+          }
+
+          var finalEl = document.getElementById('chatFinalResult');
+          finalEl.textContent = '';
+          document.getElementById('chatFinalSection').style.display = '';
+
+          var reader = resp.body.getReader();
+          var decoder = new TextDecoder();
+          var buf = '';
+
+          while (true) {
+            var r = await reader.read();
+            if (r.done) break;
+            buf += decoder.decode(r.value, { stream: true });
+            var lines = buf.split('\n');
+            buf = lines.pop();
+            for (var i = 0; i < lines.length; i++) {
+              if (!lines[i].startsWith('data: ')) continue;
+              try {
+                var data = JSON.parse(lines[i].slice(6));
+                if (data.type === 'chunk') finalEl.textContent += data.text;
+                else if (data.type === 'error') finalEl.textContent += '\n[오류] ' + data.detail;
+              } catch(e) {}
+            }
+          }
+
+          // 최종 결과 영역으로 스크롤
+          document.getElementById('chatFinalSection').scrollIntoView({ behavior: 'smooth' });
+        } catch(e) {
+          chatAppendMsg('notice', '오류: ' + e.message);
+        } finally {
+          chatSetEnabled(true);
         }
-        genFetchQuota();
-      });
+      };
 
-      genCopyBtn.addEventListener('click', function() {
-        if (!genFullText) return;
-        navigator.clipboard.writeText(genFullText).then(function() {
-          genCopyBtn.textContent = '복사됨!';
-          setTimeout(function() { genCopyBtn.textContent = '결과 복사'; }, 1500);
-        }).catch(function() {
-          genCopyBtn.textContent = '복사 실패';
-          setTimeout(function() { genCopyBtn.textContent = '결과 복사'; }, 1500);
+      // ── 복사 ──
+      window.chatCopyDraft = function() {
+        var text = document.getElementById('chatFinalResult').textContent;
+        navigator.clipboard.writeText(text).then(function() {
+          var btn = document.getElementById('chatCopyBtn');
+          btn.textContent = '복사됨!';
+          setTimeout(function() { btn.textContent = '복사'; }, 1500);
         });
-      });
+      };
 
-      // 초기 쿼터 로드 (탭 전환 시)
-      var tabGenBtn = document.getElementById('tabGenerate');
-      if (tabGenBtn) {
-        tabGenBtn.addEventListener('click', function() { genFetchQuota(); });
+      window.chatBackToChat = function() {
+        document.getElementById('chatFinalSection').style.display = 'none';
+        var msgs = document.getElementById('chatMessages');
+        msgs.scrollTop = msgs.scrollHeight;
+      };
+
+      // ── 이전 대화 목록 ──
+      window.chatToggleSessions = function() {
+        var list = document.getElementById('chatSessionsList');
+        if (list.classList.contains('open')) { list.classList.remove('open'); return; }
+
+        fetch('/api/pledge-chat/sessions', { credentials: 'include' })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            list.innerHTML = '';
+            if (!data.sessions || !data.sessions.length) {
+              list.innerHTML = '<div class="chat-session-item"><span class="meta">이전 대화가 없습니다</span></div>';
+            } else {
+              data.sessions.forEach(function(s) {
+                var item = document.createElement('div');
+                item.className = 'chat-session-item';
+                var status = s.status === 'finalized' ? ' [완료]' : '';
+                item.innerHTML = '<span class="topic">' + escapeHtml(s.topic) + status + '</span> <span class="meta">' + (s.created_at || '') + '</span>';
+                item.onclick = function() { chatLoadSession(s.id); };
+                list.appendChild(item);
+              });
+            }
+            list.classList.add('open');
+          }).catch(function(){});
+      };
+
+      function chatLoadSession(sid) {
+        fetch('/api/pledge-chat/' + sid, { credentials: 'include' })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            chatSessionId = sid;
+            chatStarted = true;
+            var msgs = document.getElementById('chatMessages');
+            msgs.innerHTML = '';
+            data.messages.forEach(function(m) {
+              chatAppendMsg(m.role, m.content);
+            });
+
+            document.getElementById('chatBtnFinalize').style.display = '';
+            document.getElementById('chatSessionsList').classList.remove('open');
+
+            if (data.session.status === 'finalized') {
+              chatSetEnabled(false);
+              if (data.session.final_draft) {
+                document.getElementById('chatFinalResult').textContent = data.session.final_draft;
+                document.getElementById('chatFinalSection').style.display = '';
+              }
+            } else {
+              chatSetEnabled(true);
+            }
+          }).catch(function(){});
       }
     })();
 
