@@ -99,6 +99,28 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_hist_user_created ON analysis_history(user_id, created_at);
 
+        CREATE TABLE IF NOT EXISTS pledge_chat_sessions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            topic TEXT NOT NULL,
+            output_format TEXT NOT NULL DEFAULT '정책',
+            status TEXT NOT NULL DEFAULT 'active',
+            final_draft TEXT,
+            rag_context TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON pledge_chat_sessions(user_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS pledge_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES pledge_chat_sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON pledge_chat_messages(session_id, created_at);
+
         CREATE TABLE IF NOT EXISTS candidates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,

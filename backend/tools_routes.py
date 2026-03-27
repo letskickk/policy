@@ -221,3 +221,199 @@ def register_tools_routes(app, require_approved, _client_ip):
             return {"items": rows}
         finally:
             conn.close()
+
+    # ── 공약 개발 챗봇 ─────────────────────────────────────────
+
+    class ChatStartRequest(BaseModel):
+        topic: str = Field(..., min_length=1, max_length=500)
+        output_format: Literal["정책", "정책포지션", "지역공약", "논평", "메시지"] = "정책"
+
+    class ChatMessageRequest(BaseModel):
+        message: str = Field(..., min_length=1, max_length=2000)
+
+    @app.post("/api/pledge-chat/start")
+    def pledge_chat_start(body: ChatStartRequest, request: Request):
+        from backend.pledge_chat import create_session, first_message_stream
+        from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
+        from backend.usage_logger import log_usage
+
+        user = require_approved(request)
+        ip = _client_ip(request)
+
+        ok, msg = check_rate_limit_ip(ip)
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_rate_limit_user(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_quota(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+
+        session = create_session(user["id"], body.topic.strip(), body.output_format)
+        session_id = session["session_id"]
+
+        t0 = time.perf_counter()
+
+        def generate():
+            full_text = ""
+            had_error = False
+            try:
+                # 세션 ID를 먼저 전송
+                yield f"data: {json.dumps({'type': 'session', 'session_id': session_id}, ensure_ascii=False)}\n\n"
+
+                for chunk in first_message_stream(session_id, body.topic.strip()):
+                    full_text += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                had_error = True
+                logger.exception("[pledge-chat/start] error")
+                yield f"data: {json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
+
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            log_usage(
+                user_id=user["id"], ip=ip,
+                endpoint="/api/pledge-chat/start", action="chat_start",
+                input_chars=len(body.topic), output_chars=len(full_text),
+                model="", token_in=0, token_out=0, cost_estimate=None,
+                status_code=500 if had_error else 200, latency_ms=elapsed_ms,
+            )
+
+        return StreamingResponse(
+            generate(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.post("/api/pledge-chat/{session_id}/message")
+    def pledge_chat_message(session_id: str, body: ChatMessageRequest, request: Request):
+        from backend.pledge_chat import chat_stream, get_session
+        from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
+        from backend.usage_logger import log_usage
+
+        user = require_approved(request)
+        ip = _client_ip(request)
+
+        ok, msg = check_rate_limit_ip(ip)
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_rate_limit_user(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+
+        session = get_session(session_id, user["id"])
+        if not session:
+            raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+        if session["status"] == "finalized":
+            raise HTTPException(status_code=400, detail="이미 완료된 세션입니다.")
+
+        t0 = time.perf_counter()
+
+        def generate():
+            full_text = ""
+            had_error = False
+            try:
+                for chunk in chat_stream(session_id, body.message.strip()):
+                    full_text += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                had_error = True
+                logger.exception("[pledge-chat/message] error")
+                yield f"data: {json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
+
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            log_usage(
+                user_id=user["id"], ip=ip,
+                endpoint=f"/api/pledge-chat/{session_id}/message", action="chat_message",
+                input_chars=len(body.message), output_chars=len(full_text),
+                model="", token_in=0, token_out=0, cost_estimate=None,
+                status_code=500 if had_error else 200, latency_ms=elapsed_ms,
+            )
+
+        return StreamingResponse(
+            generate(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.post("/api/pledge-chat/{session_id}/finalize")
+    def pledge_chat_finalize(session_id: str, request: Request):
+        from backend.pledge_chat import finalize_stream, get_session
+        from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
+        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.config import OPENAI_MODEL
+
+        user = require_approved(request)
+        ip = _client_ip(request)
+
+        ok, msg = check_rate_limit_ip(ip)
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_rate_limit_user(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_quota(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+
+        session = get_session(session_id, user["id"])
+        if not session:
+            raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+
+        t0 = time.perf_counter()
+
+        def generate():
+            full_text = ""
+            had_error = False
+            try:
+                for chunk in finalize_stream(session_id):
+                    if chunk.startswith("[ERROR]"):
+                        had_error = True
+                        yield f"data: {json.dumps({'type': 'error', 'detail': chunk[7:]}, ensure_ascii=False)}\n\n"
+                    else:
+                        full_text += chunk
+                        yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'final', 'text': full_text}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                had_error = True
+                logger.exception("[pledge-chat/finalize] error")
+                yield f"data: {json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
+
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            out_chars = len(full_text)
+            token_in = out_chars // 2
+            token_out = out_chars // 2
+            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
+            log_usage(
+                user_id=user["id"], ip=ip,
+                endpoint=f"/api/pledge-chat/{session_id}/finalize", action="chat_finalize",
+                input_chars=0, output_chars=out_chars,
+                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                token_out=token_out if not had_error else 0,
+                cost_estimate=cost,
+                status_code=500 if had_error else 200, latency_ms=elapsed_ms,
+            )
+
+        return StreamingResponse(
+            generate(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/api/pledge-chat/sessions")
+    def pledge_chat_sessions(request: Request):
+        from backend.pledge_chat import list_sessions
+        user = require_approved(request)
+        return {"sessions": list_sessions(user["id"])}
+
+    @app.get("/api/pledge-chat/{session_id}")
+    def pledge_chat_detail(session_id: str, request: Request):
+        from backend.pledge_chat import get_session, get_messages
+        user = require_approved(request)
+        session = get_session(session_id, user["id"])
+        if not session:
+            raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+        messages = get_messages(session_id)
+        # 시스템 메시지는 프론트에 노출하지 않음
+        visible_msgs = [m for m in messages if m["role"] != "system"]
+        return {"session": session, "messages": visible_msgs}
