@@ -173,9 +173,12 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
                 logger.warning("drafter RAG search failed: %s", e)
                 return []
 
-        # 병렬 검색: ① 토픽 기반 공약 ② 정강정책 전용 ③ 2022 당선인
-        with ThreadPoolExecutor(max_workers=3) as ex:
-            f_topic = ex.submit(_vs_search, OPENAI_VECTOR_STORE_ID, topic, 8)
+        # 병렬 검색: ① 정책 VS 토픽 ② 지역 VS 토픽 ③ 정강정책 전용 ④ 2022 당선인
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            f_topic = ex.submit(_vs_search, OPENAI_VECTOR_STORE_ID, topic, 12)
+            f_regional = ex.submit(
+                _vs_search, OPENAI_REGIONAL_VECTOR_STORE_ID, topic, 8,
+            ) if OPENAI_REGIONAL_VECTOR_STORE_ID else None
             f_platform = ex.submit(
                 _vs_search, OPENAI_VECTOR_STORE_ID,
                 "개혁신당 강령 정강정책 이념 취지 가치", 5,
@@ -187,11 +190,12 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
             ) if OPENAI_WINNERS2022_VECTOR_STORE_ID else None
 
         topic_results = f_topic.result()
+        regional_results = f_regional.result() if f_regional else []
         platform_results = f_platform.result()
 
         logger.info(
-            "[drafter] VS search results: topic=%d, platform=%d",
-            len(topic_results), len(platform_results),
+            "[drafter] VS search results: topic=%d, regional=%d, platform=%d",
+            len(topic_results), len(regional_results), len(platform_results),
         )
         for fn, text in platform_results:
             logger.debug("[drafter] platform result file=%s chars=%d", fn, len(text))
@@ -199,7 +203,16 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
         # 정강정책 전용 결과 + 토픽 결과 중 정강 파일 합산
         platform_parts = [text for _, text in platform_results if text]
         pledge_parts = []
-        for fn, text in topic_results:
+        seen_texts = set()  # 중복 제거용
+
+        for fn, text in topic_results + regional_results:
+            if not text:
+                continue
+            text_key = text[:200]  # 앞 200자로 중복 판단
+            if text_key in seen_texts:
+                continue
+            seen_texts.add(text_key)
+
             if "정강" in fn or "정책" in fn:
                 if text not in platform_parts:
                     platform_parts.append(text)

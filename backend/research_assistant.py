@@ -122,6 +122,24 @@ def research_topic(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+# 의미 유사 키워드 확장 맵 (검색 다양성 향상)
+_SYNONYM_MAP = {
+    "주거": ["주택", "임대", "거주", "전세", "월세", "아파트"],
+    "주택": ["주거", "임대", "거주"],
+    "청년": ["2030", "MZ", "사회초년생"],
+    "고령": ["노인", "어르신", "시니어", "고령자"],
+    "노인": ["고령", "어르신", "시니어"],
+    "교통": ["대중교통", "버스", "지하철", "도로"],
+    "환경": ["기후", "탄소", "에너지"],
+    "일자리": ["고용", "취업", "채용", "근로"],
+    "고용": ["일자리", "취업", "근로"],
+    "교육": ["학교", "학습", "등록금"],
+    "복지": ["돌봄", "사회서비스", "지원"],
+    "안전": ["재난", "방범", "치안"],
+    "경제": ["산업", "기업", "성장"],
+}
+
+
 def _extract_topic_keywords(topic: str, classified_label: str) -> list[str]:
     """주제 문자열과 분류 결과에서 검색 키워드 추출."""
     # 기본: 사용자 입력 토큰
@@ -137,7 +155,14 @@ def _extract_topic_keywords(topic: str, classified_label: str) -> list[str]:
                     tokens.append(kw)
             break
 
-    return tokens
+    # 의미 유사 키워드 확장 (검색 다양성 향상)
+    expanded = list(tokens)
+    for t in tokens:
+        for syn in _SYNONYM_MAP.get(t, []):
+            if syn not in expanded:
+                expanded.append(syn)
+
+    return expanded
 
 
 def _find_related_documents(
