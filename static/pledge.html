@@ -157,16 +157,9 @@
       display: inline-block;
       filter: none;
     }
-    .top-bar .brand-title {
-      font-size: 0.95rem !important;
-      font-weight: 800 !important;
-      letter-spacing: -0.01em !important;
-      color: rgba(255,255,255,0.92);
-    }
     .top-bar .brand-tag {
       display: block;
       margin-top: 0.22rem;
-      font-size: 0.76rem !important;
       color: #ffb37a;
       letter-spacing: -0.01em;
       font-weight: 800;
@@ -1173,7 +1166,7 @@
           if (d.email) {
             const e = String(d.email).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const row = document.getElementById('loginRow');
-            row.innerHTML = e + ' 로그인 중 <form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
+            row.innerHTML = '<form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
             row.style.display = 'block';
             fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
