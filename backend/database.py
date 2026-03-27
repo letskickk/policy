@@ -498,7 +498,61 @@ def init_db() -> None:
             ON citizen_proposals(status, created_at);
         """)
 
+        # ── Hub FTS5 전문 검색 인덱스 ──
+        conn.executescript("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS hub_docs_fts USING fts5(
+            title, summary, body,
+            content=policy_documents, content_rowid=id,
+            tokenize='unicode61'
+        );
+        CREATE VIRTUAL TABLE IF NOT EXISTS hub_positions_fts USING fts5(
+            title, summary, body,
+            content=policy_positions, content_rowid=id,
+            tokenize='unicode61'
+        );
+        """)
+
+        # FTS 동기화 트리거 (policy_documents)
+        for op, trig_body in [
+            ("INSERT", "INSERT INTO hub_docs_fts(rowid, title, summary, body) VALUES (new.id, new.title, new.summary, new.body)"),
+            ("DELETE", "INSERT INTO hub_docs_fts(hub_docs_fts, rowid, title, summary, body) VALUES('delete', old.id, old.title, old.summary, old.body)"),
+            ("UPDATE", "INSERT INTO hub_docs_fts(hub_docs_fts, rowid, title, summary, body) VALUES('delete', old.id, old.title, old.summary, old.body); INSERT INTO hub_docs_fts(rowid, title, summary, body) VALUES (new.id, new.title, new.summary, new.body)"),
+        ]:
+            try:
+                conn.execute(f"""
+                    CREATE TRIGGER IF NOT EXISTS hub_docs_fts_ai_{op.lower()}
+                    AFTER {op} ON policy_documents BEGIN {trig_body}; END
+                """)
+            except sqlite3.OperationalError:
+                pass
+
+        # FTS 동기화 트리거 (policy_positions)
+        for op, trig_body in [
+            ("INSERT", "INSERT INTO hub_positions_fts(rowid, title, summary, body) VALUES (new.id, new.title, new.summary, new.body)"),
+            ("DELETE", "INSERT INTO hub_positions_fts(hub_positions_fts, rowid, title, summary, body) VALUES('delete', old.id, old.title, old.summary, old.body)"),
+            ("UPDATE", "INSERT INTO hub_positions_fts(hub_positions_fts, rowid, title, summary, body) VALUES('delete', old.id, old.title, old.summary, old.body); INSERT INTO hub_positions_fts(rowid, title, summary, body) VALUES (new.id, new.title, new.summary, new.body)"),
+        ]:
+            try:
+                conn.execute(f"""
+                    CREATE TRIGGER IF NOT EXISTS hub_positions_fts_ai_{op.lower()}
+                    AFTER {op} ON policy_positions BEGIN {trig_body}; END
+                """)
+            except sqlite3.OperationalError:
+                pass
+
         conn.commit()
         logger.info("DB 초기화 완료: %s", DB_PATH)
+    finally:
+        conn.close()
+
+
+def rebuild_hub_fts() -> None:
+    """기존 데이터로 FTS 인덱스 재구축 (백필)."""
+    conn = get_connection()
+    try:
+        conn.execute("INSERT INTO hub_docs_fts(hub_docs_fts) VALUES('rebuild')")
+        conn.execute("INSERT INTO hub_positions_fts(hub_positions_fts) VALUES('rebuild')")
+        conn.commit()
+        logger.info("Hub FTS 인덱스 재구축 완료")
     finally:
         conn.close()

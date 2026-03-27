@@ -242,6 +242,8 @@ def _ensure_startup():
         print("[1/2] DB 초기화...", flush=True)
         init_db()
         _db_ready = True
+        from backend.database import rebuild_hub_fts
+        rebuild_hub_fts()
         print("[1/2] DB 초기화 완료", flush=True)
         
         print("[2/2] 인덱스/Vector Store 준비...", flush=True)
@@ -4900,4 +4902,15 @@ def api_contact(body: ContactRequest, request: Request):
 
 @app.get("/hub-briefing", include_in_schema=False)
 def hub_briefing_page():
-    return FileResponse(ROOT_DIR / "static" / "hub-briefing.html")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/hub", status_code=301)
+
+@app.get("/hub/archive", include_in_schema=False)
+def hub_archive_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/hub", status_code=301)
+
+@app.get("/policy-lab", include_in_schema=False)
+def policy_lab_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/hub", status_code=301)

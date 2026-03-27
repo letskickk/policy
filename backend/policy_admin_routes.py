@@ -1017,3 +1017,112 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             return {"status": "ok", "new_status": body.status}
         finally:
             conn.close()
+
+    # ── Hub 통합 검색 ──────────────────────────────────────────
+
+    DOC_TYPE_LABELS = {
+        "bill": "법안",
+        "commentary": "논평",
+        "poll": "여론조사",
+        "meeting": "회의록",
+        "pledge": "공약",
+        "platform": "정강정책",
+        "briefing": "브리핑",
+        "position": "정책포지션",
+    }
+
+    @app.get("/api/admin/hub/search")
+    def hub_search(
+        request: Request,
+        q: str = Query(default="", max_length=200),
+        doc_type: str = Query(default="", max_length=40),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ):
+        require_admin(request)
+        conn = get_connection()
+        try:
+            results = []
+            if q.strip():
+                safe_q = q.strip().replace('"', '""')
+                fts_query = f'"{safe_q}"'
+                type_filter = "AND d.doc_type = ?" if doc_type else ""
+                type_params = (doc_type,) if doc_type else ()
+
+                # 문서 검색
+                rows_docs = conn.execute(
+                    f"""
+                    SELECT d.id, d.title, d.doc_type, d.summary, d.published_at, d.speaker_name,
+                           'document' AS source
+                    FROM hub_docs_fts f
+                    JOIN policy_documents d ON d.id = f.rowid
+                    WHERE hub_docs_fts MATCH ? AND d.status = 'active' {type_filter}
+                    ORDER BY rank
+                    LIMIT ? OFFSET ?
+                    """,
+                    (fts_query, *type_params, limit, offset),
+                ).fetchall()
+
+                # 포지션 검색 (doc_type 필터가 'position'이거나 비어있을 때)
+                if not doc_type or doc_type == "position":
+                    rows_pos = conn.execute(
+                        """
+                        SELECT p.id, p.title, 'position' AS doc_type, p.summary, p.created_at AS published_at,
+                               NULL AS speaker_name, 'position' AS source
+                        FROM hub_positions_fts f
+                        JOIN policy_positions p ON p.id = f.rowid
+                        WHERE hub_positions_fts MATCH ? AND p.status != 'archived'
+                        ORDER BY rank
+                        LIMIT ? OFFSET ?
+                        """,
+                        (fts_query, limit, offset),
+                    ).fetchall()
+                else:
+                    rows_pos = []
+
+                for row in list(rows_docs) + list(rows_pos):
+                    r = dict(row)
+                    r["type_label"] = DOC_TYPE_LABELS.get(r["doc_type"], r["doc_type"])
+                    results.append(r)
+                results = results[:limit]
+            else:
+                # 검색어 없으면 최신순 브라우즈
+                type_filter = "WHERE d.doc_type = ?" if doc_type else "WHERE 1=1"
+                type_params = (doc_type,) if doc_type else ()
+
+                rows = conn.execute(
+                    f"""
+                    SELECT id, title, doc_type, summary, published_at, speaker_name, 'document' AS source
+                    FROM policy_documents d
+                    {type_filter} AND d.status = 'active'
+                    ORDER BY COALESCE(d.published_at, d.created_at) DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (*type_params, limit, offset),
+                ).fetchall()
+
+                if not doc_type or doc_type == "position":
+                    pos_rows = conn.execute(
+                        """
+                        SELECT id, title, 'position' AS doc_type, summary, created_at AS published_at,
+                               NULL AS speaker_name, 'position' AS source
+                        FROM policy_positions
+                        WHERE status != 'archived'
+                        ORDER BY updated_at DESC
+                        LIMIT ? OFFSET ?
+                        """,
+                        (limit, offset),
+                    ).fetchall()
+                else:
+                    pos_rows = []
+
+                for row in list(rows) + list(pos_rows):
+                    r = dict(row)
+                    r["type_label"] = DOC_TYPE_LABELS.get(r["doc_type"], r["doc_type"])
+                    results.append(r)
+                results.sort(key=lambda x: x.get("published_at") or "", reverse=True)
+                results = results[:limit]
+
+            return {"items": results, "count": len(results)}
+        finally:
+            conn.close()
