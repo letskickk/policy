@@ -1073,6 +1073,32 @@
         flex: 0 0 auto;
       }
     }
+    /* ── 멘토링 탭 ── */
+    .mentoring-tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;}
+    .mentoring-tab{padding:0.75rem 1.5rem;background:none;border:none;color:var(--muted);
+      font-size:1rem;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;
+      margin-bottom:-2px;transition:all 0.2s;}
+    .mentoring-tab:hover{color:var(--text);}
+    .mentoring-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+    @media(max-width:640px){.mentoring-tab{padding:0.6rem 1rem;font-size:0.9rem;}}
+    /* ── 생성 탭 전용 ── */
+    .gen-profile-badge{display:inline-block;background:rgba(255,255,255,0.06);border:1px solid rgba(148,163,184,0.15);
+      border-radius:999px;padding:0.3rem 0.9rem;font-size:0.85rem;color:var(--muted);margin-bottom:1rem;}
+    .gen-form-label{display:block;font-weight:600;margin-bottom:0.4rem;color:var(--text);}
+    .gen-input{width:100%;padding:0.6rem 0.8rem;background:var(--input-bg,rgba(255,255,255,0.05));
+      border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;}
+    .gen-input:focus{outline:none;border-color:var(--brand);}
+    .gen-textarea{min-height:80px;resize:vertical;}
+    .gen-select{width:100%;padding:0.6rem 0.8rem;background:var(--input-bg,rgba(255,255,255,0.05));
+      border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;
+      appearance:none;-webkit-appearance:none;}
+    .gen-result{white-space:pre-wrap;line-height:1.75;font-size:0.95rem;min-height:120px;}
+    .gen-result.empty{color:var(--muted);text-align:center;padding:2rem 1rem;}
+    .gen-copy-btn{margin-top:0.75rem;padding:0.5rem 1.2rem;background:rgba(255,255,255,0.08);
+      border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:0.85rem;}
+    .gen-copy-btn:hover{background:rgba(255,255,255,0.12);}
+    .gen-error{color:#f87171;padding:1rem;text-align:center;}
+    .gen-field{margin-bottom:1rem;}
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1099,6 +1125,11 @@
   </div>
 
   <main>
+    <div class="mentoring-tab-bar" id="mentoringTabBar">
+      <button class="mentoring-tab active" data-tab="check">공약 점검</button>
+      <button class="mentoring-tab" data-tab="generate" id="tabGenerate" style="display:none;">AI 초안 생성</button>
+    </div>
+    <div id="paneCheck">
     <header class="hero">
       <h1>
         <span class="hero-title-line"><span class="hero-accent">AI 정책 멘토링</span>으로</span>
@@ -1178,11 +1209,85 @@
         최종 정책 수립 과정에서 검토를 <strong><bold>보조하는 용도로 활용</strong></bold>해 주시기 바랍니다.
       </div>
     </section>
+    </div><!-- /paneCheck -->
+
+    <div id="paneGenerate" style="display:none;">
+      <header class="hero">
+        <h1>
+          <span class="hero-title-line"><span class="hero-accent">AI 정책 초안</span></span>
+          <span class="hero-title-line">생성기</span>
+        </h1>
+        <p class="subtitle">주제와 형식을 입력하면 당 정강정책·공약·법안을 참조한 맞춤형 정책 초안을 생성합니다.</p>
+      </header>
+      <div id="genProfileBadge" class="gen-profile-badge" style="display:none;"></div>
+      <section class="card">
+        <div class="gen-field">
+          <label class="gen-form-label">정책 주제</label>
+          <input id="genTopic" class="gen-input" maxlength="500" placeholder="예: 청년 주거 안정 대책" />
+        </div>
+        <div class="gen-field">
+          <label class="gen-form-label">상세 설명 <span style="color:var(--muted);font-weight:400;">(선택)</span></label>
+          <textarea id="genDescription" class="gen-input gen-textarea" maxlength="2000" placeholder="배경, 대상, 기대효과 등을 자유롭게 적어주세요"></textarea>
+        </div>
+        <div class="gen-field">
+          <label class="gen-form-label">출력 형식</label>
+          <select id="genFormat" class="gen-select">
+            <option value="정책포지션">정책포지션</option>
+            <option value="지역공약">지역공약</option>
+            <option value="논평">논평</option>
+            <option value="메시지">메시지</option>
+          </select>
+        </div>
+        <button type="button" id="genBtn" class="btn-primary">AI 초안 생성</button>
+        <div id="genQuotaBar" class="quota-bar-wrap" style="display:none;">
+          <div class="quota-item">
+            <span class="quota-label">오늘</span>
+            <div class="quota-track"><div class="quota-fill" id="genQuotaDailyFill" style="width:0%"></div></div>
+            <span class="quota-count" id="genQuotaDailyText">-</span>
+          </div>
+          <div class="quota-item">
+            <span class="quota-label">이번달</span>
+            <div class="quota-track"><div class="quota-fill" id="genQuotaMonthlyFill" style="width:0%"></div></div>
+            <span class="quota-count" id="genQuotaMonthlyText">-</span>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="form-label">생성 결과</h2>
+        <div class="result-container">
+          <div id="genResult" class="gen-result empty">
+            주제를 입력하고 버튼을 눌러주세요.
+          </div>
+        </div>
+        <button type="button" id="genCopyBtn" class="gen-copy-btn" style="display:none;">결과 복사</button>
+      </section>
+    </div><!-- /paneGenerate -->
   </main>
 
   </div>
   <script>
     let meData = { is_admin: false };
+
+    // ── 탭 전환 ──
+    function switchTab(name) {
+      document.querySelectorAll('.mentoring-tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.tab === name);
+      });
+      document.getElementById('paneCheck').style.display = name === 'check' ? '' : 'none';
+      document.getElementById('paneGenerate').style.display = name === 'generate' ? '' : 'none';
+      history.replaceState(null, '', '#' + name);
+    }
+    document.querySelectorAll('.mentoring-tab').forEach(function(t) {
+      t.addEventListener('click', function() {
+        if (this.dataset.tab === 'generate' && !meData.is_admin) return;
+        switchTab(this.dataset.tab);
+      });
+    });
+    window.addEventListener('hashchange', function() {
+      var h = location.hash.replace('#','');
+      switchTab(h === 'generate' && meData.is_admin ? 'generate' : 'check');
+    });
+
     function renderQuota(q) {
       if (!q) return;
       const bar = document.getElementById('quotaBar');
@@ -1219,6 +1324,21 @@
             row.innerHTML = '<form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
             row.style.display = 'block';
             fetchQuota();  // 로그인 확인 후 쿼터 표시
+          }
+          // ── 탭 전환: 관리자만 생성 탭 표시 ──
+          if (d.is_admin) {
+            document.getElementById('tabGenerate').style.display = '';
+            const hash = location.hash.replace('#','');
+            if (hash === 'generate') switchTab('generate');
+          }
+          // 생성 탭 프로필 배지
+          const ELECTION_LABELS = {metro_mayor:'광역단체장',local_mayor:'기초단체장',regional_council:'광역의원',local_council:'기초의원',party_official:'당직자'};
+          if (d.region_name || d.election_position) {
+            const badge = document.getElementById('genProfileBadge');
+            if (badge) {
+              badge.textContent = [ELECTION_LABELS[d.election_position], d.region_name, d.district_name].filter(Boolean).join(' · ');
+              badge.style.display = '';
+            }
           }
         }
       } catch (e) {}
@@ -1987,6 +2107,177 @@
       }, 180000);
     });
 
+    // ══════════════════════════════════════════════════════════
+    // ── AI 초안 생성 탭 핸들러 ──
+    // ══════════════════════════════════════════════════════════
+    (function() {
+      var genBtn = document.getElementById('genBtn');
+      var genResult = document.getElementById('genResult');
+      var genCopyBtn = document.getElementById('genCopyBtn');
+      var genTopicEl = document.getElementById('genTopic');
+      var genDescEl = document.getElementById('genDescription');
+      var genFormatEl = document.getElementById('genFormat');
+      var genAbort = null;
+      var genFullText = '';
+
+      function genShowError(msg) {
+        genResult.className = 'gen-result';
+        genResult.innerHTML = '<div class="gen-error">' + msg + '</div>';
+        genCopyBtn.style.display = 'none';
+      }
+
+      function genReset() {
+        genBtn.disabled = false;
+        genBtn.textContent = 'AI 초안 생성';
+      }
+
+      function genFetchQuota() {
+        fetch('/api/tools/quota', { credentials: 'include' }).then(function(r) {
+          if (!r.ok) return;
+          return r.json();
+        }).then(function(q) {
+          if (!q) return;
+          var bar = document.getElementById('genQuotaBar');
+          if (!bar) return;
+          var dp = Math.min(100, Math.round(q.daily_used / q.daily_limit * 100));
+          var mp = Math.min(100, Math.round(q.monthly_used / q.monthly_limit * 100));
+          document.getElementById('genQuotaDailyFill').style.width = dp + '%';
+          document.getElementById('genQuotaMonthlyFill').style.width = mp + '%';
+          document.getElementById('genQuotaDailyText').textContent = q.daily_used + '/' + q.daily_limit + '회';
+          document.getElementById('genQuotaMonthlyText').textContent = q.monthly_used + '/' + q.monthly_limit + '회';
+          bar.style.display = 'block';
+        }).catch(function(){});
+      }
+
+      genBtn.addEventListener('click', async function() {
+        var topic = (genTopicEl.value || '').trim();
+        if (!topic) {
+          genShowError('정책 주제를 입력해 주세요.');
+          genTopicEl.focus();
+          return;
+        }
+
+        genBtn.disabled = true;
+        genBtn.textContent = '생성 중...';
+        genResult.className = 'gen-result';
+        genResult.textContent = '';
+        genCopyBtn.style.display = 'none';
+        genFullText = '';
+
+        if (genAbort) genAbort.abort();
+        genAbort = new AbortController();
+        var timeout = setTimeout(function() {
+          genAbort.abort();
+          genShowError('응답 시간이 초과되었습니다. 다시 시도해주세요.');
+          genReset();
+        }, 60000);
+
+        var res;
+        try {
+          res = await fetch('/api/tools/generate/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: topic,
+              description: (genDescEl.value || '').trim(),
+              output_format: genFormatEl.value
+            }),
+            credentials: 'include',
+            signal: genAbort.signal
+          });
+        } catch(e) {
+          clearTimeout(timeout);
+          if (e.name === 'AbortError') return;
+          genShowError('서버 연결에 실패했습니다. 다시 시도해주세요.');
+          genReset();
+          return;
+        }
+
+        if (!res.ok) {
+          clearTimeout(timeout);
+          var data = {};
+          try { data = await res.json(); } catch(e) {}
+          var next = encodeURIComponent(location.pathname + location.search);
+          if (res.status === 401) { window.location.href = '/login?next=' + next; return; }
+          if (res.status === 403) { window.location.href = '/pending'; return; }
+          if (res.status === 429) {
+            genShowError((data.detail || '일일 사용 한도를 초과했습니다.') + '<br><a href="/dashboard" style="color:#ffb37a;">MY PAGE 확인</a>');
+          } else {
+            genShowError(data.detail || '서버 요청이 실패했습니다.');
+          }
+          genReset();
+          return;
+        }
+
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder();
+        var buf = '';
+
+        try {
+          while (true) {
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            buf += decoder.decode(chunk.value, { stream: true });
+            var parts = buf.split('\n\n');
+            buf = parts.pop();
+
+            for (var i = 0; i < parts.length; i++) {
+              var line = parts[i].trim();
+              if (!line.startsWith('data:')) continue;
+              var jsonStr = line.slice(5).trim();
+              var msg;
+              try { msg = JSON.parse(jsonStr); } catch(e) { continue; }
+
+              if (msg.type === 'chunk') {
+                genFullText += msg.text;
+                genResult.textContent = genFullText;
+              } else if (msg.type === 'final') {
+                genFullText = msg.text || genFullText;
+                genResult.textContent = genFullText;
+              } else if (msg.type === 'done') {
+                // 완료
+              } else if (msg.type === 'error') {
+                genShowError(msg.detail || '생성 중 오류가 발생했습니다.');
+                genReset();
+                clearTimeout(timeout);
+                return;
+              }
+            }
+          }
+        } catch(e) {
+          if (e.name === 'AbortError') return;
+          genShowError('연결이 끊어졌습니다. 다시 시도해주세요.');
+          genReset();
+          clearTimeout(timeout);
+          return;
+        }
+
+        clearTimeout(timeout);
+        genReset();
+        if (genFullText) {
+          genCopyBtn.style.display = '';
+          genResult.className = 'gen-result';
+        }
+        genFetchQuota();
+      });
+
+      genCopyBtn.addEventListener('click', function() {
+        if (!genFullText) return;
+        navigator.clipboard.writeText(genFullText).then(function() {
+          genCopyBtn.textContent = '복사됨!';
+          setTimeout(function() { genCopyBtn.textContent = '결과 복사'; }, 1500);
+        }).catch(function() {
+          genCopyBtn.textContent = '복사 실패';
+          setTimeout(function() { genCopyBtn.textContent = '결과 복사'; }, 1500);
+        });
+      });
+
+      // 초기 쿼터 로드 (탭 전환 시)
+      var tabGenBtn = document.getElementById('tabGenerate');
+      if (tabGenBtn) {
+        tabGenBtn.addEventListener('click', function() { genFetchQuota(); });
+      }
+    })();
 
   </script>
   <script src="/static/js/nec-form-modal.js"></script>
