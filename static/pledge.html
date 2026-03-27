@@ -220,11 +220,16 @@
     .hero .hero-flow-card{
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
-      padding: 0.75rem 0.85rem;
+      gap: 0.35rem;
+      padding: 0.85rem 1rem;
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(148,163,184,0.12);
       border-radius: 12px;
+    }
+    .hero .flow-header{
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
     }
     .hero .flow-num{
       display: inline-flex;
@@ -239,15 +244,15 @@
       font-weight: 800;
       flex-shrink: 0;
     }
-    .hero .hero-flow-card strong{
-      font-size: 0.9rem;
+    .hero .flow-header strong{
+      font-size: 0.95rem;
       font-weight: 800;
       color: var(--text-strong);
     }
     .hero .flow-desc{
-      font-size: 0.78rem;
-      color: var(--muted2);
-      line-height: 1.45;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.55;
     }
     @media (max-width: 600px){
       .hero .hero-flow{
@@ -1102,18 +1107,15 @@
       <p class="subtitle">공약을 입력하면 AI가 종합 분석하고 보완 포인트를 제안합니다.</p>
       <div class="hero-flow">
         <div class="hero-flow-card">
-          <span class="flow-num">1</span>
-          <strong>공약 입력</strong>
-          <span class="flow-desc">(배경) → (실행방안) → (기대효과) 구조로 작성하면 정확도가 높아집니다</span>
+          <div class="flow-header"><span class="flow-num">1</span><strong>공약 입력</strong></div>
+          <span class="flow-desc">(배경) → (실행방안) → (기대효과) 구조로 작성하면 분석 정확도가 높아집니다</span>
         </div>
         <div class="hero-flow-card">
-          <span class="flow-num">2</span>
-          <strong>AI 종합 분석</strong>
-          <span class="flow-desc">정강정책 부합성, 중앙당·당선인 공약 유사도, 출마자 간 중복까지 한번에 검사</span>
+          <div class="flow-header"><span class="flow-num">2</span><strong>AI 종합 분석</strong></div>
+          <span class="flow-desc">정강정책 부합성, 중앙당·당선인 공약 유사도, 출마자 간 중복까지 한번에 검사합니다</span>
         </div>
         <div class="hero-flow-card">
-          <span class="flow-num">3</span>
-          <strong>점수 · 보완 제안</strong>
+          <div class="flow-header"><span class="flow-num">3</span><strong>점수 · 보완 제안</strong></div>
           <span class="flow-desc">항목별 세부점수와 종합점수를 산출하고, 부족한 부분의 개선 방향을 제안합니다</span>
         </div>
       </div>
