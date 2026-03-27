@@ -71,6 +71,7 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_usage_user_created ON usage_logs(user_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_logs(created_at);
+        CREATE INDEX IF NOT EXISTS idx_usage_action ON usage_logs(action, created_at);
 
         CREATE TABLE IF NOT EXISTS analysis_cache (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

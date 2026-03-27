@@ -1018,6 +1018,111 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         finally:
             conn.close()
 
+    # ── 파이프라인 대시보드 ─────────────────────────────────────
+
+    @app.get("/api/admin/pipeline/stats")
+    def pipeline_stats(request: Request):
+        require_admin(request)
+        conn = get_connection()
+        try:
+            # collect: doc_type별 건수
+            rows = conn.execute(
+                "SELECT doc_type, count(*) FROM policy_documents GROUP BY doc_type"
+            ).fetchall()
+            collect = {r[0]: r[1] for r in rows}
+
+            # store
+            doc_count = conn.execute("SELECT count(*) FROM policy_documents").fetchone()[0]
+            pos_count = conn.execute("SELECT count(*) FROM policy_positions").fetchone()[0]
+            try:
+                fts_count = conn.execute("SELECT count(*) FROM hub_docs_fts").fetchone()[0]
+                fts_ok = True
+            except Exception:
+                fts_count, fts_ok = 0, False
+
+            # vector store — OpenAI API 실시간 조회
+            import os
+            vs_status = {}
+            try:
+                from openai import OpenAI
+                client = OpenAI()
+                for label, env_key in [
+                    ("policy", "OPENAI_VECTOR_STORE_ID"),
+                    ("regional", "OPENAI_REGIONAL_VECTOR_STORE_ID"),
+                ]:
+                    vs_id = os.environ.get(env_key, "")
+                    if vs_id:
+                        vs = client.vector_stores.retrieve(vs_id)
+                        vs_status[label] = {
+                            "status": vs.status,
+                            "file_count": getattr(vs.file_counts, "completed", 0),
+                        }
+            except Exception:
+                pass  # VS 조회 실패 시 빈 dict
+
+            # usage
+            check_total = conn.execute(
+                "SELECT count(*) FROM usage_logs WHERE action='analysis_run'"
+            ).fetchone()[0]
+            check_today = conn.execute(
+                "SELECT count(*) FROM usage_logs WHERE action='analysis_run' AND date(created_at)=date('now')"
+            ).fetchone()[0]
+            draft_total = conn.execute(
+                "SELECT count(*) FROM usage_logs WHERE action='draft_generate'"
+            ).fetchone()[0]
+            draft_today = conn.execute(
+                "SELECT count(*) FROM usage_logs WHERE action='draft_generate' AND date(created_at)=date('now')"
+            ).fetchone()[0]
+
+            # recent_activity: 문서 생성 + 사용 로그 혼합, 시간순 정렬
+            recent_docs = conn.execute(
+                """SELECT created_at, doc_type, title FROM policy_documents
+                   ORDER BY created_at DESC LIMIT 10"""
+            ).fetchall()
+            recent_usage = conn.execute(
+                """SELECT created_at, action, endpoint FROM usage_logs
+                   WHERE action IN ('analysis_run','draft_generate')
+                   ORDER BY created_at DESC LIMIT 5"""
+            ).fetchall()
+
+            activity = []
+            for row in recent_docs:
+                activity.append({
+                    "ts": row[0],
+                    "action": f"import_{row[1]}",
+                    "detail": f"{row[2] or row[1]} 수집",
+                })
+            for row in recent_usage:
+                action_label = "공약 점검" if row[1] == "analysis_run" else "AI 초안 생성"
+                activity.append({
+                    "ts": row[0],
+                    "action": row[1],
+                    "detail": f"{action_label} 사용",
+                })
+            activity.sort(key=lambda x: x.get("ts") or "", reverse=True)
+            activity = activity[:15]
+
+        finally:
+            conn.close()
+
+        return {
+            "collect": collect,
+            "store": {
+                "documents": doc_count,
+                "positions": pos_count,
+                "fts_indexed": fts_ok,
+                "fts_doc_count": fts_count,
+                "vector_store": vs_status,
+            },
+            "usage": {
+                "check_total": check_total,
+                "check_today": check_today,
+                "draft_total": draft_total,
+                "draft_today": draft_today,
+            },
+            "recent_activity": activity,
+        }
+
     # ── Hub 통합 검색 ──────────────────────────────────────────
 
     DOC_TYPE_LABELS = {

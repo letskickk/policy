@@ -10,13 +10,13 @@ client = TestClient(app)
 def test_hub_page_returns_200():
     response = client.get("/hub")
     assert response.status_code == 200
-    assert "브리핑" in response.text
+    assert "정책 자료 허브" in response.text
 
 
 def test_hub_archive_page_returns_200():
     response = client.get("/hub/archive")
     assert response.status_code == 200
-    assert "자료실" in response.text
+    assert "자료 허브" in response.text
 
 
 def test_hub_briefing_redirects_to_hub():

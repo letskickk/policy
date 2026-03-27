@@ -3,111 +3,520 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>관리자 홈 - 정책 멘토링</title>
+  <title>관리자 대시보드 - 정책 멘토링</title>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif; min-height: 100vh; padding: 2rem; }
     .wrap { max-width: 1100px; margin: 0 auto; }
     @media (max-width: 640px) { body { padding: 1rem; } }
+
+    /* ── Pipeline grid ── */
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      position: relative;
+    }
+    @media (max-width: 768px) {
+      .pipeline-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Arrows between pipeline cards ── */
+    .pipeline-card { position: relative; }
+    .pipeline-card:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -1.1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.4rem;
+      color: var(--rf-text-muted);
+      font-weight: 700;
+      z-index: 2;
+    }
+    @media (max-width: 768px) {
+      .pipeline-card:not(:last-child)::after {
+        content: "↓";
+        right: auto;
+        left: 50%;
+        top: auto;
+        bottom: -1.1rem;
+        transform: translateX(-50%);
+      }
+    }
+
+    /* ── Card header ── */
+    .pipe-header {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
+      color: var(--rf-text-muted);
+    }
+
+    /* ── Collection table ── */
+    .doc-table { width: 100%; border-collapse: collapse; }
+    .doc-table td { padding: 0.35rem 0; font-size: 0.92rem; }
+    .doc-table td:first-child { color: var(--rf-text-muted); }
+    .doc-table td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rf-text-strong); }
+    .doc-table tr + tr td { border-top: 1px solid var(--rf-line); }
+
+    /* ── Storage KPI ── */
+    .kpi-row {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .kpi-block { flex: 1; }
+    .kpi-num {
+      font-size: 2rem;
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--rf-text-strong);
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-label { font-size: 0.8rem; color: var(--rf-text-muted); margin-top: 0.15rem; }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--rf-line);
+      background: var(--rf-panel);
+      white-space: nowrap;
+    }
+    .badge--ok { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
+    .badge--warn { color: #ca8a04; border-color: #fef08a; background: #fefce8; }
+
+    /* ── Usage split ── */
+    .usage-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .usage-block { text-align: center; }
+    .usage-num {
+      font-size: 2rem;
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--rf-text-strong);
+      font-variant-numeric: tabular-nums;
+    }
+    .usage-sub {
+      font-size: 0.8rem;
+      color: var(--rf-text-muted);
+      margin-top: 0.15rem;
+    }
+    .usage-divider {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--rf-line);
+    }
+
+    /* ── Activity log ── */
+    .activity-list { list-style: none; padding: 0; }
+    .activity-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.5rem 0;
+      font-size: 0.92rem;
+      gap: 1rem;
+    }
+    .activity-list li + li { border-top: 1px solid var(--rf-line); }
+    .activity-time { flex-shrink: 0; font-size: 0.8rem; color: var(--rf-text-muted); white-space: nowrap; }
+
+    /* ── Skeleton loading ── */
+    @keyframes skeletonPulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    .skeleton-line {
+      height: 1rem;
+      border-radius: 4px;
+      background: var(--rf-line);
+      animation: skeletonPulse 1.5s ease-in-out infinite;
+      margin-bottom: 0.5rem;
+    }
+    .skeleton-line.w60 { width: 60%; }
+    .skeleton-line.w80 { width: 80%; }
+    .skeleton-line.w40 { width: 40%; }
+    .skeleton-line.tall { height: 2rem; width: 50%; }
+
+    /* ── Error state ── */
+    .error-state {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--rf-text-muted);
+    }
+    .error-state p { margin-bottom: 0.75rem; }
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--rf-line);
+      border-radius: 6px;
+      background: var(--rf-panel);
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--rf-text-strong);
+    }
+    .retry-btn:hover { background: var(--rf-line); }
+
+    /* ── Pending zero / nonzero ── */
+    .count-zero { color: var(--rf-text-muted) !important; }
+    .count-active { color: var(--rf-text-strong) !important; }
+
+    /* ── Touch targets ── */
+    .mini-item { min-height: 44px; }
+    .btn-secondary { min-height: 44px; min-width: 44px; }
+
+    /* ── Empty activity ── */
+    .empty-state { text-align: center; padding: 1.5rem; color: var(--rf-text-muted); font-size: 0.9rem; }
   </style>
-  <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
 <body class="rf-admin-page">
   <div class="wrap">
+
+    <!-- ═══ Zone A: Pending alerts ═══ -->
     <section class="hero">
-      <div class="section-title">관리자 데스크</div>
-      <h1>운영 우선순위부터 보는 관리자 홈</h1>
-      <p class="page-desc">승인 대기, 정책 기준 데이터 정리, 사용량, 런타임 상태를 한 화면에서 바로 이어서 처리합니다.</p>
+      <div class="section-title">관리자 대시보드</div>
+      <h1>파이프라인 현황</h1>
+      <p class="page-desc">수집 → 저장 → AI 활용 파이프라인 상태를 한눈에 확인합니다.</p>
       <div class="summary-grid" style="margin-top:18px;">
         <div class="stat-item">
           <div class="meta">사용자 승인 대기</div>
-          <div id="pendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+          <div id="pendingCount" class="count-zero" style="font-size:34px;font-weight:900;">0건</div>
         </div>
         <div class="stat-item">
           <div class="meta">공약 승인 대기</div>
-          <div id="pledgePendingCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+          <div id="pledgePendingCount" class="count-zero" style="font-size:34px;font-weight:900;">0건</div>
         </div>
         <div class="stat-item">
           <div class="meta">시민 제안 (신규)</div>
-          <div id="proposalCount" style="font-size:34px;font-weight:900;color:var(--rf-text-strong);">0</div>
+          <div id="proposalCount" class="count-zero" style="font-size:34px;font-weight:900;">0건</div>
         </div>
       </div>
     </section>
 
-    <section class="card" style="margin-top:16px;">
-      <div class="section-title">정책 허브</div>
-      <div class="briefing-grid">
-        <a class="mini-item" href="/policy-lab" style="border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.06);">
-          <strong style="color:#c4b5fd;">정책 허브 (통합)</strong>
-          <div class="meta">AI 드래프터, 이슈 레이더, 제안 관리, 리뷰 관리를 한 화면에서 운영합니다.</div>
-        </a>
+    <!-- ═══ Zone B: Pipeline status ═══ -->
+    <div class="pipeline-grid" style="margin-top:1.5rem;">
+
+      <!-- B1: Collection -->
+      <div class="card pipeline-card" id="pipeCollect">
+        <div class="pipe-header">1. 수집 (Collection)</div>
+        <div id="collectBody">
+          <div class="skeleton-line w80"></div>
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line w80"></div>
+          <div class="skeleton-line w40"></div>
+          <div class="skeleton-line w80"></div>
+          <div class="skeleton-line w60"></div>
+        </div>
+      </div>
+
+      <!-- B2: Storage -->
+      <div class="card pipeline-card" id="pipeStore">
+        <div class="pipe-header">2. 저장 (Storage)</div>
+        <div id="storeBody">
+          <div class="skeleton-line tall"></div>
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line tall"></div>
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line w80"></div>
+        </div>
+      </div>
+
+      <!-- B3: AI Usage -->
+      <div class="card pipeline-card" id="pipeUsage">
+        <div class="pipe-header">3. AI 활용 (Usage)</div>
+        <div id="usageBody">
+          <div class="skeleton-line tall"></div>
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line tall"></div>
+          <div class="skeleton-line w60"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Zone C: Recent activity ═══ -->
+    <section class="card" style="margin-top:1.5rem;">
+      <div class="section-title">최근 활동</div>
+      <div id="activityBody">
+        <div class="skeleton-line w80"></div>
+        <div class="skeleton-line w60"></div>
+        <div class="skeleton-line w80"></div>
       </div>
     </section>
 
-    <section class="card" style="margin-top:16px;">
-      <div class="section-title">작업 큐</div>
+    <!-- ═══ Zone D: Quick links ═══ -->
+    <section class="card" style="margin-top:1.5rem;">
+      <div class="section-title">빠른 이동</div>
       <div class="briefing-grid">
+        <a class="mini-item" href="/policy-lab">
+          <strong>정책 허브 (통합)</strong>
+          <div class="meta">AI 드래프터, 이슈 레이더, 제안 관리, 리뷰 관리</div>
+        </a>
         <a class="mini-item" href="/admin/users">
           <strong>사용자 관리</strong>
-          <div class="meta">승인, 거절, 정지, 일괄 업로드까지 한 곳에서 처리합니다.</div>
+          <div class="meta">승인, 거절, 정지, 일괄 업로드</div>
         </a>
         <a class="mini-item" href="/admin/candidates">
-          <strong>출마자·공약 관리</strong>
-          <div class="meta">공약 승인 인박스와 신규 등록 작업을 같은 화면에서 이어갑니다.</div>
+          <strong>출마자 공약 관리</strong>
+          <div class="meta">공약 승인 인박스, 신규 등록</div>
         </a>
         <a class="mini-item" href="/admin/policy-ssot">
           <strong>정책 SSOT 관리</strong>
-          <div class="meta">정책 원문, 논평, 법안, 규정의 기준 데이터를 정리합니다.</div>
+          <div class="meta">정책 원문, 논평, 법안, 규정</div>
+        </a>
+        <a class="mini-item" href="/hub">
+          <strong>허브 검색</strong>
+          <div class="meta">정책 자료 통합 검색</div>
         </a>
         <a class="mini-item" href="/admin/usage">
           <strong>사용량 통계</strong>
-          <div class="meta">일간·월간 사용량 흐름과 과부하 징후를 먼저 확인합니다.</div>
+          <div class="meta">일간 / 월간 사용량</div>
         </a>
         <a class="mini-item" href="/admin/ops">
           <strong>운영 상태</strong>
-          <div class="meta">벡터스토어, PDF 처리, 런타임 진단 상태를 점검합니다.</div>
+          <div class="meta">벡터스토어, PDF, 런타임 진단</div>
         </a>
         <a class="mini-item" href="/map">
           <strong>지역계 후보 지도</strong>
-          <div class="meta">실제 공개 화면으로 나가는 후보 지도를 바로 확인합니다.</div>
+          <div class="meta">공개 화면 후보 지도 확인</div>
+        </a>
+        <a class="mini-item" href="/proposals">
+          <strong>시민 정책 제안</strong>
+          <div class="meta">제안 목록 확인 및 관리</div>
         </a>
       </div>
-    </section>
-
-    <section class="card" style="margin-top:16px;">
-      <div class="section-title">빠른 이동</div>
-      <div class="links">
-        <a class="nav-link" href="/proposals">시민 정책 제안</a>
-        <a class="nav-link" href="/my-pledges">내 공약 등록</a>
-        <a class="nav-link" href="/dashboard">MY PAGE</a>
+      <div style="margin-top:1rem;">
         <form action="/api/auth/logout" method="POST" style="display:inline-flex;">
           <button type="submit" class="btn-secondary">로그아웃</button>
         </form>
       </div>
     </section>
   </div>
+
   <script>
-    (async () => {
+    /* ── Constants ── */
+    const DOC_TYPE_LABELS = {
+      bill: "법안", commentary: "논평", poll: "여론조사",
+      meeting: "회의록", pledge: "공약", platform: "정강정책",
+      briefing: "브리핑", position: "정책포지션"
+    };
+
+    /* ── Helpers ── */
+    function relativeTime(ts) {
+      const diff = Date.now() - new Date(ts).getTime();
+      if (diff < 0) return "방금";
+      const sec = Math.floor(diff / 1000);
+      if (sec < 60) return "방금";
+      const min = Math.floor(sec / 60);
+      if (min < 60) return min + "분 전";
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return hr + "시간 전";
+      const day = Math.floor(hr / 24);
+      return day + "일 전";
+    }
+
+    function fmtNum(n) {
+      return (n || 0).toLocaleString("ko-KR");
+    }
+
+    function setPendingCount(elId, count) {
+      const el = document.getElementById(elId);
+      const n = count || 0;
+      el.textContent = n + "건";
+      el.className = n > 0 ? "count-active" : "count-zero";
+    }
+
+    function showError(containerId) {
+      const el = document.getElementById(containerId);
+      el.innerHTML =
+        '<div class="error-state">' +
+          '<p>데이터를 불러올 수 없습니다</p>' +
+          '<button class="retry-btn" onclick="loadPipeline()">다시 시도</button>' +
+        '</div>';
+    }
+
+    /* ── Render: Collection card ── */
+    function renderCollect(data) {
+      const el = document.getElementById("collectBody");
+      if (!data || Object.keys(data).length === 0) {
+        el.innerHTML = '<div class="empty-state">수집된 문서 0건</div>';
+        return;
+      }
+      let rows = "";
+      for (const [key, label] of Object.entries(DOC_TYPE_LABELS)) {
+        const count = data[key];
+        if (count === undefined && !(key in data)) continue;
+        const val = count || 0;
+        const cls = val === 0 ? ' style="color:var(--rf-text-muted)"' : "";
+        rows += "<tr><td>" + label + "</td><td" + cls + ">" + (val === 0 ? "0건" : fmtNum(val) + "건") + "</td></tr>";
+      }
+      // Include any keys not in labels
+      for (const [key, val] of Object.entries(data)) {
+        if (!(key in DOC_TYPE_LABELS)) {
+          const v = val || 0;
+          const cls = v === 0 ? ' style="color:var(--rf-text-muted)"' : "";
+          rows += "<tr><td>" + key + "</td><td" + cls + ">" + (v === 0 ? "0건" : fmtNum(v) + "건") + "</td></tr>";
+        }
+      }
+      el.innerHTML = '<table class="doc-table"><tbody>' + rows + '</tbody></table>';
+    }
+
+    /* ── Render: Storage card ── */
+    function renderStore(data) {
+      const el = document.getElementById("storeBody");
+      if (!data) { el.innerHTML = '<div class="empty-state">저장소 정보 없음</div>'; return; }
+
+      const docs = data.documents || 0;
+      const pos = data.positions || 0;
+      const ftsOk = data.fts_indexed === true;
+      const ftsCount = data.fts_doc_count || 0;
+
+      // Vector Store badges
+      const vs = data.vector_store || {};
+      let vsBadges = "";
+      for (const [name, info] of Object.entries(vs)) {
+        const ok = info && info.status === "completed";
+        vsBadges += '<span class="badge ' + (ok ? "badge--ok" : "badge--warn") + '">' +
+          (ok ? "&#x2705;" : "&#x26A0;&#xFE0F;") + " VS:" + name +
+          (ok && info.file_count ? " (" + info.file_count + ")" : "") +
+          '</span>';
+      }
+      if (!Object.keys(vs).length) {
+        vsBadges = '<span class="badge badge--warn">&#x26A0;&#xFE0F; VS 미확인</span>';
+      }
+
+      const ftsBadge = ftsOk
+        ? '<span class="badge badge--ok">&#x2705; 인덱스 (' + fmtNum(ftsCount) + ')</span>'
+        : '<span class="badge badge--warn">&#x26A0;&#xFE0F; 인덱스 필요</span>';
+
+      el.innerHTML =
+        '<div class="kpi-row">' +
+          '<div class="kpi-block"><div class="kpi-num">' + fmtNum(docs) + '</div><div class="kpi-label">문서 수</div></div>' +
+          '<div class="kpi-block"><div class="kpi-num">' + fmtNum(pos) + '</div><div class="kpi-label">포지션 수</div></div>' +
+        '</div>' +
+        '<div class="badge-row">' + vsBadges + ftsBadge + '</div>';
+    }
+
+    /* ── Render: Usage card ── */
+    function renderUsage(data) {
+      const el = document.getElementById("usageBody");
+      if (!data) { el.innerHTML = '<div class="empty-state">사용량 정보 없음</div>'; return; }
+
+      el.innerHTML =
+        '<div class="usage-split">' +
+          '<div class="usage-block">' +
+            '<div class="usage-num">' + fmtNum(data.check_today) + '</div>' +
+            '<div class="usage-sub">오늘 점검</div>' +
+          '</div>' +
+          '<div class="usage-block">' +
+            '<div class="usage-num">' + fmtNum(data.draft_today) + '</div>' +
+            '<div class="usage-sub">오늘 초안</div>' +
+          '</div>' +
+          '<div class="usage-divider"></div>' +
+          '<div class="usage-block">' +
+            '<div class="usage-num">' + fmtNum(data.check_total) + '</div>' +
+            '<div class="usage-sub">누적 점검</div>' +
+          '</div>' +
+          '<div class="usage-block">' +
+            '<div class="usage-num">' + fmtNum(data.draft_total) + '</div>' +
+            '<div class="usage-sub">누적 초안</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    /* ── Render: Activity ── */
+    function renderActivity(items) {
+      const el = document.getElementById("activityBody");
+      if (!items || items.length === 0) {
+        el.innerHTML = '<div class="empty-state">최근 활동 내역이 없습니다</div>';
+        return;
+      }
+      let html = '<ul class="activity-list">';
+      for (const item of items.slice(0, 10)) {
+        html += '<li><span>' + (item.detail || item.action || "") + '</span>' +
+          '<span class="activity-time">' + relativeTime(item.ts) + '</span></li>';
+      }
+      html += '</ul>';
+      el.innerHTML = html;
+    }
+
+    /* ── Load pipeline data ── */
+    async function loadPipeline() {
+      // Reset to skeleton
+      document.getElementById("collectBody").innerHTML =
+        '<div class="skeleton-line w80"></div><div class="skeleton-line w60"></div>' +
+        '<div class="skeleton-line w80"></div><div class="skeleton-line w40"></div>';
+      document.getElementById("storeBody").innerHTML =
+        '<div class="skeleton-line tall"></div><div class="skeleton-line w60"></div>' +
+        '<div class="skeleton-line tall"></div><div class="skeleton-line w60"></div>';
+      document.getElementById("usageBody").innerHTML =
+        '<div class="skeleton-line tall"></div><div class="skeleton-line w60"></div>' +
+        '<div class="skeleton-line tall"></div><div class="skeleton-line w60"></div>';
+      document.getElementById("activityBody").innerHTML =
+        '<div class="skeleton-line w80"></div><div class="skeleton-line w60"></div>';
+
       try {
-        const r = await fetch('/api/admin/users/pending', { credentials: 'include' });
+        const r = await fetch("/api/admin/pipeline/stats", { credentials: "include" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const d = await r.json();
+        renderCollect(d.collect);
+        renderStore(d.store);
+        renderUsage(d.usage);
+        renderActivity(d.recent_activity);
+      } catch (e) {
+        console.error("Pipeline load failed:", e);
+        showError("collectBody");
+        showError("storeBody");
+        showError("usageBody");
+        document.getElementById("activityBody").innerHTML =
+          '<div class="error-state"><p>데이터를 불러올 수 없습니다</p>' +
+          '<button class="retry-btn" onclick="loadPipeline()">다시 시도</button></div>';
+      }
+    }
+
+    /* ── Load pending counts (existing APIs) ── */
+    async function loadPending() {
+      try {
+        const r = await fetch("/api/admin/users/pending", { credentials: "include" });
         if (r.ok) {
           const d = await r.json();
-          document.getElementById('pendingCount').textContent = (d.users || []).length;
+          setPendingCount("pendingCount", (d.users || []).length);
         }
       } catch (e) {}
+
       try {
-        const r2 = await fetch('/api/admin/candidates', { credentials: 'include' });
+        const r2 = await fetch("/api/admin/candidates", { credentials: "include" });
         if (r2.ok) {
           const list = await r2.json();
-          const pending = (Array.isArray(list) ? list : []).filter((c) => (c.approval_status || 'PENDING') === 'PENDING').length;
-          document.getElementById('pledgePendingCount').textContent = pending;
+          const pending = (Array.isArray(list) ? list : []).filter(
+            (c) => (c.approval_status || "PENDING") === "PENDING"
+          ).length;
+          setPendingCount("pledgePendingCount", pending);
         }
       } catch (e) {}
+
       try {
-        const r3 = await fetch('/api/policy/proposals?status=new', { credentials: 'include' });
-        if (r3.ok) { const list = await r3.json(); document.getElementById('proposalCount').textContent = (Array.isArray(list) ? list : []).length; }
+        const r3 = await fetch("/api/policy/proposals?status=new", { credentials: "include" });
+        if (r3.ok) {
+          const list = await r3.json();
+          setPendingCount("proposalCount", (Array.isArray(list) ? list : []).length);
+        }
       } catch (e) {}
-    })();
+    }
+
+    /* ── Init ── */
+    loadPending();
+    loadPipeline();
   </script>
 </body>
 </html>
