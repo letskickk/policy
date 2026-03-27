@@ -170,17 +170,18 @@
     /* --- [헤더 / 히어로] --- */
     header, main { max-width: 880px; margin-left: auto; margin-right: auto; padding-left: 1.25rem; padding-right: 1.25rem; }
     .hero{
+      max-width: 880px !important;
+      box-sizing: border-box !important;
       margin-bottom: 0.75rem;
-      padding-top: 0.75rem;
       text-align: center;
     }
     .hero h1{
       font-size: clamp(1.4rem, 3.5vw, 1.8rem) !important;
       font-weight: 950;
       color: var(--text-strong);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.6rem;
       letter-spacing: -0.03em;
-      line-height: 1.2 !important;
+      line-height: 1.25 !important;
       word-break: keep-all;
     }
     .hero .hero-title-line{
@@ -193,12 +194,42 @@
       color: var(--brand);
     }
     .hero .subtitle{
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       color: var(--muted);
       font-weight: 600;
-      line-height: 1.7;
+      line-height: 1.65;
       word-break: keep-all;
+      margin-bottom: 0.85rem;
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .hero .hero-steps{
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
       margin-bottom: 1rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .hero .hero-step{
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .hero .hero-step-num{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 800;
+      flex-shrink: 0;
     }
     .hero .hero-chips{
       display: flex;
@@ -1065,7 +1096,12 @@
       <span class="hero-title-line"><span class="hero-accent">AI 정책 멘토링</span>으로</span>
       <span class="hero-title-line">공약의 완성도를 높이세요</span>
     </h1>
-    <p class="subtitle">정강정책 부합성, 중앙당 공약 유사도, 당선인 비교, 중복 검사까지 AI가 종합 분석하고 보완 포인트를 제안합니다.</p>
+    <p class="subtitle">공약을 입력하면 정강정책 부합성, 중앙당 공약 유사도, 당선인 비교, 중복 검사를 AI가 종합 분석하고 보완 포인트를 제안합니다.</p>
+    <div class="hero-steps">
+      <span class="hero-step"><span class="hero-step-num">1</span> 공약 입력</span>
+      <span class="hero-step"><span class="hero-step-num">2</span> AI 종합 분석</span>
+      <span class="hero-step"><span class="hero-step-num">3</span> 점수 · 보완 제안</span>
+    </div>
     <div class="hero-chips">
       <span class="hero-chip">정강정책 부합 검사</span>
       <span class="hero-chip">유사·중복 탐지</span>
