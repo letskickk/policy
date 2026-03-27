@@ -27,7 +27,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o"
 
 OUTPUT_FORMATS = {
-    "정책포지션": "정책포지션",
+    "정책": "정책",
+    "정책포지션": "정책",  # 하위호환
     "지역공약": "지역공약",
     "입법취지서": "입법취지서",
     "논평": "논평",
@@ -60,6 +61,7 @@ def _build_drafter_user_message(
     pledges_context: str,
     winners2022_context: str,
     candidates_context: str,
+    messages_context: str,
     assembly_context: str,
     research_context: str,
     election_type: str = "",
@@ -73,6 +75,7 @@ def _build_drafter_user_message(
         .replace("{{PLEDGES_CONTEXT}}", pledges_context or "(우리당 공약 문서 없음)")
         .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", winners2022_context or "(2022 당선인 공약 없음)")
         .replace("{{CANDIDATES_PLEDGES_CONTEXT}}", candidates_context or "(등록된 출마자 공약 없음)")
+        .replace("{{MESSAGES_CONTEXT}}", messages_context or "(공식 논평·보도자료 없음)")
         .replace("{{ASSEMBLY_CONTEXT}}", assembly_context or "(지방의회 데이터 없음)")
         .replace("{{RESEARCH_CONTEXT}}", research_context or "(연구 자료 없음)")
         .replace("{{TOPIC}}", topic)
@@ -87,8 +90,64 @@ def _build_drafter_user_message(
 # ---------------------------------------------------------------------------
 # RAG context retrieval (reuse existing Vector Store search)
 # ---------------------------------------------------------------------------
+def _extract_vs_texts(page_data) -> list[tuple[str, str]]:
+    """Vector Store 검색 결과에서 (filename, text) 리스트 추출."""
+    results = []
+    for r in page_data:
+        content = ""
+        if hasattr(r, "content") and r.content:
+            for c in (r.content if isinstance(r.content, list) else [r.content]):
+                if hasattr(c, "text"):
+                    content += str(c.text) + "\n"
+        fn = getattr(r, "filename", "") or ""
+        results.append((fn, content.strip()))
+    return results
+
+
+def _search_messages_by_topic(topic: str, limit: int = 8) -> str:
+    """DB에서 토픽과 관련된 공식 논평·보도자료·브리핑 검색."""
+    conn = get_connection()
+    try:
+        # FTS5 검색 시도
+        safe_q = topic.strip().replace('"', '""')
+        try:
+            rows = conn.execute(
+                """SELECT d.title, d.speaker_name, d.published_at, d.summary
+                   FROM hub_docs_fts f
+                   JOIN policy_documents d ON d.id = f.rowid
+                   WHERE hub_docs_fts MATCH ?
+                     AND d.doc_type IN ('statement','press_release','briefing','commentary')
+                     AND d.status = 'active'
+                   ORDER BY rank LIMIT ?""",
+                (f'"{safe_q}"', limit),
+            ).fetchall()
+        except Exception:
+            # FTS 없으면 LIKE 검색
+            rows = conn.execute(
+                """SELECT title, speaker_name, published_at, summary
+                   FROM policy_documents
+                   WHERE doc_type IN ('statement','press_release','briefing','commentary')
+                     AND status = 'active'
+                     AND (title LIKE ? OR summary LIKE ?)
+                   ORDER BY published_at DESC LIMIT ?""",
+                (f"%{topic}%", f"%{topic}%", limit),
+            ).fetchall()
+
+        if not rows:
+            return ""
+        parts = []
+        for r in rows:
+            line = f"[{r['published_at'] or ''}] {r['speaker_name'] or ''}: {r['title']}"
+            if r["summary"]:
+                line += f"\n{r['summary'][:300]}"
+            parts.append(line)
+        return "\n\n".join(parts)
+    finally:
+        conn.close()
+
+
 def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
-    """기존 Vector Store에서 RAG 컨텍스트 검색."""
+    """기존 Vector Store에서 RAG 컨텍스트 검색 + DB에서 공식 메시지 검색."""
     try:
         from backend.openai_vector_store import (
             OPENAI_VECTOR_STORE_ID,
@@ -99,65 +158,69 @@ def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
 
         client = get_openai_client()
         if not client or not OPENAI_VECTOR_STORE_ID:
-            return {"platform": "", "pledges": "", "winners2022": "", "candidates": ""}
+            return {"platform": "", "pledges": "", "winners2022": "", "candidates": "", "messages": ""}
 
-        # 정강정책 + 공약 검색
-        results = []
-        try:
-            page = client.vector_stores.search(
-                vector_store_id=OPENAI_VECTOR_STORE_ID,
-                query=topic,
-                max_num_results=8,
-                rewrite_query=True,
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _vs_search(vs_id, query, max_results):
+            try:
+                page = client.vector_stores.search(
+                    vector_store_id=vs_id, query=query,
+                    max_num_results=max_results, rewrite_query=True,
+                )
+                return _extract_vs_texts(page.data)
+            except Exception as e:
+                logger.warning("drafter RAG search failed: %s", e)
+                return []
+
+        # 병렬 검색: ① 토픽 기반 공약 ② 정강정책 전용 ③ 2022 당선인
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            f_topic = ex.submit(_vs_search, OPENAI_VECTOR_STORE_ID, topic, 8)
+            f_platform = ex.submit(
+                _vs_search, OPENAI_VECTOR_STORE_ID,
+                "개혁신당 강령 정강정책 이념 취지 가치", 5,
             )
-            for r in page.data:
-                content = ""
-                if hasattr(r, "content") and r.content:
-                    for c in (r.content if isinstance(r.content, list) else [r.content]):
-                        if hasattr(c, "text"):
-                            content += str(c.text) + "\n"
-                fn = getattr(r, "filename", "") or ""
-                results.append((fn, content.strip()))
-        except Exception as e:
-            logger.warning("drafter RAG search failed: %s", e)
+            f_winners = ex.submit(
+                _vs_search,
+                OPENAI_WINNERS2022_VECTOR_STORE_ID or "",
+                topic, 5,
+            ) if OPENAI_WINNERS2022_VECTOR_STORE_ID else None
 
-        # 정강정책 vs 공약 분리
-        platform_parts = []
+        topic_results = f_topic.result()
+        platform_results = f_platform.result()
+
+        # 정강정책 전용 결과 + 토픽 결과 중 정강 파일 합산
+        platform_parts = [text for _, text in platform_results if text]
         pledge_parts = []
-        for fn, text in results:
+        for fn, text in topic_results:
             if "정강" in fn or "정책" in fn:
-                platform_parts.append(text)
+                if text not in platform_parts:
+                    platform_parts.append(text)
             else:
                 pledge_parts.append(text)
 
         # Winners 2022
         winners_text = ""
-        if OPENAI_WINNERS2022_VECTOR_STORE_ID:
-            try:
-                page2 = client.vector_stores.search(
-                    vector_store_id=OPENAI_WINNERS2022_VECTOR_STORE_ID,
-                    query=topic,
-                    max_num_results=5,
-                    rewrite_query=True,
-                )
-                parts = []
-                for r in page2.data:
-                    if hasattr(r, "content") and r.content:
-                        for c in (r.content if isinstance(r.content, list) else [r.content]):
-                            if hasattr(c, "text"):
-                                parts.append(str(c.text))
-                winners_text = "\n".join(parts)
-            except Exception as e:
-                logger.warning("drafter winners2022 search failed: %s", e)
+        if f_winners:
+            winners_results = f_winners.result()
+            winners_text = "\n".join(text for _, text in winners_results if text)
+
+        # 공식 논평·보도자료 (DB 검색)
+        messages_text = ""
+        try:
+            messages_text = _search_messages_by_topic(topic)
+        except Exception as e:
+            logger.warning("drafter messages search failed: %s", e)
 
         return {
             "platform": "\n\n".join(platform_parts)[:8000],
             "pledges": "\n\n".join(pledge_parts)[:8000],
             "winners2022": winners_text[:5000],
             "candidates": "",
+            "messages": messages_text[:6000],
         }
     except ImportError:
-        return {"platform": "", "pledges": "", "winners2022": "", "candidates": ""}
+        return {"platform": "", "pledges": "", "winners2022": "", "candidates": "", "messages": ""}
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +341,7 @@ def generate_policy_draft(
         pledges_context=rag["pledges"],
         winners2022_context=rag["winners2022"],
         candidates_context=rag["candidates"],
+        messages_context=rag.get("messages", ""),
         assembly_context=research["assembly"]["context_text"],
         research_context=research["briefing_text"],
         election_type=election_type,
@@ -351,6 +415,7 @@ def generate_policy_draft(
             "pledges": bool(rag["pledges"]),
             "winners2022": bool(rag["winners2022"]),
             "candidates": bool(rag["candidates"]),
+            "messages": bool(rag.get("messages", "")),
         },
     }
 
