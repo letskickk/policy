@@ -26,7 +26,14 @@
 | `backend/database.py` | SQLite(DB_PATH) 초기화·쿼리 |
 | `backend/quota_rate.py` | 일일 30회·월 300회 쿼터 |
 | `static/js/check-result-render.js` | 점검 결과 프론트 렌더링 |
-| `static/pledge.html` | 공약 입력/점검 페이지 |
+| `backend/pledge_chat.py` | 공약 개발 챗봇 서비스 (세션·대화·RAG·finalize) |
+| `backend/tools_routes.py` | AI 도구 API (생성 스트리밍, 챗봇 5개 API, 쿼터, 이력) |
+| `backend/policy_drafter.py` | AI 정책 초안 생성 (RAG + 프롬프트 + GPT 스트리밍) |
+| `backend/research_assistant.py` | 주제별 리서치 (키워드 확장, 문서/포지션 검색) |
+| `prompts/공약_챗봇_시스템.txt` | 챗봇 시스템 프롬프트 (정책 기획 코치) |
+| `prompts/정책_생성_시스템.txt` | 생성기 시스템 프롬프트 (정강정책 논조, 내부태그 미노출) |
+| `prompts/정책_생성_유저.txt` | 생성기 유저 프롬프트 (5개 출력 형식 템플릿) |
+| `static/pledge.html` | 공약 점검 + AI 공약 개발 챗봇 (탭 전환) |
 | `static/map.html` | 지역별 출마자 지도 (지도 클릭·지역/선거타입/선거구 필터, 후보 목록·공약 상세·이름 검색) |
 
 ---
@@ -80,6 +87,15 @@
 | GET | `/api/candidates` | 후보자 목록 (region_code, district_code, election_type) |
 | GET | `/api/candidates/{id}` | 후보 상세·공약 전체 (지도 모달) |
 | GET | `/api/stats/election-types` | 선거 타입별 후보 수 |
+| POST | `/api/tools/generate/stream` | AI 정책 초안 스트리밍 생성 |
+| GET | `/api/tools/quota` | 사용자 쿼터 현황 |
+| GET | `/api/tools/history` | 최근 생성 이력 |
+| POST | `/api/pledge-chat/start` | 챗봇 세션 시작 + 첫 AI 응답 (SSE) |
+| POST | `/api/pledge-chat/{id}/message` | 챗봇 메시지 전송 + AI 응답 (SSE) |
+| POST | `/api/pledge-chat/{id}/finalize` | 대화 기반 최종 공약문 생성 (SSE) |
+| GET | `/api/pledge-chat/sessions` | 내 챗봇 세션 목록 |
+| GET | `/api/pledge-chat/{id}` | 세션 상세 + 메시지 |
+| GET | `/api/admin/pipeline/stats` | 파이프라인 대시보드 통계 |
 
 ---
 
