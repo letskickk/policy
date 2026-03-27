@@ -29,7 +29,7 @@ def register_tools_routes(app, require_approved, _client_ip):
     class ToolsGenerateRequest(BaseModel):
         topic: str = Field(..., min_length=1, max_length=500)
         description: str = Field("", max_length=2000)
-        output_format: Literal["정책포지션", "지역공약", "논평", "메시지"]
+        output_format: Literal["정책", "정책포지션", "지역공약", "논평", "메시지"]
 
     # ── 생성 스트리밍 ──────────────────────────────────────────
 
