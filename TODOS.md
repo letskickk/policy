@@ -23,6 +23,19 @@
 - **Priority:** P2
 - **Depends on:** 백엔드 API에 limit/offset 파라미터 추가 필요
 
+## P2: hub.html 전면 재검토
+- **What:** hub.html SSOT 검색·열람 페이지 전면 재검토 — UX, 데이터 표시, FTS 인덱스 init_db() 자동 생성 문제, 검색 결과 품질
+- **Why:** Phase 2에서 빠르게 리빌드했으나 init_db()에서 FTS5 테이블이 자동 생성되지 않는 문제 발견 (수동 실행으로 우회). UI/UX도 재검토 필요.
+- **Effort:** M (human) → S (CC+gstack)
+- **Priority:** P2
+- **Context:** FTS5 executescript 블록이 init_db() 내에서 에러를 삼킴. 트리거·백필은 수동 실행으로 서버에 적용 완료 (docs 1,449건, positions 27건). hub.html은 관리자 전용 페이지.
+
+## P3: SSE 핸들러 공통 streamSSE() 함수 추출
+- **What:** pledge.html의 점검/생성 SSE 핸들러를 공통 함수로 추출
+- **Why:** 두 핸들러가 거의 동일한 SSE 파싱 로직 사용 중. 선거 후 리팩토링.
+- **Effort:** S (human) → S (CC+gstack)
+- **Priority:** P3
+
 ## P3: DRY — escape 함수 통합
 - **What:** safe(), esc(), escapeHtml() 등 6개 페이지에 중복 정의된 escape 함수를 공통 JS로 추출
 - **Why:** hub-shared.js에 이미 safe() 있음. 나머지 페이지도 공유하면 중복 제거.
