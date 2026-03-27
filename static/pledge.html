@@ -205,10 +205,25 @@
       font-weight: 600;
       line-height: 1.65;
       word-break: keep-all;
-      margin-bottom: 0.85rem;
+      margin-bottom: 0.75rem;
       max-width: 540px;
       margin-left: auto;
       margin-right: auto;
+    }
+    .hero .hero-chips{
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .hero .hero-chip{
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: rgba(203,213,225,0.75);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 999px;
+      padding: 0.28rem 0.7rem;
     }
 
     /* --- [카드] --- */
@@ -1056,19 +1071,22 @@
         <span class="hero-title-line">공약의 완성도를 높이세요</span>
       </h1>
       <p class="subtitle">공약을 입력하면 AI가 종합 분석하고 보완 포인트를 제안합니다.</p>
+      <div class="hero-chips">
+        <span class="hero-chip">정강정책 부합성</span>
+        <span class="hero-chip">공약 유사도 비교</span>
+        <span class="hero-chip">종합점수 산출</span>
+        <span class="hero-chip">수정·보완 제안</span>
+      </div>
     </header>
     <section class="card">
       <label class="form-label">공약 입력</label>
       <p class="form-hint">
         아래 구조처럼 작성하면 분석 정확도가 높아집니다: <strong>(배경) → (실행방안) → (기대효과)</strong>
       </p>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
-        <button type="button" id="draftHelperBtn" class="btn-secondary">공약 초안 도우미</button>
-      </div>
       <div class="pledge-input-group">
         <input type="text" id="pledgeTitle" class="pledge-title-input" maxlength="100" placeholder="공약 제목을 입력하세요" />
         <div class="pledge-divider"></div>
-        <textarea id="pledge" class="pledge-content-area" maxlength="3000" placeholder="공약 내용을 입력하세요&#13;&#10;&#13;&#10;(배경) 통학버스는 다양한 교육기관에서 운행되지만 안전장비 의무화가 미흡하고 사고 대응이 수동 신고 중심이라 골든타임 지연 위험이 존재함&#13;&#10;(실행방안) ① 통학버스 음주운전 시동잠금장치 도입 및 신규 차량 의무화 ② AI 사고대응 시스템 구축 ③ 교통안전공단 내 전담기구 설치&#13;&#10;(기대효과) ▲ 음주사고 원천 차단 ▲ 사고 시 골든타임 확보 및 치명률 감소"></textarea>
+        <textarea id="pledge" class="pledge-content-area" maxlength="3000" placeholder="공약 내용을 입력하세요"></textarea>
       </div>
       <div id="charCounter" class="char-counter">0 / 3,000자</div>
       <button type="button" id="btn" class="btn-primary">AI 분석 시작하기</button>
@@ -1507,7 +1525,6 @@
         <div class="result-actions">
           <button type="button" class="btn-secondary" id="copyResultBtn">결과 복사</button>
           <button type="button" class="btn-secondary" id="downloadTxtBtn">TXT로 저장</button>
-          <button type="button" class="btn-primary" id="necFormBtn">선거공약서 작성</button>
           <button type="button" class="btn-secondary" id="printResultBtn">인쇄하기</button>
         </div>
       `;
