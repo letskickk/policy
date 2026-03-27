@@ -40,14 +40,11 @@ def _load_chat_system_prompt() -> str:
 # Session CRUD
 # ---------------------------------------------------------------------------
 def create_session(user_id: int, topic: str, output_format: str = "정책") -> dict:
-    """새 챗봇 세션 생성 + RAG 컨텍스트 1회 검색."""
+    """새 챗봇 세션 생성. RAG는 주제가 구체화된 후 lazy로 수행."""
     session_id = uuid.uuid4().hex[:16]
 
-    # RAG 컨텍스트 (기존 drafter 재사용)
-    rag_context = _fetch_rag_context(topic)
-
-    # 시스템 메시지 구성
-    system_msg = _build_system_message(rag_context)
+    # 시작 시에는 RAG 없이 기본 시스템 프롬프트만
+    system_msg = _load_chat_system_prompt()
 
     conn = get_connection()
     try:
@@ -55,7 +52,7 @@ def create_session(user_id: int, topic: str, output_format: str = "정책") -> d
             """INSERT INTO pledge_chat_sessions
                (id, user_id, topic, output_format, rag_context)
                VALUES (?, ?, ?, ?, ?)""",
-            (session_id, user_id, topic, output_format, json.dumps(rag_context, ensure_ascii=False)),
+            (session_id, user_id, topic, output_format, "{}"),
         )
         conn.execute(
             "INSERT INTO pledge_chat_messages (session_id, role, content) VALUES (?, 'system', ?)",
@@ -147,6 +144,51 @@ def _fetch_rag_context(topic: str) -> dict:
     return rag
 
 
+def _maybe_inject_rag(session_id: str, user_message: str) -> None:
+    """세션에 RAG 컨텍스트가 없으면 user_message를 주제로 RAG 검색 후 시스템 메시지 업데이트."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT rag_context FROM pledge_chat_sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+        if not row:
+            return
+        existing = json.loads(row["rag_context"] or "{}")
+        if existing.get("platform") or existing.get("pledges"):
+            return  # 이미 RAG 완료
+
+        # 유형 선택 메시지("1", "정책" 등)면 RAG 스킵
+        short = user_message.strip()
+        if len(short) <= 5 and (short.isdigit() or short in ("정책", "지역공약", "논평", "메시지")):
+            return
+
+        # 이 메시지가 주제가 될 만큼 구체적인지 확인 (최소 4자)
+        if len(short) < 4:
+            return
+    finally:
+        conn.close()
+
+    # RAG 수행
+    logger.info("[pledge_chat] lazy RAG for session=%s topic=%s", session_id, user_message[:50])
+    rag = _fetch_rag_context(user_message)
+
+    # 시스템 메시지 업데이트
+    new_system = _build_system_message(rag)
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE pledge_chat_messages SET content = ? WHERE session_id = ? AND role = 'system'",
+            (new_system, session_id),
+        )
+        conn.execute(
+            "UPDATE pledge_chat_sessions SET rag_context = ?, topic = ? WHERE id = ?",
+            (json.dumps(rag, ensure_ascii=False), user_message[:200], session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _build_system_message(rag: dict) -> str:
     """챗봇 시스템 프롬프트 + RAG 컨텍스트를 합산."""
     base_prompt = _load_chat_system_prompt()
@@ -180,6 +222,9 @@ def _build_system_message(rag: dict) -> str:
 def chat_stream(session_id: str, user_message: str):
     """사용자 메시지 저장 → AI 응답 스트리밍 제너레이터 반환."""
     _save_message(session_id, "user", user_message)
+
+    # RAG가 아직 안 되어있으면 이 메시지를 주제로 RAG 수행
+    _maybe_inject_rag(session_id, user_message)
 
     # 히스토리 로드
     messages = _load_openai_messages(session_id)
