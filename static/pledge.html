@@ -1306,8 +1306,8 @@
       });
     });
     // ?tab=generate 쿼리 파라미터 지원 (로그인 리다이렉트 시 해시 유실 대비)
-    var _qTab = new URLSearchParams(location.search).get('tab');
-    if (_qTab === 'generate') history.replaceState(null, '', '#generate');
+    var _wantGenerate = (new URLSearchParams(location.search).get('tab') === 'generate') || (location.hash === '#generate');
+    if (_wantGenerate) history.replaceState(null, '', location.pathname + '#generate');
     window.addEventListener('hashchange', function() {
       var h = location.hash.replace('#','');
       switchTab(h === 'generate' && meData.can_use_policy_tools ? 'generate' : 'check');
@@ -1366,9 +1366,7 @@
           meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr' || d.email === 'ktest@test.kr' || d.email === 'gjtest@test.kr');
           if (meData.can_use_policy_tools) {
             document.getElementById('tabGenerate').style.display = '';
-            const hash = location.hash.replace('#','');
-            const qTab = new URLSearchParams(location.search).get('tab');
-            if (hash === 'generate' || qTab === 'generate') switchTab('generate');
+            if (_wantGenerate || location.hash === '#generate') switchTab('generate');
           }
           // 인사말 렌더링 (meData 로드 완료)
           if (window._chatGreetingReady) window._chatGreetingReady();
