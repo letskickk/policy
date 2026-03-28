@@ -1244,6 +1244,15 @@
         <span class="chat-sessions-toggle" style="color:var(--muted);font-size:0.82rem;cursor:pointer;text-decoration:underline;" onclick="chatToggleSessions()">이전 대화</span>
       </div>
       <div class="chat-sessions-list" id="chatSessionsList"></div>
+      <section class="card chat-container" id="chatContainer">
+        <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 선거구 기준 생활 이슈, 지방의회 자료, 기사, 우리당 자료, 공공데이터를 바탕으로 공약 초안의 방향을 잡아드립니다. 아래 입력창에 주제를 입력하거나, 메시지를 보내주세요.</div></div>
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
+          <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
+          <button class="chat-btn-finalize" id="chatBtnFinalize" onclick="chatFinalize()" style="display:none;">방향 정리 보기</button>
+        </div>
+      </section>
       <div id="chatQuotaBar" class="quota-bar-wrap" style="display:none;">
         <div class="quota-item">
           <span class="quota-label">오늘</span>
@@ -1256,15 +1265,6 @@
           <span class="quota-count" id="chatQuotaMonthlyText">-</span>
         </div>
       </div>
-      <section class="card chat-container" id="chatContainer">
-        <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 선거구 기준 생활 이슈, 지방의회 자료, 기사, 우리당 자료, 공공데이터를 바탕으로 공약 초안의 방향을 잡아드립니다. 아래 입력창에 주제를 입력하거나, 메시지를 보내주세요.</div></div>
-        <div class="chat-input-bar">
-          <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
-                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
-          <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
-          <button class="chat-btn-finalize" id="chatBtnFinalize" onclick="chatFinalize()" style="display:none;">방향 정리 보기</button>
-        </div>
-      </section>
       <section class="card" id="chatFinalSection" style="display:none;">
         <h2 class="form-label">정책 방향 정리</h2>
         <div class="result-container">
@@ -1304,8 +1304,8 @@
 
     function _fmtTokens(n) {
       if (!n) return '0';
-      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      if (n >= 1000000) return Math.round(n / 1000) + 'K';
+      if (n >= 1000) return Math.round(n / 1000) + 'K';
       return String(n);
     }
 
@@ -2209,11 +2209,11 @@
         ];
 
         var subTopics = [
-          { label: '교통·안전', msg: (loc ? loc + ' ' : '') + '교통·안전 관련 의회 논의와 현안을 알려줘' },
-          { label: '복지·돌봄', msg: (loc ? loc + ' ' : '') + '복지·돌봄 관련 의회 논의와 현안을 알려줘' },
-          { label: '상권·골목경제', msg: (loc ? loc + ' ' : '') + '상권·골목경제 관련 의회 논의와 현안을 알려줘' },
-          { label: '주차·통행', msg: (loc ? loc + ' ' : '') + '주차·통행 관련 의회 논의와 현안을 알려줘' },
-          { label: '환경·시설', msg: (loc ? loc + ' ' : '') + '환경·시설 관련 의회 논의와 현안을 알려줘' },
+          { label: '교통·안전', msg: (loc ? loc + ' ' : '') + '교통·안전 현안을 알려줘' },
+          { label: '복지·돌봄', msg: (loc ? loc + ' ' : '') + '복지·돌봄 현안을 알려줘' },
+          { label: '상권·골목경제', msg: (loc ? loc + ' ' : '') + '상권·골목경제 현안을 알려줘' },
+          { label: '주차·통행', msg: (loc ? loc + ' ' : '') + '주차·통행 현안을 알려줘' },
+          { label: '환경·시설', msg: (loc ? loc + ' ' : '') + '환경·시설 현안을 알려줘' },
           { label: '✏️ 직접 입력', msg: null },
         ];
 
