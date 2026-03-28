@@ -674,6 +674,33 @@ def _fetch_seoul_facilities(region_info: dict) -> dict:
 # 통합 조회 함수
 # ---------------------------------------------------------------------------
 
+# 주제 → API 매핑
+_TOPIC_API_MAP = {
+    "kosis": ["인구", "세대", "고령", "청년", "노인", "1인가구", "전입", "전출", "주민", "연령", "출산", "인구구조"],
+    "taas": ["교통", "사고", "안전", "보행", "어린이", "통학", "보호구역", "횡단보도", "도로", "주차", "자전거"],
+    "semas": ["상권", "상가", "자영업", "골목", "경제", "업종", "폐업", "창업", "소상공인", "시장"],
+    "seoul": ["시설", "도서관", "체육", "공원", "복지", "문화", "주차장", "CCTV", "돌봄", "경로당", "어린이집"],
+}
+
+
+def _select_relevant_apis(all_fetchers: dict, topic: str, keywords: list[str] | None) -> dict:
+    """주제/키워드 기반으로 필요한 API만 선택. 매칭 없으면 kosis만."""
+    if not topic and not keywords:
+        return {"kosis": all_fetchers["kosis"]}
+
+    text = (topic + " " + " ".join(keywords or [])).lower()
+    selected = {}
+    for api_name, trigger_words in _TOPIC_API_MAP.items():
+        if api_name in all_fetchers and any(w in text for w in trigger_words):
+            selected[api_name] = all_fetchers[api_name]
+
+    # 매칭 없으면 kosis(인구)만 기본 제공
+    if not selected:
+        selected["kosis"] = all_fetchers["kosis"]
+
+    return selected
+
+
 def query_public_data_context(
     *,
     region: Optional[str] = None,
@@ -696,15 +723,21 @@ def query_public_data_context(
     if not region_info["province"] and not region_info["district"]:
         return {"available": False, "context_text": "", "sources": {}}
 
-    fetchers = {
+    # 주제 키워드 기반으로 필요한 API만 선택
+    all_fetchers = {
         "semas": lambda: _fetch_semas_commercial(region_info),
         "taas": lambda: _fetch_taas_accidents(region_info),
         "kosis": lambda: _fetch_kosis_population(region_info),
         "seoul": lambda: _fetch_seoul_facilities(region_info),
     }
 
+    fetchers = _select_relevant_apis(all_fetchers, topic, keywords)
+
+    if not fetchers:
+        return {"available": False, "context_text": "", "sources": {}}
+
     sources = {}
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=len(fetchers)) as pool:
         futures = {pool.submit(fn): name for name, fn in fetchers.items()}
         for future in as_completed(futures, timeout=15):
             name = futures[future]
