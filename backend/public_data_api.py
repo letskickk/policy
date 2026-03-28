@@ -343,8 +343,11 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
 # authKey, searchYearCd, siDo(2자리), guGun(3자리)
 # ---------------------------------------------------------------------------
 
-TAAS_BASE = "https://opendata.koroad.or.kr/data/rest"
-TAAS_ENDPOINTS = {
+# 서버(AWS 시드니)에서 opendata.koroad.or.kr 차단됨 → api.odcloud.kr 사용
+TAAS_ODCLOUD = "https://api.odcloud.kr/api/15045638/v1/uddi:69cb47bd-0373-4dee-9101-a1878f8c97c4"
+# opendata.koroad.or.kr (로컬/한국 서버용 fallback)
+TAAS_KOROAD_BASE = "https://opendata.koroad.or.kr/data/rest"
+TAAS_KOROAD_ENDPOINTS = {
     "지자체별": "/frequentzone/lg",
     "보행자": "/frequentzone/pedstrians",
     "보행어린이": "/frequentzone/child",
@@ -357,103 +360,101 @@ _GUGUN_MAP = {}  # 런타임에 필요하면 확장
 
 
 def _fetch_taas_accidents(region_info: dict) -> dict:
-    """TAAS 교통사고 다발지역 — 시군구별 5개 유형 통합 조회."""
-    from backend.config import TAAS_API_KEY
+    """교통사고 통계 조회. odcloud(연도별) 우선, koroad(다발지역) fallback."""
+    from backend.config import TAAS_API_KEY, DATA_GO_KR_API_KEY
 
     source = "taas"
-    if not TAAS_API_KEY:
-        return _empty_result(source, "API 키 미설정")
-
-    province_code = region_info["province_code"]
     district = region_info["district"]
-    if not province_code:
-        return _empty_result(source, "시도 코드 미확인")
 
-    ck = _cache_key("taas_v2", province_code=province_code, district=district)
+    ck = _cache_key("taas_v3", province=region_info["province"], district=district)
     cached = _get_cached(ck)
     if cached:
         cached["from_cache"] = True
         return cached
 
-    current_year = datetime.now().year
-    all_accidents = {}
+    # 1) odcloud 교통사고 연도별 통계 (서버에서 항상 접근 가능)
+    odcloud_key = DATA_GO_KR_API_KEY
+    if odcloud_key:
+        params = {"serviceKey": odcloud_key, "page": "1", "perPage": "30", "returnType": "JSON"}
+        raw = _http_get_json(TAAS_ODCLOUD, params, timeout=8)
+        if raw and isinstance(raw, dict) and raw.get("data"):
+            items = raw["data"]
+            recent = sorted(items, key=lambda x: int(x.get("연도") or 0), reverse=True)[:5]
+            summary_lines = ["교통사고 통계 (최근 5년):"]
+            for item in recent:
+                summary_lines.append(
+                    f"  - {item.get('연도')}년: 사고 {item.get('사고')}건, "
+                    f"사망 {item.get('사망')}명, 부상 {item.get('부상')}명"
+                )
+            result = {
+                "source": source, "available": True, "data": recent,
+                "summary": "\n".join(summary_lines), "item_count": len(recent),
+            }
+            _set_cached(ck, result)
+            return result
 
-    for label, endpoint in TAAS_ENDPOINTS.items():
-        url = TAAS_BASE + endpoint
-        params = {
-            "authKey": TAAS_API_KEY,
-            "searchYearCd": str(current_year - 2),  # TAAS 데이터는 2년 전이 최신
-            "siDo": province_code,
-            "guGun": "",
-            "type": "json",
-            "numOfRows": "200",
-            "pageNo": "1",
-        }
-        raw = _http_get_json(url, params, timeout=5)
-        if not raw:
-            continue
+    # 2) koroad 다발지역 (한국 서버에서만 접근 가능)
+    if TAAS_API_KEY:
+        province_code = region_info["province_code"]
+        current_year = datetime.now().year
+        all_accidents = {}
 
-        try:
-            # TAAS 응답: {resultCode, items: {item: [...]}}
-            items_wrapper = raw.get("items", {})
-            if isinstance(items_wrapper, dict):
-                items = items_wrapper.get("item", [])
-            else:
-                items = items_wrapper if isinstance(items_wrapper, list) else []
-            if isinstance(items, dict):
-                items = [items]
+        for label, endpoint in TAAS_KOROAD_ENDPOINTS.items():
+            url = TAAS_KOROAD_BASE + endpoint
+            params = {
+                "authKey": TAAS_API_KEY,
+                "searchYearCd": str(current_year - 2),
+                "siDo": province_code or "11",
+                "guGun": "",
+                "type": "json",
+                "numOfRows": "200",
+                "pageNo": "1",
+            }
+            raw = _http_get_json(url, params, timeout=5)
+            if not raw:
+                continue
+            try:
+                items_wrapper = raw.get("items", {})
+                items = items_wrapper.get("item", []) if isinstance(items_wrapper, dict) else []
+                if isinstance(items, dict):
+                    items = [items]
+                district_short = region_info["district_short"]
+                filtered = [
+                    item for item in (items or [])
+                    if (district and (district in (item.get("spot_nm") or "") or district in (item.get("sido_sgg_nm") or "")))
+                    or (district_short and (district_short in (item.get("spot_nm") or "") or district_short in (item.get("sido_sgg_nm") or "")))
+                    or not district
+                ]
+                if filtered:
+                    all_accidents[label] = filtered[:5]
+            except Exception as e:
+                logger.warning("TAAS %s parse error: %s", label, e)
 
-            # 지역 필터: spot_nm에 district 또는 district_short 포함
-            # TAAS spot_nm 형식: "서울 강북구 수유동(수유리사거리 부근)"
-            filtered = []
-            district_short = region_info["district_short"]
-            for item in (items or []):
-                spot = item.get("spot_nm") or item.get("afos_fid_nm") or ""
-                sgg = item.get("sido_sgg_nm") or ""
-                if district and (district in spot or district in sgg):
-                    filtered.append(item)
-                elif district_short and (district_short in spot or district_short in sgg):
-                    filtered.append(item)
-                elif not district:
-                    filtered.append(item)
+        if all_accidents:
+            total = sum(len(v) for v in all_accidents.values())
+            summary_lines = [f"{district or region_info['province']} 교통사고 다발지역 ({total}건):"]
+            for label, items in all_accidents.items():
+                summary_lines.append(f"  [{label}] {len(items)}건")
+                for item in items[:3]:
+                    spot = item.get("spot_nm") or "위치 미상"
+                    cnt = item.get("occrrnc_cnt") or ""
+                    death = item.get("dth_dnv_cnt") or ""
+                    line = f"    - {spot}"
+                    if cnt:
+                        line += f" (사고 {cnt}건"
+                        if death:
+                            line += f", 사망 {death}명"
+                        line += ")"
+                    summary_lines.append(line)
+            result = {
+                "source": source, "available": True, "data": all_accidents,
+                "summary": "\n".join(summary_lines),
+                "category_count": len(all_accidents), "total_spots": total,
+            }
+            _set_cached(ck, result)
+            return result
 
-            if filtered:
-                all_accidents[label] = filtered[:5]
-        except Exception as e:
-            logger.warning("TAAS %s parse error: %s", label, e)
-
-    # 요약 생성
-    summary_lines = []
-    total = sum(len(v) for v in all_accidents.values())
-    if total:
-        target = district or region_info["province"]
-        summary_lines.append(f"{target} 교통사고 다발지역 ({total}건):")
-        for label, items in all_accidents.items():
-            summary_lines.append(f"  [{label}] {len(items)}건")
-            for item in items[:3]:
-                spot = item.get("spot_nm") or item.get("afos_fid_nm") or "위치 미상"
-                cnt = item.get("occrrnc_cnt") or item.get("caslt_cnt") or ""
-                death = item.get("dth_dnv_cnt") or ""
-                line = f"    - {spot}"
-                if cnt:
-                    line += f" (사고 {cnt}건"
-                    if death:
-                        line += f", 사망 {death}명"
-                    line += ")"
-                summary_lines.append(line)
-    else:
-        summary_lines.append("교통사고 다발지역 데이터 없음")
-
-    result = {
-        "source": source,
-        "available": bool(all_accidents),
-        "data": all_accidents,
-        "summary": "\n".join(summary_lines),
-        "category_count": len(all_accidents),
-        "total_spots": total,
-    }
-    _set_cached(ck, result)
-    return result
+    return _empty_result(source, "API 호출 실패")
 
 
 
@@ -786,12 +787,11 @@ def test_all_apis() -> dict:
     else:
         results["semas"] = {"key_set": False}
 
-    # TAAS
-    if TAAS_API_KEY:
-        url = TAAS_BASE + TAAS_ENDPOINTS["지자체별"]
-        params = {"authKey": TAAS_API_KEY, "searchYearCd": "2024",
-                  "siDo": "11", "guGun": "", "type": "json", "numOfRows": "1", "pageNo": "1"}
-        raw = _http_get_json(url, params, timeout=10)
+    # TAAS (odcloud)
+    from backend.config import DATA_GO_KR_API_KEY as _dgk
+    if _dgk:
+        params = {"serviceKey": _dgk, "page": "1", "perPage": "1", "returnType": "JSON"}
+        raw = _http_get_json(TAAS_ODCLOUD, params, timeout=8)
         results["taas"] = {"key_set": True, "response": bool(raw),
                            "sample": str(raw)[:200] if raw else None}
     else:
