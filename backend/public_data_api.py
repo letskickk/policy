@@ -229,6 +229,10 @@ def _http_get_json(url: str, params: dict, *, timeout: int = 10,
             if attempt < 2:
                 import time
                 time.sleep(0.5 * (1 + attempt))
+        except (OSError, TimeoutError) as e:
+            # 타임아웃/네트워크 에러는 재시도 안 함
+            logger.warning("public_data API timeout/network: %s — %s", url, e)
+            return None
         except Exception as e:
             last_err = e
             if attempt < 2:
@@ -385,7 +389,7 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
             "numOfRows": "200",
             "pageNo": "1",
         }
-        raw = _http_get_json(url, params, timeout=12)
+        raw = _http_get_json(url, params, timeout=5)
         if not raw:
             continue
 
@@ -702,7 +706,7 @@ def query_public_data_context(
     sources = {}
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(fn): name for name, fn in fetchers.items()}
-        for future in as_completed(futures, timeout=30):
+        for future in as_completed(futures, timeout=15):
             name = futures[future]
             try:
                 sources[name] = future.result()
