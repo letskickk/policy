@@ -253,50 +253,55 @@ def _find_related_positions(
 
 def _fetch_related_news(*, topic: str, region: Optional[str], keywords: list[str], limit: int = 6) -> list[dict]:
     """Google News RSS 기반 보조 기사 수집. 지역 자료보다 후순위 참고용."""
-    query_parts = []
-    if region:
-        query_parts.append(region)
-    query_parts.append(topic)
-    query_parts.extend(keywords[:3])
-    query = " ".join(part for part in query_parts if part).strip()
-    if not query:
-        return []
-
-    url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({
-        "q": query,
-        "hl": "ko",
-        "gl": "KR",
-        "ceid": "KR:ko",
-    })
-
-    try:
-        data = urllib.request.urlopen(url, timeout=15).read()
-        root = ET.fromstring(data)
-    except Exception as e:
-        logger.warning("related news fetch failed: %s", e)
-        return []
+    region_full = (region or "").strip()
+    region_short = region_full.split()[-1] if region_full else ""
+    query_candidates = []
+    for region_token in [region_full, region_short, ""]:
+        query_parts = []
+        if region_token:
+            query_parts.append(region_token)
+        query_parts.append(topic)
+        query_parts.extend(keywords[:3])
+        query = " ".join(part for part in query_parts if part).strip()
+        if query:
+            query_candidates.append(query)
 
     articles = []
     seen = set()
-    region_text = (region or "").strip()
-    for item in root.findall('.//item'):
-        title = (item.findtext('title') or '').strip()
-        link = (item.findtext('link') or '').strip()
-        source = (item.findtext('source') or '').strip()
-        if not title or title in seen:
-            continue
-        seen.add(title)
-        score = 0
-        hay = f"{title} {source}"
-        if region_text and region_text in hay:
-            score += 3
-        score += sum(1 for kw in keywords[:4] if kw and kw in hay)
-        articles.append({
-            "title": title,
-            "link": link,
-            "source": source,
-            "relevance_score": score,
+    for query in query_candidates:
+        url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({
+            "q": query,
+            "hl": "ko",
+            "gl": "KR",
+            "ceid": "KR:ko",
         })
+        try:
+            data = urllib.request.urlopen(url, timeout=15).read()
+            root = ET.fromstring(data)
+        except Exception as e:
+            logger.warning("related news fetch failed: %s", e)
+            continue
+
+        for item in root.findall('.//item'):
+            title = (item.findtext('title') or '').strip()
+            link = (item.findtext('link') or '').strip()
+            source = (item.findtext('source') or '').strip()
+            if not title or title in seen:
+                continue
+            seen.add(title)
+            score = 0
+            hay = f"{title} {source}"
+            if region_full and region_full in hay:
+                score += 4
+            if region_short and region_short in hay:
+                score += 6
+            score += sum(1 for kw in keywords[:4] if kw and kw in hay)
+            articles.append({
+                "title": title,
+                "link": link,
+                "source": source,
+                "relevance_score": score,
+            })
 
     articles.sort(key=lambda x: x["relevance_score"], reverse=True)
     return articles[:limit]

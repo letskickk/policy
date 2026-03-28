@@ -556,9 +556,42 @@ def query_assembly_context(
     # 프롬프트에 넣을 텍스트 생성
     context_lines = []
 
-    if assembly.get("results"):
-        context_lines.append(f"[지방의회 의정정보] {len(assembly['results'])}건 검색됨")
-        for item in assembly["results"][:10]:
+    region_text = (region or '').strip()
+    district_text = (district_name or '').strip()
+
+    def _is_local_match(item: dict) -> bool:
+        hay = " ".join([
+            str(item.get("council") or ""),
+            str(item.get("title") or ""),
+            str(item.get("summary") or ""),
+            str(item.get("speaker") or ""),
+            str(item.get("committee") or ""),
+            str(item.get("content") or ""),
+        ])
+        if district_text and district_text in hay:
+            return True
+        if region_text and region_text in hay:
+            return True
+        short = region_text.split()[-1] if region_text else ""
+        return bool(short and short in hay)
+
+    local_assembly = [item for item in assembly.get("results", []) if _is_local_match(item)]
+    compare_assembly = [item for item in assembly.get("results", []) if not _is_local_match(item)]
+    local_speeches = [item for item in speeches.get("results", []) if _is_local_match(item)]
+    compare_speeches = [item for item in speeches.get("results", []) if not _is_local_match(item)]
+
+    if local_assembly:
+        context_lines.append(f"[지방의회 의정정보 - 내 지역 중심] {len(local_assembly)}건")
+        for item in local_assembly[:8]:
+            line = f"- [{item.get('type', '')}] [{item.get('council', '')}] {item.get('title', '')} ({item.get('date', '')})"
+            if item.get("speaker"):
+                line += f" — {item['speaker']}"
+            if item.get("summary"):
+                line += f"\n  {item['summary'][:200]}"
+            context_lines.append(line)
+    elif assembly.get("results"):
+        context_lines.append(f"[지방의회 의정정보 - 비교 사례] {len(assembly['results'])}건")
+        for item in assembly["results"][:6]:
             line = f"- [{item.get('type', '')}] [{item.get('council', '')}] {item.get('title', '')} ({item.get('date', '')})"
             if item.get("speaker"):
                 line += f" — {item['speaker']}"
@@ -566,9 +599,22 @@ def query_assembly_context(
                 line += f"\n  {item['summary'][:200]}"
             context_lines.append(line)
 
-    if speeches.get("results"):
-        context_lines.append(f"\n[발언 빅데이터] {len(speeches['results'])}건 검색됨")
-        for item in speeches["results"][:10]:
+    if compare_assembly and local_assembly:
+        context_lines.append(f"\n[지방의회 비교 사례] {len(compare_assembly)}건")
+        for item in compare_assembly[:4]:
+            line = f"- [{item.get('type', '')}] [{item.get('council', '')}] {item.get('title', '')} ({item.get('date', '')})"
+            context_lines.append(line)
+
+    if local_speeches:
+        context_lines.append(f"\n[발언 빅데이터 - 내 지역 중심] {len(local_speeches)}건")
+        for item in local_speeches[:6]:
+            line = f"- [{item.get('council', '')} {item.get('committee', '')}] {item.get('speaker', '')} ({item.get('date', '')})"
+            if item.get("content"):
+                line += f"\n  {item['content'][:200]}"
+            context_lines.append(line)
+    elif speeches.get("results"):
+        context_lines.append(f"\n[발언 빅데이터 - 비교 사례] {len(speeches['results'])}건")
+        for item in speeches["results"][:4]:
             line = f"- [{item.get('council', '')} {item.get('committee', '')}] {item.get('speaker', '')} ({item.get('date', '')})"
             if item.get("content"):
                 line += f"\n  {item['content'][:200]}"
