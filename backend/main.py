@@ -403,9 +403,10 @@ def index():
     return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
 
 
-def _login_redirect(path: str):
+def _login_redirect(path: str, query: str = ""):
     from urllib.parse import quote
-    return RedirectResponse(url=f"/login?next={quote(path)}", status_code=302)
+    full = path + ("?" + query if query else "")
+    return RedirectResponse(url=f"/login?next={quote(full)}", status_code=302)
 
 
 @app.api_route("/test-check", methods=["GET", "HEAD"])
@@ -422,7 +423,7 @@ def pledge_page(request: Request):
     """공약 입력·점검 폼 페이지. (승인 사용자 전용)"""
     user = get_current_user(request)
     if not user:
-        return _login_redirect(request.url.path)
+        return _login_redirect(request.url.path, str(request.url.query or ""))
     # ADMIN_EMAILS/관리자는 승인 대기 화면으로 보내지 않음
     if (
         user["status"] != STATUS_APPROVED
