@@ -1367,7 +1367,8 @@
           if (meData.can_use_policy_tools) {
             document.getElementById('tabGenerate').style.display = '';
             const hash = location.hash.replace('#','');
-            if (hash === 'generate') switchTab('generate');
+            const qTab = new URLSearchParams(location.search).get('tab');
+            if (hash === 'generate' || qTab === 'generate') switchTab('generate');
           }
           // 인사말 렌더링 (meData 로드 완료)
           if (window._chatGreetingReady) window._chatGreetingReady();
