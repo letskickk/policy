@@ -4,9 +4,24 @@ from fastapi import HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from backend.database import get_connection
+from backend.auth import verify_session_token
+from backend.config import POLICY_DRAFTER_TEST_EMAILS
 
 
 def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
+    def require_policy_drafter_access(request: Request) -> dict:
+        try:
+            return require_admin(request)
+        except Exception:
+            token = request.cookies.get("policy_auth")
+            user = verify_session_token(token) if token else None
+            if not user:
+                raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+            if user.get("status") != "APPROVED":
+                raise HTTPException(status_code=403, detail="승인된 사용자만 접근 가능합니다.")
+            if user.get("email", "").lower() in POLICY_DRAFTER_TEST_EMAILS:
+                return user
+            raise HTTPException(status_code=403, detail="관리자 또는 허용된 테스트 계정만 접근 가능합니다.")
     class FeaturedIssueUpsertBody(BaseModel):
         position_id: int = Field(..., ge=1)
         reason: Optional[str] = Field(default=None, max_length=500)
@@ -626,7 +641,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def create_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 생성."""
         ensure_db_ready()
-        _ = require_admin(request)
+        _ = require_policy_drafter_access(request)
 
         from backend.policy_drafter import generate_policy_draft
 
@@ -644,7 +659,7 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def stream_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 스트리밍 생성."""
         ensure_db_ready()
-        _ = require_admin(request)
+        _ = require_policy_drafter_access(request)
 
         from fastapi.responses import StreamingResponse
         from backend.policy_drafter import generate_policy_draft
@@ -696,8 +711,8 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
 
     @app.api_route("/policy-lab", methods=["GET", "HEAD"])
     def policy_lab_page(request: Request):
-        """정책 허브 (관리자 전용)."""
-        _ = require_admin(request)
+        """정책 허브 (관리자 또는 허용된 테스트 계정)."""
+        _ = require_policy_drafter_access(request)
         res = serve_html("policy-lab.html")
         if res is not None:
             return res
