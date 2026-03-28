@@ -139,7 +139,7 @@ def _save_message(session_id: str, role: str, content: str) -> None:
 # ---------------------------------------------------------------------------
 # RAG context (reuse policy_drafter)
 # ---------------------------------------------------------------------------
-def _fetch_rag_context(topic: str) -> dict:
+def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
     """policy_drafter의 _get_rag_contexts + research_topic 재사용."""
     try:
         from backend.policy_drafter import _get_rag_contexts
@@ -150,7 +150,14 @@ def _fetch_rag_context(topic: str) -> dict:
 
     try:
         from backend.research_assistant import research_topic
-        research = research_topic(topic=topic, years=2)
+        user = get_user(user_id) if user_id else {}
+        research = research_topic(
+            topic=topic,
+            region=(user or {}).get("region_name") or None,
+            district_name=(user or {}).get("district_name") or None,
+            election_type=(user or {}).get("election_position") or None,
+            years=2,
+        )
         rag["assembly"] = research.get("assembly", {}).get("context_text", "")
         rag["research"] = research.get("briefing_text", "")
     except Exception as e:
@@ -166,7 +173,7 @@ def _maybe_inject_rag(session_id: str, user_message: str) -> None:
     conn = get_connection()
     try:
         row = conn.execute(
-            "SELECT rag_context FROM pledge_chat_sessions WHERE id = ?", (session_id,)
+            "SELECT rag_context, user_id FROM pledge_chat_sessions WHERE id = ?", (session_id,)
         ).fetchone()
         if not row:
             return
@@ -187,7 +194,7 @@ def _maybe_inject_rag(session_id: str, user_message: str) -> None:
 
     # RAG 수행
     logger.info("[pledge_chat] lazy RAG for session=%s topic=%s", session_id, user_message[:50])
-    rag = _fetch_rag_context(user_message)
+    rag = _fetch_rag_context(user_message, user_id=row["user_id"] if row else None)
 
     # 시스템 메시지 업데이트
     new_system = _build_system_message(rag)

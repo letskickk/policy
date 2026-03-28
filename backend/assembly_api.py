@@ -496,6 +496,8 @@ def _parse_speech_response(data: dict) -> list[dict]:
 def query_assembly_context(
     *,
     region: Optional[str] = None,
+    district_name: Optional[str] = None,
+    election_type: Optional[str] = None,
     keywords: Optional[list[str]] = None,
     years: int = 2,
 ) -> dict:
@@ -516,6 +518,37 @@ def query_assembly_context(
     """
     assembly = search_local_assembly(region=region, keywords=keywords, years=years)
     speeches = search_speeches(region=region, keywords=keywords, years=years)
+
+    def _score_item(item: dict) -> int:
+        score = 0
+        region_text = (region or "").strip()
+        district_text = (district_name or "").strip()
+        election_text = (election_type or "").strip()
+        hay = " ".join([
+            str(item.get("council") or ""),
+            str(item.get("title") or ""),
+            str(item.get("summary") or ""),
+            str(item.get("speaker") or ""),
+            str(item.get("committee") or ""),
+            str(item.get("content") or ""),
+        ])
+        if region_text and region_text in hay:
+            score += 100
+        if district_text and district_text in hay:
+            score += 140
+        if election_text:
+            if ("기초" in election_text or "구의원" in election_text or "시의원" in election_text or "군의원" in election_text):
+                if any(tok in hay for tok in ["구의회", "시의회", "군의회", "구의원", "시의원", "군의원"]):
+                    score += 40
+            elif ("광역" in election_text or "시장" in election_text or "도지사" in election_text):
+                if any(tok in hay for tok in ["시의회", "도의회", "시장", "도지사"]):
+                    score += 30
+        return score
+
+    if assembly.get("results"):
+        assembly["results"] = sorted(assembly["results"], key=_score_item, reverse=True)
+    if speeches.get("results"):
+        speeches["results"] = sorted(speeches["results"], key=_score_item, reverse=True)
 
     sources_tried = 2
     sources_available = sum([assembly.get("available", False), speeches.get("available", False)])

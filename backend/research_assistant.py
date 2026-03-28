@@ -10,6 +10,9 @@ Phase 3 드래프터의 입력으로 사용됨.
 from __future__ import annotations
 
 import logging
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 from typing import Optional
 
 from backend.assembly_api import query_assembly_context
@@ -36,6 +39,8 @@ def research_topic(
     *,
     topic: str,
     region: Optional[str] = None,
+    district_name: Optional[str] = None,
+    election_type: Optional[str] = None,
     years: int = 2,
     max_docs: int = 20,
 ) -> dict:
@@ -64,6 +69,11 @@ def research_topic(
                 "context_text": str,
                 "result_count": int,
             },
+            "news": {
+                "available": bool,
+                "articles": [...],
+                "result_count": int,
+            },
             "briefing_text": str,  # 요약 브리핑 (프롬프트용)
         }
     """
@@ -84,11 +94,16 @@ def research_topic(
     # 4. 지방의회 API 조회
     assembly = query_assembly_context(
         region=region,
+        district_name=district_name,
+        election_type=election_type,
         keywords=keywords[:5],  # API 검색어는 5개까지
         years=years,
     )
 
-    # 5. 브리핑 텍스트 생성
+    # 5. 관련 기사 검색 (보조 근거 레이어)
+    news_articles = _fetch_related_news(topic=topic, region=region, keywords=keywords)
+
+    # 6. 브리핑 텍스트 생성
     briefing = _build_briefing(
         topic=topic,
         region=region,
@@ -96,6 +111,7 @@ def research_topic(
         related_docs=related_docs,
         related_positions=related_positions,
         assembly=assembly,
+        news_articles=news_articles,
     )
 
     return {
@@ -113,6 +129,11 @@ def research_topic(
             "context_text": assembly["context_text"],
             "result_count": len(assembly.get("assembly_results", []))
             + len(assembly.get("speech_results", [])),
+        },
+        "news": {
+            "available": bool(news_articles),
+            "articles": news_articles,
+            "result_count": len(news_articles),
         },
         "briefing_text": briefing,
     }
@@ -230,6 +251,58 @@ def _find_related_positions(
     return [item for _, item in scored[:10]]
 
 
+def _fetch_related_news(*, topic: str, region: Optional[str], keywords: list[str], limit: int = 6) -> list[dict]:
+    """Google News RSS 기반 보조 기사 수집. 지역 자료보다 후순위 참고용."""
+    query_parts = []
+    if region:
+        query_parts.append(region)
+    query_parts.append(topic)
+    query_parts.extend(keywords[:3])
+    query = " ".join(part for part in query_parts if part).strip()
+    if not query:
+        return []
+
+    url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({
+        "q": query,
+        "hl": "ko",
+        "gl": "KR",
+        "ceid": "KR:ko",
+    })
+
+    try:
+        data = urllib.request.urlopen(url, timeout=15).read()
+        root = ET.fromstring(data)
+    except Exception as e:
+        logger.warning("related news fetch failed: %s", e)
+        return []
+
+    articles = []
+    seen = set()
+    region_text = (region or "").strip()
+    for item in root.findall('.//item'):
+        title = (item.findtext('title') or '').strip()
+        link = (item.findtext('link') or '').strip()
+        source = (item.findtext('source') or '').strip()
+        if not title or title in seen:
+            continue
+        seen.add(title)
+        score = 0
+        hay = f"{title} {source}"
+        if region_text and region_text in hay:
+            score += 3
+        score += sum(1 for kw in keywords[:4] if kw and kw in hay)
+        articles.append({
+            "title": title,
+            "link": link,
+            "source": source,
+            "relevance_score": score,
+        })
+
+    articles.sort(key=lambda x: x["relevance_score"], reverse=True)
+    return articles[:limit]
+
+
+
 def _build_briefing(
     *,
     topic: str,
@@ -238,6 +311,7 @@ def _build_briefing(
     related_docs: list[dict],
     related_positions: list[dict],
     assembly: dict,
+    news_articles: list[dict],
 ) -> str:
     """프롬프트에 넣을 리서치 브리핑 텍스트 생성."""
     lines = []
@@ -275,5 +349,15 @@ def _build_briefing(
     # 지방의회
     lines.append("[지방의회 논의]")
     lines.append(assembly["context_text"])
+    lines.append("")
+
+    # 관련 기사 (보조 근거)
+    if news_articles:
+        lines.append(f"[관련 기사] {len(news_articles)}건")
+        for article in news_articles[:5]:
+            source = article.get("source") or "기사"
+            lines.append(f"- ({source}) {article['title']}")
+    else:
+        lines.append("[관련 기사] 없음")
 
     return "\n".join(lines)
