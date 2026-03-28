@@ -1245,7 +1245,7 @@
       </div>
       <div class="chat-sessions-list" id="chatSessionsList"></div>
       <section class="card chat-container" id="chatContainer">
-        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 정책 방향 제안 챗봇입니다. 지역 이슈와 정책 방향을 함께 정리해보겠습니다.</div></div>
         <div class="chat-input-bar">
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
@@ -1345,9 +1345,9 @@
           }
         }
       } catch (e) {}
-      var msgs = document.getElementById('chatMessages');
-      if (msgs && !msgs.children.length) {
-        chatAppendMsg('assistant', chatInitialGreeting());
+      var greetingEl = document.getElementById('chatGreeting');
+      if (greetingEl) {
+        greetingEl.textContent = chatInitialGreeting();
       }
     })();
     const pledgeEl = document.getElementById('pledge');
