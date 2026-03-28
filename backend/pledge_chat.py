@@ -243,13 +243,17 @@ def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
             election_type=(user or {}).get("election_position") or None,
             years=2,
         )
-        rag["assembly"] = research.get("assembly", {}).get("context_text", "")
-        rag["research"] = research.get("briefing_text", "")
-        rag["public_data"] = research.get("public_data", {}).get("context_text", "")
+        assembly_info = research.get("assembly") or {}
+        rag["assembly"] = assembly_info.get("context_text", "") if isinstance(assembly_info, dict) else ""
+        rag["research"] = research.get("briefing_text", "") or ""
+        public_data_info = research.get("public_data") or {}
+        rag["public_data"] = public_data_info.get("context_text", "") if isinstance(public_data_info, dict) else ""
     except Exception as e:
-        logger.warning("pledge_chat research failed: %s", e)
+        import traceback as _tb
+        logger.warning("pledge_chat research failed: %s\n%s", e, _tb.format_exc())
         rag["assembly"] = ""
         rag["research"] = ""
+        rag["public_data"] = ""
 
     return rag
 

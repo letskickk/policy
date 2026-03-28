@@ -2135,11 +2135,26 @@
         var district = meData && meData.district_name ? String(meData.district_name) : '';
         var labelMap = { metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원', local_council:'기초의원', party_official:'당직자' };
         var roleLabel = labelMap[election] || election || '후보';
-        var location = [region, district].filter(Boolean).join(' ');
+        // 지역 중복 제거: region 마지막 단어가 district 첫 단어와 같으면 제거 (예: "서울특별시 강북구" + "강북구 가선거구" → "서울특별시 강북구 가선거구")
+        var location = '';
+        if (region && district) {
+          var rParts = region.split(/\s+/), dParts = district.split(/\s+/);
+          if (rParts[rParts.length-1] === dParts[0]) {
+            location = rParts.slice(0,-1).concat(dParts).join(' ');
+          } else {
+            location = region + ' ' + district;
+          }
+        } else {
+          location = district || region;
+        }
 
         var intro = '안녕하세요. 개혁신당 공약 설계 코치입니다.';
-        if (name || location) {
-          intro = '안녕하세요, ' + (location ? location + ' ' : '') + roleLabel + (name ? ' ' + name + ' 후보님.' : '님.');
+        if (location && name) {
+          intro = '안녕하세요, ' + location + ' ' + roleLabel + '님. ' + roleLabel + '에 출마하신 ' + name + '님.';
+        } else if (location) {
+          intro = '안녕하세요, ' + location + ' ' + roleLabel + '님.';
+        } else if (name) {
+          intro = '안녕하세요, ' + roleLabel + '에 출마하신 ' + name + '님.';
         }
 
         // 컨테이너 비우기
@@ -2160,11 +2175,22 @@
         qDiv.textContent = '어떤 방식으로 시작하시겠습니까?';
         el.appendChild(qDiv);
 
+        var loc = district || region || '';
+
         var choices = [
-          { num: '1', label: '이 지역 핵심 이슈부터 알고 싶다', msg: (district || region || '우리 지역') + ' 핵심 생활 이슈를 알려줘' },
+          { num: '1', label: '이 지역 현안·의회 논의부터 알고 싶다', action: 'topicPicker' },
           { num: '2', label: '내 정책 아이디어를 다듬고 싶다', msg: '' },
           { num: '3', label: '우리당 공약과 연결해서 방향 잡기', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
-          { num: '4', label: '비슷한 지역 사례부터 참고하기', msg: (district || region || '유사 지역') + ' 비슷한 사례를 먼저 보여줘' },
+          { num: '4', label: '비슷한 지역 사례부터 참고하기', msg: (loc ? loc + ' ' : '') + '비슷한 선거구 사례를 먼저 보여줘' },
+        ];
+
+        var subTopics = [
+          { label: '교통·안전', msg: (loc ? loc + ' ' : '') + '교통·안전 관련 의회 논의와 현안을 알려줘' },
+          { label: '복지·돌봄', msg: (loc ? loc + ' ' : '') + '복지·돌봄 관련 의회 논의와 현안을 알려줘' },
+          { label: '상권·골목경제', msg: (loc ? loc + ' ' : '') + '상권·골목경제 관련 의회 논의와 현안을 알려줘' },
+          { label: '주차·통행', msg: (loc ? loc + ' ' : '') + '주차·통행 관련 의회 논의와 현안을 알려줘' },
+          { label: '환경·시설', msg: (loc ? loc + ' ' : '') + '환경·시설 관련 의회 논의와 현안을 알려줘' },
+          { label: '✏️ 직접 입력', msg: null },
         ];
 
         choices.forEach(function(c) {
@@ -2172,7 +2198,25 @@
           btn.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,#f9f9f9);color:var(--text,#333);font-size:0.88rem;cursor:pointer;text-align:left;';
           btn.textContent = c.num + '. ' + c.label;
           btn.addEventListener('click', function() {
-            if (c.msg) {
+            if (c.action === 'topicPicker') {
+              // 인사말 영역을 분야 선택 picker로 교체
+              el.innerHTML = '<div style="font-size:0.92rem;margin-bottom:0.5rem;">어떤 분야가 제일 걱정되세요?</div>';
+              subTopics.forEach(function(t) {
+                var tb = document.createElement('button');
+                tb.style.cssText = 'display:inline-block;padding:0.35rem 0.7rem;margin:0.2rem 0.2rem 0 0;border:1px solid var(--brand,#f87013);border-radius:20px;background:transparent;color:var(--brand,#f87013);font-size:0.85rem;cursor:pointer;';
+                tb.textContent = t.label;
+                tb.addEventListener('click', function() {
+                  if (t.msg) {
+                    document.getElementById('chatInput').value = t.msg;
+                    chatSend();
+                  } else {
+                    document.getElementById('chatInput').focus();
+                    document.getElementById('chatInput').placeholder = '관심 있는 분야나 정책 아이디어를 입력하세요';
+                  }
+                });
+                el.appendChild(tb);
+              });
+            } else if (c.msg) {
               document.getElementById('chatInput').value = c.msg;
               chatSend();
             } else {
