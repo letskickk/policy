@@ -1345,10 +1345,7 @@
           }
         }
       } catch (e) {}
-      try {
-        var greetingEl = document.getElementById('chatGreeting');
-        if (greetingEl) chatRenderGreeting(greetingEl);
-      } catch(greetErr) { console.error('greeting error', greetErr); }
+      // chatRenderGreeting는 아래 IIFE 안에서 호출됨
     })();
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
@@ -2118,6 +2115,14 @@
     // ── 공약 개발 챗봇 핸들러 ──
     // ══════════════════════════════════════════════════════════
     (function() {
+      // 인사말 렌더링 (meData 로드 후 실행)
+      setTimeout(function() {
+        try {
+          var _gel = document.getElementById('chatGreeting');
+          if (_gel) chatRenderGreeting(_gel);
+        } catch(e) { console.error('greeting', e); }
+      }, 500);
+
       var chatSessionId = null;
       var chatIsStreaming = false;
       var chatMsgCount = 0;  // AI 응답 횟수 추적
