@@ -1245,16 +1245,7 @@
       </div>
       <div class="chat-sessions-list" id="chatSessionsList"></div>
       <section class="card chat-container" id="chatContainer">
-        <div class="chat-messages" id="chatMessages">
-          <div class="chat-msg assistant">안녕하세요! 개혁신당 정책 방향 제안 챗봇입니다. 어떤 지역 이슈나 정책 방향을 함께 정리해볼까요?
-
-1. 정책 - 정책 초안 (배경, 실행방안, 기대효과)
-2. 지역공약 - 지역 맞춤형 공약
-3. 논평 - 현안에 대한 당 논평
-4. 메시지 - 보도자료/SNS용 메시지
-
-번호나 유형을 말씀해 주세요!</div>
-        </div>
+        <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input-bar">
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
@@ -1263,7 +1254,7 @@
         </div>
       </section>
       <section class="card" id="chatFinalSection" style="display:none;">
-        <h2 class="form-label">최종 공약문</h2>
+        <h2 class="form-label">정책 방향 정리</h2>
         <div class="result-container">
           <div id="chatFinalResult" class="chat-final-result"></div>
         </div>
@@ -1354,6 +1345,10 @@
           }
         }
       } catch (e) {}
+      var msgs = document.getElementById('chatMessages');
+      if (msgs && !msgs.children.length) {
+        chatAppendMsg('assistant', chatInitialGreeting());
+      }
     })();
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
@@ -2128,6 +2123,21 @@
       var chatMsgCount = 0;  // AI 응답 횟수 추적
       var chatStarted = false;  // 첫 세션 시작 여부
 
+      function chatInitialGreeting() {
+        var name = meData && meData.name ? String(meData.name) : '';
+        var election = meData && meData.election_position ? String(meData.election_position) : '';
+        var region = meData && meData.region_name ? String(meData.region_name) : '';
+        var district = meData && meData.district_name ? String(meData.district_name) : '';
+        var labelMap = { metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원', local_council:'기초의원', party_official:'당직자' };
+        var roleLabel = labelMap[election] || election || '후보';
+        var location = [region, district].filter(Boolean).join(' ');
+        var intro = '안녕하세요. 개혁신당 정책 방향 제안 챗봇입니다.';
+        if (name || location || roleLabel) {
+          intro = '안녕하세요. ' + [location, roleLabel + '로 출마하신', name ? (name + ' 후보님,') : '후보님,'].filter(Boolean).join(' ') + ' 지역 이슈와 정책 방향을 함께 정리해보겠습니다.';
+        }
+        return intro + '\n\n지금 단계에서는 바로 공약 문안을 쓰기보다, 이 지역에서 반복되는 생활 이슈와 정책 방향을 먼저 넓게 살펴보는 것이 좋습니다.\n\n1. 정책 - 정책 방향과 초안 보조\n2. 지역공약 - 지역 맞춤형 방향 제안\n3. 논평 - 현안에 대한 당 논평\n4. 메시지 - 보도자료/SNS용 메시지\n\n번호나 유형을 말씀해 주세요!';
+      }
+
       function chatAppendMsg(cls, text) {
         var el = document.createElement('div');
         el.className = 'chat-msg ' + cls;
@@ -2249,7 +2259,7 @@
       window.chatFinalize = async function() {
         if (chatIsStreaming || !chatSessionId) return;
         chatSetEnabled(false);
-        chatAppendMsg('notice', '공약문을 생성하고 있습니다...');
+        chatAppendMsg('notice', '정책 방향과 보조 결과를 정리하고 있습니다...');
 
         try {
           var resp = await fetch('/api/pledge-chat/' + chatSessionId + '/finalize', {
