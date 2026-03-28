@@ -144,3 +144,12 @@ _data_key = os.getenv("DATA_GO_KR_API_KEY", "").strip().replace("\r", "").replac
 DATA_GO_KR_API_KEY = _data_key
 DATA_GO_KR_WINNER_API_KEY = os.getenv("DATA_GO_KR_WINNER_API_KEY", "").strip().replace("\r", "").replace("\n", "") or _data_key
 DATA_GO_KR_PLEDGE_API_KEY = os.getenv("DATA_GO_KR_PLEDGE_API_KEY", "").strip().replace("\r", "").replace("\n", "") or _data_key
+
+# 소상공인시장진흥공단 상가(상권)정보 API (data.go.kr 서비스)
+SEMAS_API_KEY = os.getenv("SEMAS_API_KEY", "").strip().replace("\r", "").replace("\n", "") or _data_key
+# 도로교통공단 TAAS 교통사고 다발지역 API (data.go.kr 서비스)
+TAAS_API_KEY = os.getenv("TAAS_API_KEY", "").strip().replace("\r", "").replace("\n", "") or _data_key
+# KOSIS 국가통계포털 API (kosis.kr, 별도 인증)
+KOSIS_API_KEY = os.getenv("KOSIS_API_KEY", "").strip().replace("\r", "").replace("\n", "")
+# 서울 열린데이터 광장 API (data.seoul.go.kr, 별도 인증)
+SEOUL_OPEN_API_KEY = os.getenv("SEOUL_OPEN_API_KEY", "").strip().replace("\r", "").replace("\n", "")

@@ -12,3 +12,4 @@ data/api_cache/
 __pycache__/
 *.pyc
 *.pyo
+.gstack/

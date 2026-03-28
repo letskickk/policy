@@ -1572,6 +1572,22 @@ def debug_scan():
     }
 
 
+@app.get("/api/debug/test-public-apis")
+def debug_test_public_apis():
+    """공공데이터 API 키 유효성 테스트 (SEMAS/TAAS/KOSIS/Seoul)."""
+    _debug_endpoint()
+    from backend.public_data_api import test_all_apis
+    return test_all_apis()
+
+
+@app.get("/api/debug/test-public-data")
+def debug_test_public_data(region: str = Query("서울특별시 강북구"), topic: str = Query("생활환경")):
+    """공공데이터 통합 조회 테스트."""
+    _debug_endpoint()
+    from backend.public_data_api import query_public_data_context
+    return query_public_data_context(region=region, topic=topic)
+
+
 @app.post("/check", response_model=PledgeCheckResponse)
 def check_pledge(body: PledgeCheckRequest, request: Request):
     """공약을 입력하면 중앙당의 정강정책·공약과의 적합도, 근거, 수정·보완 체크리스트를 반환한다. (승인 사용자 전용)"""

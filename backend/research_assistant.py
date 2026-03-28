@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 from typing import Optional
 
 from backend.assembly_api import query_assembly_context
+from backend.public_data_api import query_public_data_context
 from backend.database import get_connection
 from backend.policy_ssot import (
     TOPIC_RULES,
@@ -100,10 +101,16 @@ def research_topic(
         years=years,
     )
 
-    # 5. 관련 기사 검색 (보조 근거 레이어)
+    # 5. 공공데이터 조회 (인구/상권/교통/시설)
+    public_data = query_public_data_context(
+        region=region, district_name=district_name,
+        topic=topic, keywords=keywords[:5],
+    )
+
+    # 6. 관련 기사 검색 (보조 근거 레이��)
     news_articles = _fetch_related_news(topic=topic, region=region, keywords=keywords)
 
-    # 6. 브리핑 텍스트 생성
+    # 7. 브리핑 텍스트 생성
     briefing = _build_briefing(
         topic=topic,
         region=region,
@@ -111,6 +118,7 @@ def research_topic(
         related_docs=related_docs,
         related_positions=related_positions,
         assembly=assembly,
+        public_data=public_data,
         news_articles=news_articles,
     )
 
@@ -129,6 +137,11 @@ def research_topic(
             "context_text": assembly["context_text"],
             "result_count": len(assembly.get("assembly_results", []))
             + len(assembly.get("speech_results", [])),
+        },
+        "public_data": {
+            "available": public_data.get("available", False),
+            "context_text": public_data.get("context_text", ""),
+            "sources": {k: v.get("available", False) for k, v in public_data.get("sources", {}).items()},
         },
         "news": {
             "available": bool(news_articles),
@@ -316,6 +329,7 @@ def _build_briefing(
     related_docs: list[dict],
     related_positions: list[dict],
     assembly: dict,
+    public_data: dict,
     news_articles: list[dict],
 ) -> str:
     """프롬프트에 넣을 리서치 브리핑 텍스트 생성."""
@@ -355,6 +369,14 @@ def _build_briefing(
     lines.append("[지방의회 논의]")
     lines.append(assembly["context_text"])
     lines.append("")
+
+    # 공공데이터
+    if public_data.get("available") and public_data.get("context_text"):
+        lines.append(public_data["context_text"])
+        lines.append("")
+    else:
+        lines.append("[공공데이터] 없음")
+        lines.append("")
 
     # 관련 기사 (보조 근거)
     if news_articles:
