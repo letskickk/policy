@@ -385,13 +385,13 @@ def og_image_png():
     raise HTTPException(status_code=404, detail="og.png not found")
 
 
-@app.api_route("/og-coach.png", methods=["GET", "HEAD"])
+@app.api_route("/og-coach.jpg", methods=["GET", "HEAD"])
 def og_image_coach():
     """OG image for 공약코치 page."""
-    path = STATIC_DIR / "og-coach.png"
+    path = STATIC_DIR / "og-coach.jpg"
     if path.exists():
-        return FileResponse(path, media_type="image/png")
-    raise HTTPException(status_code=404, detail="og-coach.png not found")
+        return FileResponse(path, media_type="image/jpeg")
+    raise HTTPException(status_code=404, detail="og-coach.jpg not found")
 
 
 @app.get("/static/{path:path}")
