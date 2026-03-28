@@ -1305,6 +1305,9 @@
         switchTab(this.dataset.tab);
       });
     });
+    // ?tab=generate 쿼리 파라미터 지원 (로그인 리다이렉트 시 해시 유실 대비)
+    var _qTab = new URLSearchParams(location.search).get('tab');
+    if (_qTab === 'generate') history.replaceState(null, '', '#generate');
     window.addEventListener('hashchange', function() {
       var h = location.hash.replace('#','');
       switchTab(h === 'generate' && meData.can_use_policy_tools ? 'generate' : 'check');
@@ -1360,7 +1363,7 @@
             fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
           // ── 탭 전환: 관리자 또는 허용된 테스트 계정만 생성 탭 표시 ──
-          meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr' || d.email === 'ktest@test.kr');
+          meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr' || d.email === 'ktest@test.kr' || d.email === 'gjtest@test.kr');
           if (meData.can_use_policy_tools) {
             document.getElementById('tabGenerate').style.display = '';
             const hash = location.hash.replace('#','');
