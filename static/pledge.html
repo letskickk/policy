@@ -1280,6 +1280,7 @@
         <div class="chat-final-actions">
           <button type="button" class="btn-primary" onclick="chatCopyDraft()" id="chatCopyBtn">복사</button>
           <button type="button" style="padding:0.5rem 1rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;" onclick="chatBackToChat()">대화로 돌아가기</button>
+          <button type="button" style="padding:0.5rem 1rem;border:1px solid var(--brand);border-radius:8px;background:transparent;color:var(--brand);cursor:pointer;font-weight:700;" onclick="chatStartNew()">새 대화 시작</button>
         </div>
       </section>
     </div><!-- /paneGenerate -->
@@ -2497,6 +2498,21 @@
         document.getElementById('chatFinalSection').style.display = 'none';
         var msgs = document.getElementById('chatMessages');
         msgs.scrollTop = msgs.scrollHeight;
+      };
+
+      window.chatStartNew = function() {
+        chatSessionId = null;
+        chatMsgCount = 0;
+        chatStarted = false;
+        document.getElementById('chatFinalSection').style.display = 'none';
+        var msgs = document.getElementById('chatMessages');
+        msgs.innerHTML = '<div class="chat-msg assistant" id="chatGreeting"></div>';
+        var gel = document.getElementById('chatGreeting');
+        if (gel) chatRenderGreeting(gel);
+        document.getElementById('chatBtnFinalize').style.display = 'none';
+        chatSetEnabled(true);
+        var popup = document.getElementById('chatQuickPopup');
+        if (popup) popup.style.display = 'none';
       };
 
       // ── 이전 대화 목록 ──
