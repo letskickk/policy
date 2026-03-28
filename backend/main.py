@@ -941,6 +941,7 @@ def api_me(request: Request):
     out = {"id": user["id"], "email": user["email"], "status": user["status"], "role": user["role"]}
     out["is_admin"] = user["role"] == ROLE_ADMIN or user["email"] in ADMIN_EMAILS
     if full:
+        out["name"] = full.get("name") or ""
         out["election_position"] = full.get("election_position") or ""
         out["region_code"] = full.get("region_code") or ""
         out["region_name"] = full.get("region_name") or ""
