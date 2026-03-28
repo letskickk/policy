@@ -11,6 +11,8 @@ from backend.config import (
     ADMIN_EMAILS,
     QUOTA_DAILY,
     QUOTA_MONTHLY,
+    QUOTA_DAILY_TOKENS,
+    QUOTA_MONTHLY_TOKENS,
     RATE_LIMIT_IP_PER_MIN,
     RATE_LIMIT_USER_PER_MIN,
 )
@@ -30,8 +32,8 @@ def _clean_old(now: float, timestamps: list[float]) -> None:
 
 def check_quota(user_id: int) -> tuple[bool, str]:
     """
-    user_id의 일일/월간 쿼터 초과 여부 확인.
-    usage_logs에서 status_code 2xx인 것만 카운트.
+    user_id의 일일/월간 토큰 쿼터 초과 여부 확인.
+    usage_logs에서 status_code 2xx인 token_in+token_out 합산.
     관리자(role=ADMIN 또는 ADMIN_EMAILS)는 쿼터 미적용.
     """
     user = get_user(user_id)
@@ -48,18 +50,18 @@ def check_quota(user_id: int) -> tuple[bool, str]:
         cur = conn.execute(
             """
             SELECT
-                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS daily,
-                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS monthly
+                COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS daily_tokens,
+                COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS monthly_tokens
             """,
             (user_id, today, user_id, month),
         )
         row = cur.fetchone()
-        daily_count = row["daily"] if row else 0
-        monthly_count = row["monthly"] if row else 0
-        if daily_count >= QUOTA_DAILY:
-            return False, f"일일 쿼터 초과 ({QUOTA_DAILY}회/일)"
-        if monthly_count >= QUOTA_MONTHLY:
-            return False, f"월간 쿼터 초과 ({QUOTA_MONTHLY}회/월)"
+        daily_tokens = row["daily_tokens"] if row else 0
+        monthly_tokens = row["monthly_tokens"] if row else 0
+        if daily_tokens >= QUOTA_DAILY_TOKENS:
+            return False, f"일일 토큰 한도 초과 ({QUOTA_DAILY_TOKENS // 1000}K토큰/일)"
+        if monthly_tokens >= QUOTA_MONTHLY_TOKENS:
+            return False, f"월간 토큰 한도 초과 ({QUOTA_MONTHLY_TOKENS // 1000}K토큰/월)"
         return True, ""
     finally:
         conn.close()

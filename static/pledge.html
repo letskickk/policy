@@ -1244,6 +1244,18 @@
         <span class="chat-sessions-toggle" style="color:var(--muted);font-size:0.82rem;cursor:pointer;text-decoration:underline;" onclick="chatToggleSessions()">이전 대화</span>
       </div>
       <div class="chat-sessions-list" id="chatSessionsList"></div>
+      <div id="chatQuotaBar" class="quota-bar-wrap" style="display:none;">
+        <div class="quota-item">
+          <span class="quota-label">오늘</span>
+          <div class="quota-track"><div class="quota-fill" id="chatQuotaDailyFill" style="width:0%"></div></div>
+          <span class="quota-count" id="chatQuotaDailyText">-</span>
+        </div>
+        <div class="quota-item">
+          <span class="quota-label">이번달</span>
+          <div class="quota-track"><div class="quota-fill" id="chatQuotaMonthlyFill" style="width:0%"></div></div>
+          <span class="quota-count" id="chatQuotaMonthlyText">-</span>
+        </div>
+      </div>
       <section class="card chat-container" id="chatContainer">
         <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 선거구 기준 생활 이슈, 지방의회 자료, 기사, 우리당 자료, 공공데이터를 바탕으로 공약 초안의 방향을 잡아드립니다. 아래 입력창에 주제를 입력하거나, 메시지를 보내주세요.</div></div>
         <div class="chat-input-bar">
@@ -1290,21 +1302,33 @@
       switchTab(h === 'generate' && meData.can_use_policy_tools ? 'generate' : 'check');
     });
 
+    function _fmtTokens(n) {
+      if (!n) return '0';
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return String(n);
+    }
+
+    function _renderQuotaInto(q, barId, dailyFillId, monthlyFillId, dailyTextId, monthlyTextId) {
+      const bar = document.getElementById(barId);
+      if (!bar) return;
+      const dailyPct   = Math.min(100, Math.round((q.daily_used   || 0) / (q.daily_limit   || 1) * 100));
+      const monthlyPct = Math.min(100, Math.round((q.monthly_used || 0) / (q.monthly_limit || 1) * 100));
+      const dFill = document.getElementById(dailyFillId);
+      const mFill = document.getElementById(monthlyFillId);
+      if (dFill) { dFill.style.width = dailyPct + '%'; dFill.className = 'quota-fill' + (dailyPct >= 90 ? ' warn' : ''); }
+      if (mFill) { mFill.style.width = monthlyPct + '%'; mFill.className = 'quota-fill' + (monthlyPct >= 90 ? ' warn' : ''); }
+      const dEl = document.getElementById(dailyTextId);
+      const mEl = document.getElementById(monthlyTextId);
+      if (dEl) dEl.textContent = _fmtTokens(q.daily_used) + '/' + _fmtTokens(q.daily_limit) + '토큰';
+      if (mEl) mEl.textContent = _fmtTokens(q.monthly_used) + '/' + _fmtTokens(q.monthly_limit) + '토큰';
+      bar.style.display = 'block';
+    }
+
     function renderQuota(q) {
       if (!q) return;
-      const bar = document.getElementById('quotaBar');
-      if (!bar) return;
-      const dailyPct   = Math.min(100, Math.round(q.daily_used   / q.daily_limit   * 100));
-      const monthlyPct = Math.min(100, Math.round(q.monthly_used / q.monthly_limit * 100));
-      const dFill = document.getElementById('quotaDailyFill');
-      const mFill = document.getElementById('quotaMonthlyFill');
-      dFill.style.width = dailyPct + '%';
-      mFill.style.width = monthlyPct + '%';
-      dFill.className   = 'quota-fill' + (q.daily_remaining   <= 3  ? ' warn' : '');
-      mFill.className   = 'quota-fill' + (q.monthly_remaining <= 10 ? ' warn' : '');
-      document.getElementById('quotaDailyText').textContent   = q.daily_used   + '/' + q.daily_limit   + '회';
-      document.getElementById('quotaMonthlyText').textContent = q.monthly_used + '/' + q.monthly_limit + '회';
-      bar.style.display = 'block';
+      _renderQuotaInto(q, 'quotaBar', 'quotaDailyFill', 'quotaMonthlyFill', 'quotaDailyText', 'quotaMonthlyText');
+      _renderQuotaInto(q, 'chatQuotaBar', 'chatQuotaDailyFill', 'chatQuotaMonthlyFill', 'chatQuotaDailyText', 'chatQuotaMonthlyText');
     }
 
     async function fetchQuota() {
@@ -2200,10 +2224,14 @@
           btn.addEventListener('click', function() {
             if (c.action === 'topicPicker') {
               // 인사말 영역을 분야 선택 picker로 교체
-              el.innerHTML = '<div style="font-size:0.92rem;margin-bottom:0.5rem;">어떤 분야가 제일 걱정되세요?</div>';
+              el.innerHTML = '';
+              var qDiv2 = document.createElement('div');
+              qDiv2.style.cssText = 'font-size:0.92rem;margin-bottom:0.4rem;';
+              qDiv2.textContent = '어떤 분야 현안부터 살펴볼까요?';
+              el.appendChild(qDiv2);
               subTopics.forEach(function(t) {
                 var tb = document.createElement('button');
-                tb.style.cssText = 'display:inline-block;padding:0.35rem 0.7rem;margin:0.2rem 0.2rem 0 0;border:1px solid var(--brand,#f87013);border-radius:20px;background:transparent;color:var(--brand,#f87013);font-size:0.85rem;cursor:pointer;';
+                tb.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;';
                 tb.textContent = t.label;
                 tb.addEventListener('click', function() {
                   if (t.msg) {
@@ -2280,6 +2308,7 @@
                 if (msgEl) msgEl.classList.remove('streaming');
                 msgEl = null;
                 chatMsgCount++;
+                fetchQuota();
               } else if (data.type === 'error') {
                 chatAppendMsg('notice', '오류: ' + data.detail);
               }

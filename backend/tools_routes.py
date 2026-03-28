@@ -150,7 +150,7 @@ def register_tools_routes(app, require_approved, _client_ip):
 
     @app.get("/api/tools/quota")
     def tools_quota(request: Request):
-        from backend.config import QUOTA_DAILY, QUOTA_MONTHLY
+        from backend.config import QUOTA_DAILY_TOKENS, QUOTA_MONTHLY_TOKENS
         from backend.database import get_connection
 
         user = require_approved(request)
@@ -162,8 +162,8 @@ def register_tools_routes(app, require_approved, _client_ip):
             cur = conn.execute(
                 """
                 SELECT
-                    (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS daily,
-                    (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS monthly
+                    COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS daily,
+                    COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS monthly
                 """,
                 (user["id"], today, user["id"], month),
             )
@@ -175,9 +175,11 @@ def register_tools_routes(app, require_approved, _client_ip):
 
         return {
             "daily_used": daily_used,
-            "daily_limit": QUOTA_DAILY,
+            "daily_limit": QUOTA_DAILY_TOKENS,
             "monthly_used": monthly_used,
-            "monthly_limit": QUOTA_MONTHLY,
+            "monthly_limit": QUOTA_MONTHLY_TOKENS,
+            "daily_remaining": max(0, QUOTA_DAILY_TOKENS - daily_used),
+            "monthly_remaining": max(0, QUOTA_MONTHLY_TOKENS - monthly_used),
         }
 
     # ── 최근 생성 이력 ────────────────────────────────────────
@@ -235,7 +237,8 @@ def register_tools_routes(app, require_approved, _client_ip):
     def pledge_chat_start(body: ChatStartRequest, request: Request):
         from backend.pledge_chat import create_session, first_message_stream
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage
+        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.config import OPENAI_MODEL
 
         user = require_approved(request)
         ip = _client_ip(request)
@@ -272,11 +275,17 @@ def register_tools_routes(app, require_approved, _client_ip):
                 yield f"data: {json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            out_chars = len(full_text)
+            token_in = len(body.topic) // 4
+            token_out = out_chars // 4
+            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
                 endpoint="/api/pledge-chat/start", action="chat_start",
-                input_chars=len(body.topic), output_chars=len(full_text),
-                model="", token_in=0, token_out=0, cost_estimate=None,
+                input_chars=len(body.topic), output_chars=out_chars,
+                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                token_out=token_out if not had_error else 0,
+                cost_estimate=cost,
                 status_code=500 if had_error else 200, latency_ms=elapsed_ms,
             )
 
@@ -288,8 +297,9 @@ def register_tools_routes(app, require_approved, _client_ip):
     @app.post("/api/pledge-chat/{session_id}/message")
     def pledge_chat_message(session_id: str, body: ChatMessageRequest, request: Request):
         from backend.pledge_chat import chat_stream, get_session
-        from backend.quota_rate import check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage
+        from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
+        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.config import OPENAI_MODEL
 
         user = require_approved(request)
         ip = _client_ip(request)
@@ -298,6 +308,9 @@ def register_tools_routes(app, require_approved, _client_ip):
         if not ok:
             raise HTTPException(status_code=429, detail=msg)
         ok, msg = check_rate_limit_user(user["id"])
+        if not ok:
+            raise HTTPException(status_code=429, detail=msg)
+        ok, msg = check_quota(user["id"])
         if not ok:
             raise HTTPException(status_code=429, detail=msg)
 
@@ -323,11 +336,17 @@ def register_tools_routes(app, require_approved, _client_ip):
                 yield f"data: {json.dumps({'type': 'error', 'detail': str(e)[:300]}, ensure_ascii=False)}\n\n"
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            out_chars = len(full_text)
+            token_in = len(body.message) // 4
+            token_out = out_chars // 4
+            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
                 endpoint=f"/api/pledge-chat/{session_id}/message", action="chat_message",
-                input_chars=len(body.message), output_chars=len(full_text),
-                model="", token_in=0, token_out=0, cost_estimate=None,
+                input_chars=len(body.message), output_chars=out_chars,
+                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                token_out=token_out if not had_error else 0,
+                cost_estimate=cost,
                 status_code=500 if had_error else 200, latency_ms=elapsed_ms,
             )
 

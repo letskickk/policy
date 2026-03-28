@@ -1075,6 +1075,37 @@ class DeleteUserBody(BaseModel):
     user_id: int = Field(..., description="사용자 ID")
 
 
+class ResetQuotaBody(BaseModel):
+    email: str = Field(..., description="이메일")
+
+
+@app.post("/api/admin/users/reset-quota")
+def api_admin_reset_quota(body: ResetQuotaBody, request: Request):
+    """관리자: 특정 사용자의 오늘 쿼터(usage_logs 오늘 행) 삭제."""
+    require_admin(request)
+    from backend.database import get_connection
+    import time
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (body.email.strip().lower(),)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        today = time.strftime("%Y-%m-%d")
+        deleted = conn.execute(
+            "DELETE FROM usage_logs WHERE user_id = ? AND date(created_at) = ?",
+            (row["id"], today),
+        ).rowcount
+        conn.commit()
+        return {"message": f"오늘 사용 기록 {deleted}건 삭제 완료", "email": body.email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
 @app.post("/api/admin/users/delete")
 def api_admin_delete_user(body: DeleteUserBody, request: Request):
     user = require_admin(request)
@@ -1218,20 +1249,22 @@ def api_usage_summary(request: Request):
         cur = conn.execute(
             """
             SELECT
-                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS daily_used,
-                (SELECT COUNT(*) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify') AS monthly_used
+                COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND date(created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS daily_used,
+                COALESCE((SELECT SUM(COALESCE(token_in,0)+COALESCE(token_out,0)) FROM usage_logs WHERE user_id = ? AND strftime('%Y-%m', created_at) = ? AND status_code >= 200 AND status_code < 300 AND endpoint != '/api/pledge/verify'), 0) AS monthly_used
             """,
             (u["id"], today, u["id"], month),
         )
         row = cur.fetchone()
-        from backend.config import QUOTA_DAILY, QUOTA_MONTHLY
+        from backend.config import QUOTA_DAILY_TOKENS, QUOTA_MONTHLY_TOKENS
+        daily_used = row["daily_used"] if row else 0
+        monthly_used = row["monthly_used"] if row else 0
         return {
-            "daily_used": row["daily_used"] if row else 0,
-            "monthly_used": row["monthly_used"] if row else 0,
-            "daily_limit": QUOTA_DAILY,
-            "monthly_limit": QUOTA_MONTHLY,
-            "daily_remaining": max(0, QUOTA_DAILY - (row["daily_used"] if row else 0)),
-            "monthly_remaining": max(0, QUOTA_MONTHLY - (row["monthly_used"] if row else 0)),
+            "daily_used": daily_used,
+            "monthly_used": monthly_used,
+            "daily_limit": QUOTA_DAILY_TOKENS,
+            "monthly_limit": QUOTA_MONTHLY_TOKENS,
+            "daily_remaining": max(0, QUOTA_DAILY_TOKENS - daily_used),
+            "monthly_remaining": max(0, QUOTA_MONTHLY_TOKENS - monthly_used),
         }
     finally:
         conn.close()
