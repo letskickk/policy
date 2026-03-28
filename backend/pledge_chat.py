@@ -37,6 +37,47 @@ def _load_chat_system_prompt() -> str:
     return "개혁신당 정책 기획 코치 역할이다. 출마자와 대화하면서 지역 이슈, 정책 방향, 우선순위와 근거를 함께 정리한다. 바로 완성 공약을 단정적으로 써주기보다 선택지와 방향성을 제안한다."
 
 
+def _load_district_dong_map() -> dict:
+    """선거구-동 매핑 JSON 로드."""
+    import json as _json
+    path = ROOT_DIR / "data" / "district_dong_map.json"
+    if not path.exists():
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {}
+
+
+def _get_district_dongs(election_position: str, region_name: str, district_name: str) -> list[str]:
+    """선거구에 포함된 행정동 목록 반환."""
+    mapping = _load_district_dong_map()
+    # election_position → 매핑 키
+    if "local" in (election_position or ""):
+        layer = mapping.get("local_council", {})
+    elif "regional" in (election_position or ""):
+        layer = mapping.get("regional_council", {})
+    else:
+        return []
+
+    # region_name: "서울특별시 강북구" → 시도, 구시군 분리
+    parts = (region_name or "").strip().split()
+    sido = parts[0] if parts else ""
+    gu = parts[-1] if len(parts) >= 2 else ""
+
+    # district_name: "강북구 가선거구" → 선거구명
+    dn_parts = (district_name or "").strip().split()
+    sgg = dn_parts[-1] if dn_parts else ""  # "가선거구"
+
+    if "local" in (election_position or ""):
+        return layer.get(sido, {}).get(gu, {}).get(sgg, [])
+    else:
+        # 광역의원: 선거구명이 "강북구제1선거구" 형태
+        full_sgg = gu + sgg if gu and sgg else sgg
+        return layer.get(sido, {}).get(full_sgg, [])
+
+
 def _build_user_context_text(user_id: int) -> str:
     user = get_user(user_id) or {}
     parts = []
@@ -48,16 +89,23 @@ def _build_user_context_text(user_id: int) -> str:
         parts.append(f"주요 지역: {user['region_name']}")
     if user.get("district_name"):
         parts.append(f"선거구: {user['district_name']}")
+
+    # 선거구 포함 동 매핑
+    dongs = _get_district_dongs(
+        user.get("election_position", ""),
+        user.get("region_name", ""),
+        user.get("district_name", ""),
+    )
+    if dongs:
+        parts.append(f"선거구 관할 행정동: {', '.join(dongs)}")
+
     if not parts:
         return ""
     guide = (
-        "위 정보가 있으면 대화 첫 단계에서 지역 맥락과 출마 단위를 먼저 반영하라. "
-        "선거구 정보가 있으면 구 전체보다 선거구와 생활권을 우선적으로 다루고, 그다음에 구 전체 맥락을 보조적으로 언급하라. "
-        "선거구 정보가 이미 있으면 그걸 다시 사용자에게 묻지 말고, 그 선거구 기준으로 먼저 답하라. 더 세밀한 생활권 분석이 꼭 필요할 때만 추가로 물어라. "
-        "서울시장처럼 광역단위면 시 전체 이슈, 기초의원이면 동네 생활 이슈를 먼저 제시하라. "
-        "가능하면 해당 지역에서 반복되는 현안, 생활 문제, 인구구조·상권·교통·주거 같은 구조적 특징을 먼저 짚고 시작하라. "
-        "너무 빨리 2~3개 선택지로 좁히지 말고, 먼저 지역 이슈 지형과 유사 사례를 넓게 보여준 뒤 방향을 고르게 하라. "
-        "정보가 없는 부분은 추측하지 말고 필요한 경우 질문하라."
+        "위 정보를 대화 시작부터 반영하라. "
+        "선거구 관할 행정동이 있으면 그 동 이름을 구체적으로 언급하라. "
+        "선거구 정보가 이미 있으면 다시 묻지 말고 그 기준으로 답하라. "
+        "기초의원이면 해당 동 단위 생활 이슈를, 광역이면 시·도 단위 이슈를 먼저 다루라."
     )
     return "\n\n[후보자 기본 정보]\n" + "\n".join(parts) + "\n" + guide
 
