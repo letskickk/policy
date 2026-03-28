@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from backend.config import PROMPTS_DIR
+from backend.config import PROMPTS_DIR, ROOT_DIR
 from backend.database import get_connection
 from backend.auth import get_user
 
