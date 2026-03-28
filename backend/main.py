@@ -432,9 +432,18 @@ def test_check_page():
     raise HTTPException(status_code=404, detail="test-check.html not found")
 
 
+import re as _re
+_OG_BOT_RE = _re.compile(r"kakaotalk|facebookexternalhit|facebot|twitterbot|slackbot|linkedinbot|discordbot|telegrambot|whatsapp", _re.IGNORECASE)
+
 @app.api_route("/pledge", methods=["GET", "HEAD"])
 def pledge_page(request: Request):
     """공약 입력·점검 폼 페이지. (승인 사용자 전용)"""
+    # OG 크롤러는 로그인 없이 HTML(OG 태그) 접근 허용
+    ua = request.headers.get("user-agent", "")
+    if _OG_BOT_RE.search(ua):
+        res = _serve_html("pledge.html")
+        if res is not None:
+            return res
     user = get_current_user(request)
     if not user:
         return _login_redirect(request.url.path, str(request.url.query or ""))
