@@ -684,10 +684,15 @@ _TOPIC_API_MAP = {
 }
 
 
+_GENERAL_TOPIC_WORDS = {"이슈", "현황", "생활", "공약", "정책", "문제", "과제", "환경", "지역"}
+
+
 def _select_relevant_apis(all_fetchers: dict, topic: str, keywords: list[str] | None) -> dict:
-    """주제/키워드 기반으로 필요한 API만 선택. 매칭 없으면 kosis만."""
+    """주제/키워드 기반으로 필요한 API만 선택.
+    일반 포괄 주제(생활이슈 등)는 전체 API 호출, 매칭 없으면 kosis+taas.
+    """
     if not topic and not keywords:
-        return {"kosis": all_fetchers["kosis"]}
+        return {k: all_fetchers[k] for k in ("kosis", "taas") if k in all_fetchers}
 
     text = (topic + " " + " ".join(keywords or [])).lower()
     selected = {}
@@ -695,9 +700,16 @@ def _select_relevant_apis(all_fetchers: dict, topic: str, keywords: list[str] | 
         if api_name in all_fetchers and any(w in text for w in trigger_words):
             selected[api_name] = all_fetchers[api_name]
 
-    # 매칭 없으면 kosis(인구)만 기본 제공
+    # 포괄 주제어("생활", "이슈", "현황" 등) → 전체 API 호출
+    if any(w in text for w in _GENERAL_TOPIC_WORDS):
+        for k in all_fetchers:
+            selected.setdefault(k, all_fetchers[k])
+
+    # 매칭 없으면 kosis + taas 기본
     if not selected:
-        selected["kosis"] = all_fetchers["kosis"]
+        for k in ("kosis", "taas"):
+            if k in all_fetchers:
+                selected[k] = all_fetchers[k]
 
     return selected
 

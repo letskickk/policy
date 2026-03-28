@@ -234,10 +234,13 @@ def search_local_assembly(
     rasmbly_id = _resolve_rasmbly_id(region)
 
     # clik API는 searchKeyword에 공백이 있으면 ERROR11 → 가장 핵심 키워드 1개 사용
+    # 의미없는 일반 키워드(이슈/생활/현황/정책/공약 등)는 검색어로 사용 안 함
+    _SKIP_KW = {"이슈", "현황", "생활", "정책", "공약", "과제", "문제", "핵심", "지역", "주요", "이유", "환경"}
     keyword_str = ""
     if keywords:
-        # 가장 긴 (구체적인) 키워드를 우선 사용
-        keyword_str = max(keywords, key=len) if keywords else ""
+        specific = [k for k in keywords if k not in _SKIP_KW and len(k) >= 2]
+        keyword_str = max(specific, key=len) if specific else ""
+    # rasmblyId 없을 때만 region을 키워드로 사용
     if not keyword_str and region and not rasmbly_id:
         keyword_str = region
 
