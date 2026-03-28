@@ -332,16 +332,16 @@
 
     <!-- 시작 화면 -->
     <div class="start-panel" id="startPanel">
-      <h2>AI와 함께 공약을 만들어 보세요</h2>
-      <p>주제를 입력하면 AI 코치가 질문을 던지며 지역 이슈와 정책 방향을 함께 좁혀갑니다.<br>대화가 끝나면 바로 공약을 써주기보다, 근거 자료를 바탕으로 우선순위와 방향성을 정리합니다.</p>
+      <div id="chatGreetingArea" style="text-align:left;width:100%;max-width:480px;line-height:1.7;color:var(--text);margin-bottom:0.5rem;"></div>
       <div class="start-form">
+        <div id="guidedChoices" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.5rem;"></div>
         <select id="outputFormat">
           <option value="정책">정책</option>
           <option value="지역공약">지역공약</option>
           <option value="논평">논평</option>
           <option value="메시지">메시지</option>
         </select>
-        <input type="text" id="topicInput" placeholder="공약 주제를 입력하세요 (예: 청년 주거 안정)" maxlength="500">
+        <input type="text" id="topicInput" placeholder="직접 주제를 입력하셔도 됩니다 (예: 청년 주거 안정)" maxlength="500">
         <button class="btn-start" id="btnStart" onclick="startChat()">대화 시작</button>
       </div>
     </div>
@@ -663,6 +663,63 @@
         startChat();
       }
     });
+
+    // 인사말 + 가이드 선택지
+    (async function initGreeting() {
+      var labelMap = { metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원', local_council:'기초의원', party_official:'당직자' };
+      var greetArea = document.getElementById('chatGreetingArea');
+      var choicesArea = document.getElementById('guidedChoices');
+      try {
+        var r = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!r.ok) return;
+        var d = await r.json();
+        var name = d.name || '';
+        var role = labelMap[d.election_position] || d.election_position || '후보';
+        var region = d.region_name || '';
+        var district = d.district_name || '';
+        var location = [region, district].filter(Boolean).join(' ');
+
+        var intro = '안녕하세요.';
+        if (name || location) {
+          intro = '안녕하세요, ' + (location ? location + ' ' : '') + role + (name ? ' ' + name + ' 후보님.' : '님.');
+        }
+
+        greetArea.innerHTML = '<h2 style="font-size:1.2rem;margin-bottom:0.5rem;">' + escapeHtml(intro) + '</h2>'
+          + '<p style="color:var(--muted);line-height:1.6;margin:0;">'
+          + '이 도구는 선거구 기준 생활 이슈, 지방의회 자료, 관련 기사, 우리당 자료, 공공데이터를 바탕으로 정책 방향을 좁혀가는 보조도구입니다.'
+          + '<br>AI 코치가 질문을 던지며 함께 공약을 만들어갑니다.'
+          + '</p>';
+
+        var choices = [
+          { label: '이 지역 핵심 이슈부터 알고 싶다', topic: (district || region || '우리 지역') + ' 핵심 생활 이슈' },
+          { label: '내 정책 아이디어를 다듬고 싶다', topic: '' },
+          { label: '우리당 공약과 연결해서 방향 잡기', topic: '우리당 공약 연계 정책 방향' },
+          { label: '비슷한 지역 사례부터 참고하기', topic: (district || region || '유사 지역') + ' 유사 사례 참고' },
+        ];
+
+        var btnStyle = 'display:block;width:100%;padding:0.7rem 1rem;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem;cursor:pointer;text-align:left;';
+        choices.forEach(function(c) {
+          var btn = document.createElement('button');
+          btn.setAttribute('style', btnStyle);
+          btn.textContent = c.label;
+          btn.onmouseover = function() { btn.style.borderColor = 'var(--brand-light)'; };
+          btn.onmouseout = function() { btn.style.borderColor = 'var(--input-border)'; };
+          btn.onclick = function() {
+            if (c.topic) {
+              document.getElementById('topicInput').value = c.topic;
+              startChat();
+            } else {
+              document.getElementById('topicInput').focus();
+              document.getElementById('topicInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
+            }
+          };
+          choicesArea.appendChild(btn);
+        });
+      } catch (e) {
+        greetArea.innerHTML = '<h2 style="font-size:1.2rem;">AI와 함께 공약을 만들어 보세요</h2>'
+          + '<p style="color:var(--muted);line-height:1.6;">주제를 입력하면 AI 코치가 질문을 던지며 지역 이슈와 정책 방향을 함께 좁혀갑니다.</p>';
+      }
+    })();
   </script>
 </body>
 </html>
