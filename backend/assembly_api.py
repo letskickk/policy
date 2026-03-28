@@ -155,6 +155,52 @@ def _is_rate_limited(url: str) -> bool:
 #           searchType=ALL, searchKeyword, rasmblyId
 # ---------------------------------------------------------------------------
 
+def _resolve_rasmbly_id(region: Optional[str]) -> str:
+    """지역명으로 clik 의회 ID를 조회. 캐시됨."""
+    if not region or not ASSEMBLY_API_KEY:
+        return ""
+    # "서울특별시 강북구" → "강북"
+    parts = region.strip().split()
+    search_kw = parts[-1].replace("구", "").replace("시", "").replace("군", "") if parts else ""
+    if not search_kw or len(search_kw) < 2:
+        return ""
+
+    cache_k = _cache_key("rasmbly_id", region=search_kw)
+    cached = _get_cached(cache_k)
+    if cached:
+        return cached.get("rasmbly_id", "")
+
+    url = f"{CLIK_BASE_URL}/assemblyinfo.do"
+    params = {
+        "key": ASSEMBLY_API_KEY,
+        "type": "json",
+        "displayType": "list",
+        "startCount": "0",
+        "listCount": "5",
+        "searchType": "ALL",
+        "searchKeyword": search_kw,
+    }
+    data = _http_get(url, params)
+    if not data:
+        return ""
+
+    items = data.get("LIST", [])
+    if isinstance(data, list) and data:
+        items = data[0].get("LIST", [])
+
+    rasmbly_id = ""
+    for item in items:
+        row = item.get("ROW", item)
+        nm = row.get("RASMBLY_NM", "")
+        rid = row.get("RASMBLY_ID", "")
+        if rid and search_kw in nm:
+            rasmbly_id = rid
+            break
+
+    _set_cached(cache_k, {"rasmbly_id": rasmbly_id})
+    return rasmbly_id
+
+
 def search_local_assembly(
     *,
     region: Optional[str] = None,
@@ -164,6 +210,7 @@ def search_local_assembly(
 ) -> dict:
     """
     지방의회 회의록 + 의안 통합 검색.
+    region이 있으면 해당 의회(rasmblyId)를 직접 지정하여 검색.
 
     Returns:
         {
@@ -177,18 +224,21 @@ def search_local_assembly(
     if not ASSEMBLY_API_KEY:
         return _empty_result("clik", region=region, keywords=keywords, reason="API 키 미설정")
 
-    cache_k = _cache_key("clik", region=region, keywords=keywords, years=years, limit=limit)
+    cache_k = _cache_key("clik_v2", region=region, keywords=keywords, years=years, limit=limit)
     cached = _get_cached(cache_k)
     if cached:
         cached["from_cache"] = True
         return cached
+
+    # 지역 의회 ID 조회
+    rasmbly_id = _resolve_rasmbly_id(region)
 
     # clik API는 searchKeyword에 공백이 있으면 ERROR11 → 가장 핵심 키워드 1개 사용
     keyword_str = ""
     if keywords:
         # 가장 긴 (구체적인) 키워드를 우선 사용
         keyword_str = max(keywords, key=len) if keywords else ""
-    if not keyword_str and region:
+    if not keyword_str and region and not rasmbly_id:
         keyword_str = region
 
     # 양쪽에서 절반씩 가져와서 의안도 노출
@@ -209,6 +259,8 @@ def search_local_assembly(
             "searchType": "ALL",
             "searchKeyword": keyword_str,
         }
+        if rasmbly_id:
+            minutes_params["rasmblyId"] = rasmbly_id
         minutes_data = _http_get(minutes_url, minutes_params)
         if minutes_data:
             minute_items = _parse_minutes_response(minutes_data)
@@ -226,6 +278,8 @@ def search_local_assembly(
             "searchType": "BI_SJ",
             "searchKeyword": keyword_str,
         }
+        if rasmbly_id:
+            bill_params["rasmblyId"] = rasmbly_id
         bill_data = _http_get(bill_url, bill_params)
         if bill_data:
             bill_items = _parse_bill_response(bill_data)
