@@ -1222,7 +1222,7 @@
       <header class="hero">
         <h1>
           <span class="hero-title-line"><span class="hero-accent">개혁신당 AI</span></span>
-          <span class="hero-title-line">정책 방향 제안 챗봇</span>
+          <span class="hero-title-line">공약 설계 코치</span>
         </h1>
         <p class="subtitle">AI 코치와 대화하면서 지역 이슈와 정책 방향을 함께 좁혀보세요. 회의록·정강정책·우리당 공약을 바탕으로 방향성과 근거를 정리해줍니다.</p>
         <div class="hero-flow">
@@ -1245,7 +1245,7 @@
       </div>
       <div class="chat-sessions-list" id="chatSessionsList"></div>
       <section class="card chat-container" id="chatContainer">
-        <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 정책 방향 제안 챗봇입니다. 지역 이슈와 정책 방향을 함께 정리해보겠습니다.</div></div>
+        <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 지역 이슈와 정책 방향을 함께 정리해보겠습니다.</div></div>
         <div class="chat-input-bar">
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
@@ -2131,7 +2131,7 @@
         var labelMap = { metro_mayor:'광역단체장', local_mayor:'기초단체장', regional_council:'광역의원', local_council:'기초의원', party_official:'당직자' };
         var roleLabel = labelMap[election] || election || '후보';
         var location = [region, district].filter(Boolean).join(' ');
-        var intro = '안녕하세요. 개혁신당 정책 방향 제안 챗봇입니다.';
+        var intro = '안녕하세요. 개혁신당 공약 설계 코치입니다.';
         if (name || location) {
           intro = '안녕하세요, ' + (location ? location + ' ' : '') + roleLabel + (name ? ' ' + name + ' 후보님.' : '님.');
         }
