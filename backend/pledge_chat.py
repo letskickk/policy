@@ -169,6 +169,7 @@ def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
         )
         rag["assembly"] = research.get("assembly", {}).get("context_text", "")
         rag["research"] = research.get("briefing_text", "")
+        rag["public_data"] = research.get("public_data", {}).get("context_text", "")
     except Exception as e:
         logger.warning("pledge_chat research failed: %s", e)
         rag["assembly"] = ""
@@ -240,6 +241,8 @@ def _build_system_message(rag: dict) -> str:
         context_parts.append(f"[참고: 지방의회 논의]\n{rag['assembly'][:3000]}")
     if rag.get("research"):
         context_parts.append(f"[참고: 연구 자료]\n{rag['research'][:3000]}")
+    if rag.get("public_data"):
+        context_parts.append(f"[참고: 공공데이터 — 지역 현황]\n{rag['public_data'][:4000]}")
 
     if context_parts:
         context_section = "\n\n---\n아래는 대화 중 참고할 자료이다. 대화에서 자연스럽게 활용하되 내부 태그를 노출하지 마라.\n\n" + "\n\n".join(context_parts)
@@ -268,7 +271,7 @@ def chat_stream(session_id: str, user_message: str):
     stream = client.chat.completions.create(
         model=CHAT_MODEL,
         messages=messages,
-        max_completion_tokens=1024,
+        max_completion_tokens=4096,
         timeout=60,
         stream=True,
     )
