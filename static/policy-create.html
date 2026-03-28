@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 정책 플랫폼 | 정책 초안 생성</title>
+  <title>AI 정책 플랫폼 | 정책 방향 정리</title>
   <link rel="stylesheet" href="/static/css/common.css?v=2">
   <style>
     .page-shell { padding-bottom: 6rem; }
@@ -417,11 +417,11 @@
     </div>
 
     <section class="hero">
-      <span class="eyebrow">AI 정책 플랫폼 | 정책 초안 생성</span>
-      <h1>정책 초안을 빠르게 잡고, 근거까지 함께 확인합니다.</h1>
-      <p>주제를 입력하면 AI가 초안 문서를 만들고, 관련 SSOT와 참고 근거를 함께 보여줍니다. 오른쪽에는 결과를, 왼쪽에는 조건을 두어 작업 흐름을 한눈에 읽히게 했습니다.</p>
+      <span class="eyebrow">AI 정책 플랫폼 | 정책 방향 정리</span>
+      <h1>정책 방향을 빠르게 잡고, 근거까지 함께 확인합니다.</h1>
+      <p>주제를 입력하면 AI가 정책의 방향, 핵심 쟁점, 참고 근거를 먼저 정리해줍니다. 바로 완성 문안을 쓰기보다 지역 맥락과 우리당 자료를 바탕으로 초안의 뼈대를 잡는 흐름입니다.</p>
       <div class="hero-meta">
-        <span class="badge badge-blue">초안 생성</span>
+        <span class="badge badge-blue">방향 제안</span>
         <span class="badge badge-green">근거 패널</span>
         <span class="badge badge-purple">챗봇 도움말</span>
       </div>
@@ -483,7 +483,7 @@
             </select>
           </div>
 
-          <button class="btn btn-generate" id="generateBtn" onclick="generateDraft()">초안 생성</button>
+          <button class="btn btn-generate" id="generateBtn" onclick="generateDraft()">방향 정리 시작</button>
         </div>
       </div>
 
@@ -496,14 +496,14 @@
             </div>
           </div>
           <div class="panel-body">
-            <p class="loading-spinner" id="loadingMsg" style="display:none;">초안을 생성하고 있습니다...</p>
+            <p class="loading-spinner" id="loadingMsg" style="display:none;">정책 방향과 참고 근거를 정리하고 있습니다...</p>
             <p class="err" id="errMsg" style="display:none;"></p>
-            <div class="result-area" id="resultArea"><span class="result-empty">주제를 입력하고 초안 생성 버튼을 누르면 결과가 표시됩니다.</span></div>
+            <div class="result-area" id="resultArea"><span class="result-empty">주제를 입력하고 방향 정리 시작 버튼을 누르면 결과가 표시됩니다.</span></div>
 
             <div class="actions" id="actionBar" style="display:none;">
-              <button class="btn btn-green" onclick="saveDraft()">초안 저장</button>
+              <button class="btn btn-green" onclick="saveDraft()">정리 결과 저장</button>
               <button class="btn btn-secondary" onclick="copyDraft()">복사</button>
-              <button class="btn btn-secondary" onclick="generateDraft()">다시 생성</button>
+              <button class="btn btn-secondary" onclick="generateDraft()">다시 정리</button>
             </div>
 
             <div class="research-panel" id="researchPanel" style="display:none;">
@@ -523,8 +523,8 @@
           <div class="panel-body">
             <div class="summary-strip">
               <div class="summary-chip"><strong>1. 주제 입력</strong><span>핵심 이슈를 짧게 적습니다.</span></div>
-              <div class="summary-chip"><strong>2. 초안 생성</strong><span>AI가 정책 구조를 만들고 분류합니다.</span></div>
-              <div class="summary-chip"><strong>3. 저장 또는 복사</strong><span>결과를 바로 다음 작업으로 넘깁니다.</span></div>
+              <div class="summary-chip"><strong>2. 방향 정리</strong><span>AI가 정책 방향, 쟁점, 참고 근거를 정리합니다.</span></div>
+              <div class="summary-chip"><strong>3. 저장 또는 복사</strong><span>정리 결과를 다음 작업의 출발점으로 넘깁니다.</span></div>
             </div>
           </div>
         </div>

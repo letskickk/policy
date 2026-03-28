@@ -1,8 +1,8 @@
 """
-공약 개발 챗봇 — 대화형 정책 초안 생성.
+정책 방향 제안 챗봇 — 대화형 정책 보조.
 
-출마자와 AI가 대화하면서 공약을 점진적으로 구체화하고,
-마지막에 정식 공약문을 자동 생성한다.
+출마자와 AI가 대화하면서 지역 이슈, 정책 방향, 우선순위를 함께 정리하고,
+필요할 때 초안 보조에 참고할 수 있는 구조화된 결과를 만든다.
 기존 policy_drafter의 RAG 파이프라인을 재사용.
 """
 
@@ -17,6 +17,7 @@ from typing import Optional
 
 from backend.config import PROMPTS_DIR
 from backend.database import get_connection
+from backend.auth import get_user
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,23 @@ def _load_chat_system_prompt() -> str:
     path = PROMPTS_DIR / "공약_챗봇_시스템.txt"
     if path.exists():
         return path.read_text(encoding="utf-8").strip()
-    return "개혁신당 정책 기획 코치 역할이다. 출마자와 대화하면서 공약을 함께 개발한다."
+    return "개혁신당 정책 기획 코치 역할이다. 출마자와 대화하면서 지역 이슈, 정책 방향, 우선순위와 근거를 함께 정리한다. 바로 완성 공약을 단정적으로 써주기보다 선택지와 방향성을 제안한다."
+
+
+def _build_user_context_text(user_id: int) -> str:
+    user = get_user(user_id) or {}
+    parts = []
+    if user.get("name"):
+        parts.append(f"이름: {user['name']}")
+    if user.get("election_position"):
+        parts.append(f"출마 직책: {user['election_position']}")
+    if user.get("region_name"):
+        parts.append(f"주요 지역: {user['region_name']}")
+    if user.get("district_name"):
+        parts.append(f"선거구: {user['district_name']}")
+    if not parts:
+        return ""
+    return "\n\n[후보자 기본 정보]\n" + "\n".join(parts) + "\n위 정보가 있으면 대화 첫 단계에서 지역 맥락과 출마 단위를 먼저 반영하라. 정보가 없는 부분은 추측하지 말고 필요한 경우 질문하라."
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +60,8 @@ def create_session(user_id: int, topic: str, output_format: str = "정책") -> d
     """새 챗봇 세션 생성. RAG는 주제가 구체화된 후 lazy로 수행."""
     session_id = uuid.uuid4().hex[:16]
 
-    # 시작 시에는 RAG 없이 기본 시스템 프롬프트만
-    system_msg = _load_chat_system_prompt()
+    # 시작 시에는 RAG 없이 기본 시스템 프롬프트 + 후보자 기본 정보만
+    system_msg = _load_chat_system_prompt() + _build_user_context_text(user_id)
 
     conn = get_connection()
     try:
@@ -259,10 +276,10 @@ def first_message_stream(session_id: str, topic: str):
 
 
 # ---------------------------------------------------------------------------
-# Finalize — 대화 내용으로 정식 공약문 생성
+# Finalize — 대화 내용을 바탕으로 방향 정리 / 초안 보조 결과 생성
 # ---------------------------------------------------------------------------
 def finalize_stream(session_id: str):
-    """대화 내용을 기반으로 기존 생성기 형식의 공약문을 스트리밍 생성."""
+    """대화 내용을 기반으로 방향 정리와 초안 보조에 쓸 결과를 스트리밍 생성."""
     conn = get_connection()
     try:
         session = conn.execute(
@@ -281,7 +298,7 @@ def finalize_stream(session_id: str):
     # 대화 요약 구성
     conversation_summary = _build_conversation_summary(session_id)
 
-    # 기존 drafter 프롬프트 재사용
+    # 기존 drafter 프롬프트 재사용 (완성본 자동작성보다 방향 정리/초안 보조 용도)
     from backend.policy_drafter import (
         _load_drafter_system_prompt,
         _load_drafter_user_template,
@@ -380,13 +397,13 @@ def _build_conversation_summary(session_id: str) -> str:
 
     conversation_text = "\n".join(parts)
 
-    # 대화 내용을 주제로 변환
-    summary = f"""아래는 출마자와 AI 코치의 공약 개발 대화 내용이다. 이 대화에서 논의된 내용을 바탕으로 정책 초안을 작성하라.
+    # 대화 내용을 방향 정리용 텍스트로 변환
+    summary = f"""아래는 출마자와 AI 코치의 정책 방향 정리 대화 내용이다. 이 대화에서 논의된 내용을 바탕으로 지역 이슈, 정책 방향, 우선순위, 참고 근거를 구조화하라.
 
 --- 대화 내용 ---
 {conversation_text[:6000]}
 --- 대화 끝 ---
 
-위 대화에서 합의된 정책 방향, 대상, 수단, 기대효과를 반영하여 초안을 작성하라."""
+위 대화에서 확인된 지역 맥락, 대상, 수단, 기대효과, 추가 검토가 필요한 쟁점을 먼저 정리하고, 필요하면 사람이 다듬을 수 있는 초안 보조 형태로 제시하라."""
 
     return summary
