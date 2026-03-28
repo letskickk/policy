@@ -2219,7 +2219,7 @@
           { num: '1', label: '이 지역 현안·의회 논의부터 알고 싶다', action: 'topicPicker' },
           { num: '2', label: '내 정책 아이디어를 다듬고 싶다', msg: '' },
           { num: '3', label: '우리당 공약과 연결해서 방향 잡기', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
-          { num: '4', label: '비슷한 지역 사례부터 참고하기', msg: (loc ? loc + ' ' : '') + '비슷한 선거구 사례를 먼저 보여줘' },
+          { num: '4', label: '타지역 사례부터 참고하기', msg: (loc ? loc + ' ' : '') + '비슷한 선거구의 타지역 사례를 먼저 보여줘' },
         ];
 
         var subTopics = [
@@ -2283,7 +2283,7 @@
                 { label: '지역 현안', action: 'topicPicker' },
                 { label: '아이디어 다듬기', msg: '' },
                 { label: '당 공약 연결', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
-                { label: '지역 사례', msg: (loc ? loc + ' ' : '') + '비슷한 선거구 사례를 먼저 보여줘' },
+                { label: '타지역 사례', msg: (loc ? loc + ' ' : '') + '비슷한 선거구의 타지역 사례를 먼저 보여줘' },
               ];
               subTopics.forEach(function(t) { if (t.msg) quickItems.push({ label: t.label, msg: t.msg }); });
               quickItems.forEach(function(q) {
