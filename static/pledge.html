@@ -1089,9 +1089,11 @@
     .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;}
     .chat-msg.notice{align-self:center;background:rgba(96,165,250,0.1);color:var(--muted);font-size:0.82rem;max-width:90%;text-align:center;}
     .chat-msg.streaming{opacity:0.85;}
-    .chat-quick-btns{display:flex;gap:0.35rem;flex-wrap:wrap;padding:0.4rem 0 0.2rem;}
-    .chat-quick-btns button{padding:0.28rem 0.6rem;border:1px solid var(--border);border-radius:14px;background:transparent;color:var(--muted);font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:border-color 0.15s,color 0.15s;}
-    .chat-quick-btns button:hover{border-color:var(--brand);color:var(--brand);}
+    .chat-btn-topic{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:1.2rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.15s,color 0.15s;}
+    .chat-btn-topic:hover{border-color:var(--brand);color:var(--brand);}
+    .chat-quick-popup{display:flex;gap:0.35rem;flex-wrap:wrap;padding:0.4rem 0.2rem;border:1px solid var(--border);border-radius:8px;background:var(--card);margin-bottom:0.3rem;}
+    .chat-quick-popup button{padding:0.3rem 0.65rem;border:1px solid var(--border);border-radius:14px;background:transparent;color:var(--muted);font-size:0.8rem;cursor:pointer;white-space:nowrap;transition:border-color 0.15s,color 0.15s;}
+    .chat-quick-popup button:hover{border-color:var(--brand);color:var(--brand);}
     .chat-input-bar{display:flex;gap:0.5rem;padding:0.75rem 0;border-top:1px solid var(--border);}
     .chat-input-bar input{flex:1;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:0.93rem;}
     .chat-input-bar input:focus{outline:none;border-color:var(--brand);background:var(--input-bg-focus);}
@@ -1249,8 +1251,9 @@
       <div class="chat-sessions-list" id="chatSessionsList"></div>
       <section class="card chat-container" id="chatContainer">
         <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 선거구 기준 생활 이슈, 지방의회 자료, 기사, 우리당 자료, 공공데이터를 바탕으로 공약 초안의 방향을 잡아드립니다. 아래 입력창에 주제를 입력하거나, 메시지를 보내주세요.</div></div>
-        <div id="chatQuickBtns" class="chat-quick-btns" style="display:none;"></div>
+        <div id="chatQuickPopup" class="chat-quick-popup" style="display:none;"></div>
         <div class="chat-input-bar">
+          <button class="chat-btn-topic" id="chatBtnTopic" title="주제 선택">+</button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
           <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
@@ -2263,53 +2266,46 @@
           el.appendChild(btn);
         });
 
-        // 입력바 위 상시 빠른 버튼 생성
-        var qbWrap = document.getElementById('chatQuickBtns');
-        if (qbWrap) {
-          qbWrap.innerHTML = '';
-          var quickItems = [
-            { label: '지역 현안', action: 'topicPicker' },
-            { label: '내 아이디어 다듬기', msg: '' },
-            { label: '당 공약 연결', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
-            { label: '지역 사례', msg: (loc ? loc + ' ' : '') + '비슷한 선거구 사례를 먼저 보여줘' },
-          ];
-          quickItems.forEach(function(q) {
-            var qb = document.createElement('button');
-            qb.textContent = q.label;
-            qb.addEventListener('click', function() {
-              if (q.action === 'topicPicker') {
-                // 서브토픽 picker를 그대로 사용
-                var _gel = document.getElementById('chatGreeting');
-                if (_gel) {
-                  _gel.innerHTML = '';
-                  var qDiv2 = document.createElement('div');
-                  qDiv2.style.cssText = 'font-size:0.92rem;margin-bottom:0.4rem;';
-                  qDiv2.textContent = '어떤 분야 현안부터 살펴볼까요?';
-                  _gel.appendChild(qDiv2);
-                  subTopics.forEach(function(t) {
-                    var tb = document.createElement('button');
-                    tb.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;';
-                    tb.textContent = t.label;
-                    tb.addEventListener('click', function() {
-                      if (t.msg) { document.getElementById('chatInput').value = t.msg; chatSend(); }
-                      else { document.getElementById('chatInput').focus(); document.getElementById('chatInput').placeholder = '관심 있는 분야나 정책 아이디어를 입력하세요'; }
-                    });
-                    _gel.appendChild(tb);
-                  });
-                  var msgs = document.getElementById('chatMessages');
-                  msgs.scrollTop = 0;
-                }
-              } else if (q.msg) {
-                document.getElementById('chatInput').value = q.msg;
-                chatSend();
-              } else {
-                document.getElementById('chatInput').focus();
-                document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
-              }
-            });
-            qbWrap.appendChild(qb);
+        // + 버튼 클릭 시 팝업 토글
+        var _popupBuilt = false;
+        var topicBtn = document.getElementById('chatBtnTopic');
+        if (topicBtn) {
+          topicBtn.addEventListener('click', function() {
+            var popup = document.getElementById('chatQuickPopup');
+            if (!popup) return;
+            if (popup.style.display !== 'none') { popup.style.display = 'none'; return; }
+            if (!_popupBuilt) {
+              _popupBuilt = true;
+              var quickItems = [
+                { label: '지역 현안', action: 'topicPicker' },
+                { label: '아이디어 다듬기', msg: '' },
+                { label: '당 공약 연결', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
+                { label: '지역 사례', msg: (loc ? loc + ' ' : '') + '비슷한 선거구 사례를 먼저 보여줘' },
+              ];
+              subTopics.forEach(function(t) { if (t.msg) quickItems.push({ label: t.label, msg: t.msg }); });
+              quickItems.forEach(function(q) {
+                var qb = document.createElement('button');
+                qb.textContent = q.label;
+                qb.addEventListener('click', function() {
+                  popup.style.display = 'none';
+                  if (q.action === 'topicPicker') {
+                    popup.style.display = 'none';
+                    // sub-topic을 팝업 안에서 보여주는 대신, 직접 입력으로 포커스
+                    document.getElementById('chatInput').focus();
+                    document.getElementById('chatInput').placeholder = '관심 분야를 입력하세요 (예: 복지, 교통, 상권)';
+                  } else if (q.msg) {
+                    document.getElementById('chatInput').value = q.msg;
+                    chatSend();
+                  } else {
+                    document.getElementById('chatInput').focus();
+                    document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
+                  }
+                });
+                popup.appendChild(qb);
+              });
+            }
+            popup.style.display = '';
           });
-          qbWrap.style.display = '';
         }
 
         var footDiv = document.createElement('div');
