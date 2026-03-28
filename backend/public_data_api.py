@@ -59,24 +59,36 @@ _SEOUL_DISTRICTS = {
 def normalize_region(region: Optional[str], district_name: Optional[str] = None) -> dict:
     """지역명을 API 호출에 필요한 형태로 분해."""
     region = (region or "").strip()
-    district = (district_name or "").strip()
+    district_raw = (district_name or "").strip()
 
     # "서울특별시 강북구" → province / district 분리
     parts = region.replace("  ", " ").split()
     province = ""
-    if not district:
-        if len(parts) >= 2:
-            province = parts[0]
-            district = parts[-1]
-        elif len(parts) == 1:
-            token = parts[0]
-            # 시도 이름인지, 구/군 이름인지
-            if token in _PROVINCE_MAP or token in _PROVINCE_MAP.values():
-                province = token
-            else:
-                district = token
-    else:
-        province = region if len(parts) <= 1 else parts[0]
+    district = ""
+
+    # region_name에서 시도/구 추출
+    if len(parts) >= 2:
+        province = parts[0]
+        district = parts[-1]  # "강북구"
+    elif len(parts) == 1:
+        token = parts[0]
+        if token in _PROVINCE_MAP or token in _PROVINCE_MAP.values():
+            province = token
+        else:
+            district = token
+
+    # district_name이 "강북구 가선거구" 같은 형태면, 구 이름 추출
+    if district_raw:
+        # "강북구 가선거구" → "강북구" 추출
+        dn_parts = district_raw.split()
+        for p in dn_parts:
+            if p.endswith("구") or p.endswith("시") or p.endswith("군"):
+                if not district:
+                    district = p
+                break
+
+    if not district and district_raw:
+        district = district_raw.split()[0] if district_raw.split() else district_raw
 
     # 시도 정규화
     province_full = _PROVINCE_MAP.get(province, province)
@@ -90,8 +102,9 @@ def normalize_region(region: Optional[str], district_name: Optional[str] = None)
     return {
         "province": province_full,
         "province_code": province_code,
-        "district": district,
-        "district_short": district_short,
+        "district": district,             # "강북구"
+        "district_raw": district_raw,     # "강북구 가선거구" (원본)
+        "district_short": district_short, # "강북"
         "is_seoul": is_seoul,
     }
 
@@ -179,7 +192,8 @@ def _is_rate_limited(endpoint: str) -> bool:
 # HTTP helper
 # ---------------------------------------------------------------------------
 def _http_get_json(url: str, params: dict, *, timeout: int = 10,
-                   headers: Optional[dict] = None) -> Optional[dict | list]:
+                   headers: Optional[dict] = None,
+                   encode_plus: bool = False) -> Optional[dict | list]:
     """HTTP GET → JSON. 실패 시 None. 3회 재시도."""
     if _is_rate_limited(url):
         return None
@@ -192,7 +206,10 @@ def _http_get_json(url: str, params: dict, *, timeout: int = 10,
     if headers:
         _headers.update(headers)
 
-    full_url = url + "?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+    if encode_plus:
+        full_url = url + "?" + urllib.parse.urlencode(params)
+    else:
+        full_url = url + "?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
     last_err = None
     for attempt in range(3):
         try:
@@ -227,20 +244,17 @@ def _empty_result(source: str, reason: str = "") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 1. 소상공인 상권정보 (api.odcloud.kr)
+# 1. 소상공인 상권정보 (apis.data.go.kr)
 # ---------------------------------------------------------------------------
-# 소상공인시장진흥공단_상가(상권)정보, namespace=15083033
-# Base URL: https://api.odcloud.kr/api/15083033/v1/{endpoint_id}
-# 인증: serviceKey 쿼리 파라미터
+# https://apis.data.go.kr/B553077/api/open/sdsc/storeListInDong
+# divId: ctprvnCd(시도), signguCd(시군구), adongCd(행정동)
 # ---------------------------------------------------------------------------
 
-ODCLOUD_BASE = "https://api.odcloud.kr/api"
-# 소상공인 상가정보 엔드포인트 (시도/읍면동별 업소수)
-SEMAS_ENDPOINT = f"{ODCLOUD_BASE}/15083033/v1/uddi:c7049f5a-d95e-4143-be96-b4d3c16130ee"
+SEMAS_BASE = "https://apis.data.go.kr/B553077/api/open/sdsc"
 
 
 def _fetch_semas_commercial(region_info: dict) -> dict:
-    """소상공인 상권정보 조회 — 읍면동별 업소수 현황."""
+    """소상공인 상권정보 — 시군구 기준 상가업소 조회."""
     from backend.config import SEMAS_API_KEY
 
     source = "semas"
@@ -248,48 +262,64 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
         return _empty_result(source, "API 키 미설정")
 
     district = region_info["district"]
+    province_code = region_info["province_code"]
     if not district:
         return _empty_result(source, "지역 미지정")
 
-    ck = _cache_key("semas", district=district)
+    ck = _cache_key("semas_v2", district=district, province=region_info["province"])
     cached = _get_cached(ck)
     if cached:
         cached["from_cache"] = True
         return cached
 
+    # 시도 코드로 상가 목록 조회
+    url = f"{SEMAS_BASE}/storeListInDong"
     params = {
-        "serviceKey": SEMAS_API_KEY,
-        "page": "1",
-        "perPage": "500",
-        "returnType": "JSON",
+        "ServiceKey": SEMAS_API_KEY,
+        "divId": "ctprvnCd",
+        "key": province_code or "11",
+        "numOfRows": "200",
+        "pageNo": "1",
+        "type": "json",
     }
-    raw = _http_get_json(SEMAS_ENDPOINT, params, timeout=15)
-    if not raw or not isinstance(raw, dict):
-        return _empty_result(source, "API 호출 실패")
+    raw = _http_get_json(url, params, timeout=15)
 
-    items = raw.get("data", [])
-    # 지역 필터링: district(구/시)가 포함된 항목
-    district_short = region_info["district_short"]
+    items = []
+    if raw and isinstance(raw, dict):
+        body = raw.get("body", raw)
+        if isinstance(body, dict):
+            item_list = body.get("items", [])
+            if isinstance(item_list, dict):
+                item_list = item_list.get("item", [])
+                if isinstance(item_list, dict):
+                    item_list = [item_list]
+            items = item_list if isinstance(item_list, list) else []
+
+    # 지역 필터
     filtered = []
+    district_short = region_info["district_short"]
     for item in items:
-        sido = item.get("시도") or ""
-        dong = item.get("읍면동") or ""
-        if district in sido or district_short in sido or district in dong:
+        addr = (item.get("rdnmAdr") or item.get("lnoAdr") or
+                item.get("rdnWhlAddr") or "")
+        gu = item.get("signguNm") or ""
+        if district in addr or district in gu or district_short in addr:
             filtered.append(item)
 
-    # 요약
+    # 업종 분포 요약
     summary_lines = []
     if filtered:
-        total_stores = sum(int(item.get("업소수") or 0) for item in filtered)
-        summary_lines.append(f"{district} 상권현황 ({len(filtered)}개 동):")
-        summary_lines.append(f"  - 총 업소수: {total_stores:,}개")
-        top = sorted(filtered, key=lambda x: int(x.get("업소수") or 0), reverse=True)[:5]
-        for item in top:
-            summary_lines.append(f"  - {item.get('읍면동', '')}: {item.get('업소수', '')}개")
+        biz_counts = {}
+        for item in filtered:
+            biz = item.get("indsLclsNm") or item.get("indsMclsNm") or "기타"
+            biz_counts[biz] = biz_counts.get(biz, 0) + 1
+        top_biz = sorted(biz_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+        summary_lines.append(f"{district} 상가 현황 ({len(filtered)}개 업소):")
+        for biz, cnt in top_biz:
+            summary_lines.append(f"  - {biz}: {cnt}개")
     elif items:
-        summary_lines.append("상권 데이터 조회됨 (해당 지역 필터링 결과 없음)")
+        summary_lines.append(f"상가 데이터 {len(items)}건 조회됨 ({district} 필터 결과 없음)")
     else:
-        summary_lines.append("상권 데이터 없음")
+        summary_lines.append("상가 데이터 없음")
 
     result = {
         "source": source,
@@ -303,59 +333,120 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 2. 한국도로공사 교통사고통계 (api.odcloud.kr)
+# 2. TAAS 교통사고 다발지역 (opendata.koroad.or.kr)
 # ---------------------------------------------------------------------------
-# namespace=15045638, 연도별 사고/사망/부상
+# 도로교통공단 TAAS 오픈 API
+# authKey, searchYearCd, siDo(2자리), guGun(3자리)
 # ---------------------------------------------------------------------------
 
-TAAS_ENDPOINT = f"{ODCLOUD_BASE}/15045638/v1/uddi:69cb47bd-0373-4dee-9101-a1878f8c97c4"
+TAAS_BASE = "https://opendata.koroad.or.kr/data/rest"
+TAAS_ENDPOINTS = {
+    "지자체별": "/frequentzone/lg",
+    "보행자": "/frequentzone/pedstrians",
+    "보행어린이": "/frequentzone/child",
+    "보행노인": "/frequentzone/oldman",
+    "어린이보호구역": "/frequentzone/schoolzone/child",
+}
+
+# 시군구 코드 매핑 (시도코드 2자리 + 시군구 3자리)
+_GUGUN_MAP = {}  # 런타임에 필요하면 확장
 
 
 def _fetch_taas_accidents(region_info: dict) -> dict:
-    """한국도로공사 교통사고통계 조회."""
+    """TAAS 교통사고 다발지역 — 시군구별 5개 유형 통합 조회."""
     from backend.config import TAAS_API_KEY
 
     source = "taas"
     if not TAAS_API_KEY:
         return _empty_result(source, "API 키 미설정")
 
-    ck = _cache_key("taas", province=region_info["province"])
+    province_code = region_info["province_code"]
+    district = region_info["district"]
+    if not province_code:
+        return _empty_result(source, "시도 코드 미확인")
+
+    ck = _cache_key("taas_v2", province_code=province_code, district=district)
     cached = _get_cached(ck)
     if cached:
         cached["from_cache"] = True
         return cached
 
-    params = {
-        "serviceKey": TAAS_API_KEY,
-        "page": "1",
-        "perPage": "30",
-        "returnType": "JSON",
-    }
-    raw = _http_get_json(TAAS_ENDPOINT, params, timeout=15)
-    if not raw or not isinstance(raw, dict):
-        return _empty_result(source, "API 호출 실패")
+    current_year = datetime.now().year
+    all_accidents = {}
 
-    items = raw.get("data", [])
-    if not items:
-        return _empty_result(source, "데이터 없음")
+    for label, endpoint in TAAS_ENDPOINTS.items():
+        url = TAAS_BASE + endpoint
+        params = {
+            "authKey": TAAS_API_KEY,
+            "searchYearCd": str(current_year - 2),  # TAAS 데이터는 2년 전이 최신
+            "siDo": province_code,
+            "guGun": "",
+            "type": "json",
+            "numOfRows": "200",
+            "pageNo": "1",
+        }
+        raw = _http_get_json(url, params, timeout=12)
+        if not raw:
+            continue
 
-    recent = sorted(items, key=lambda x: int(x.get("연도") or 0), reverse=True)[:5]
+        try:
+            # TAAS 응답: {resultCode, items: {item: [...]}}
+            items_wrapper = raw.get("items", {})
+            if isinstance(items_wrapper, dict):
+                items = items_wrapper.get("item", [])
+            else:
+                items = items_wrapper if isinstance(items_wrapper, list) else []
+            if isinstance(items, dict):
+                items = [items]
 
+            # 지역 필터: spot_nm에 district 또는 district_short 포함
+            # TAAS spot_nm 형식: "서울 강북구 수유동(수유리사거리 부근)"
+            filtered = []
+            district_short = region_info["district_short"]
+            for item in (items or []):
+                spot = item.get("spot_nm") or item.get("afos_fid_nm") or ""
+                sgg = item.get("sido_sgg_nm") or ""
+                if district and (district in spot or district in sgg):
+                    filtered.append(item)
+                elif district_short and (district_short in spot or district_short in sgg):
+                    filtered.append(item)
+                elif not district:
+                    filtered.append(item)
+
+            if filtered:
+                all_accidents[label] = filtered[:5]
+        except Exception as e:
+            logger.warning("TAAS %s parse error: %s", label, e)
+
+    # 요약 생성
     summary_lines = []
-    summary_lines.append("교통사고 통계 (고속도로, 최근 5년):")
-    for item in recent:
-        yr = item.get("연도", "")
-        acc = item.get("사고", "")
-        death = item.get("사망", "")
-        inj = item.get("부상", "")
-        summary_lines.append(f"  - {yr}년: 사고 {acc}건, 사망 {death}명, 부상 {inj}명")
+    total = sum(len(v) for v in all_accidents.values())
+    if total:
+        target = district or region_info["province"]
+        summary_lines.append(f"{target} 교통사고 다발지역 ({total}건):")
+        for label, items in all_accidents.items():
+            summary_lines.append(f"  [{label}] {len(items)}건")
+            for item in items[:3]:
+                spot = item.get("spot_nm") or item.get("afos_fid_nm") or "위치 미상"
+                cnt = item.get("occrrnc_cnt") or item.get("caslt_cnt") or ""
+                death = item.get("dth_dnv_cnt") or ""
+                line = f"    - {spot}"
+                if cnt:
+                    line += f" (사고 {cnt}건"
+                    if death:
+                        line += f", 사망 {death}명"
+                    line += ")"
+                summary_lines.append(line)
+    else:
+        summary_lines.append("교통사고 다발지역 데이터 없음")
 
     result = {
         "source": source,
-        "available": bool(recent),
-        "data": recent,
+        "available": bool(all_accidents),
+        "data": all_accidents,
         "summary": "\n".join(summary_lines),
-        "item_count": len(recent),
+        "category_count": len(all_accidents),
+        "total_spots": total,
     }
     _set_cached(ck, result)
     return result
@@ -660,8 +751,10 @@ def test_all_apis() -> dict:
 
     # TAAS
     if TAAS_API_KEY:
-        params = {"serviceKey": TAAS_API_KEY, "page": "1", "perPage": "1", "returnType": "JSON"}
-        raw = _http_get_json(TAAS_ENDPOINT, params, timeout=10)
+        url = TAAS_BASE + TAAS_ENDPOINTS["지자체별"]
+        params = {"authKey": TAAS_API_KEY, "searchYearCd": "2024",
+                  "siDo": "11", "guGun": "", "type": "json", "numOfRows": "1", "pageNo": "1"}
+        raw = _http_get_json(url, params, timeout=10)
         results["taas"] = {"key_set": True, "response": bool(raw),
                            "sample": str(raw)[:200] if raw else None}
     else:
