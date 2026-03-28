@@ -830,7 +830,7 @@
     .footer a:hover{ text-decoration: underline; }
 
     @media (max-width: 640px){
-      body { padding: 1.25rem 0.75rem 2rem; }
+      body { padding: 0.75rem 0.3rem 1.5rem; }
       .top-bar{
         padding: 0 0.5rem;
         gap: 0.75rem;
@@ -853,14 +853,19 @@
         padding: 0 0.75rem;
         font-size: 0.85rem;
       }
-      .card { padding: 1.25rem; border-radius: 16px; }
+      .card { padding: 0.85rem; border-radius: 14px; }
       .form-label, .form-hint{ font-size: 0.9rem; }
       textarea { min-height: 180px; }
       .btn-primary, .btn-secondary{ padding: 0.7rem 1rem; font-size: 0.9rem; }
     }
 
     @media (max-width: 768px){
-      body{ padding: 1.35rem 0.9rem 2.2rem; }
+      body{ padding: 0.75rem 0.4rem 1.5rem; }
+      body.rf-workspace-page main{
+        width: calc(100% - 0.4rem) !important;
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+      }
       .top-bar{
         align-items: stretch;
       }
@@ -892,7 +897,7 @@
         font-size: 0.98rem;
       }
       .card{
-        padding: 1.25rem;
+        padding: 0.85rem;
       }
       .pledge-input-group{
         border-radius: 14px;
@@ -951,12 +956,17 @@
 
     @media (max-width: 540px){
       body{
-        padding: 0.6rem 0.4rem 0.9rem;
+        padding: 0.4rem 0 0.9rem;
+      }
+      body.rf-workspace-page main{
+        width: 100% !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
       }
       header,
       main{
-        padding-left: 0.35rem;
-        padding-right: 0.35rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
       }
       .top-bar{
         gap: 0.5rem;
@@ -993,9 +1003,9 @@
         min-height: 42px;
       }
       .card{
-        padding: 0.85rem;
-        border-radius: 15px;
-        margin-bottom: 1rem;
+        padding: 0.6rem;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
       }
       .form-label{
         font-size: 0.98rem;
@@ -1096,8 +1106,8 @@
       }
       /* 챗봇 모바일 최적화 */
       .chat-container{min-height:auto;}
-      .chat-messages{padding:0.5rem 0;}
-      .chat-msg{max-width:98%;font-size:0.9rem;padding:0.55rem 0.7rem;}
+      .chat-messages{padding:0.3rem 0;}
+      .chat-msg{max-width:100%;font-size:0.9rem;padding:0.5rem 0.6rem;}
       .chat-input-bar{gap:0.35rem;padding:0.5rem 0;}
       .chat-btn-topic{font-size:0.72rem;padding:0 0.4rem;height:32px;}
       .chat-btn-send{padding:0.5rem 0.75rem;font-size:0.88rem;}
