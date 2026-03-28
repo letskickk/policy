@@ -1398,7 +1398,8 @@
           // Admin tools group gate
           const adminStatus = document.getElementById('adminToolStatus');
           const adminGroup = document.getElementById('adminToolGroup');
-          if (d.is_admin) {
+          const canUsePolicyTools = !!(d.is_admin || d.email === 'gtest@test.kr');
+          if (canUsePolicyTools) {
             if (adminStatus) { adminStatus.textContent = '사용 가능'; adminStatus.style.color = '#86efac'; }
           } else {
             if (adminGroup) adminGroup.addEventListener('click', function(e) {

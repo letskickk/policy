@@ -1277,7 +1277,7 @@
 
   </div>
   <script>
-    let meData = { is_admin: false };
+    let meData = { is_admin: false, can_use_policy_tools: false };
 
     // ── 탭 전환 ──
     function switchTab(name) {
@@ -1290,13 +1290,13 @@
     }
     document.querySelectorAll('.mentoring-tab').forEach(function(t) {
       t.addEventListener('click', function() {
-        if (this.dataset.tab === 'generate' && !meData.is_admin) return;
+        if (this.dataset.tab === 'generate' && !meData.can_use_policy_tools) return;
         switchTab(this.dataset.tab);
       });
     });
     window.addEventListener('hashchange', function() {
       var h = location.hash.replace('#','');
-      switchTab(h === 'generate' && meData.is_admin ? 'generate' : 'check');
+      switchTab(h === 'generate' && meData.can_use_policy_tools ? 'generate' : 'check');
     });
 
     function renderQuota(q) {
@@ -1336,8 +1336,9 @@
             row.style.display = 'block';
             fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
-          // ── 탭 전환: 관리자만 생성 탭 표시 ──
-          if (d.is_admin) {
+          // ── 탭 전환: 관리자 또는 허용된 테스트 계정만 생성 탭 표시 ──
+          meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr');
+          if (meData.can_use_policy_tools) {
             document.getElementById('tabGenerate').style.display = '';
             const hash = location.hash.replace('#','');
             if (hash === 'generate') switchTab('generate');
