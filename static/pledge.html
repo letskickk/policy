@@ -951,12 +951,12 @@
 
     @media (max-width: 540px){
       body{
-        padding: 0.6rem 0.2rem 0.9rem;
+        padding: 0.6rem 0.4rem 0.9rem;
       }
       header,
       main{
-        padding-left: 0.55rem;
-        padding-right: 0.55rem;
+        padding-left: 0.35rem;
+        padding-right: 0.35rem;
       }
       .top-bar{
         gap: 0.5rem;
@@ -993,7 +993,7 @@
         min-height: 42px;
       }
       .card{
-        padding: 0.72rem;
+        padding: 0.85rem;
         border-radius: 15px;
         margin-bottom: 1rem;
       }
@@ -1094,6 +1094,16 @@
         white-space: nowrap;
         flex: 0 0 auto;
       }
+      /* 챗봇 모바일 최적화 */
+      .chat-container{min-height:auto;}
+      .chat-messages{padding:0.5rem 0;}
+      .chat-msg{max-width:98%;font-size:0.9rem;padding:0.55rem 0.7rem;}
+      .chat-input-bar{gap:0.35rem;padding:0.5rem 0;}
+      .chat-btn-topic{font-size:0.72rem;padding:0 0.4rem;height:32px;}
+      .chat-btn-send{padding:0.5rem 0.75rem;font-size:0.88rem;}
+      .chat-btn-finalize{padding:0.5rem 0.75rem;font-size:0.82rem;}
+      .quota-bar-wrap{padding:0.5rem 0.6rem;}
+      .quota-item{grid-template-columns:3.8rem 1fr auto;gap:0.35rem;font-size:0.78rem;}
     }
     /* ── 멘토링 탭 ── */
     .mentoring-tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;}
@@ -1106,7 +1116,7 @@
     /* ── 공약 개발 챗봇 ── */
     .chat-container{display:flex;flex-direction:column;min-height:480px;}
     .chat-messages{flex:1;overflow-y:auto;max-height:500px;padding:1rem 0;display:flex;flex-direction:column;gap:0.6rem;}
-    .chat-msg{max-width:85%;padding:0.65rem 0.9rem;border-radius:12px;font-size:0.93rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+    .chat-msg{max-width:92%;padding:0.65rem 0.9rem;border-radius:12px;font-size:0.93rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
     .chat-msg.assistant{align-self:flex-start;background:rgba(255,255,255,0.07);color:var(--text);border-bottom-left-radius:4px;}
     .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;}
     .chat-msg.notice{align-self:center;background:rgba(96,165,250,0.1);color:var(--muted);font-size:0.82rem;max-width:90%;text-align:center;}
