@@ -298,33 +298,25 @@ def finalize_stream(session_id: str):
     # 대화 요약 구성
     conversation_summary = _build_conversation_summary(session_id)
 
-    # 기존 drafter 프롬프트 재사용 (완성본 자동작성보다 방향 정리/초안 보조 용도)
-    from backend.policy_drafter import (
-        _load_drafter_system_prompt,
-        _load_drafter_user_template,
-        OUTPUT_FORMATS,
-    )
+    system = _load_chat_system_prompt()
 
-    system = _load_drafter_system_prompt()
-    fmt = OUTPUT_FORMATS.get(output_format, output_format)
+    context_blocks = []
+    if rag.get("platform"):
+        context_blocks.append(f"[정강정책]\n{rag['platform'][:2500]}")
+    if rag.get("pledges"):
+        context_blocks.append(f"[우리당 공약]\n{rag['pledges'][:2500]}")
+    if rag.get("messages"):
+        context_blocks.append(f"[논평·보도자료]\n{rag['messages'][:2000]}")
+    if rag.get("assembly"):
+        context_blocks.append(f"[지방의회 논의]\n{rag['assembly'][:2500]}")
+    if rag.get("research"):
+        context_blocks.append(f"[연구 자료]\n{rag['research'][:2000]}")
+    if rag.get("winners2022"):
+        context_blocks.append(f"[2022 당선인 공약]\n{rag['winners2022'][:1800]}")
 
-    # 유저 프롬프트 구성 — 대화 내용을 주제로 삽입
-    template = _load_drafter_user_template()
-    user_msg = (
-        template.replace("{{PLATFORM_CONTEXT}}", rag.get("platform", "") or "(정강정책 문서 없음)")
-        .replace("{{PLEDGES_CONTEXT}}", rag.get("pledges", "") or "(우리당 공약 문서 없음)")
-        .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", rag.get("winners2022", "") or "(2022 당선인 공약 없음)")
-        .replace("{{CANDIDATES_PLEDGES_CONTEXT}}", rag.get("candidates", "") or "(등록된 출마자 공약 없음)")
-        .replace("{{MESSAGES_CONTEXT}}", rag.get("messages", "") or "(공식 논평·보도자료 없음)")
-        .replace("{{ASSEMBLY_CONTEXT}}", rag.get("assembly", "") or "(지방의회 데이터 없음)")
-        .replace("{{RESEARCH_CONTEXT}}", rag.get("research", "") or "(연구 자료 없음)")
-        .replace("{{TOPIC}}", conversation_summary)
-        .replace("{{OUTPUT_FORMAT}}", fmt)
-        .replace("{{ELECTION_TYPE}}", "")
-        .replace("{{REGION_PROVINCE}}", "")
-        .replace("{{REGION_CITY}}", "")
-        .replace("{{DISTRICT_NAME}}", "")
-    )
+    user_msg = conversation_summary + "\n\n다음 형식으로 결과를 정리하라.\n1. 핵심 문제 정의\n2. 자료 기반 관찰\n3. 정책 방향 제안\n4. 가능한 옵션 2~3개\n5. 추가 검토 쟁점\n\n완성 공약문처럼 쓰지 말고, 사람이 다음 단계에서 판단하고 다듬을 수 있는 정책 방향 제안서처럼 작성하라. 각 항목은 짧은 문단 또는 불릿으로 명확히 정리하라."
+    if context_blocks:
+        user_msg += "\n\n참고 자료:\n\n" + "\n\n".join(context_blocks)
 
     from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
