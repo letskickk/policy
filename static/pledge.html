@@ -1347,7 +1347,7 @@
       } catch (e) {}
       var greetingEl = document.getElementById('chatGreeting');
       if (greetingEl) {
-        greetingEl.textContent = chatInitialGreeting();
+        chatRenderGreeting(greetingEl);
       }
     })();
     const pledgeEl = document.getElementById('pledge');
@@ -2123,7 +2123,7 @@
       var chatMsgCount = 0;  // AI 응답 횟수 추적
       var chatStarted = false;  // 첫 세션 시작 여부
 
-      function chatInitialGreeting() {
+      function chatRenderGreeting(el) {
         var name = meData && meData.name ? String(meData.name) : '';
         var election = meData && meData.election_position ? String(meData.election_position) : '';
         var region = meData && meData.region_name ? String(meData.region_name) : '';
@@ -2132,10 +2132,34 @@
         var roleLabel = labelMap[election] || election || '후보';
         var location = [region, district].filter(Boolean).join(' ');
         var intro = '안녕하세요. 개혁신당 정책 방향 제안 챗봇입니다.';
-        if (name || location || roleLabel) {
-          intro = '안녕하세요. ' + [location, roleLabel + '로 출마하신', name ? (name + ' 후보님,') : '후보님,'].filter(Boolean).join(' ') + ' 지역 이슈와 정책 방향을 함께 정리해보겠습니다.';
+        if (name || location) {
+          intro = '안녕하세요, ' + (location ? location + ' ' : '') + roleLabel + (name ? ' ' + name + ' 후보님.' : '님.');
         }
-        return intro + '\n\n이 도구는 선거구 기준 생활 이슈, 지방의회 자료, 관련 기사, 우리당 자료를 바탕으로 정책 방향을 좁혀가는 보조도구입니다.\n\n먼저 어떤 방식으로 시작하시겠습니까?\n1. 이 지역에서 지금 뭐가 핵심 이슈인지 먼저 알고 싶다\n2. 내가 생각하는 정책 아이디어가 있는데 다듬고 싶다\n3. 우리당 공약·정강정책과 연결해서 방향을 잡고 싶다\n4. 비슷한 지역 사례부터 참고하고 싶다\n\n번호로 말씀해 주셔도 되고, 바로 주제를 적어주셔도 됩니다.';
+        var desc = '이 도구는 선거구 기준 생활 이슈, 지방의회 자료, 관련 기사, 우리당 자료, 공공데이터를 바탕으로 정책 방향을 좁혀가는 보조도구입니다.';
+        var html = '<div style="margin-bottom:0.6rem;">' + intro + '</div>'
+          + '<div style="color:var(--muted,#888);font-size:0.9rem;margin-bottom:0.8rem;">' + desc + '</div>'
+          + '<div style="font-size:0.92rem;margin-bottom:0.4rem;">어떤 방식으로 시작하시겠습니까?</div>';
+        var choices = [
+          { num: '1', label: '이 지역 핵심 이슈부터 알고 싶다', msg: (district || region || '우리 지역') + ' 핵심 생활 이슈를 알려줘' },
+          { num: '2', label: '내 정책 아이디어를 다듬고 싶다', msg: '' },
+          { num: '3', label: '우리당 공약과 연결해서 방향 잡기', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
+          { num: '4', label: '비슷한 지역 사례부터 참고하기', msg: (district || region || '유사 지역') + ' 비슷한 사례를 먼저 보여줘' },
+        ];
+        var btnCss = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,#f9f9f9);color:var(--text,#333);font-size:0.88rem;cursor:pointer;text-align:left;';
+        choices.forEach(function(c) {
+          html += '<button style="' + btnCss + '" onmouseover="this.style.borderColor=\'var(--brand-light,#4a7)\';" onmouseout="this.style.borderColor=\'var(--input-border,#ddd)\';" onclick="chatGuideClick(this,\'' + c.msg.replace(/'/g, "\\'") + '\')">' + c.num + '. ' + c.label + '</button>';
+        });
+        html += '<div style="color:var(--muted,#888);font-size:0.82rem;margin-top:0.5rem;">번호를 누르셔도 되고, 바로 주제를 입력하셔도 됩니다.</div>';
+        el.innerHTML = html;
+      }
+      function chatGuideClick(btn, msg) {
+        if (msg) {
+          document.getElementById('chatInput').value = msg;
+          chatSend();
+        } else {
+          document.getElementById('chatInput').focus();
+          document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
+        }
       }
 
       function chatAppendMsg(cls, text) {
