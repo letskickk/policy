@@ -26,6 +26,11 @@ CHAT_MODEL = os.getenv("CHAT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o"
 
 MAX_HISTORY_MESSAGES = 40  # 대화 히스토리 최대 메시지 수 (시스템 제외)
 
+# 모듈 레벨 캐시 — 서버 재시작 전까지 유지
+_DISTRICT_DONG_MAP_CACHE: Optional[dict] = None
+_PLATFORM_CACHE: Optional[str] = None
+_PLEDGES_CACHE: Optional[str] = None
+
 
 # ---------------------------------------------------------------------------
 # Prompt
@@ -38,16 +43,38 @@ def _load_chat_system_prompt() -> str:
 
 
 def _load_district_dong_map() -> dict:
-    """선거구-동 매핑 JSON 로드."""
+    """선거구-동 매핑 JSON 로드 (모듈 레벨 캐시)."""
+    global _DISTRICT_DONG_MAP_CACHE
+    if _DISTRICT_DONG_MAP_CACHE is not None:
+        return _DISTRICT_DONG_MAP_CACHE
     import json as _json
     path = ROOT_DIR / "data" / "district_dong_map.json"
     if not path.exists():
-        return {}
+        _DISTRICT_DONG_MAP_CACHE = {}
+        return _DISTRICT_DONG_MAP_CACHE
     try:
         with open(path, encoding="utf-8") as f:
-            return _json.load(f)
+            _DISTRICT_DONG_MAP_CACHE = _json.load(f)
     except Exception:
-        return {}
+        _DISTRICT_DONG_MAP_CACHE = {}
+    return _DISTRICT_DONG_MAP_CACHE
+
+
+def _fetch_platform_pledges() -> tuple[str, str]:
+    """정강정책 + 우리당 공약을 캐시에서 반환. 최초 호출 시 RAG 검색."""
+    global _PLATFORM_CACHE, _PLEDGES_CACHE
+    if _PLATFORM_CACHE is not None:
+        return _PLATFORM_CACHE, _PLEDGES_CACHE or ""
+    try:
+        from backend.policy_drafter import _get_rag_contexts
+        rag = _get_rag_contexts("공약 방향 정강정책 자유 공정 혁신 지방분권")
+        _PLATFORM_CACHE = rag.get("platform") or ""
+        _PLEDGES_CACHE = rag.get("pledges") or ""
+    except Exception as e:
+        logger.warning("[pledge_chat] platform pre-load failed: %s", e)
+        _PLATFORM_CACHE = ""
+        _PLEDGES_CACHE = ""
+    return _PLATFORM_CACHE, _PLEDGES_CACHE or ""
 
 
 def _get_district_dongs(election_position: str, region_name: str, district_name: str) -> list[str]:
@@ -117,8 +144,9 @@ def create_session(user_id: int, topic: str, output_format: str = "정책") -> d
     """새 챗봇 세션 생성. RAG는 주제가 구체화된 후 lazy로 수행."""
     session_id = uuid.uuid4().hex[:16]
 
-    # 시작 시에는 RAG 없이 기본 시스템 프롬프트 + 후보자 기본 정보만
-    system_msg = _load_chat_system_prompt() + _build_user_context_text(user_id)
+    # 정강정책 + 우리당 공약은 세션 시작부터 항상 포함 (topic 무관)
+    # topic 기반 RAG는 첫 메시지 후 _maybe_inject_rag에서 lazy 수행
+    system_msg = _build_system_message({}, user_id=user_id)
 
     conn = get_connection()
     try:
@@ -226,8 +254,12 @@ def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
     return rag
 
 
+# 2자 이하는 RAG 스킵 (단, 정책 관련 2자 키워드는 예외)
+_POLICY_TRIGGER_SET = {"교통", "복지", "상권", "주차", "노인", "청년", "환경", "교육", "안전", "주거", "돌봄", "의료"}
+
+
 def _maybe_inject_rag(session_id: str, user_message: str) -> None:
-    """세션에 RAG 컨텍스트가 없으면 user_message를 주제로 RAG 검색 후 시스템 메시지 업데이트."""
+    """세션에 topic RAG가 없으면 user_message를 주제로 RAG 검색 후 시스템 메시지 업데이트."""
     conn = get_connection()
     try:
         row = conn.execute(
@@ -236,26 +268,23 @@ def _maybe_inject_rag(session_id: str, user_message: str) -> None:
         if not row:
             return
         existing = json.loads(row["rag_context"] or "{}")
-        if existing.get("platform") or existing.get("pledges"):
-            return  # 이미 RAG 완료
+        if existing.get("assembly") is not None or existing.get("public_data") is not None:
+            return  # 이미 topic RAG 완료
 
-        # 유형 선택 메시지("1", "정책" 등)면 RAG 스킵
+        # 2자 이하 + 정책 키워드 아닌 경우만 스킵 (숫자, 단순 선택 등)
         short = user_message.strip()
-        if len(short) <= 5 and (short.isdigit() or short in ("정책", "지역공약", "논평", "메시지")):
-            return
-
-        # 이 메시지가 주제가 될 만큼 구체적인지 확인 (최소 4자)
-        if len(short) < 4:
+        if len(short) <= 2 and short not in _POLICY_TRIGGER_SET:
             return
     finally:
         conn.close()
 
     # RAG 수행
+    user_id = row["user_id"] if row else None
     logger.info("[pledge_chat] lazy RAG for session=%s topic=%s", session_id, user_message[:50])
-    rag = _fetch_rag_context(user_message, user_id=row["user_id"] if row else None)
+    rag = _fetch_rag_context(user_message, user_id=user_id)
 
-    # 시스템 메시지 업데이트
-    new_system = _build_system_message(rag)
+    # 시스템 메시지 업데이트 (정강정책+후보자정보 포함)
+    new_system = _build_system_message(rag, user_id=user_id)
     conn = get_connection()
     try:
         conn.execute(
@@ -271,16 +300,25 @@ def _maybe_inject_rag(session_id: str, user_message: str) -> None:
         conn.close()
 
 
-def _build_system_message(rag: dict) -> str:
-    """챗봇 시스템 프롬프트 + RAG 컨텍스트를 합산."""
+def _build_system_message(rag: dict, user_id: int | None = None) -> str:
+    """챗봇 시스템 프롬프트 + RAG 컨텍스트를 합산.
+
+    정강정책 + 우리당 공약은 topic 무관 항상 포함 (캐시 사용).
+    user_id가 주어지면 후보자 기본 정보도 포함.
+    """
     base_prompt = _load_chat_system_prompt()
+
+    # 정강정책 + 우리당 공약 항상 포함 (캐시 우선, rag 내용으로 덮어씀)
+    cached_platform, cached_pledges = _fetch_platform_pledges()
+    platform_text = rag.get("platform") or cached_platform
+    pledges_text = rag.get("pledges") or cached_pledges
 
     # 참고 자료 섹션
     context_parts = []
-    if rag.get("platform"):
-        context_parts.append(f"[참고: 정강정책]\n{rag['platform'][:4000]}")
-    if rag.get("pledges"):
-        context_parts.append(f"[참고: 우리당 공약]\n{rag['pledges'][:4000]}")
+    if platform_text:
+        context_parts.append(f"[참고: 정강정책]\n{platform_text[:4000]}")
+    if pledges_text:
+        context_parts.append(f"[참고: 우리당 공약]\n{pledges_text[:4000]}")
     if rag.get("winners2022"):
         context_parts.append(f"[참고: 2022 당선인 공약]\n{rag['winners2022'][:3000]}")
     if rag.get("messages"):
@@ -297,7 +335,8 @@ def _build_system_message(rag: dict) -> str:
     else:
         context_section = ""
 
-    return base_prompt + context_section
+    user_context = _build_user_context_text(user_id) if user_id else ""
+    return base_prompt + context_section + user_context
 
 
 # ---------------------------------------------------------------------------
@@ -313,16 +352,24 @@ def chat_stream(session_id: str, user_message: str):
     # 히스토리 로드
     messages = _load_openai_messages(session_id)
 
-    from openai import OpenAI
+    from openai import OpenAI, APIError, APITimeoutError
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    stream = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=messages,
-        max_completion_tokens=4096,
-        timeout=60,
-        stream=True,
-    )
+    try:
+        stream = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=messages,
+            max_completion_tokens=4096,
+            timeout=60,
+            stream=True,
+        )
+    except APITimeoutError:
+        yield "[ERROR]응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+        return
+    except APIError as e:
+        logger.error("[pledge_chat] OpenAI API error in chat_stream: %s", e)
+        yield "[ERROR]AI 응답 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        return
 
     full = []
     for chunk in stream:
@@ -367,11 +414,15 @@ def finalize_stream(session_id: str):
 
     system = _load_chat_system_prompt()
 
+    # 정강정책 + 우리당 공약: rag에 없으면 캐시 사용 (항상 포함)
+    cached_platform, cached_pledges = _fetch_platform_pledges()
     context_blocks = []
-    if rag.get("platform"):
-        context_blocks.append(f"[정강정책]\n{rag['platform'][:2500]}")
-    if rag.get("pledges"):
-        context_blocks.append(f"[우리당 공약]\n{rag['pledges'][:2500]}")
+    platform_text = rag.get("platform") or cached_platform
+    pledges_text = rag.get("pledges") or cached_pledges
+    if platform_text:
+        context_blocks.append(f"[정강정책]\n{platform_text[:2500]}")
+    if pledges_text:
+        context_blocks.append(f"[우리당 공약]\n{pledges_text[:2500]}")
     if rag.get("messages"):
         context_blocks.append(f"[논평·보도자료]\n{rag['messages'][:2000]}")
     if rag.get("assembly"):
@@ -381,23 +432,31 @@ def finalize_stream(session_id: str):
     if rag.get("winners2022"):
         context_blocks.append(f"[2022 당선인 공약]\n{rag['winners2022'][:1800]}")
 
-    user_msg = conversation_summary + "\n\n다음 형식으로 결과를 정리하라.\n1. 핵심 문제 정의\n2. 자료 기반 관찰\n3. 정책 방향 제안\n4. 가능한 옵션 2~3개\n5. 추가 검토 쟁점\n\n완성 공약문처럼 쓰지 말고, 사람이 다음 단계에서 판단하고 다듬을 수 있는 정책 방향 제안서처럼 작성하라. 각 항목은 짧은 문단 또는 불릿으로 명확히 정리하라."
+    user_msg = conversation_summary + "\n\n다음 형식으로 결과를 정리하라.\n1. 핵심 문제 정의\n2. 자료 기반 관찰\n3. 정책 방향 제안\n4. 가능한 옵션 2~3개\n5. 추가 검토 쟁점\n6. 인근 지역 2022년 당선인 공약과의 연결점 (2022 당선인 공약 자료가 있을 때만)\n7. 우리당 공약 방향과의 연결점 (우리당 공약 자료가 있을 때만)\n\n완성 공약문처럼 쓰지 말고, 사람이 다음 단계에서 판단하고 다듬을 수 있는 정책 방향 제안서처럼 작성하라. 각 항목은 짧은 문단 또는 불릿으로 명확히 정리하라. 6·7번 항목은 해당 자료가 없으면 생략하라."
     if context_blocks:
         user_msg += "\n\n참고 자료:\n\n" + "\n\n".join(context_blocks)
 
-    from openai import OpenAI
+    from openai import OpenAI, APIError, APITimeoutError
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    stream = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user_msg},
-        ],
-        max_completion_tokens=4096,
-        timeout=180,
-        stream=True,
-    )
+    try:
+        stream = client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            max_completion_tokens=4096,
+            timeout=180,
+            stream=True,
+        )
+    except APITimeoutError:
+        yield "[ERROR]응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+        return
+    except APIError as e:
+        logger.error("[pledge_chat] OpenAI API error in finalize_stream: %s", e)
+        yield "[ERROR]AI 응답 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        return
 
     full = []
     for chunk in stream:
