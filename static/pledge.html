@@ -1089,7 +1089,7 @@
     .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;}
     .chat-msg.notice{align-self:center;background:rgba(96,165,250,0.1);color:var(--muted);font-size:0.82rem;max-width:90%;text-align:center;}
     .chat-msg.streaming{opacity:0.85;}
-    .chat-btn-topic{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:1.2rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.15s,color 0.15s;}
+    .chat-btn-topic{height:34px;padding:0 0.55rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.2rem;flex-shrink:0;transition:border-color 0.15s,color 0.15s;white-space:nowrap;}
     .chat-btn-topic:hover{border-color:var(--brand);color:var(--brand);}
     .chat-quick-popup{display:flex;gap:0.35rem;flex-wrap:wrap;padding:0.4rem 0.2rem;border:1px solid var(--border);border-radius:8px;background:var(--card);margin-bottom:0.3rem;}
     .chat-quick-popup button{padding:0.3rem 0.65rem;border:1px solid var(--border);border-radius:14px;background:transparent;color:var(--muted);font-size:0.8rem;cursor:pointer;white-space:nowrap;transition:border-color 0.15s,color 0.15s;}
@@ -1253,7 +1253,7 @@
         <div class="chat-messages" id="chatMessages"><div class="chat-msg assistant" id="chatGreeting">안녕하세요. 개혁신당 공약 설계 코치입니다. 선거구 기준 생활 이슈, 지방의회 자료, 기사, 우리당 자료, 공공데이터를 바탕으로 공약 초안의 방향을 잡아드립니다. 아래 입력창에 주제를 입력하거나, 메시지를 보내주세요.</div></div>
         <div id="chatQuickPopup" class="chat-quick-popup" style="display:none;"></div>
         <div class="chat-input-bar">
-          <button class="chat-btn-topic" id="chatBtnTopic" title="주제 선택">+</button>
+          <button class="chat-btn-topic" id="chatBtnTopic" title="주제 선택">주제 선택</button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." maxlength="2000"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
           <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
@@ -1366,7 +1366,7 @@
           meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr' || d.email === 'ktest@test.kr' || d.email === 'gjtest@test.kr');
           if (meData.can_use_policy_tools) {
             document.getElementById('tabGenerate').style.display = '';
-            if (_wantGenerate || location.hash === '#generate') switchTab('generate');
+            switchTab('generate');
           }
           // 인사말 렌더링 (meData 로드 완료)
           if (window._chatGreetingReady) window._chatGreetingReady();

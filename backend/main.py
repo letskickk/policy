@@ -358,7 +358,11 @@ class PledgeCheckResponse(BaseModel):
 def _serve_html(filename: str):
     path = STATIC_DIR / filename
     if path.exists():
-        return FileResponse(path, media_type="text/html; charset=utf-8")
+        return FileResponse(
+            path,
+            media_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
     return None
 
 
@@ -886,16 +890,15 @@ def api_login(body: LoginBody, request: Request):
     if isinstance(user, dict) and user.get("error") == "email_not_verified":
         raise HTTPException(status_code=401, detail="이메일 인증이 필요합니다. 아래 '인증 메일 다시 받기'를 이용하세요.")
     token = create_session_token(user)
-    if user["email"] in ADMIN_EMAILS or user["role"] == ROLE_ADMIN:
-        redirect_url = "/admin"
-    elif user["status"] != STATUS_APPROVED:
+    next_path = (body.next or "").strip()
+    if user["status"] != STATUS_APPROVED:
         redirect_url = "/pending"
+    elif next_path and next_path.startswith("/") and next_path not in ("/login", "/signup"):
+        redirect_url = next_path
+    elif user["email"] in ADMIN_EMAILS or user["role"] == ROLE_ADMIN:
+        redirect_url = "/admin"
     else:
-        next_path = (body.next or "").strip()
-        if next_path and next_path.startswith("/") and next_path not in ("/login", "/signup"):
-            redirect_url = next_path
-        else:
-            redirect_url = "/"
+        redirect_url = "/"
     from fastapi.responses import JSONResponse
     resp = JSONResponse({"redirect": redirect_url})
     resp.set_cookie(AUTH_COOKIE, token, max_age=AUTH_COOKIE_MAX_AGE, httponly=True, samesite="lax")
@@ -1079,6 +1082,35 @@ class DeleteUserBody(BaseModel):
 
 class ResetQuotaBody(BaseModel):
     email: str = Field(..., description="이메일")
+
+
+class ResetPasswordBody(BaseModel):
+    email: str = Field(..., description="이메일")
+    password: str = Field(..., description="새 비밀번호")
+
+
+@app.post("/api/admin/users/reset-password")
+def api_admin_reset_password(body: ResetPasswordBody, request: Request):
+    """관리자: 특정 사용자의 비밀번호 재설정."""
+    require_admin(request)
+    from backend.database import get_connection
+    from passlib.hash import pbkdf2_sha256
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (body.email.strip().lower(),)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        hashed = pbkdf2_sha256.using(rounds=100000).hash(body.password)
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, row["id"]))
+        conn.commit()
+        return {"message": f"비밀번호 재설정 완료", "email": body.email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 
 @app.post("/api/admin/users/reset-quota")
