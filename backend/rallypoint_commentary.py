@@ -11,9 +11,12 @@ from urllib.request import Request, urlopen
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 SOURCE_KEY = "rallypoint_commentary"
+PRESS_SOURCE_KEY = "rallypoint_press"
 API_BASE_URL = "https://api-main.rallypoint.kr/v1/document"
 LIST_URL = "https://rallypoint.kr/board/commentary"
+PRESS_LIST_URL = "https://rallypoint.kr/board/press"
 DETAIL_URL_TEMPLATE = "https://rallypoint.kr/board/commentary/{doc_id}"
+PRESS_DETAIL_URL_TEMPLATE = "https://rallypoint.kr/board/press/{doc_id}"
 OFFICIAL_BRIEFING_URL = "https://www.reformparty.kr/briefing"
 OFFICIAL_BRIEFING_MAX_PAGES = 5
 COMMENTARY_PAGE_SIZE = 20
@@ -727,3 +730,279 @@ def sync_commentary(*, actor_id: Optional[int], limit: int = 20, include_body: b
             error_message=str(exc),
         )
         raise
+
+
+# ─────────────────────────────────────────────
+# 보도자료 (rallypoint.kr/board/press) 수집
+# ─────────────────────────────────────────────
+
+PRESS_TITLE_PREFIX_RE = re.compile(
+    r"^\[(?P<ref_date>\d{6,8})[\s_.-]*(?P<party>.+?)\s+"
+    r"(?P<label>보도자료)\]\s*(?P<title>.*)$"
+)
+
+
+def _parse_press_title(raw_title: str) -> tuple[str, dict]:
+    """보도자료 제목에서 메타데이터 추출."""
+    cleaned = _clean_title_cell_html(raw_title)
+    match = PRESS_TITLE_PREFIX_RE.match(cleaned)
+    if not match:
+        return cleaned, {"title_prefix_date": ""}
+    title = re.sub(r"^\s*■\s*", "", match.group("title").strip()).strip()
+    return title or cleaned, {
+        "party_name": match.group("party").strip(),
+        "title_prefix_date": match.group("ref_date"),
+    }
+
+
+def _parse_press_api_list(payload: dict, limit: Optional[int] = None) -> list[CommentaryItem]:
+    """보도자료 API 응답 파싱 → CommentaryItem 리스트."""
+    decoded = _decode_api_payload(payload)
+    doc_list = decoded.get("docList")
+    if not isinstance(doc_list, list):
+        return []
+
+    items: list[CommentaryItem] = []
+    for doc in doc_list:
+        if not isinstance(doc, dict):
+            continue
+        document_srl = str(doc.get("document_srl", "")).strip()
+        raw_title = str(doc.get("title", "")).strip()
+        if not document_srl or not raw_title:
+            continue
+        published_at = None
+        regdate = str(doc.get("regdate", "")).strip()
+        if len(regdate) >= 8 and regdate[:8].isdigit():
+            published_at = f"{regdate[:4]}-{regdate[4:6]}-{regdate[6:8]}"
+        title_text, metadata = _parse_press_title(raw_title)
+        items.append(
+            CommentaryItem(
+                row_no=document_srl,
+                title=title_text,
+                published_at=published_at,
+                source_url=PRESS_DETAIL_URL_TEMPLATE.format(doc_id=document_srl),
+                source_ref=f"{PRESS_SOURCE_KEY}:{document_srl}",
+                speaker="",
+                speaker_name=None,
+                body=None,
+                summary=_extract_summary(title_text),
+                metadata={
+                    **metadata,
+                    "source_key": PRESS_SOURCE_KEY,
+                    "board_url": PRESS_LIST_URL,
+                    "document_srl": document_srl,
+                    "module_srl": str(doc.get("module_srl", "")).strip(),
+                    "comment_count": str(doc.get("comment_count", "")).strip(),
+                    "readed_count": str(doc.get("readed_count", "")).strip(),
+                },
+            )
+        )
+        if limit is not None and len(items) >= limit:
+            break
+    return items
+
+
+def _fetch_press_list_items(limit: int) -> list[CommentaryItem]:
+    """보도자료 API에서 리스트 수집."""
+    items: list[CommentaryItem] = []
+    seen_refs: set[str] = set()
+    max_items = limit if limit > 0 else COMMENTARY_MAX_PAGES * COMMENTARY_PAGE_SIZE
+
+    for page in range(COMMENTARY_MAX_PAGES):
+        skip = page * COMMENTARY_PAGE_SIZE
+        url = (
+            f"{API_BASE_URL}?mid=press&skip={skip}&take={COMMENTARY_PAGE_SIZE}"
+            "&keyword=&searchType=-1"
+        )
+        payload = _fetch_json(url)
+        page_items = _parse_press_api_list(payload)
+        if not page_items:
+            break
+
+        added_on_page = 0
+        for item in page_items:
+            if item.source_ref in seen_refs:
+                continue
+            seen_refs.add(item.source_ref)
+            items.append(item)
+            added_on_page += 1
+            if len(items) >= max_items:
+                return items
+
+        if added_on_page == 0:
+            break
+        if len(page_items) < COMMENTARY_PAGE_SIZE:
+            break
+
+    return items
+
+
+def fetch_press_items(limit: int = 20, include_body: bool = True) -> list[CommentaryItem]:
+    """보도자료 수집 (리스트 + 본문)."""
+    items = _fetch_press_list_items(limit)
+
+    if not include_body:
+        return items
+
+    for item in items:
+        try:
+            document_srl = str(item.metadata.get("document_srl", "")).strip()
+            detail = _fetch_detail_payload_by_document_srl(document_srl) if document_srl else None
+            if detail is not None:
+                body, detail_meta = _extract_body_from_detail_payload(detail, item.title)
+            else:
+                body, detail_meta = _extract_body_from_detail(_fetch_text(item.source_url), item.title)
+        except (HTTPError, URLError, TimeoutError, OSError):
+            body, detail_meta = None, {"detail_status": "fetch_error"}
+        item.body = body
+        item.metadata.update(detail_meta)
+    return items
+
+
+def sync_press(*, actor_id: Optional[int], limit: int = 20, include_body: bool = True) -> dict:
+    """보도자료 동기화 — DB에 upsert."""
+    from backend.policy_ssot import upsert_policy_document
+    from backend.policy_suggestions import rebuild_link_suggestions
+
+    run_id = _create_ingest_run_for(PRESS_SOURCE_KEY)
+    imported_count = 0
+    updated_count = 0
+    skipped_count = 0
+
+    try:
+        items = fetch_press_items(limit=limit, include_body=include_body)
+        touched_document_ids: list[int] = []
+
+        for item in items:
+            existing = _find_existing_press_document(item)
+            if existing is None:
+                created = upsert_policy_document(
+                    document_id=None,
+                    title=item.title,
+                    doc_type="press_release",
+                    summary=item.summary,
+                    body=item.body,
+                    speaker="",
+                    speaker_name=None,
+                    owner_name="개혁신당",
+                    source_url=item.source_url,
+                    source_ref=item.source_ref,
+                    published_at=item.published_at,
+                    status="active",
+                    metadata=item.metadata,
+                    actor_id=actor_id,
+                )
+                imported_count += 1
+                touched_document_ids.append(int(created["id"]))
+                continue
+
+            new_metadata = dict(existing.get("metadata") or {})
+            new_metadata.update(item.metadata)
+            body = item.body or existing.get("body") or None
+            summary = item.summary or existing.get("summary") or None
+            title = item.title or existing["title"]
+            published_at = item.published_at or existing.get("published_at")
+
+            changed = any([
+                title != existing["title"],
+                summary != (existing.get("summary") or None),
+                body != (existing.get("body") or None),
+                published_at != existing.get("published_at"),
+                new_metadata != (existing.get("metadata") or {}),
+            ])
+            if not changed:
+                skipped_count += 1
+                touched_document_ids.append(int(existing["id"]))
+                continue
+
+            updated = upsert_policy_document(
+                document_id=existing["id"],
+                title=title,
+                doc_type=existing["doc_type"],
+                summary=summary,
+                body=body,
+                speaker=existing.get("speaker") or "",
+                speaker_name=existing.get("speaker_name"),
+                owner_name=existing.get("owner_name") or "개혁신당",
+                source_url=item.source_url,
+                source_ref=item.source_ref,
+                published_at=published_at,
+                status=existing["status"],
+                metadata=new_metadata,
+                actor_id=actor_id,
+            )
+            updated_count += 1
+            touched_document_ids.append(int(updated["id"]))
+
+        for document_id in sorted(set(touched_document_ids)):
+            rebuild_link_suggestions(document_id=document_id)
+
+        _finish_ingest_run(
+            run_id,
+            status="completed",
+            imported_count=imported_count,
+            updated_count=updated_count,
+            skipped_count=skipped_count,
+        )
+        return {
+            "run_id": run_id,
+            "source_key": PRESS_SOURCE_KEY,
+            "imported_count": imported_count,
+            "updated_count": updated_count,
+            "skipped_count": skipped_count,
+            "items": len(items),
+        }
+    except Exception as exc:
+        _finish_ingest_run(
+            run_id,
+            status="failed",
+            imported_count=imported_count,
+            updated_count=updated_count,
+            skipped_count=skipped_count,
+            error_message=str(exc),
+        )
+        raise
+
+
+def _create_ingest_run_for(source_key: str) -> int:
+    """범용 ingest run 생성."""
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO policy_ingest_runs (source_key, status) VALUES (?, 'running')",
+            (source_key,),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def _find_existing_press_document(item: CommentaryItem) -> Optional[dict]:
+    """보도자료 기존 문서 검색 (source_ref 또는 제목+날짜 매칭)."""
+    from backend.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM policy_documents WHERE source_ref = ? AND status != 'deleted' LIMIT 1",
+            (item.source_ref,),
+        ).fetchone()
+        if row:
+            d = dict(row)
+            raw = d.get("metadata_json")
+            d["metadata"] = json.loads(raw) if raw else {}
+            return d
+
+        row = conn.execute(
+            "SELECT * FROM policy_documents WHERE doc_type = 'press_release' AND title = ? AND published_at = ? AND status != 'deleted' LIMIT 1",
+            (item.title, item.published_at),
+        ).fetchone()
+        if row:
+            d = dict(row)
+            raw = d.get("metadata_json")
+            d["metadata"] = json.loads(raw) if raw else {}
+            return d
+    finally:
+        conn.close()
+    return None

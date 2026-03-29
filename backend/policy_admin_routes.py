@@ -279,6 +279,13 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         from backend.rallypoint_commentary import sync_commentary
         return sync_commentary(actor_id=user["id"], limit=limit, include_body=include_body)
 
+    @app.post("/api/admin/policy/import/rallypoint-press", tags=["admin", "policy"])
+    def api_admin_policy_import_press(request: Request, limit: int = Query(default=20, ge=1, le=100), include_body: bool = Query(default=True)):
+        user = require_admin(request)
+        ensure_db_ready()
+        from backend.rallypoint_commentary import sync_press
+        return sync_press(actor_id=user["id"], limit=limit, include_body=include_body)
+
     @app.get("/api/admin/policy/import/assembly-bills/runs", tags=["admin", "policy"])
     def api_admin_policy_assembly_bill_runs(request: Request, limit: int = Query(default=10, ge=1, le=100)):
         require_admin(request)
