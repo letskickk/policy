@@ -775,6 +775,8 @@ def _parse_press_api_list(payload: dict, limit: Optional[int] = None) -> list[Co
         if len(regdate) >= 8 and regdate[:8].isdigit():
             published_at = f"{regdate[:4]}-{regdate[4:6]}-{regdate[6:8]}"
         title_text, metadata = _parse_press_title(raw_title)
+        if not title_text.strip():
+            continue
         items.append(
             CommentaryItem(
                 row_no=document_srl,
