@@ -84,8 +84,15 @@ def register_tools_routes(app, require_approved, _client_ip):
                     region_city=region_city,
                     district_name=district_name,
                 )
+                actual_in = 0
+                actual_out = 0
                 for chunk in gen:
-                    if chunk.startswith("[FINAL]"):
+                    if chunk.startswith("[USAGE]"):
+                        parts = chunk[7:].split(",")
+                        actual_in = int(parts[0]) if len(parts) > 0 else 0
+                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        continue
+                    elif chunk.startswith("[FINAL]"):
                         full_text = chunk[len("[FINAL]"):]
                         yield f"data: {json.dumps({'type': 'final', 'text': full_text}, ensure_ascii=False)}\n\n"
                     elif chunk.startswith("[ERROR]"):
@@ -106,8 +113,8 @@ def register_tools_routes(app, require_approved, _client_ip):
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             status = 500 if had_error else 200
             out_chars = len(full_text)
-            token_in = len(combined_topic) // 2
-            token_out = out_chars // 2
+            token_in = actual_in if actual_in else len(combined_topic) // 2
+            token_out = actual_out if actual_out else out_chars // 2
             cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"],
@@ -261,11 +268,18 @@ def register_tools_routes(app, require_approved, _client_ip):
         def generate():
             full_text = ""
             had_error = False
+            actual_in = 0
+            actual_out = 0
             try:
                 # 세션 ID를 먼저 전송
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id}, ensure_ascii=False)}\n\n"
 
                 for chunk in first_message_stream(session_id, body.topic.strip()):
+                    if chunk.startswith("[USAGE]"):
+                        parts = chunk[7:].split(",")
+                        actual_in = int(parts[0]) if len(parts) > 0 else 0
+                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        continue
                     full_text += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
@@ -276,8 +290,8 @@ def register_tools_routes(app, require_approved, _client_ip):
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             out_chars = len(full_text)
-            token_in = len(body.topic) // 4
-            token_out = out_chars // 4
+            token_in = actual_in if actual_in else len(body.topic) // 4
+            token_out = actual_out if actual_out else out_chars // 4
             cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
@@ -325,8 +339,15 @@ def register_tools_routes(app, require_approved, _client_ip):
         def generate():
             full_text = ""
             had_error = False
+            actual_in = 0
+            actual_out = 0
             try:
                 for chunk in chat_stream(session_id, body.message.strip()):
+                    if chunk.startswith("[USAGE]"):
+                        parts = chunk[7:].split(",")
+                        actual_in = int(parts[0]) if len(parts) > 0 else 0
+                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        continue
                     full_text += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
@@ -337,8 +358,8 @@ def register_tools_routes(app, require_approved, _client_ip):
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             out_chars = len(full_text)
-            token_in = len(body.message) // 4
-            token_out = out_chars // 4
+            token_in = actual_in if actual_in else len(body.message) // 4
+            token_out = actual_out if actual_out else out_chars // 4
             cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
@@ -384,8 +405,15 @@ def register_tools_routes(app, require_approved, _client_ip):
         def generate():
             full_text = ""
             had_error = False
+            actual_in = 0
+            actual_out = 0
             try:
                 for chunk in finalize_stream(session_id):
+                    if chunk.startswith("[USAGE]"):
+                        parts = chunk[7:].split(",")
+                        actual_in = int(parts[0]) if len(parts) > 0 else 0
+                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        continue
                     if chunk.startswith("[ERROR]"):
                         had_error = True
                         yield f"data: {json.dumps({'type': 'error', 'detail': chunk[7:]}, ensure_ascii=False)}\n\n"
@@ -401,8 +429,8 @@ def register_tools_routes(app, require_approved, _client_ip):
 
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             out_chars = len(full_text)
-            token_in = out_chars // 2
-            token_out = out_chars // 2
+            token_in = actual_in if actual_in else out_chars // 2
+            token_out = actual_out if actual_out else out_chars // 2
             cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,

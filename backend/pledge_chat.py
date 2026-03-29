@@ -366,6 +366,7 @@ def chat_stream(session_id: str, user_message: str):
             max_completion_tokens=4096,
             timeout=60,
             stream=True,
+            stream_options={"include_usage": True},
         )
     except APITimeoutError:
         yield "[ERROR]응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
@@ -376,16 +377,24 @@ def chat_stream(session_id: str, user_message: str):
         return
 
     full = []
+    usage_in = 0
+    usage_out = 0
     for chunk in stream:
         if chunk.choices and chunk.choices[0].delta.content:
             text = chunk.choices[0].delta.content
             full.append(text)
             yield text
+        if hasattr(chunk, "usage") and chunk.usage:
+            usage_in = chunk.usage.prompt_tokens or 0
+            usage_out = chunk.usage.completion_tokens or 0
 
     # AI 응답 저장
     assistant_text = "".join(full)
     if assistant_text:
         _save_message(session_id, "assistant", assistant_text)
+
+    # 실제 토큰 사용량 전달 (tools_routes에서 파싱)
+    yield f"[USAGE]{usage_in},{usage_out}"
 
 
 def first_message_stream(session_id: str, topic: str):
@@ -453,6 +462,7 @@ def finalize_stream(session_id: str):
             max_completion_tokens=4096,
             timeout=180,
             stream=True,
+            stream_options={"include_usage": True},
         )
     except APITimeoutError:
         yield "[ERROR]응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
@@ -463,11 +473,16 @@ def finalize_stream(session_id: str):
         return
 
     full = []
+    usage_in = 0
+    usage_out = 0
     for chunk in stream:
         if chunk.choices and chunk.choices[0].delta.content:
             text = chunk.choices[0].delta.content
             full.append(text)
             yield text
+        if hasattr(chunk, "usage") and chunk.usage:
+            usage_in = chunk.usage.prompt_tokens or 0
+            usage_out = chunk.usage.completion_tokens or 0
 
     # 최종 공약문 저장
     final_text = "".join(full)
@@ -481,6 +496,8 @@ def finalize_stream(session_id: str):
             conn.commit()
         finally:
             conn.close()
+
+    yield f"[USAGE]{usage_in},{usage_out}"
 
 
 # ---------------------------------------------------------------------------

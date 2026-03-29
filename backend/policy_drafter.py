@@ -393,15 +393,22 @@ def generate_policy_draft(
                 max_completion_tokens=4096,
                 timeout=180,
                 stream=True,
+                stream_options={"include_usage": True},
             )
             full = []
+            usage_in = 0
+            usage_out = 0
             for chunk in s:
                 if chunk.choices and chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
                     full.append(text)
                     yield text
+                if hasattr(chunk, "usage") and chunk.usage:
+                    usage_in = chunk.usage.prompt_tokens or 0
+                    usage_out = chunk.usage.completion_tokens or 0
             # Save to cache after stream completes
             _set_cached_draft(cache_key, "".join(full))
+            yield f"[USAGE]{usage_in},{usage_out}"
 
         return _gen()
 

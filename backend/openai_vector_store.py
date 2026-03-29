@@ -2655,10 +2655,17 @@ def run_check(
                 max_completion_tokens=4096,
                 timeout=180,
                 stream=True,
+                stream_options={"include_usage": True},
             )
+            usage_in = 0
+            usage_out = 0
             for chunk in s:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+                if hasattr(chunk, "usage") and chunk.usage:
+                    usage_in = chunk.usage.prompt_tokens or 0
+                    usage_out = chunk.usage.completion_tokens or 0
+            yield f"[USAGE]{usage_in},{usage_out}"
         return _gen()
 
     resp = client.chat.completions.create(

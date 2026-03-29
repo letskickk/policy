@@ -1783,10 +1783,17 @@ def check_pledge_stream(body: PledgeCheckRequest, request: Request):
                 _indexes if not USE_OPENAI_VECTOR_STORE else None,
                 user["id"],
             )
+            actual_in = 0
+            actual_out = 0
             for item in gen:
                 if item == "[CACHED]":
                     from_cache = True
                     yield f"data: {_json.dumps({'type': 'cached'}, ensure_ascii=False)}\n\n"
+                elif item.startswith("[USAGE]"):
+                    parts = item[7:].split(",")
+                    actual_in = int(parts[0]) if len(parts) > 0 else 0
+                    actual_out = int(parts[1]) if len(parts) > 1 else 0
+                    continue
                 elif item.startswith("[FINAL]"):
                     final_text = item[len("[FINAL]"):]
                     yield f"data: {_json.dumps({'type': 'final', 'text': final_text}, ensure_ascii=False)}\n\n"
@@ -1808,8 +1815,8 @@ def check_pledge_stream(body: PledgeCheckRequest, request: Request):
         elapsed_ms = int((_time.perf_counter() - t0) * 1000)
         status = 500 if had_error else 200
         out_chars = len(final_text) if final_text else len("".join(accumulated))
-        token_in = len(pledge_text) // 2
-        token_out = out_chars // 2
+        token_in = actual_in if actual_in else len(pledge_text) // 2
+        token_out = actual_out if actual_out else out_chars // 2
         cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
         log_usage(
             user_id=user["id"],
