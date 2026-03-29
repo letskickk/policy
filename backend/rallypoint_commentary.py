@@ -12,6 +12,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 
 SOURCE_KEY = "rallypoint_commentary"
 PRESS_SOURCE_KEY = "rallypoint_press"
+# 허은아 대표 → 이준석 대표 전환 이후 자료만 사용
+CUTOFF_DATE = "2025-02-01"
 API_BASE_URL = "https://api-main.rallypoint.kr/v1/document"
 LIST_URL = "https://rallypoint.kr/board/commentary"
 PRESS_LIST_URL = "https://rallypoint.kr/board/press"
@@ -378,7 +380,11 @@ def _fetch_commentary_list_items(limit: int) -> list[CommentaryItem]:
             break
 
         added_on_page = 0
+        hit_cutoff = False
         for item in page_items:
+            if item.published_at and item.published_at < CUTOFF_DATE:
+                hit_cutoff = True
+                break
             if item.source_ref in seen_refs:
                 continue
             seen_refs.add(item.source_ref)
@@ -387,7 +393,7 @@ def _fetch_commentary_list_items(limit: int) -> list[CommentaryItem]:
             if len(items) >= max_items:
                 return items
 
-        if added_on_page == 0:
+        if hit_cutoff or added_on_page == 0:
             break
         if len(page_items) < COMMENTARY_PAGE_SIZE:
             break
@@ -632,6 +638,9 @@ def sync_commentary(*, actor_id: Optional[int], limit: int = 20, include_body: b
         touched_document_ids: list[int] = []
 
         for item in items:
+            if item.published_at and item.published_at < CUTOFF_DATE:
+                skipped_count += 1
+                continue
             existing = _find_existing_commentary_document(item)
             if existing is None:
                 created = upsert_policy_document(
@@ -822,7 +831,11 @@ def _fetch_press_list_items(limit: int) -> list[CommentaryItem]:
             break
 
         added_on_page = 0
+        hit_cutoff = False
         for item in page_items:
+            if item.published_at and item.published_at < CUTOFF_DATE:
+                hit_cutoff = True
+                break
             if item.source_ref in seen_refs:
                 continue
             seen_refs.add(item.source_ref)
@@ -831,7 +844,7 @@ def _fetch_press_list_items(limit: int) -> list[CommentaryItem]:
             if len(items) >= max_items:
                 return items
 
-        if added_on_page == 0:
+        if hit_cutoff or added_on_page == 0:
             break
         if len(page_items) < COMMENTARY_PAGE_SIZE:
             break
@@ -876,6 +889,9 @@ def sync_press(*, actor_id: Optional[int], limit: int = 20, include_body: bool =
         touched_document_ids: list[int] = []
 
         for item in items:
+            if item.published_at and item.published_at < CUTOFF_DATE:
+                skipped_count += 1
+                continue
             existing = _find_existing_press_document(item)
             if existing is None:
                 created = upsert_policy_document(
