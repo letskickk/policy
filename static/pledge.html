@@ -1357,7 +1357,7 @@
 
     function _fmtTokens(n) {
       if (!n) return '0';
-      if (n >= 1000000) return Math.round(n / 1000) + 'K';
+      if (n >= 1000000) return (n % 1000000 === 0 ? (n/1000000) : (n/1000000).toFixed(1)) + 'M';
       if (n >= 1000) return Math.round(n / 1000) + 'K';
       return String(n);
     }
