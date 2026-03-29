@@ -126,7 +126,7 @@ QUOTA_DAILY = int(os.getenv("QUOTA_DAILY", "30"))
 QUOTA_MONTHLY = int(os.getenv("QUOTA_MONTHLY", "300"))
 # 토큰 기반 쿼터 (공약분석 + 공약코치 통합). 8만/일, 2백만/월
 QUOTA_DAILY_TOKENS = int(os.getenv("QUOTA_DAILY_TOKENS", "80000"))
-QUOTA_MONTHLY_TOKENS = int(os.getenv("QUOTA_MONTHLY_TOKENS", "2000000"))
+QUOTA_MONTHLY_TOKENS = int(os.getenv("QUOTA_MONTHLY_TOKENS", "1000000"))
 RATE_LIMIT_IP_PER_MIN = int(os.getenv("RATE_LIMIT_IP_PER_MIN", "30"))
 RATE_LIMIT_USER_PER_MIN = int(os.getenv("RATE_LIMIT_USER_PER_MIN", "10"))
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "24"))
