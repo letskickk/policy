@@ -295,3 +295,102 @@ def set_featured_issue(
     if current and current["id"] == featured_id:
         return current
     raise HTTPException(status_code=500, detail="메인 이슈 저장 후 조회에 실패했습니다.")
+
+def set_featured_issue(
+    *,
+    position_id: int,
+    reason: Optional[str],
+    start_at: Optional[str],
+    end_at: Optional[str],
+    manual_weight: int,
+    actor_id: Optional[int],
+) -> dict:
+    conn = get_connection()
+    try:
+        exists = conn.execute("SELECT id FROM policy_positions WHERE id = ?", (position_id,)).fetchone()
+        if exists is None:
+            raise HTTPException(status_code=404, detail="position not found.")
+
+        start_clean = (start_at or _today().isoformat()).strip()
+        end_clean = (end_at or "").strip() or None
+        start_date = _parse_date(start_clean)
+        end_date = _parse_date(end_clean)
+        if start_date is None:
+            raise HTTPException(status_code=400, detail="invalid start_at.")
+        if end_clean and end_date is None:
+            raise HTTPException(status_code=400, detail="invalid end_at.")
+        if start_date and end_date and end_date < start_date:
+            raise HTTPException(status_code=400, detail="end_at cannot be earlier than start_at.")
+
+        recommendation = next(
+            (item for item in recommend_featured_issues(limit=20) if item["position_id"] == position_id),
+            None,
+        )
+        priority_score = float((recommendation or {}).get("score") or 0) + float(manual_weight)
+
+        conn.execute("UPDATE policy_featured_issues SET status = 'archived' WHERE status = 'active'")
+        cur = conn.execute(
+            """
+            INSERT INTO policy_featured_issues (
+                position_id, reason, priority_score, manual_weight,
+                start_at, end_at, status, created_by, updated_by, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now'))
+            """,
+            (
+                position_id,
+                (reason or "").strip() or None,
+                priority_score,
+                int(manual_weight),
+                start_clean,
+                end_clean,
+                actor_id,
+                actor_id,
+            ),
+        )
+        featured_id = int(cur.lastrowid)
+        row = conn.execute(
+            """
+            SELECT fi.id, fi.position_id, fi.reason, fi.priority_score, fi.manual_weight,
+                   fi.start_at, fi.end_at, fi.status, fi.created_at,
+                   p.title AS position_title, p.slug AS position_slug, p.category AS position_category,
+                   COALESCE(p.summary, '') AS position_summary
+            FROM policy_featured_issues fi
+            JOIN policy_positions p ON p.id = fi.position_id
+            WHERE fi.id = ?
+            LIMIT 1
+            """,
+            (featured_id,),
+        ).fetchone()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    if row is not None:
+        return _row_to_featured_issue(row)
+    raise HTTPException(status_code=500, detail="failed to reload featured issue after save.")
+
+def get_current_featured_issue() -> Optional[dict]:
+    row = _current_featured_row()
+    if row is None:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT fi.id, fi.position_id, fi.reason, fi.priority_score, fi.manual_weight,
+                       fi.start_at, fi.end_at, fi.status, fi.created_at,
+                       p.title AS position_title, p.slug AS position_slug, p.category AS position_category,
+                       COALESCE(p.summary, '') AS position_summary
+                FROM policy_featured_issues fi
+                JOIN policy_positions p ON p.id = fi.position_id
+                WHERE fi.status = 'active'
+                ORDER BY COALESCE(fi.start_at, '0000-00-00') DESC, fi.id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+    return _row_to_featured_issue(row) if row is not None else None

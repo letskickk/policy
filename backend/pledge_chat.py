@@ -354,7 +354,8 @@ def chat_stream(session_id: str, user_message: str):
     _maybe_inject_rag(session_id, user_message)
 
     # 히스토리 로드
-    messages = _load_openai_messages(session_id)
+    turn_mode_prompt = _build_turn_mode_system_prompt(user_message)
+    messages = _load_openai_messages(session_id, turn_mode_prompt=turn_mode_prompt)
 
     from openai import OpenAI, APIError, APITimeoutError
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -503,7 +504,36 @@ def finalize_stream(session_id: str):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _load_openai_messages(session_id: str) -> list[dict]:
+_CHAT_BRIEFING_KEYWORDS = (
+    "조례", "의회", "회의록", "본회의", "상임위", "위원회", "안건", "의안",
+    "가결", "부결", "발의", "심사", "의결", "구정질문", "시정질문",
+    "행정사무감사", "속기록", "조문", "개정안", "폐지", "규칙",
+)
+
+
+def _build_turn_mode_system_prompt(user_message: str) -> str:
+    text = (user_message or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    if not any(keyword in text or keyword in lowered for keyword in _CHAT_BRIEFING_KEYWORDS):
+        return ""
+    return (
+        "이번 답변은 자료 브리핑 모드로 답하라.\n"
+        "사용자가 조례, 의회 기록, 회의록, 안건, 의결 흐름을 직접 묻고 있으므로 "
+        "자료를 배경으로만 녹여내지 말고 확인된 내용을 구체적으로 설명하라.\n"
+        "가능하면 다음 순서를 따른다.\n"
+        "1. 확인된 자료 또는 논의 대상\n"
+        "2. 핵심 내용과 현재 상태\n"
+        "3. 지역과 출마자에게 중요한 이유\n"
+        "4. 공약으로 연결할 수 있는 지점\n"
+        "5. 추가 확인이 필요한 부분\n"
+        "자료가 약하면 현재 확인 범위와 해석 가능한 함의를 구분해서 말하라.\n"
+        "완성 공약문, 슬로건, 선언문으로 쓰지 말고 브리핑 후 공약 연결점까지 제시하라."
+    )
+
+
+def _load_openai_messages(session_id: str, turn_mode_prompt: Optional[str] = None) -> list[dict]:
     """DB에서 메시지 히스토리를 OpenAI 형식으로 로드."""
     all_msgs = get_messages(session_id)
 
@@ -520,6 +550,8 @@ def _load_openai_messages(session_id: str) -> list[dict]:
     if len(history) > MAX_HISTORY_MESSAGES:
         history = history[-MAX_HISTORY_MESSAGES:]
 
+    if turn_mode_prompt:
+        openai_msgs.append({"role": "system", "content": turn_mode_prompt})
     return openai_msgs + history
 
 

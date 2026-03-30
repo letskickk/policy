@@ -648,7 +648,10 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     def create_policy_draft(request: Request, body: DraftRequest):
         """정책 초안 생성."""
         ensure_db_ready()
-        _ = require_policy_drafter_access(request)
+        try:
+            _ = require_admin(request)
+        except HTTPException:
+            _ = require_policy_drafter_access(request)
 
         from backend.policy_drafter import generate_policy_draft
 
@@ -719,7 +722,10 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
     @app.api_route("/policy-lab", methods=["GET", "HEAD"])
     def policy_lab_page(request: Request):
         """정책 허브 (관리자 또는 허용된 테스트 계정)."""
-        _ = require_policy_drafter_access(request)
+        try:
+            _ = require_admin(request)
+        except HTTPException:
+            _ = require_policy_drafter_access(request)
         res = serve_html("policy-lab.html")
         if res is not None:
             return res

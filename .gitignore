@@ -14,3 +14,12 @@ __pycache__/
 *.pyc
 *.pyo
 .gstack/
+
+harness/runs/
+harness/tier1-results/
+harness/tier2-results/
+harness/tier3-results/
+harness/tier1-prompt/runs/
+harness/tier2-ux/runs/
+harness/tier3-deploy/runs/
+harness/config.json

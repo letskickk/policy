@@ -1980,7 +1980,27 @@ def _fetch_candidate_pledges(
             WHERE candidate_id = ?
         """
         if public_only:
-            sql += " AND approval_status = 'APPROVED'"
+            sql += """
+                AND (
+                    COALESCE(approval_status, 'PENDING') = 'APPROVED'
+                    OR (
+                        COALESCE(approval_status, 'PENDING') = 'PENDING'
+                        AND (
+                            NOT EXISTS (
+                                SELECT 1
+                                FROM candidate_pledge_review_history h0
+                                WHERE h0.pledge_id = candidate_pledges.id
+                            )
+                            OR EXISTS (
+                                SELECT 1
+                                FROM candidate_pledge_review_history h
+                                WHERE h.pledge_id = candidate_pledges.id
+                                  AND h.approval_status = 'APPROVED'
+                            )
+                        )
+                    )
+                )
+            """
         sql += """
             ORDER BY priority ASC, datetime(created_at) DESC, id DESC
         """
@@ -2221,7 +2241,16 @@ def _fetch_candidate_pledges_current_public(
             SELECT cp.id, cp.title, cp.content, cp.total_score, cp.created_at
             FROM candidate_pledges cp
             WHERE cp.candidate_id = ?
-              AND cp.approval_status = 'APPROVED'
+              AND (
+                  COALESCE(cp.approval_status, 'PENDING') = 'APPROVED'
+                  OR (
+                      COALESCE(cp.approval_status, 'PENDING') = 'PENDING'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM candidate_pledge_review_history h0
+                          WHERE h0.pledge_id = cp.id
+                      )
+                  )
+              )
             ORDER BY cp.priority ASC, cp.id DESC
         """
         params_approved: tuple = (candidate_id,)
@@ -5023,3 +5052,286 @@ def hub_archive_redirect():
 def policy_lab_redirect():
     from fastapi.responses import RedirectResponse
     return RedirectResponse("/hub", status_code=301)
+
+
+def _candidate_public_rows_sql() -> str:
+    public_note = "\uacf5\ucc9c \ud655\uc815"
+    return f"""
+        FROM candidates c
+        LEFT JOIN users u ON u.id = c.user_id
+        LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
+        WHERE c.approval_status IN ('APPROVED', 'MIXED')
+          AND (
+              u.applicant_match_id IS NOT NULL
+              OR TRIM(COALESCE(pa.status_note, '')) = ''
+              OR TRIM(COALESCE(pa.status_note, '')) = '{public_note}'
+          )
+    """
+
+
+def _legacy_public_nomination_status(status_note: Optional[str], applicant_match_id: Optional[int] = None) -> bool:
+    if applicant_match_id is not None:
+        return True
+    note = (status_note or "").strip()
+    return not note or note == "\uacf5\ucc9c \ud655\uc815"
+
+
+def get_regions():
+    _ensure_db_ready()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        count_rows = conn.execute(
+            """
+            SELECT c.region_code, COUNT(*) AS candidate_count
+            """
+            + _candidate_public_rows_sql()
+            + """
+            GROUP BY c.region_code
+            """
+        ).fetchall()
+        count_map = {r["region_code"]: int(r["candidate_count"]) for r in count_rows}
+    finally:
+        conn.close()
+
+    return [
+        RegionResponse(
+            region_code=code,
+            region_name=name,
+            candidate_count=count_map.get(code, 0),
+        )
+        for code, name in REGION_NAME_MAP.items()
+    ]
+
+
+def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
+    _ensure_db_ready()
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = "SELECT c.election_type, COUNT(*) AS n " + _candidate_public_rows_sql()
+        params: list[object] = []
+        if region_code:
+            sql += " AND c.region_code = ?"
+            params.append(region_code)
+        sql += " GROUP BY c.election_type"
+        rows = conn.execute(sql, tuple(params)).fetchall()
+        return {r["election_type"]: int(r["n"]) for r in rows}
+    finally:
+        conn.close()
+
+
+def get_districts(
+    region_code: Optional[str] = Query(default=None, description="?됱젙援ъ뿭 肄붾뱶"),
+    election_type: Optional[str] = Query(default=None, description="?좉굅 ???local, mayor, etc)"),
+):
+    _ensure_db_ready()
+    code = _validate_region_code(region_code)
+    selected_election_type = _normalize_election_type(election_type)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        candidate_sql = """
+            SELECT c.district_name, c.district_code, c.election_type,
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
+            """
+        candidate_sql += _candidate_public_rows_sql()
+        candidate_sql += """
+              AND c.region_code = ?
+              AND c.district_name IS NOT NULL
+              AND TRIM(c.district_name) <> ''
+        """
+        params: list[object] = [code]
+        if selected_election_type:
+            candidate_sql += " AND c.election_type = ?"
+            params.append(selected_election_type)
+        candidate_rows = conn.execute(candidate_sql, tuple(params)).fetchall()
+
+        district_rows = conn.execute(
+            """
+            SELECT district_code, district_name
+            FROM district_codes
+            WHERE region_code = ?
+              AND (? IS NULL OR election_type = ?)
+            """,
+            (code, selected_election_type, selected_election_type),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    count_map: dict[str, dict[str, object]] = {}
+    for r in district_rows:
+        d_code = (r["district_code"] or "").strip()
+        d_name = (r["district_name"] or "").strip() or d_code
+        if d_code:
+            count_map[d_code] = {"district_name": d_name, "candidate_count": 0}
+
+    for r in candidate_rows:
+        if not _legacy_public_nomination_status(r["applicant_status_note"], r["applicant_match_id"]):
+            continue
+        district_name = (r["district_name"] or "").strip()
+        district_code = _derive_district_code(code, r["district_code"], district_name)
+        if not district_code:
+            continue
+        if district_code not in count_map:
+            count_map[district_code] = {
+                "district_name": district_name or district_code,
+                "candidate_count": 0,
+            }
+        count_map[district_code]["candidate_count"] = int(count_map[district_code]["candidate_count"]) + 1
+
+    return [
+        DistrictResponse(
+            district_code=dcode,
+            district_name=str(meta["district_name"]),
+            region_code=code,
+            candidate_count=int(meta["candidate_count"]),
+        )
+        for dcode, meta in sorted(count_map.items(), key=lambda x: (-int(x[1]["candidate_count"]), str(x[1]["district_name"])))
+    ]
+
+
+def get_candidates(
+    region_code: Optional[str] = Query(default=None, description="?됱젙援ъ뿭 肄붾뱶"),
+    district_code: Optional[str] = Query(default=None, description="?좉굅援?肄붾뱶"),
+    election_type: Optional[str] = Query(default=None, description="?좉굅 ???local, mayor, etc)"),
+):
+    _ensure_db_ready()
+    code = _validate_region_code(region_code)
+    selected_district_code = _normalize_district_code(district_code)
+    selected_election_type = _normalize_election_type(election_type)
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT c.id, c.name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.district_code, c.region_code, c.election_type, c.election_level,
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
+            """
+        sql += _candidate_public_rows_sql()
+        sql += " AND c.region_code = ?"
+        params: list[object] = [code]
+        if selected_election_type:
+            sql += " AND c.election_type = ?"
+            params.append(selected_election_type)
+        sql += """
+            ORDER BY
+                CASE c.election_type
+                    WHEN 'metro_mayor' THEN 1
+                    WHEN 'local_mayor' THEN 2
+                    WHEN 'regional_council' THEN 3
+                    WHEN 'local_council' THEN 4
+                    ELSE 5
+                END,
+                COALESCE(c.district_name, '') ASC,
+                c.name ASC
+        """
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    finally:
+        conn.close()
+
+    result: list[CandidateListItemResponse] = []
+    for r in rows:
+        if not _legacy_public_nomination_status(r["applicant_status_note"], r["applicant_match_id"]):
+            continue
+        candidate_id = int(r["id"])
+        resolved_district_code = _derive_district_code(code, r["district_code"], r["district_name"])
+        if selected_district_code and resolved_district_code != selected_district_code:
+            continue
+        result.append(
+            CandidateListItemResponse(
+                candidate_id=candidate_id,
+                name=r["name"],
+                district_name=r["district_name"],
+                district_code=resolved_district_code,
+                region_code=r["region_code"],
+                election_type=r["election_type"],
+                election_level=r["election_level"],
+                pledges=_fetch_candidate_pledges(candidate_id, limit=3, public_only=True),
+            )
+        )
+    return result
+
+
+def get_candidate_detail(candidate_id: int, as_of: Optional[str] = Query(default=None)):
+    _ensure_db_ready()
+    resolved_as_of = as_of if isinstance(as_of, str) else None
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT c.id, c.name,
+                   COALESCE(u.district_name, c.district_name) AS district_name,
+                   c.district_code, c.region_code, c.election_type, c.election_level, c.approval_status, c.user_id,
+                   pa.status_note AS applicant_status_note,
+                   u.applicant_match_id AS applicant_match_id
+            """
+            + _candidate_public_rows_sql()
+            + """
+              AND c.id = ?
+            """,
+            (candidate_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None or not _legacy_public_nomination_status(row["applicant_status_note"], row["applicant_match_id"]):
+        raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} not found.")
+
+    code = row["region_code"]
+    return CandidateDetailResponse(
+        candidate_id=int(row["id"]),
+        name=row["name"],
+        district_name=row["district_name"],
+        district_code=_derive_district_code(code, row["district_code"], row["district_name"]),
+        region_code=code,
+        region_name=_resolve_region_name(code),
+        election_type=row["election_type"],
+        election_level=row["election_level"],
+        external_profile=_fetch_candidate_external_profile(int(row["id"])),
+        pledges=_fetch_candidate_pledges_snapshot(int(row["id"]), resolved_as_of, int(row["user_id"]) if row["user_id"] is not None else None) if resolved_as_of else _fetch_candidate_pledges_current_public(int(row["id"]), limit=None),
+    )
+
+
+def _get_candidate_detail_any_status(candidate_id: int) -> CandidateDetailResponse:
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """SELECT c.id, c.name,
+                      COALESCE(u.district_name, c.district_name) AS district_name,
+                      c.district_code, c.region_code, c.election_type, c.election_level
+               FROM candidates c
+               LEFT JOIN users u ON u.id = c.user_id
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"candidate_id={candidate_id} not found.")
+
+    code = row["region_code"]
+    return CandidateDetailResponse(
+        candidate_id=int(row["id"]),
+        name=row["name"],
+        district_name=row["district_name"],
+        district_code=_derive_district_code(code, row["district_code"], row["district_name"]),
+        region_code=code,
+        region_name=_resolve_region_name(code),
+        election_type=row["election_type"],
+        election_level=row["election_level"],
+        external_profile=_fetch_candidate_external_profile(int(row["id"])),
+        pledges=_fetch_candidate_pledges(int(row["id"]), limit=None, public_only=False),
+    )

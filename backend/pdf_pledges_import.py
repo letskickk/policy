@@ -545,3 +545,49 @@ def sync_pdf_pledges(*, actor_id: Optional[int]) -> dict:
             error_message=str(exc),
         )
         raise
+
+def _campaign_position_has_verified_pdf(position_id: int) -> bool:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT d.metadata_json
+            FROM policy_document_links l
+            JOIN policy_documents d ON d.id = l.document_id
+            WHERE l.position_id = ?
+              AND d.doc_type = 'pledge'
+              AND d.source_ref LIKE ?
+            """,
+            (position_id, f"{SOURCE_KEY}:%"),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    for row in rows:
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        if bool(metadata.get("verified_public_source")) or str(metadata.get("file_type", "")).lower() == "pdf":
+            return True
+    return False
+
+
+def _upsert_campaign_position(*, title: str, summary: str, body: str, actor_id: Optional[int]) -> dict:
+    slug = slugify(title)
+    existing = _get_campaign_position_by_slug(slug)
+    if existing and not _campaign_position_has_verified_pdf(int(existing["id"])):
+        existing = None
+    return upsert_policy_position(
+        position_id=existing["id"] if existing else None,
+        title=title,
+        category=_categorize_title(title, body),
+        summary=summary,
+        body=body,
+        status="approved",
+        owner_scope="campaign",
+        effective_from=None,
+        effective_to=None,
+        version_label=CAMPAIGN_VERSION_LABEL,
+        actor_id=actor_id,
+    )

@@ -2208,6 +2208,8 @@
       var chatMsgCount = 0;  // AI 응답 횟수 추적
       var chatStarted = false;  // 첫 세션 시작 여부
 
+      var chatTopicChangePending = false;
+
       function chatRenderGreeting(el) {
         var name = meData && meData.name ? String(meData.name) : '';
         var election = meData && meData.election_position ? String(meData.election_position) : '';
@@ -2294,8 +2296,10 @@
                 tb.addEventListener('click', function() {
                   if (t.msg) {
                     document.getElementById('chatInput').value = t.msg;
+                    chatTopicChangePending = true;
                     chatSend();
                   } else {
+                    chatTopicChangePending = true;
                     document.getElementById('chatInput').focus();
                     document.getElementById('chatInput').placeholder = '관심 있는 분야나 정책 아이디어를 입력하세요';
                   }
@@ -2304,8 +2308,10 @@
               });
             } else if (c.msg) {
               document.getElementById('chatInput').value = c.msg;
+              chatTopicChangePending = true;
               chatSend();
             } else {
+              chatTopicChangePending = true;
               document.getElementById('chatInput').focus();
               document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
             }
@@ -2338,12 +2344,15 @@
                   if (q.action === 'topicPicker') {
                     popup.style.display = 'none';
                     // sub-topic을 팝업 안에서 보여주는 대신, 직접 입력으로 포커스
+                    chatTopicChangePending = true;
                     document.getElementById('chatInput').focus();
                     document.getElementById('chatInput').placeholder = '관심 분야를 입력하세요 (예: 복지, 교통, 상권)';
                   } else if (q.msg) {
                     document.getElementById('chatInput').value = q.msg;
+                    chatTopicChangePending = true;
                     chatSend();
                   } else {
+                    chatTopicChangePending = true;
                     document.getElementById('chatInput').focus();
                     document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
                   }
@@ -2424,6 +2433,10 @@
         var input = document.getElementById('chatInput');
         var msg = (input.value || '').trim();
         if (!msg) return;
+        if (chatTopicChangePending) {
+          window.chatStartNew();
+          chatTopicChangePending = false;
+        }
         input.value = '';
 
         chatAppendMsg('user', msg);
@@ -2550,6 +2563,7 @@
         chatSessionId = null;
         chatMsgCount = 0;
         chatStarted = false;
+        chatTopicChangePending = false;
         document.getElementById('chatFinalSection').style.display = 'none';
         var msgs = document.getElementById('chatMessages');
         msgs.innerHTML = '<div class="chat-msg assistant" id="chatGreeting"></div>';
