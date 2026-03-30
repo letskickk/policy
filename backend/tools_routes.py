@@ -159,6 +159,7 @@ def register_tools_routes(app, require_approved, _client_ip):
     def tools_quota(request: Request):
         from backend.config import QUOTA_DAILY_TOKENS, QUOTA_MONTHLY_TOKENS
         from backend.database import get_connection
+        from backend.quota_rate import is_unlimited_quota_user
 
         user = require_approved(request)
 
@@ -180,6 +181,17 @@ def register_tools_routes(app, require_approved, _client_ip):
         finally:
             conn.close()
 
+        if is_unlimited_quota_user(user):
+            return {
+                "daily_used": daily_used,
+                "daily_limit": None,
+                "monthly_used": monthly_used,
+                "monthly_limit": None,
+                "daily_remaining": None,
+                "monthly_remaining": None,
+                "unlimited": True,
+            }
+
         return {
             "daily_used": daily_used,
             "daily_limit": QUOTA_DAILY_TOKENS,
@@ -187,6 +199,7 @@ def register_tools_routes(app, require_approved, _client_ip):
             "monthly_limit": QUOTA_MONTHLY_TOKENS,
             "daily_remaining": max(0, QUOTA_DAILY_TOKENS - daily_used),
             "monthly_remaining": max(0, QUOTA_MONTHLY_TOKENS - monthly_used),
+            "unlimited": False,
         }
 
     # ── 최근 생성 이력 ────────────────────────────────────────

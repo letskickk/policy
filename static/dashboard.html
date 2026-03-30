@@ -262,8 +262,8 @@
         const d = await r.json();
         document.getElementById('daily').textContent = d.daily_used ?? '-';
         document.getElementById('monthly').textContent = d.monthly_used ?? '-';
-        document.getElementById('dailyLimit').textContent = d.daily_limit ?? '-';
-        document.getElementById('monthlyLimit').textContent = d.monthly_limit ?? '-';
+        document.getElementById('dailyLimit').textContent = d.unlimited ? '무제한' : (d.daily_limit ?? '-');
+        document.getElementById('monthlyLimit').textContent = d.unlimited ? '무제한' : (d.monthly_limit ?? '-');
 
         const esc = (s) => (s ?? '').toString().replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
         const fmt = (iso) => {

@@ -1365,6 +1365,18 @@
     function _renderQuotaInto(q, barId, dailyFillId, monthlyFillId, dailyTextId, monthlyTextId) {
       const bar = document.getElementById(barId);
       if (!bar) return;
+      if (q.unlimited) {
+        const dFillUnlimited = document.getElementById(dailyFillId);
+        const mFillUnlimited = document.getElementById(monthlyFillId);
+        if (dFillUnlimited) { dFillUnlimited.style.width = '0%'; dFillUnlimited.className = 'quota-fill'; }
+        if (mFillUnlimited) { mFillUnlimited.style.width = '0%'; mFillUnlimited.className = 'quota-fill'; }
+        const dUnlimited = document.getElementById(dailyTextId);
+        const mUnlimited = document.getElementById(monthlyTextId);
+        if (dUnlimited) dUnlimited.textContent = _fmtTokens(q.daily_used) + '/무제한';
+        if (mUnlimited) mUnlimited.textContent = _fmtTokens(q.monthly_used) + '/무제한';
+        bar.style.display = 'block';
+        return;
+      }
       const dailyPct   = Math.min(100, Math.round((q.daily_used   || 0) / (q.daily_limit   || 1) * 100));
       const monthlyPct = Math.min(100, Math.round((q.monthly_used || 0) / (q.monthly_limit || 1) * 100));
       const dFill = document.getElementById(dailyFillId);

@@ -1294,6 +1294,7 @@ def api_admin_applicants(request: Request):
 def api_usage_summary(request: Request):
     u = require_user(request)
     from backend.database import get_connection
+    from backend.quota_rate import is_unlimited_quota_user
     import time
     today = time.strftime("%Y-%m-%d")
     month = time.strftime("%Y-%m")
@@ -1311,6 +1312,16 @@ def api_usage_summary(request: Request):
         from backend.config import QUOTA_DAILY_TOKENS, QUOTA_MONTHLY_TOKENS
         daily_used = row["daily_used"] if row else 0
         monthly_used = row["monthly_used"] if row else 0
+        if is_unlimited_quota_user(u):
+            return {
+                "daily_used": daily_used,
+                "monthly_used": monthly_used,
+                "daily_limit": None,
+                "monthly_limit": None,
+                "daily_remaining": None,
+                "monthly_remaining": None,
+                "unlimited": True,
+            }
         return {
             "daily_used": daily_used,
             "monthly_used": monthly_used,
@@ -1318,6 +1329,7 @@ def api_usage_summary(request: Request):
             "monthly_limit": QUOTA_MONTHLY_TOKENS,
             "daily_remaining": max(0, QUOTA_DAILY_TOKENS - daily_used),
             "monthly_remaining": max(0, QUOTA_MONTHLY_TOKENS - monthly_used),
+            "unlimited": False,
         }
     finally:
         conn.close()

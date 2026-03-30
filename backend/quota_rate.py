@@ -22,12 +22,27 @@ _WINDOW_SEC = 60
 _rate_lock = Lock()
 _rate_ip: dict[str, list[float]] = defaultdict(list)
 _rate_user: dict[int, list[float]] = defaultdict(list)
+UNLIMITED_QUOTA_TEST_EMAILS = {
+    "gtest@test.kr",
+    "ktest@test.kr",
+}
 
 
 def _clean_old(now: float, timestamps: list[float]) -> None:
     cutoff = now - _WINDOW_SEC
     while timestamps and timestamps[0] < cutoff:
         timestamps.pop(0)
+
+
+def is_unlimited_quota_user(user: dict | None) -> bool:
+    if not user:
+        return False
+    email = (user.get("email") or "").strip().lower()
+    return (
+        user.get("role") == ROLE_ADMIN
+        or email in ADMIN_EMAILS
+        or email in UNLIMITED_QUOTA_TEST_EMAILS
+    )
 
 
 def check_quota(user_id: int) -> tuple[bool, str]:
@@ -37,10 +52,7 @@ def check_quota(user_id: int) -> tuple[bool, str]:
     관리자(role=ADMIN 또는 ADMIN_EMAILS)는 쿼터 미적용.
     """
     user = get_user(user_id)
-    if user and (
-        user.get("role") == ROLE_ADMIN
-        or (user.get("email") or "").strip().lower() in ADMIN_EMAILS
-    ):
+    if is_unlimited_quota_user(user):
         return True, ""
 
     conn = get_connection()
