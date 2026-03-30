@@ -2323,12 +2323,13 @@
         var _popupBuilt = false;
         var topicBtn = document.getElementById('chatBtnTopic');
         if (topicBtn) {
-          topicBtn.addEventListener('click', function() {
+          topicBtn.onclick = function() {
             var popup = document.getElementById('chatQuickPopup');
             if (!popup) return;
             if (popup.style.display !== 'none') { popup.style.display = 'none'; return; }
             if (!_popupBuilt) {
               _popupBuilt = true;
+              popup.innerHTML = '';
               var quickItems = [
                 { label: '지역 현안', action: 'topicPicker' },
                 { label: '아이디어 다듬기', msg: '' },
@@ -2361,7 +2362,7 @@
               });
             }
             popup.style.display = '';
-          });
+          };
         }
 
         var footDiv = document.createElement('div');
