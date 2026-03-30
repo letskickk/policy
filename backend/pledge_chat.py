@@ -364,7 +364,7 @@ def chat_stream(session_id: str, user_message: str):
         stream = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            max_completion_tokens=4096,
+            max_completion_tokens=1200,
             timeout=60,
             stream=True,
             stream_options={"include_usage": True},
@@ -511,6 +511,17 @@ _CHAT_BRIEFING_KEYWORDS = (
 )
 
 
+def _build_chat_style_system_prompt() -> str:
+    return (
+        "이번 턴은 티키타카가 되는 코치 모드로 답하라.\n"
+        "한 번에 다 설명하지 말고, 먼저 핵심 쟁점이나 방향 2~3개만 짧게 제시하라.\n"
+        "기본 답변은 6문장 안팎 또는 짧은 항목 3개 이내로 제한하라.\n"
+        "각 항목은 1~2문장으로 짧게 쓰고, 아직 사용자가 고르지 않은 갈래는 깊게 풀지 마라.\n"
+        "답변 마지막에는 사용자가 다음 턴에서 고를 수 있는 질문 1개만 남겨라.\n"
+        "사용자가 특정 지점을 더 물으면 그 부분만 깊게 답하고, 다른 갈래를 다시 길게 벌리지 마라."
+    )
+
+
 def _build_turn_mode_system_prompt(user_message: str) -> str:
     text = (user_message or "").strip()
     if not text:
@@ -522,14 +533,14 @@ def _build_turn_mode_system_prompt(user_message: str) -> str:
         "이번 답변은 자료 브리핑 모드로 답하라.\n"
         "사용자가 조례, 의회 기록, 회의록, 안건, 의결 흐름을 직접 묻고 있으므로 "
         "자료를 배경으로만 녹여내지 말고 확인된 내용을 구체적으로 설명하라.\n"
-        "가능하면 다음 순서를 따른다.\n"
+        "다만 첫 답변부터 길게 다 풀지 말고 다음 순서를 짧게 따른다.\n"
         "1. 확인된 자료 또는 논의 대상\n"
         "2. 핵심 내용과 현재 상태\n"
-        "3. 지역과 출마자에게 중요한 이유\n"
-        "4. 공약으로 연결할 수 있는 지점\n"
-        "5. 추가 확인이 필요한 부분\n"
+        "3. 공약으로 연결할 수 있는 지점 또는 더 볼 포인트\n"
+        "항목은 최대 3개까지만 제시하고 각 항목은 1~2문장으로 짧게 말하라.\n"
         "자료가 약하면 현재 확인 범위와 해석 가능한 함의를 구분해서 말하라.\n"
-        "완성 공약문, 슬로건, 선언문으로 쓰지 말고 브리핑 후 공약 연결점까지 제시하라."
+        "완성 공약문, 슬로건, 선언문으로 쓰지 말고 브리핑 후 공약 연결점까지만 제시하라.\n"
+        "답변 마지막에는 사용자가 다음 턴에서 더 파고들 수 있는 질문 1개만 남겨라."
     )
 
 
@@ -550,6 +561,7 @@ def _load_openai_messages(session_id: str, turn_mode_prompt: Optional[str] = Non
     if len(history) > MAX_HISTORY_MESSAGES:
         history = history[-MAX_HISTORY_MESSAGES:]
 
+    openai_msgs.append({"role": "system", "content": _build_chat_style_system_prompt()})
     if turn_mode_prompt:
         openai_msgs.append({"role": "system", "content": turn_mode_prompt})
     return openai_msgs + history
