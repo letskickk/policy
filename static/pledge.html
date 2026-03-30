@@ -2223,6 +2223,10 @@
       var chatTopicChangePending = false;
 
       function chatRenderGreeting(el) {
+        var chatInputEl = document.getElementById('chatInput');
+        if (chatInputEl && !(chatInputEl.value || '').trim()) {
+          chatInputEl.placeholder = '메시지를 입력하세요...';
+        }
         var name = meData && meData.name ? String(meData.name) : '';
         var election = meData && meData.election_position ? String(meData.election_position) : '';
         var region = meData && meData.region_name ? String(meData.region_name) : '';
@@ -2289,43 +2293,92 @@
           { label: '✏️ 직접 입력', msg: null },
         ];
 
+        function focusTopicInput(placeholderText) {
+          chatTopicChangePending = true;
+          document.getElementById('chatInput').focus();
+          document.getElementById('chatInput').placeholder = placeholderText;
+        }
+
+        function sendTopicPrompt(promptText) {
+          document.getElementById('chatInput').value = promptText;
+          chatTopicChangePending = true;
+          chatSend();
+        }
+
+        function renderGreetingTopicPicker() {
+          el.innerHTML = '';
+          var qDiv2 = document.createElement('div');
+          qDiv2.style.cssText = 'font-size:0.92rem;margin-bottom:0.4rem;';
+          qDiv2.textContent = '어떤 분야 현안부터 살펴볼까요?';
+          el.appendChild(qDiv2);
+
+          var hintDiv = document.createElement('div');
+          hintDiv.style.cssText = 'color:var(--muted,#888);font-size:0.84rem;margin-bottom:0.55rem;';
+          hintDiv.textContent = '하나를 누르면 바로 시작하고, 직접 입력으로 좁혀도 됩니다.';
+          el.appendChild(hintDiv);
+
+          subTopics.forEach(function(t) {
+            var tb = document.createElement('button');
+            tb.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;';
+            tb.textContent = t.label;
+            tb.addEventListener('click', function() {
+              if (t.msg) {
+                sendTopicPrompt(t.msg);
+              } else {
+                focusTopicInput('관심 있는 분야나 정책 아이디어를 입력하세요');
+              }
+            });
+            el.appendChild(tb);
+          });
+
+          var backBtn = document.createElement('button');
+          backBtn.type = 'button';
+          backBtn.style.cssText = 'display:block;width:100%;padding:0.5rem 0.8rem;margin-top:0.55rem;border:1px dashed var(--input-border,#ddd);border-radius:6px;background:transparent;color:var(--muted,#94a3b8);font-size:0.84rem;cursor:pointer;text-align:center;';
+          backBtn.textContent = '처음 선택지로 돌아가기';
+          backBtn.addEventListener('click', function() {
+            chatRenderGreeting(el);
+          });
+          el.appendChild(backBtn);
+        }
+
+        function renderQuickTopicPicker(popup, topicBtn) {
+          if (!popup) return;
+          popup.innerHTML = '';
+          var backBtn = document.createElement('button');
+          backBtn.textContent = '← 처음 선택지';
+          backBtn.addEventListener('click', function() {
+            _popupBuilt = false;
+            popup.style.display = 'none';
+            if (topicBtn && typeof topicBtn.onclick === 'function') topicBtn.onclick();
+          });
+          popup.appendChild(backBtn);
+
+          subTopics.forEach(function(t) {
+            var qb = document.createElement('button');
+            qb.textContent = t.label;
+            qb.addEventListener('click', function() {
+              popup.style.display = 'none';
+              if (t.msg) {
+                sendTopicPrompt(t.msg);
+              } else {
+                focusTopicInput('관심 분야를 입력하세요 (예: 복지, 교통, 상권)');
+              }
+            });
+            popup.appendChild(qb);
+          });
+        }
+
         choices.forEach(function(c) {
           var btn = document.createElement('button');
           btn.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,#f9f9f9);color:var(--text,#333);font-size:0.88rem;cursor:pointer;text-align:left;';
           btn.textContent = c.num + '. ' + c.label;
           btn.addEventListener('click', function() {
             if (c.action === 'topicPicker') {
-              // 인사말 영역을 분야 선택 picker로 교체
-              el.innerHTML = '';
-              var qDiv2 = document.createElement('div');
-              qDiv2.style.cssText = 'font-size:0.92rem;margin-bottom:0.4rem;';
-              qDiv2.textContent = '어떤 분야 현안부터 살펴볼까요?';
-              el.appendChild(qDiv2);
-              subTopics.forEach(function(t) {
-                var tb = document.createElement('button');
-                tb.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;';
-                tb.textContent = t.label;
-                tb.addEventListener('click', function() {
-                  if (t.msg) {
-                    document.getElementById('chatInput').value = t.msg;
-                    chatTopicChangePending = true;
-                    chatSend();
-                  } else {
-                    chatTopicChangePending = true;
-                    document.getElementById('chatInput').focus();
-                    document.getElementById('chatInput').placeholder = '관심 있는 분야나 정책 아이디어를 입력하세요';
-                  }
-                });
-                el.appendChild(tb);
-              });
+              renderGreetingTopicPicker();
             } else if (c.msg) {
-              document.getElementById('chatInput').value = c.msg;
-              chatTopicChangePending = true;
-              chatSend();
+              sendTopicPrompt(c.msg);
             } else {
-              chatTopicChangePending = true;
-              document.getElementById('chatInput').focus();
-              document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
+              focusTopicInput('어떤 정책 아이디어가 있으신가요?');
             }
           });
           el.appendChild(btn);
@@ -2348,26 +2401,19 @@
                 { label: '당 공약 연결', msg: '우리당 공약·정강정책과 연결해서 정책 방향을 잡고 싶다' },
                 { label: '타지역 사례', msg: (loc ? loc + ' ' : '') + '비슷한 선거구의 타지역 사례를 먼저 보여줘' },
               ];
-              subTopics.forEach(function(t) { if (t.msg) quickItems.push({ label: t.label, msg: t.msg }); });
               quickItems.forEach(function(q) {
                 var qb = document.createElement('button');
                 qb.textContent = q.label;
                 qb.addEventListener('click', function() {
-                  popup.style.display = 'none';
                   if (q.action === 'topicPicker') {
-                    popup.style.display = 'none';
-                    // sub-topic을 팝업 안에서 보여주는 대신, 직접 입력으로 포커스
-                    chatTopicChangePending = true;
-                    document.getElementById('chatInput').focus();
-                    document.getElementById('chatInput').placeholder = '관심 분야를 입력하세요 (예: 복지, 교통, 상권)';
+                    renderQuickTopicPicker(popup, topicBtn);
+                    popup.style.display = '';
                   } else if (q.msg) {
-                    document.getElementById('chatInput').value = q.msg;
-                    chatTopicChangePending = true;
-                    chatSend();
+                    popup.style.display = 'none';
+                    sendTopicPrompt(q.msg);
                   } else {
-                    chatTopicChangePending = true;
-                    document.getElementById('chatInput').focus();
-                    document.getElementById('chatInput').placeholder = '어떤 정책 아이디어가 있으신가요?';
+                    popup.style.display = 'none';
+                    focusTopicInput('어떤 정책 아이디어가 있으신가요?');
                   }
                 });
                 popup.appendChild(qb);
