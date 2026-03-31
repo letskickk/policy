@@ -184,9 +184,12 @@ def _resolve_rasmbly_id(region: Optional[str]) -> str:
     if not data:
         return ""
 
-    items = data.get("LIST", [])
     if isinstance(data, list) and data:
-        items = data[0].get("LIST", [])
+        items = data[0].get("LIST", []) if isinstance(data[0], dict) else []
+    elif isinstance(data, dict):
+        items = data.get("LIST", [])
+    else:
+        items = []
 
     rasmbly_id = ""
     for item in items:
