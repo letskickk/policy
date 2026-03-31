@@ -149,12 +149,12 @@ def _search_messages_by_topic(topic: str, limit: int = 8) -> str:
 def _get_rag_contexts(topic: str, user_meta: Optional[dict] = None) -> dict:
     """기존 Vector Store에서 RAG 컨텍스트 검색 + DB에서 공식 메시지 검색."""
     try:
-        from backend.openai_vector_store import (
+        from backend.config import (
             OPENAI_VECTOR_STORE_ID,
-            OPENAI_REGIONAL_VECTOR_STORE_ID,
             OPENAI_WINNERS2022_VECTOR_STORE_ID,
-            get_openai_client,
         )
+        OPENAI_REGIONAL_VECTOR_STORE_ID = os.getenv("OPENAI_REGIONAL_VECTOR_STORE_ID", "").strip()
+        from backend.embeddings import get_openai_client
 
         client = get_openai_client()
         if not client or not OPENAI_VECTOR_STORE_ID:
