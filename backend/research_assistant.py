@@ -92,20 +92,40 @@ def research_topic(
     related_docs = _find_related_documents(all_docs, keywords, topic, max_docs)
     related_positions = _find_related_positions(all_positions, keywords, topic)
 
-    # 4. 지방의회 API 조회
-    # 기초의원이면 구/군 이름으로 검색해야 기초의회 데이터가 나옴
-    assembly_region = region
+    # 4. 지방의회 API 조회 — 기초의회 + 광역의회 + 국회 모두 검색
+    assembly_results = []
+
+    # 4-1. 기초의회 (구/군의회) — 기초의원일 때
     if election_type and "local" in election_type and district_name:
         gu_name = district_name.strip().split()[0] if district_name.strip() else ""
-        if gu_name and gu_name != region:
-            assembly_region = gu_name
-    assembly = query_assembly_context(
-        region=assembly_region,
-        district_name=district_name,
-        election_type=election_type,
-        keywords=keywords[:5],
-        years=years,
-    )
+        if gu_name:
+            try:
+                local_assembly = query_assembly_context(
+                    region=gu_name, district_name=district_name,
+                    election_type=election_type, keywords=keywords[:5], years=years,
+                )
+                if local_assembly.get("context_text"):
+                    assembly_results.append(f"[기초의회]\n{local_assembly['context_text']}")
+            except Exception as e:
+                logger.warning("기초의회 검색 실패: %s", e)
+
+    # 4-2. 광역의회 (시/도의회)
+    if region:
+        try:
+            metro_assembly = query_assembly_context(
+                region=region, district_name=district_name,
+                election_type=election_type, keywords=keywords[:5], years=years,
+            )
+            if metro_assembly.get("context_text"):
+                assembly_results.append(f"[광역의회]\n{metro_assembly['context_text']}")
+        except Exception as e:
+            logger.warning("광역의회 검색 실패: %s", e)
+
+    # 합산
+    assembly = {
+        "available": len(assembly_results) > 0,
+        "context_text": "\n\n".join(assembly_results),
+    }
 
     # 5. 공공데이터 조회 (인구/상권/교통/시설)
     public_data = query_public_data_context(
