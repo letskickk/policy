@@ -145,12 +145,12 @@ def _build_user_context_text(user_id: int) -> str:
 # Session CRUD
 # ---------------------------------------------------------------------------
 def create_session(user_id: int, topic: str, output_format: str = "정책") -> dict:
-    """새 챗봇 세션 생성. RAG는 주제가 구체화된 후 lazy로 수행."""
+    """새 챗봇 세션 생성. topic이 있으면 즉시 RAG 수행."""
     session_id = uuid.uuid4().hex[:16]
 
-    # 정강정책 + 우리당 공약은 세션 시작부터 항상 포함 (topic 무관)
-    # topic 기반 RAG는 첫 메시지 후 _maybe_inject_rag에서 lazy 수행
-    system_msg = _build_system_message({}, user_id=user_id)
+    # topic이 있으면 즉시 RAG (의회, 공공데이터 포함)
+    rag = _fetch_rag_context(topic, user_id=user_id) if topic and len(topic.strip()) > 2 else {}
+    system_msg = _build_system_message(rag, user_id=user_id)
 
     conn = get_connection()
     try:
@@ -158,7 +158,7 @@ def create_session(user_id: int, topic: str, output_format: str = "정책") -> d
             """INSERT INTO pledge_chat_sessions
                (id, user_id, topic, output_format, rag_context)
                VALUES (?, ?, ?, ?, ?)""",
-            (session_id, user_id, topic, output_format, "{}"),
+            (session_id, user_id, topic, output_format, json.dumps({k: v[:100] if isinstance(v, str) else v for k, v in rag.items()}) if rag else "{}"),
         )
         conn.execute(
             "INSERT INTO pledge_chat_messages (session_id, role, content) VALUES (?, 'system', ?)",
