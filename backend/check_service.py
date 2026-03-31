@@ -111,7 +111,7 @@ def _build_enriched_context(pledge: str, user_meta: dict | None) -> dict[str, st
 
     def _safe_messages() -> str:
         try:
-            return (_search_messages_by_topic(pledge) or "")[:3000]
+            return (_search_messages_by_topic(pledge) or "")[:15000]
         except Exception as e:
             logger.warning("공식 논평·보도자료 컨텍스트 생성 실패: %s", e)
             return ""
@@ -140,9 +140,9 @@ def _build_enriched_context(pledge: str, user_meta: dict | None) -> dict[str, st
 
     return {
         "messages_context": messages,
-        "assembly_context": ((assembly_info or {}).get("context_text") or "")[:3000],
-        "public_data_context": ((public_data_info or {}).get("context_text") or "")[:4000],
-        "research_context": ((research or {}).get("briefing_text") or "")[:3000],
+        "assembly_context": ((assembly_info or {}).get("context_text") or "")[:20000],
+        "public_data_context": ((public_data_info or {}).get("context_text") or "")[:20000],
+        "research_context": ((research or {}).get("briefing_text") or "")[:15000],
     }
 
 

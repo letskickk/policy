@@ -204,6 +204,12 @@
       height: auto;
       display: block;
     }
+    .map-legend{
+      display:flex; justify-content:center; gap:1rem; padding:0.6rem 0 0.2rem;
+      font-size:0.75rem; color:rgba(255,255,255,0.45);
+    }
+    .map-legend-item{ display:flex; align-items:center; gap:0.35rem; }
+    .map-legend-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
 
     .korea-map path{
       stroke-width: 1;
@@ -1251,6 +1257,11 @@
     <div class="map-container">
       <div class="map-wrapper">
         <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
+      </div>
+      <div class="map-legend">
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#f97316"></span> 선택 지역</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#94a3b8"></span> 후보 등록</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#334155"></span> 미등록</span>
       </div>
     </div>
 

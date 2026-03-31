@@ -3162,6 +3162,7 @@ def get_regions():
     ]
 
 
+
 @app.get("/api/stats/election-types", tags=["candidates"])
 def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
     """선거 타입별 승인된 후보 수를 반환한다 (지도 페이지 선거 타입 셀렉트 카운팅용).

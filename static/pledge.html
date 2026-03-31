@@ -1119,18 +1119,21 @@
     .mentoring-tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;}
     .mentoring-tab{padding:0.75rem 1.5rem;background:none;border:none;color:var(--muted);
       font-size:1rem;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;
-      margin-bottom:-2px;transition:all 0.2s;}
+      margin-bottom:-2px;transition:all 0.2s;position:relative;}
     .mentoring-tab:hover{color:var(--text);}
-    .mentoring-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+    .mentoring-tab.active{color:var(--brand);border-bottom-color:var(--brand);background:rgba(255,114,16,0.08);}
+    .mentoring-tab.active::after{content:"";position:absolute;left:0.85rem;right:0.85rem;bottom:-2px;height:3px;border-radius:999px;background:linear-gradient(90deg,#f97316,#fb923c);}
     @media(max-width:640px){.mentoring-tab{padding:0.6rem 1rem;font-size:0.9rem;}}
     /* ── 공약 개발 챗봇 ── */
-    .chat-container{display:flex;flex-direction:column;min-height:480px;}
-    .chat-messages{flex:1;overflow-y:auto;max-height:500px;padding:1rem 0;display:flex;flex-direction:column;gap:0.6rem;}
-    .chat-msg{max-width:92%;padding:0.65rem 0.9rem;border-radius:12px;font-size:0.93rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
-    .chat-msg.assistant{align-self:flex-start;background:rgba(255,255,255,0.07);color:var(--text);border-bottom-left-radius:4px;}
-    .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;}
+    .chat-container{display:flex;flex-direction:column;min-height:620px;}
+    .chat-messages{flex:1;overflow-y:auto;max-height:640px;padding:1rem 0;display:flex;flex-direction:column;gap:0.6rem;}
+    .chat-msg{max-width:92%;padding:0.65rem 0.9rem;border-radius:12px;font-size:0.93rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;box-shadow:0 10px 24px rgba(0,0,0,0.16);}
+    .chat-msg.assistant{align-self:flex-start;background:rgba(255,255,255,0.07);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 10px 24px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.04);}
+    .chat-msg.user{align-self:flex-end;background:rgba(255,122,26,0.16);color:var(--text-strong);border-bottom-right-radius:4px;box-shadow:0 12px 26px rgba(249,115,22,0.14);}
     .chat-msg.notice{align-self:center;background:rgba(96,165,250,0.1);color:var(--muted);font-size:0.82rem;max-width:90%;text-align:center;}
     .chat-msg.streaming{opacity:0.85;}
+    #chatGreeting > button{transition:transform 0.16s ease,border-color 0.16s ease,box-shadow 0.16s ease;}
+    #chatGreeting > button:hover{border-color:var(--brand) !important;transform:scale(1.01);box-shadow:0 10px 18px rgba(249,115,22,0.08);}
     .chat-btn-topic{height:34px;padding:0 0.55rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.2rem;flex-shrink:0;transition:border-color 0.15s,color 0.15s;white-space:nowrap;}
     .chat-btn-topic:hover{border-color:var(--brand);color:var(--brand);}
     .chat-quick-popup{display:flex;gap:0.35rem;flex-wrap:wrap;padding:0.4rem 0.2rem;border:1px solid var(--border);border-radius:8px;background:var(--card);margin-bottom:0.3rem;}
@@ -1153,6 +1156,32 @@
     .chat-session-item:hover{background:rgba(255,255,255,0.06);color:var(--text);}
     .chat-session-item .topic{color:var(--text);font-weight:600;}
     .chat-session-item .meta{color:var(--muted);font-size:0.75rem;}
+    .chat-tips{
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.55rem;
+    }
+    .chat-tip{
+      padding: 0.7rem 0.75rem;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(148,163,184,0.14);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.58);
+    }
+    .chat-tip strong{
+      display: block;
+      margin-bottom: 0.2rem;
+      color: rgba(255,255,255,0.74);
+      font-size: 0.82rem;
+    }
+    @media(max-width:640px){
+      .chat-tips{grid-template-columns:1fr;}
+    }
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1300,6 +1329,11 @@
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
           <button class="chat-btn-send" id="chatBtnSend" onclick="chatSend()">전송</button>
           <button class="chat-btn-finalize" id="chatBtnFinalize" onclick="chatFinalize()" style="display:none;">방향 정리 보기</button>
+        </div>
+        <div class="chat-tips" aria-label="공약 작성 팁">
+          <div class="chat-tip"><strong>관심 분야부터</strong> 교통, 복지, 교육 등 관심 분야를 말하면 코치가 지역 데이터와 의회 논의를 찾아줍니다.</div>
+          <div class="chat-tip"><strong>실행 수단 함께</strong> 조례, 예산, 협의체 등을 함께 논의하면 공약이 단단해집니다.</div>
+          <div class="chat-tip"><strong>체감 변화 한 줄</strong> 주민이 느낄 변화를 한 문장으로 정리하면 공약의 힘이 생깁니다.</div>
         </div>
       </section>
       <div id="chatQuotaBar" class="quota-bar-wrap" style="display:none;">

@@ -7,23 +7,28 @@
     <link rel="stylesheet" href="/static/css/common.css?v=2">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
-    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 2rem; max-width: 420px; width: 100%; margin-top: 15vh; }
+    body { font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: linear-gradient(160deg, #04162b 0%, #073053 55%, #0a3b69 100%); min-height: 100vh; color: #e2e8f0; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(148,163,184,0.18); border-radius: 18px; padding: 2rem; max-width: 420px; width: 100%; box-shadow: 0 22px 44px rgba(0,0,0,0.22); position: relative; overflow: hidden; }
+    .card::after { content: "개혁신당 AI 정책 플랫폼에서 공약 점검과 정책 설계를 한 흐름으로 이어갑니다."; display: block; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(148,163,184,0.18); color: #cbd5e1; font-size: 0.9rem; line-height: 1.65; }
     h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
     label { display: block; font-weight: 700; margin-bottom: 0.5rem; }
-    input { width: 100%; padding: 0.75rem; padding-right: 2.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: #fff; margin-bottom: 1rem; }
+    input { width: 100%; padding: 0.75rem; padding-right: 2.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: #fff; margin-bottom: 1rem; transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
     input:-webkit-autofill { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px rgba(255,255,255,0.08) inset; }
+    input:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); background: rgba(255,255,255,0.1); }
     .pw-wrap { position: relative; margin-bottom: 1rem; }
     .pw-wrap input { margin-bottom: 0; }
     .pw-toggle { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.9rem; padding: 0.25rem; width: auto; }
     .pw-toggle:hover { color: #fff; }
-    button[type="submit"] { width: 100%; padding: 0.9rem; font-weight: 900; background: #fff; color: #0f172a; border: none; border-radius: 12px; cursor: pointer; }
-    button[type="submit"]:hover { background: #f1f5f9; }
+    button[type="submit"] { width: 100%; padding: 0.9rem; font-weight: 900; background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: #fff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 12px 24px rgba(249,115,22,0.26); transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease; }
+    button[type="submit"]:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgba(249,115,22,0.3); filter: brightness(1.04); }
     .msg { margin-top: 1rem; padding: 0.75rem; border-radius: 10px; font-size: 0.9rem; display: none; }
     .msg.err { background: rgba(255,107,107,0.14); color: #ffd1d1; }
     .msg.ok { background: rgba(34,197,94,0.2); color: #86efac; }
     .links { margin-top: 1.5rem; font-size: 0.9rem; }
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; }
+    .feature-strip { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid rgba(148,163,184,0.18); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+    .feature-chip { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; text-align: center; font-size: 0.8rem; line-height: 1.45; color: rgba(255,255,255,0.4); }
+    .feature-chip .icon { font-size: 1rem; line-height: 1; }
     .resend-wrap { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(148,163,184,0.2); display: none; }
     .resend-wrap.visible { display: block; }
     .resend-wrap button { padding: 0.5rem 1rem; background: rgba(255,179,122,0.2); color: #ffb37a; border: 1px solid rgba(255,179,122,0.4); border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
@@ -32,6 +37,9 @@
     .footer { margin-top: auto; padding-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #94a3b8; line-height: 1.8; }
     .footer a { color: #ffb37a; text-decoration: none; font-weight: 700; }
     .footer a:hover { text-decoration: underline; }
+    @media (max-width: 520px) {
+      .feature-strip { grid-template-columns: 1fr; gap: 0.65rem; }
+    }
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -57,6 +65,11 @@
     </div>
     <div class="links">
       계정이 없으신가요? <br><a href="/signup">회원가입</a> | <a href="/">메인으로</a>
+    </div>
+    <div class="feature-strip" aria-label="핵심 기능">
+      <div class="feature-chip"><span class="icon" aria-hidden="true">🧭</span><span>정책 점검</span></div>
+      <div class="feature-chip"><span class="icon" aria-hidden="true">🗺️</span><span>지역 비교</span></div>
+      <div class="feature-chip"><span class="icon" aria-hidden="true">✨</span><span>AI 생성</span></div>
     </div>
   </div>
   </div>
