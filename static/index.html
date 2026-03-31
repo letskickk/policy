@@ -1289,6 +1289,11 @@
       }
     }
 
+    .nav-links{display:flex;gap:0.3rem;align-items:center;}
+    .nav-links .nav-link{color:var(--muted2,var(--muted));text-decoration:none;font-size:0.85rem;font-weight:600;padding:0.35rem 0.65rem;border-radius:8px;transition:color 0.2s,background 0.2s;background:none;border:none;min-height:auto;}
+    .nav-links .nav-link:hover{color:var(--text-strong);background:rgba(255,255,255,0.06);}
+    .nav-links .nav-link.active{color:var(--brand-light,#ff7a1a);background:rgba(255,122,26,0.1);}
+    @media(max-width:640px){.nav-links{gap:0.15rem;}.nav-links .nav-link{font-size:0.78rem;padding:0.3rem 0.45rem;}}
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1305,6 +1310,11 @@
         <div id="authRow" class="nav-login-row"></div>
       </div>
       <div class="nav-wrap">
+        <nav class="nav-links" aria-label="주요 메뉴">
+          <a href="/" class="nav-link active" aria-current="page">홈</a>
+          <a href="/map" class="nav-link">지역 지도</a>
+          <a href="/pledge" class="nav-link">공약 코치</a>
+        </nav>
         <a href="/dashboard" class="nav-link">MY PAGE</a>
       </div>
     </div>
