@@ -88,14 +88,18 @@ def _get_district_dongs(election_position: str, region_name: str, district_name:
     else:
         return []
 
-    # region_name: "서울특별시 강북구" → 시도, 구시군 분리
+    # region_name: "서울특별시" 또는 "서울특별시 강북구"
     parts = (region_name or "").strip().split()
     sido = parts[0] if parts else ""
-    gu = parts[-1] if len(parts) >= 2 else ""
+    gu_from_region = parts[-1] if len(parts) >= 2 else ""
 
-    # district_name: "강북구 가선거구" → 선거구명
+    # district_name: "강남구 가선거구" → 구 + 선거구명
     dn_parts = (district_name or "").strip().split()
-    sgg = dn_parts[-1] if dn_parts else ""  # "가선거구"
+    gu_from_district = dn_parts[0] if len(dn_parts) >= 2 else ""
+    sgg = dn_parts[-1] if dn_parts else ""
+
+    # 구: district_name에서 우선, 없으면 region_name에서
+    gu = gu_from_district if gu_from_district and gu_from_district != sgg else gu_from_region
 
     if "local" in (election_position or ""):
         return layer.get(sido, {}).get(gu, {}).get(sgg, [])
