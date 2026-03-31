@@ -206,7 +206,9 @@ def _http_get_json(url: str, params: dict, *, timeout: int = 10,
     if headers:
         _headers.update(headers)
 
-    if encode_plus:
+    if not params:
+        full_url = url  # URL에 이미 파라미터가 포함된 경우
+    elif encode_plus:
         full_url = url + "?" + urllib.parse.urlencode(params)
     else:
         full_url = url + "?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
@@ -343,7 +345,9 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
 # authKey, searchYearCd, siDo(2자리), guGun(3자리)
 # ---------------------------------------------------------------------------
 
-# 서버(AWS 시드니)에서 opendata.koroad.or.kr 차단됨 → api.odcloud.kr 사용
+# data.go.kr 지자체별 교통사고 통계 API (활용신청 완료)
+TAAS_LGSTAT_URL = "http://apis.data.go.kr/B552061/lgStat/getRestLgStat"
+# 구 odcloud API (uddi:69cb47bd)는 광주광역시 전용이라 비활성화
 TAAS_ODCLOUD = "https://api.odcloud.kr/api/15045638/v1/uddi:69cb47bd-0373-4dee-9101-a1878f8c97c4"
 # opendata.koroad.or.kr (로컬/한국 서버용 fallback)
 TAAS_KOROAD_BASE = "https://opendata.koroad.or.kr/data/rest"
@@ -355,8 +359,48 @@ TAAS_KOROAD_ENDPOINTS = {
     "어린이보호구역": "/frequentzone/schoolzone/child",
 }
 
-# 시군구 코드 매핑 (시도코드 2자리 + 시군구 3자리)
-_GUGUN_MAP = {}  # 런타임에 필요하면 확장
+# 시도 코드 매핑 (data.go.kr lgStat API용 — 공식 코드표 기준)
+_SIDO_CODE_MAP = {
+    "서울": "1100", "서울특별시": "1100",
+    "부산": "1200", "부산광역시": "1200",
+    "대구": "2200", "대구광역시": "2200",
+    "인천": "2300", "인천광역시": "2300",
+    "광주": "2400", "광주광역시": "2400",
+    "대전": "2500", "대전광역시": "2500",
+    "울산": "2600", "울산광역시": "2600",
+    "세종": "2700", "세종특별자치시": "2700",
+    "경기": "1300", "경기도": "1300",
+    "강원": "1400", "강원특별자치도": "1400", "강원도": "1400",
+    "충북": "1500", "충청북도": "1500",
+    "충남": "1600", "충청남도": "1600",
+    "전북": "1700", "전북특별자치도": "1700", "전라북도": "1700",
+    "전남": "1800", "전라남도": "1800",
+    "경북": "1900", "경상북도": "1900",
+    "경남": "2000", "경상남도": "2000",
+    "제주": "2100", "제주특별자치도": "2100",
+}
+# 시군구 코드 매핑 (공식 코드표 기준)
+_GUGUN_CODE_MAP = {
+    # 서울 (1100)
+    "종로구": "1101", "중구": "1102", "용산구": "1103", "성동구": "1104",
+    "동대문구": "1105", "성북구": "1106", "도봉구": "1107", "은평구": "1108",
+    "서대문구": "1109", "마포구": "1110", "강서구": "1111", "구로구": "1112",
+    "영등포구": "1113", "동작구": "1114", "관악구": "1115", "강남구": "1116",
+    "강동구": "1117", "송파구": "1118", "서초구": "1119", "양천구": "1120",
+    "중랑구": "1121", "노원구": "1122", "광진구": "1123", "강북구": "1124",
+    "금천구": "1125",
+    # 부산 (1200)
+    "중구_부산": "1201", "서구_부산": "1202", "동구_부산": "1203", "영도구": "1204",
+    "진구": "1205", "동래구": "1206", "남구_부산": "1207", "북구_부산": "1208",
+    "해운대구": "1209", "사하구": "1210", "금정구": "1211", "강서구_부산": "1212",
+    "연제구": "1213", "수영구": "1214", "사상구": "1215", "기장군": "1216",
+    # 광주 (2400)
+    "동구_광주": "2401", "서구_광주": "2402", "북구_광주": "2403",
+    "광산구": "2404", "남구_광주": "2405",
+    # 대전 (2500)
+    "동구_대전": "2501", "중구_대전": "2502", "서구_대전": "2503",
+    "유성구": "2504", "대덕구": "2505",
+}
 
 
 def _fetch_taas_accidents(region_info: dict) -> dict:
@@ -372,26 +416,75 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
         cached["from_cache"] = True
         return cached
 
-    # 1) odcloud 교통사고 연도별 통계 (서버에서 항상 접근 가능)
-    odcloud_key = DATA_GO_KR_API_KEY
-    if odcloud_key:
-        params = {"serviceKey": odcloud_key, "page": "1", "perPage": "30", "returnType": "JSON"}
-        raw = _http_get_json(TAAS_ODCLOUD, params, timeout=8)
-        if raw and isinstance(raw, dict) and raw.get("data"):
-            items = raw["data"]
-            recent = sorted(items, key=lambda x: int(x.get("연도") or 0), reverse=True)[:5]
-            summary_lines = ["교통사고 통계 (최근 5년):"]
-            for item in recent:
-                summary_lines.append(
-                    f"  - {item.get('연도')}년: 사고 {item.get('사고')}건, "
-                    f"사망 {item.get('사망')}명, 부상 {item.get('부상')}명"
-                )
-            result = {
-                "source": source, "available": True, "data": recent,
-                "summary": "\n".join(summary_lines), "item_count": len(recent),
-            }
-            _set_cached(ck, result)
-            return result
+    # 1) data.go.kr lgStat API — 시군구별 교통사고 통계 (정확한 지역별 데이터)
+    if DATA_GO_KR_API_KEY:
+        province = region_info.get("province", "")
+        sido_code = _SIDO_CODE_MAP.get(province, "")
+        gugun_code = ""
+        if district:
+            gugun_code = _GUGUN_CODE_MAP.get(district, "")
+            if not gugun_code:
+                # 동명이구 처리: "남구" → province 기반으로 찾기
+                for suffix in [f"_{province[:2]}", ""]:
+                    candidate = f"{district}{suffix}" if suffix else district
+                    if candidate in _GUGUN_CODE_MAP:
+                        gugun_code = _GUGUN_CODE_MAP[candidate]
+                        break
+
+        if sido_code:
+            from datetime import datetime as _dt
+            current_year = _dt.now().year
+            summary_lines = []
+            recent_data = []
+            # 최근 3년 조회
+            for year in range(current_year - 1, current_year - 4, -1):
+                try:
+                    import urllib.parse as _up
+                    encoded_key = _up.quote(DATA_GO_KR_API_KEY)
+                    api_url = (
+                        f"{TAAS_LGSTAT_URL}?ServiceKey={encoded_key}"
+                        f"&searchYearCd={year}&siDo={sido_code}"
+                        f"&type=json&numOfRows=13&pageNo=1"
+                    )
+                    if gugun_code:
+                        api_url += f"&guGun={gugun_code}"
+                    raw = _http_get_json(api_url, {}, timeout=10)
+                    if not raw:
+                        continue
+                    items = []
+                    if isinstance(raw, dict):
+                        items_wrap = raw.get("items", {})
+                        if isinstance(items_wrap, dict):
+                            items = items_wrap.get("item", [])
+                        elif isinstance(items_wrap, list):
+                            items = items_wrap
+                    # "전체사고" 항목만 추출
+                    for item in (items if isinstance(items, list) else [items]):
+                        if not isinstance(item, dict):
+                            continue
+                        if item.get("acc_cl_nm") == "전체사고":
+                            acc = item.get("acc_cnt", "")
+                            dth = item.get("dth_dnv_cnt", "")
+                            inj = item.get("injpsn_cnt", "")
+                            region_label = item.get("sido_sgg_nm", district or province)
+                            summary_lines.append(
+                                f"  - {year}년: 사고 {acc}건, 사망 {dth}명, 부상 {inj}명"
+                            )
+                            recent_data.append(item)
+                            break
+                except Exception as e:
+                    logger.warning("lgStat API year=%s error: %s", year, e)
+
+            if summary_lines:
+                region_label = district or province
+                header = f"{region_label} 교통사고 통계 (최근 {len(summary_lines)}년, TAAS 기준):"
+                result = {
+                    "source": source, "available": True, "data": recent_data,
+                    "summary": header + "\n" + "\n".join(summary_lines),
+                    "item_count": len(recent_data),
+                }
+                _set_cached(ck, result)
+                return result
 
     # 2) koroad 다발지역 (한국 서버에서만 접근 가능)
     if TAAS_API_KEY:

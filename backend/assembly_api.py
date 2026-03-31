@@ -35,7 +35,7 @@ CLIK_BASE_URL = "https://clik.nanet.go.kr/openapi"
 SPEECH_BASE_URL = "https://dataset.nanet.go.kr/api"
 
 CACHE_TTL_HOURS = 24
-MAX_RESULTS_PER_QUERY = 20
+MAX_RESULTS_PER_QUERY = 50
 
 
 # ---------------------------------------------------------------------------

@@ -23,8 +23,46 @@ logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o"
+REASONING_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5.4"  # 추론이 필요한 턴에 사용
 
 MAX_HISTORY_MESSAGES = 40  # 대화 히스토리 최대 메시지 수 (시스템 제외)
+
+def _needs_reasoning(user_message: str) -> bool:
+    """mini 모델로 1차 판단: 이 메시지가 깊은 추론을 요구하는지."""
+    text = (user_message or "").strip()
+    if not text or len(text) < 5:
+        return False
+
+    # 빠른 키워드 사전 필터 — 명백한 일반 대화는 API 호출 안 함
+    _QUICK_SKIP = {"네", "아니", "좋아", "ㅇㅇ", "ㄴㄴ", "그래", "응", "1", "2", "3", "고마워", "감사"}
+    if text in _QUICK_SKIP or len(text) <= 3:
+        return False
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        resp = client.chat.completions.create(
+            model=CHAT_MODEL,  # mini로 판단
+            messages=[
+                {"role": "system", "content": (
+                    "너는 메시지 분류기다. 사용자 메시지가 다음 중 하나에 해당하면 YES, 아니면 NO만 답하라.\n"
+                    "YES 기준: 타지역 사례 요청, 전략 비교/분석, 왜 유리한지 논리 설명, 경쟁 후보 차별화, "
+                    "트렌드/흐름 해석, 복잡한 정책 설계, 프레임 제안, 장단점 비교\n"
+                    "NO 기준: 단순 선택(1번/2번), 감사/인사, 특정 분야 더 보기, 정리 요청, 의회 안건 조회, "
+                    "간단한 질문, 방향 확인"
+                )},
+                {"role": "user", "content": text},
+            ],
+            max_completion_tokens=3,
+            timeout=5,
+        )
+        answer = (resp.choices[0].message.content or "").strip().upper()
+        result = answer.startswith("YES")
+        logger.info("[pledge_chat] reasoning_check: %s → %s", text[:40], result)
+        return result
+    except Exception as e:
+        logger.warning("[pledge_chat] reasoning check failed: %s", e)
+        return False
 
 # 모듈 레벨 캐시 — 서버 재시작 전까지 유지
 _DISTRICT_DONG_MAP_CACHE: Optional[dict] = None
@@ -67,7 +105,7 @@ def _fetch_platform_pledges() -> tuple[str, str]:
         return _PLATFORM_CACHE, _PLEDGES_CACHE or ""
     try:
         from backend.policy_drafter import _get_rag_contexts
-        rag = _get_rag_contexts("공약 방향 정강정책 자유 공정 혁신 지방분권")
+        rag = _get_rag_contexts("정강정책 복지 안전 교육 경제 환경 주거 교통 지방분권 행정혁신 공약")
         _PLATFORM_CACHE = rag.get("platform") or ""
         _PLEDGES_CACHE = rag.get("pledges") or ""
     except Exception as e:
@@ -313,6 +351,7 @@ def _build_system_message(rag: dict, user_id: int | None = None) -> str:
 
     정강정책 + 우리당 공약은 topic 무관 항상 포함 (캐시 사용).
     user_id가 주어지면 후보자 기본 정보도 포함.
+    의회·공공데이터는 포함하되 태그 내 지시로 사용 시점을 제어.
     """
     base_prompt = _load_chat_system_prompt()
 
@@ -324,19 +363,19 @@ def _build_system_message(rag: dict, user_id: int | None = None) -> str:
     # 참고 자료 섹션
     context_parts = []
     if platform_text:
-        context_parts.append(f"[참고: 정강정책]\n{platform_text[:4000]}")
+        context_parts.append(f"[참고: 정강정책]\n{platform_text[:8000]}")
     if pledges_text:
-        context_parts.append(f"[참고: 우리당 공약]\n{pledges_text[:4000]}")
+        context_parts.append(f"[참고: 우리당 공약]\n{pledges_text[:6000]}")
     if rag.get("winners2022"):
         context_parts.append(f"[참고: 2022 당선인 공약]\n{rag['winners2022'][:3000]}")
     if rag.get("messages"):
         context_parts.append(f"[참고: 공식 논평·보도자료]\n{rag['messages'][:3000]}")
     if rag.get("assembly"):
-        context_parts.append(f"[참고: 지방의회 논의]\n{rag['assembly'][:3000]}")
+        context_parts.append(f"[참고: 지방의회 논의 — 사용자가 의회·조례를 직접 물었을 때만 인용하라. 첫 턴에서 꺼내지 마라.]\n{rag['assembly'][:3000]}")
     if rag.get("research"):
         context_parts.append(f"[참고: 연구 자료]\n{rag['research'][:3000]}")
     if rag.get("public_data"):
-        context_parts.append(f"[참고: 공공데이터 — 지역 현황]\n{rag['public_data'][:4000]}")
+        context_parts.append(f"[참고: 공공데이터 — 사용자가 해당 분야를 파고들 때만 수치를 인용하라. 첫 턴에서 꺼내지 마라.]\n{rag['public_data'][:4000]}")
 
     if context_parts:
         context_section = "\n\n---\n아래는 대화 중 참고할 자료이다. 대화에서 자연스럽게 활용하되 내부 태그를 노출하지 마라.\n\n" + "\n\n".join(context_parts)
@@ -364,12 +403,17 @@ def chat_stream(session_id: str, user_message: str):
     from openai import OpenAI, APIError, APITimeoutError
     client = OpenAI(api_key=OPENAI_API_KEY)
 
+    # 추론 필요 여부에 따라 모델 선택
+    use_reasoning = _needs_reasoning(user_message)
+    model = REASONING_MODEL if use_reasoning else CHAT_MODEL
+    logger.info("[pledge_chat] model=%s reasoning=%s msg=%s", model, use_reasoning, user_message[:50])
+
     try:
         stream = client.chat.completions.create(
-            model=CHAT_MODEL,
+            model=model,
             messages=messages,
             max_completion_tokens=4000,
-            timeout=90,
+            timeout=120 if use_reasoning else 90,
             stream=True,
             stream_options={"include_usage": True},
         )
@@ -438,9 +482,9 @@ def finalize_stream(session_id: str):
     platform_text = rag.get("platform") or cached_platform
     pledges_text = rag.get("pledges") or cached_pledges
     if platform_text:
-        context_blocks.append(f"[정강정책]\n{platform_text[:2500]}")
+        context_blocks.append(f"[정강정책]\n{platform_text[:6000]}")
     if pledges_text:
-        context_blocks.append(f"[우리당 공약]\n{pledges_text[:2500]}")
+        context_blocks.append(f"[우리당 공약]\n{pledges_text[:5000]}")
     if rag.get("messages"):
         context_blocks.append(f"[논평·보도자료]\n{rag['messages'][:2000]}")
     if rag.get("assembly"):
@@ -522,9 +566,8 @@ def _build_chat_style_system_prompt() -> str:
         "기본 답변은 8~10문장 안팎 또는 짧은 항목 3개 이내로 제한하라.\n"
         "각 항목은 2~3문장 안쪽으로 쓰고, 왜 이 지역에서 중요한지 짧게 설명하라.\n"
         "자료가 있으면 첫 문장이나 첫 항목 안에 지역명, 의회 논의, 조례, 안건명, 구체 지점 중 최소 1개를 넣어라.\n"
-        "학교명, 역명, 아파트명, 상가명, 버스정류장명, 특정 교차로명 같은 고유명사는 실제 자료에 있을 때만 말하라.\n"
-        "근거 없이 고유명사를 특정하기 어렵다면 낮은 수준처럼 물러서지 말고, 더 정확한 기준으로 전환하라.\n"
-        "예를 들어 학교명 대신 통학로 유형, 정문/후문, 골목/대로변, 학원가 연결 동선처럼 바로 공약화 가능한 틀로 좁혀라.\n"
+        "구/동 이름, 정책·사업명은 GPT 일반 지식으로 자유롭게 말할 수 있다. 타지역 사례를 물으면 실제 구/동과 정책명을 구체적으로 들어라.\n"
+        "단, 특정 학교명·아파트명·버스정류장명·교차로명은 자료에 있을 때만 말하라.\n"
         "아직 사용자가 고르지 않은 갈래는 깊게 풀지 마라.\n"
         "답변 마지막에는 사용자가 다음 턴에서 고를 수 있는 질문 1개만 남겨라.\n"
         "사용자가 특정 지점을 더 물으면 그 부분만 깊게 답하고, 다른 갈래를 다시 길게 벌리지 마라."
@@ -539,18 +582,14 @@ def _build_turn_mode_system_prompt(user_message: str) -> str:
     if not any(keyword in text or keyword in lowered for keyword in _CHAT_BRIEFING_KEYWORDS):
         return ""
     return (
-        "이번 답변은 자료 브리핑 모드로 답하라.\n"
-        "사용자가 조례, 의회 기록, 회의록, 안건, 의결 흐름을 직접 묻고 있으므로 "
-        "자료를 배경으로만 녹여내지 말고 확인된 내용을 구체적으로 설명하라.\n"
-        "다만 첫 답변부터 길게 다 풀지 말고 다음 순서를 조금 더 설명력 있게 따른다.\n"
-        "1. 확인된 자료 또는 논의 대상\n"
-        "2. 핵심 내용과 현재 상태\n"
-        "3. 공약으로 연결할 수 있는 지점 또는 더 볼 포인트\n"
-        "항목은 최대 3개까지만 제시하고 각 항목은 2~3문장 안쪽으로 짧게 말하라.\n"
-        "첫 항목에는 가능하면 지역명, 의회명, 안건명, 조례명 같은 식별 가능한 근거를 넣어라.\n"
-        "자료가 약하면 현재 확인 범위와 해석 가능한 함의를 구분해서 말하라.\n"
-        "완성 공약문, 슬로건, 선언문으로 쓰지 말고 브리핑 후 공약 연결점까지만 제시하라.\n"
-        "답변 마지막에는 사용자가 다음 턴에서 더 파고들 수 있는 질문 1개만 남겨라."
+        "이번 답변은 의회 자료 브리핑 모드이다.\n"
+        "반드시 시스템 프롬프트 rule 10의 2단계 순서를 따르라.\n"
+        "[1단계] 참고 자료에 있는 안건 전체를 분야별로 짧게 분류하여 한눈에 보여줘라.\n"
+        "예: '행정·의회운영 2건(의원 공무국외출장 조례 전부개정조례안 등), 생활환경·웰니스 1건(웰니스 특화도시 조성 특별위원회 보고서)...'\n"
+        "각 분야는 1줄, 안건명만 나열하라. 분석하지 마라.\n"
+        "분류 후 '어느 분야를 먼저 볼까요?'로 끝내라.\n"
+        "[2단계는 사용자가 분야를 고른 뒤에만 진행한다.]\n"
+        "자료가 적어도(3건 이하) 분류 형식을 유지하라. 건수가 적으면 적다고 말하면 된다."
     )
 
 
