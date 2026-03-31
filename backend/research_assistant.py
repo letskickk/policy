@@ -93,11 +93,17 @@ def research_topic(
     related_positions = _find_related_positions(all_positions, keywords, topic)
 
     # 4. 지방의회 API 조회
+    # 기초의원이면 구/군 이름으로 검색해야 기초의회 데이터가 나옴
+    assembly_region = region
+    if election_type and "local" in election_type and district_name:
+        gu_name = district_name.strip().split()[0] if district_name.strip() else ""
+        if gu_name and gu_name != region:
+            assembly_region = gu_name
     assembly = query_assembly_context(
-        region=region,
+        region=assembly_region,
         district_name=district_name,
         election_type=election_type,
-        keywords=keywords[:5],  # API 검색어는 5개까지
+        keywords=keywords[:5],
         years=years,
     )
 
