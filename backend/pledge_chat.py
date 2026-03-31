@@ -22,7 +22,7 @@ from backend.auth import get_user
 logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-CHAT_MODEL = os.getenv("CHAT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-5.4-mini"
+CHAT_MODEL = os.getenv("CHAT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o"
 
 MAX_HISTORY_MESSAGES = 40  # 대화 히스토리 최대 메시지 수 (시스템 제외)
 
@@ -324,28 +324,22 @@ def _build_system_message(rag: dict, user_id: int | None = None) -> str:
     # 참고 자료 섹션
     context_parts = []
     if platform_text:
-        context_parts.append(f"[참고: 정강정책]\n{platform_text[:15000]}")
+        context_parts.append(f"[참고: 정강정책]\n{platform_text[:4000]}")
     if pledges_text:
-        context_parts.append(f"[참고: 우리당 공약]\n{pledges_text[:15000]}")
+        context_parts.append(f"[참고: 우리당 공약]\n{pledges_text[:4000]}")
     if rag.get("winners2022"):
-        context_parts.append(f"[참고: 2022 당선인 공약]\n{rag['winners2022'][:10000]}")
+        context_parts.append(f"[참고: 2022 당선인 공약]\n{rag['winners2022'][:3000]}")
     if rag.get("messages"):
-        context_parts.append(f"[참고: 공식 논평·보도자료]\n{rag['messages'][:10000]}")
+        context_parts.append(f"[참고: 공식 논평·보도자료]\n{rag['messages'][:3000]}")
     if rag.get("assembly"):
-        context_parts.append(f"[참고: 지방의회 논의]\n{rag['assembly'][:15000]}")
+        context_parts.append(f"[참고: 지방의회 논의]\n{rag['assembly'][:3000]}")
     if rag.get("research"):
-        context_parts.append(f"[참고: 연구 자료]\n{rag['research'][:10000]}")
+        context_parts.append(f"[참고: 연구 자료]\n{rag['research'][:3000]}")
     if rag.get("public_data"):
-        context_parts.append(f"[참고: 공공데이터 — 지역 현황]\n{rag['public_data'][:10000]}")
+        context_parts.append(f"[참고: 공공데이터 — 지역 현황]\n{rag['public_data'][:4000]}")
 
     if context_parts:
-        context_section = (
-            "\n\n---\n아래는 대화 중 참고할 자료이다. 반드시 아래 우선순위를 지켜라.\n"
-            "1순위: 정강정책·우리당 공약 — 정책 방향과 가치의 근거로 먼저 활용하라.\n"
-            "2순위: 의회 논의·논평 — 지역 현안의 맥락과 근거로 활용하라.\n"
-            "3순위: 공공데이터 — 후보자가 해당 분야에 관심을 표명한 뒤에만 수치를 제시하라. 첫 답변에서 통계를 앞세우지 마라.\n"
-            "내부 태그를 노출하지 마라.\n\n"
-        ) + "\n\n".join(context_parts)
+        context_section = "\n\n---\n아래는 대화 중 참고할 자료이다. 대화에서 자연스럽게 활용하되 내부 태그를 노출하지 마라.\n\n" + "\n\n".join(context_parts)
     else:
         context_section = ""
 
@@ -374,8 +368,8 @@ def chat_stream(session_id: str, user_message: str):
         stream = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            max_completion_tokens=4000,
-            timeout=90,
+            max_completion_tokens=1800,
+            timeout=60,
             stream=True,
             stream_options={"include_usage": True},
         )
