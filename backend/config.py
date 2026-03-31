@@ -36,7 +36,8 @@ PROMPTS_DIR = ROOT_DIR / "prompts"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 # /check(당 부합 점검)에서 사용
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
+# /check(당 부합 점검)에서 사용 — 5축 채점·보정 규칙 정확도가 핵심
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
 
 # GPT 컨텍스트 한도(자). 초과 시 잘라냄. 0이면 앱 한도 없음(전부 로드, GPT API 토큰 한도는 별도)
 # 각 컨텍스트(정강정책, 공약)는 절반씩 사용. 기본 50000 → 폴더당 25000자
@@ -56,11 +57,10 @@ if _embed_dim:
     EMBEDDING_DIMENSION = int(_embed_dim)
 else:
     EMBEDDING_DIMENSION = 3072 if "large" in EMBEDDING_MODEL.lower() else 1536
-# /api/pledge/verify·카드 생성에서 사용. 미설정 시 OPENAI_MODEL(gpt-5.2)과 동일
-# Responses API 사용 시 gpt-5.2 등 최신 모델 지원
-CHAT_MODEL = os.getenv("CHAT_MODEL", "").strip() or OPENAI_MODEL
-# 이미지 저장용 카드뉴스 요약 전용 모델. 미설정 시 gpt-5.2-mini 사용.
-CARD_SUMMARY_MODEL = os.getenv("CARD_SUMMARY_MODEL", "").strip() or "gpt-5-mini"
+# 챗봇·카드·verify 등 대화형에서 사용. 점검(OPENAI_MODEL)보다 가벼운 모델.
+CHAT_MODEL = os.getenv("CHAT_MODEL", "").strip() or "gpt-5.4-mini"
+# 이미지 저장용 카드뉴스 요약 전용 모델
+CARD_SUMMARY_MODEL = os.getenv("CARD_SUMMARY_MODEL", "").strip() or "gpt-5.4-mini"
 
 # 인덱스 캐시: AWS/컨테이너에서 /tmp는 재시작 시 휘발 → INDEX_CACHE_DIR로 영구 경로 지정 권장
 _def_cache_env = os.getenv("INDEX_CACHE_DIR", "").strip()
