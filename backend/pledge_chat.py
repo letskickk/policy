@@ -368,8 +368,8 @@ def chat_stream(session_id: str, user_message: str):
         stream = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            max_completion_tokens=1800,
-            timeout=60,
+            max_completion_tokens=4000,
+            timeout=90,
             stream=True,
             stream_options={"include_usage": True},
         )
