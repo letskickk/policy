@@ -5060,12 +5060,6 @@ def hub_archive_redirect():
     from fastapi.responses import RedirectResponse
     return RedirectResponse("/hub", status_code=301)
 
-@app.get("/policy-lab", include_in_schema=False)
-def policy_lab_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse("/hub", status_code=301)
-
-
 def _candidate_public_rows_sql() -> str:
     public_note = "\uacf5\ucc9c \ud655\uc815"
     return f"""

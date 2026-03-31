@@ -12,9 +12,21 @@
 ===== [등록된 출마자 공약] =====
 {{CANDIDATES_PLEDGES_CONTEXT}}
 
+===== [공식 논평 보도자료] =====
+{{MESSAGES_CONTEXT}}
+
+===== [지방의회 논의] =====
+{{ASSEMBLY_CONTEXT}}
+
+===== [공공데이터 지역 현황] =====
+{{PUBLIC_DATA_CONTEXT}}
+
+===== [리서치 자료] =====
+{{RESEARCH_CONTEXT}}
+
 ---
 
-위 문서만 근거로 아래 [출마자 공약]을 점검하라.
+위 문서를 근거로 아래 [출마자 공약]을 점검하라.
 
 [출마자 정보]
 선거유형: {{ELECTION_TYPE}}

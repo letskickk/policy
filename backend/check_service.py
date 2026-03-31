@@ -6,6 +6,7 @@
 import logging
 import re
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Iterator
 
 from openai import OpenAI
@@ -89,6 +90,62 @@ def _load_candidates_context() -> str:
         return ""
 
 
+def _build_enriched_context(pledge: str, user_meta: dict | None) -> dict[str, str]:
+    region = " ".join(
+        part for part in [
+            (user_meta or {}).get("region_province", ""),
+            (user_meta or {}).get("region_city", ""),
+            (user_meta or {}).get("district_name", ""),
+        ]
+        if part
+    ).strip()
+    if not region:
+        return {}
+
+    try:
+        from backend.policy_drafter import _search_messages_by_topic
+        from backend.research_assistant import research_topic
+    except Exception as e:
+        logger.warning("추가 컨텍스트 로더 import 실패: %s", e)
+        return {}
+
+    def _safe_messages() -> str:
+        try:
+            return (_search_messages_by_topic(pledge) or "")[:3000]
+        except Exception as e:
+            logger.warning("공식 논평·보도자료 컨텍스트 생성 실패: %s", e)
+            return ""
+
+    def _safe_research() -> dict:
+        try:
+            return research_topic(
+                topic=pledge,
+                region=region,
+                district_name=(user_meta or {}).get("district_name") or None,
+                election_type=(user_meta or {}).get("election_type") or None,
+                years=2,
+            ) or {}
+        except Exception as e:
+            logger.warning("리서치 컨텍스트 생성 실패: %s", e)
+            return {}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        messages_future = executor.submit(_safe_messages)
+        research_future = executor.submit(_safe_research)
+        messages = messages_future.result()
+        research = research_future.result()
+
+    assembly_info = research.get("assembly") if isinstance(research, dict) else {}
+    public_data_info = research.get("public_data") if isinstance(research, dict) else {}
+
+    return {
+        "messages_context": messages,
+        "assembly_context": ((assembly_info or {}).get("context_text") or "")[:3000],
+        "public_data_context": ((public_data_info or {}).get("context_text") or "")[:4000],
+        "research_context": ((research or {}).get("briefing_text") or "")[:3000],
+    }
+
+
 def _build_winners2022_context_for_non_vs(
     pledge: str,
     winners2022_vector_store_id: str | None,
@@ -144,6 +201,7 @@ def check_pledge_alignment(
         user_meta = build_pledge_meta_from_user(user)
 
     candidates_context = _load_candidates_context()
+    enriched_context = _build_enriched_context(pledge_key, user_meta)
 
     use_vector_store = bool(vector_store_id)
     use_faiss_search = (
@@ -165,6 +223,10 @@ def check_pledge_alignment(
             max_results=10,
             user_meta=user_meta,
             candidates_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
         )
     elif use_faiss_search:
         logger.info("FAISS 검색 기반 점검 (관련 청크만 사용)...")
@@ -192,6 +254,10 @@ def check_pledge_alignment(
         user = build_user_message(
             platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
             user_meta=user_meta,
         )
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -225,6 +291,10 @@ def check_pledge_alignment(
         user = build_user_message(
             platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
             user_meta=user_meta,
         )
 
@@ -288,6 +358,7 @@ def check_pledge_alignment_stream(
         user_meta = build_pledge_meta_from_user(user)
 
     candidates_context = _load_candidates_context()
+    enriched_context = _build_enriched_context(pledge_key, user_meta)
 
     use_vector_store = bool(vector_store_id)
     use_faiss_search = (
@@ -311,6 +382,10 @@ def check_pledge_alignment_stream(
             max_results=10,
             user_meta=user_meta,
             candidates_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
             _stream=True,
         )
         for chunk in gen:
@@ -344,6 +419,10 @@ def check_pledge_alignment_stream(
         user_msg = build_user_message(
             platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
             user_meta=user_meta,
         )
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -379,6 +458,10 @@ def check_pledge_alignment_stream(
         user_msg = build_user_message(
             platform_context, pledges_context, pledge_key, winners2022_ctx,
             candidates_pledges_context=candidates_context,
+            messages_context=enriched_context.get("messages_context", ""),
+            assembly_context=enriched_context.get("assembly_context", ""),
+            public_data_context=enriched_context.get("public_data_context", ""),
+            research_context=enriched_context.get("research_context", ""),
             user_meta=user_meta,
         )
         client = OpenAI(api_key=OPENAI_API_KEY)

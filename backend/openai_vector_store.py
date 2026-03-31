@@ -1929,6 +1929,10 @@ def run_check(
     max_results: int = 12,
     user_meta: dict | None = None,
     candidates_context: str = "",
+    messages_context: str = "",
+    assembly_context: str = "",
+    public_data_context: str = "",
+    research_context: str = "",
     _stream: bool = False,
 ):
     """
@@ -2640,6 +2644,10 @@ def run_check(
     user = build_user_message(
         platform_context, pledges_context, pledge, winners2022_context,
         candidates_pledges_context=candidates_context,
+        messages_context=messages_context,
+        assembly_context=assembly_context,
+        public_data_context=public_data_context,
+        research_context=research_context,
         user_meta=user_meta,
     )
     t_before_llm = time.perf_counter()

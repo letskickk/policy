@@ -79,6 +79,10 @@ def build_user_message(
     pledge: str,
     winners2022_pledges_context: str = "",
     candidates_pledges_context: str = "",
+    messages_context: str = "",
+    assembly_context: str = "",
+    public_data_context: str = "",
+    research_context: str = "",
     election_type: str = "",
     region_level: str = "",
     region_province: str = "",
@@ -99,11 +103,19 @@ def build_user_message(
     winners2022 = (winners2022_pledges_context or "").strip() or "(2022 당선인 공약 문서 없음)"
     candidates_raw = (candidates_pledges_context or "").strip()
     candidates = candidates_raw or "(등록된 출마자 공약 없음)"
+    messages = (messages_context or "").strip() or "(공식 논평·보도자료 없음)"
+    assembly = (assembly_context or "").strip() or "(지방의회 논의 없음)"
+    public_data = (public_data_context or "").strip() or "(공공데이터 지역 현황 없음)"
+    research = (research_context or "").strip() or "(리서치 자료 없음)"
     out = (
         template.replace("{{PLATFORM_CONTEXT}}", platform)
         .replace("{{PLEDGES_CONTEXT}}", pledges)
         .replace("{{WINNERS2022_PLEDGES_CONTEXT}}", winners2022)
         .replace("{{CANDIDATES_PLEDGES_CONTEXT}}", candidates)
+        .replace("{{MESSAGES_CONTEXT}}", messages)
+        .replace("{{ASSEMBLY_CONTEXT}}", assembly)
+        .replace("{{PUBLIC_DATA_CONTEXT}}", public_data)
+        .replace("{{RESEARCH_CONTEXT}}", research)
         .replace("{{PLEDGE}}", pledge)
         .replace("{{ELECTION_TYPE}}", election_type or "")
         .replace("{{REGION_LEVEL}}", region_level or "")
