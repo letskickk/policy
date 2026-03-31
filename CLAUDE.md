@@ -162,3 +162,65 @@ uvicorn backend.main:app --reload
 
 - **스크린샷 금지**: 명시적으로 요청하지 않는 한 `preview_screenshot` 등 스크린샷 도구 사용 금지.
   코드 변경 검증은 `curl`, `grep`, `preview_snapshot`, `preview_logs` 등 텍스트 기반 도구로 수행.
+
+---
+
+## 서버 접속 정보
+
+- **운영 서버**: `ssh -i /c/policy.pem ubuntu@13.211.138.44`
+- **프로젝트 경로**: `/home/ubuntu/Policy` (대문자 P)
+- **실행**: `nohup .venv/bin/python3 .venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 > /tmp/policy.log 2>&1 &`
+- **정적 파일**: scp로 업로드 → 재시작 불필요. 코드 변경 → `pkill -f uvicorn` + 위 명령
+- **URL**: https://policy.reformparty.kr/
+
+---
+
+## 챗봇 하이브리드 모델 구조 (2026-04-01 구현)
+
+- **일반 대화**: `CHAT_MODEL` (gpt-5.4-mini) — 빠른 응답
+- **추론 필요 턴**: `REASONING_MODEL` (gpt-5.4) — 사례 분석, 팩트체크, 전략 비교
+- **판단 방식**: mini가 YES/NO로 1차 판단 (`_needs_reasoning()` in `pledge_chat.py`)
+- 3자 이하 / 명백한 단순 응답은 API 호출 없이 mini 직행
+
+## 프롬프트 마커 체계 (2026-04-01)
+
+챗봇 응답에서 AI가 `[사실]`, `[제안]`, `[확인필요]` 마커를 문단 앞에 붙임.
+프론트엔드(`pledge.html`)의 `chatFormatLayers()` 함수가 스트리밍 완료 시 파싱하여 색상 구분 카드로 렌더링.
+- `[사실]` → 파란색 좌측 보더
+- `[제안]` → 주황색 좌측 보더
+- `[확인필요]` → 노란색 좌측 보더
+
+## 교통사고 API (2026-04-01 교체)
+
+- **구 API**: `api.odcloud.kr/api/15045638` — 광주광역시 전용, 지역 구분 없음 → **비활성화**
+- **신 API**: `http://apis.data.go.kr/B552061/lgStat/getRestLgStat` — 시군구별 정확 데이터
+- **주의**: http (not https), 시군구 코드는 `_GUGUN_CODE_MAP` 참조
+- 코드: `public_data_api.py` `_fetch_taas_accidents()` 함수
+
+## impeccable 디자인 스킬 (설치됨)
+
+- 경로: `~/.claude/skills/impeccable/`
+- 프로젝트 디자인 컨텍스트: `.impeccable.md`
+- `/critique` 결과: 22/40 → P0/P1 수정 완료
+
+---
+
+## 현재 진행 상황 (2026-04-01)
+
+### 완료
+- [x] 하이브리드 모델 (mini 판단 → 5.4/mini 선택)
+- [x] 교통사고 API 교체 (광주 전용 → data.go.kr lgStat)
+- [x] 의회 검색 건수 20→50
+- [x] 프롬프트: 사실/해석 구분, 출처 표시, 확정적 문체 금지, 5년 이상 회의록 금지
+- [x] 프롬프트: [사실]/[제안]/[확인필요] 마커 체계
+- [x] UI 3층 렌더링 (chatFormatLayers)
+- [x] /critique 22/40 → P0 글로벌 네비게이션, P0 색상 대비 WCAG, P1 포커스 링, P1 상태 컴포넌트
+- [x] overdrive: 카드/버튼 스프링, 챗봇 메시지 애니, 스크롤 진행 바, 고스트 추천 질문
+- [x] GitHub push (b4dfd4f) + 서버 배포 완료
+
+### 다음 작업 (TODO)
+- [ ] `/distill` — pledge.html 인지부하 감소 (탭 2개+3단계 플로우 단순화, CTA 명확화)
+- [ ] `/normalize` — 컴포넌트 일관성 (card/panel/surface 중복 정리, 브레이크포인트 통일 640/900 두 개로)
+- [ ] `/harden` — 모달 포커스 트랩 구현, map.html SVG 포커스 스타일, 에러/빈 상태 엣지케이스
+- [ ] `/polish` — 최종 품질 점검 (항상 마지막)
+- [ ] `/critique` 재실행 → 점수 개선 확인
