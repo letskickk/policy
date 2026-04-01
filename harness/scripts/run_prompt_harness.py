@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import shutil
 import subprocess
 import sys
@@ -16,10 +17,22 @@ HARNESS = ROOT / "harness"
 RESULTS = HARNESS / "results"
 RAW_RESULT = RESULTS / "promptfoo-eval.json"
 TIER_RESULT = RESULTS / "tier-1.json"
+DB_PATH = ROOT / "data" / "policy.db"
 
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
     return max(low, min(high, value))
+
+
+def clear_analysis_cache() -> None:
+    if not DB_PATH.exists():
+        return
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute("DELETE FROM analysis_cache")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def compute_verify_quality(results: list[dict]) -> float:
@@ -47,6 +60,10 @@ def compute_verify_quality(results: list[dict]) -> float:
             quality = clamp((40.0 - score) / 40.0 * 100.0)
         elif expectation == "verify_slogan":
             quality = clamp((45.0 - score) / 45.0 * 100.0)
+        elif expectation == "verify_vague_numeric":
+            quality = clamp((60.0 - score) / 60.0 * 100.0)
+        elif expectation == "verify_query_like":
+            quality = clamp((25.0 - score) / 25.0 * 100.0)
         else:
             quality = 0.0
         qualities.append(quality)
@@ -75,6 +92,8 @@ def main() -> int:
         npx,
         "promptfoo",
         "eval",
+        "--max-concurrency",
+        "2",
         "--config",
         str(HARNESS / "promptfoo.yaml"),
         "--output",
@@ -84,20 +103,25 @@ def main() -> int:
     env = dict(**__import__("os").environ)
     env.setdefault("T1_BASE_URL", "http://127.0.0.1:8011")
     env.setdefault("PROMPTFOO_DISABLE_TELEMETRY", "1")
-    try:
-        process = start_server(8011, RESULTS / "tier-1.server.out.log", RESULTS / "tier-1.server.err.log")
-        completed = subprocess.run(
-            command,
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-        )
-    finally:
-        stop_server(process)
-    if completed.returncode != 0:
+    completed = None
+    for _attempt in range(2):
+        clear_analysis_cache()
+        try:
+            process = start_server(8011, RESULTS / "tier-1.server.out.log", RESULTS / "tier-1.server.err.log")
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+        finally:
+            stop_server(process)
+        if completed.returncode == 0:
+            break
+    if completed is None or completed.returncode != 0:
         payload = {
             "tier": 1,
             "score": 0.0,

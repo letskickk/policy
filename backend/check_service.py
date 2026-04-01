@@ -20,26 +20,23 @@ logger = logging.getLogger(__name__)
 _RESULT_CACHE: "OrderedDict[str, str]" = OrderedDict()
 _RESULT_CACHE_MAX = 128
 
-
 def apply_check_postprocessing(result: str, pledge: str) -> str:
     """GPT 응답 후처리: 섹션 2 형식, 명칭만 제시 시 보정."""
-    # 유사·중복 공약: 없음. (긴 설명...) → "없음"만 유지
     result = re.sub(
-        r'(유사·중복 공약:\s*)없음\.?\s*\([^)]+\)',
-        r'\1없음',
+        r"(유사·중복 공약:\s*)없음\.?\s*\([^)]+\)",
+        r"\1없음",
         result,
         count=1,
     )
-    # 섹션 2 제목·결과 형식 보정
     result = result.replace("2. 개혁신당 공약과의 비교", "2. 개혁신당 중앙당 공약과의 유사성")
-    _idx = result.find("2. 개혁신당")
-    if _idx != -1:
-        _rest = result[_idx:]
-        _m = re.search(r"결과:\s*(?:적합|부분적 적합|부적합)\s*\((\d{1,3})점\)", _rest)
-        if _m:
-            _start = _idx + _m.start()
-            _end = _idx + _m.end()
-            result = result[:_start] + f"결과: 유사도({_m.group(1)}점)" + result[_end:]
+    idx = result.find("2. 개혁신당")
+    if idx != -1:
+        rest = result[idx:]
+        match = re.search(r"결과:\s*(?:적합|부분적 적합|부적합)\s*\((\d{1,3})점\)", rest)
+        if match:
+            start = idx + match.start()
+            end = idx + match.end()
+            result = result[:start] + f"결과: 유사도({match.group(1)}점)" + result[end:]
 
     if len(pledge.strip()) < 80:
         result = re.sub(
@@ -48,9 +45,9 @@ def apply_check_postprocessing(result: str, pledge: str) -> str:
             result,
             count=1,
         )
-        _fix = "제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 우리당 공약의 구체적 방안을 참고해 보완 필요."
-        result = re.sub(r"일치율은\s*90% 이상[^.]*판단한다?", f"{_fix}", result)
-        result = re.sub(r"90% 이상\s*\(거의 동일\)", _fix, result)
+        fix = "제시공약은 명칭만 있어 구체적으로 뭘 하겠다는 내용이 없음. 우리당 공약의 구체적 방안을 참고해 보완 필요."
+        result = re.sub(r"일치율은\s*90% 이상[^.]*판단한다?", fix, result)
+        result = re.sub(r"90% 이상\s*\(거의 동일\)", fix, result)
         result = result.replace("거의 동일", "구체적 방안 부족")
         result = result.replace("사실상 동일한", "명칭만 동일한")
         result = result.replace("동일하여", "명칭은 같으나")

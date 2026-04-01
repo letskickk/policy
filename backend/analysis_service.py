@@ -114,6 +114,12 @@ def _enrich_verify_result(result: Any) -> Any:
     if not isinstance(result, dict):
         return result
 
+    rubric = result.get("rubric")
+    if isinstance(rubric, dict):
+        for key in ("platform", "pledges", "conflicts"):
+            if key not in result and isinstance(rubric.get(key), list):
+                result[key] = rubric.get(key)
+
     score = max(0.0, min(100.0, _extract_fit_score(result)))
     score = round(score, 1)
     signal = _signal_from_score(score)

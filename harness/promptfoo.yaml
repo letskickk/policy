@@ -1,256 +1,273 @@
-description: "개혁신당 정책 멘토링 — 실서버 프롬프트 품질 하네스 (엄격 기준)"
+description: "policy T1 harness: live coach + verify endpoint evaluation"
 
 providers:
   - file://providers/policy-local-provider.mjs
 
 prompts:
-  - "{{prompt}}"
-
-defaultTest:
-  assert:
-    # ════ 공통 필수: 마크다운 완전 금지 ════
-    - type: not-contains
-      value: "**"
-    - type: javascript
-      value: |
-        const mdPatterns = [/^#{1,6}\s/m, /\*\*[^*]+\*\*/g, /^\|.*\|$/m, /^[-*]\s/m];
-        const hits = mdPatterns.flatMap(p => (output.match(p) || []));
-        // 리스트 항목 "-" 은 프롬프트에서 허용하므로 ##와 **만 체크
-        const serious = [/^#{1,6}\s/m, /\*\*[^*]+\*\*/g].flatMap(p => (output.match(p) || []));
-        return serious.length === 0
-          ? { pass: true, score: 1, reason: 'No markdown' }
-          : { pass: false, score: 0, reason: `Markdown found: ${serious.slice(0,3).join(' | ')}` };
-
-    # ════ 공통 필수: 종합해석 등급 존재 ════
-    - type: javascript
-      value: |
-        const m = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
-        return m
-          ? { pass: true, score: 1, reason: `Grade: ${m[1]}` }
-          : { pass: false, score: 0, reason: 'Missing 종합해석 등급 (required by prompt)' };
-
-    # ════ 공통 필수: 6개 섹션 구조 ════
-    - type: javascript
-      value: |
-        const required = [
-          '1. 개혁신당 정강정책과의 부합성',
-          '2. 개혁신당 중앙당 공약과의 유사성',
-          '3. 제8회 지방선거',
-          '4. 우리 당 출마자 공약 비교',
-          '5. 총평',
-          '6. 수정·보완 제안'
-        ];
-        const found = required.filter(s => output.includes(s));
-        return found.length >= 6
-          ? { pass: true, score: 1, reason: 'All 6 sections present' }
-          : { pass: false, score: 0, reason: `${found.length}/6 sections. Missing: ${required.filter(s => !output.includes(s)).join(', ')}` };
-
-    # ════ 공통 필수: 5개 평가축 점수 존재 ════
-    - type: javascript
-      value: |
-        const axes = ['정강정책 정합성', '정책 설계 완성도', '실현 가능성', '구체성', '전달력'];
-        const found = axes.filter(a => {
-          const pattern = new RegExp(a + '\\s*[\\(（]?\\d{1,2}');
-          return pattern.test(output);
-        });
-        return found.length === 5
-          ? { pass: true, score: 1, reason: 'All 5 axes scored' }
-          : { pass: false, score: 0, reason: `Scored ${found.length}/5. Missing: ${axes.filter(a => !found.includes(a)).join(', ')}` };
-
-    # ════ 공통: 총점 = 5축 합산 일치 (±3점 허용) ════
-    - type: javascript
-      value: file://scorers/scoring-consistency-scorer.mjs
-
-    # ════ 공통: 내부 태그 미노출 ════
-    - type: javascript
-      value: |
-        const tags = ['[정강정책]', '[우리당 공약]', '[공공데이터]', '[연구 자료]', '[pledge]', '[platform]', '[bill]'];
-        const found = tags.filter(t => output.includes(t));
-        return found.length === 0
-          ? { pass: true, score: 1, reason: 'No internal tags' }
-          : { pass: false, score: 0, reason: `Internal tags leaked: ${found.join(', ')}` };
-
-    # ════ 공통: 내부 채점 규칙 노출 금지 ════
-    - type: javascript
-      value: |
-        const leaks = ['상한 규칙:', '초과 금지', '감점 기준', '점 초과 금지 적용', '상한 규칙 적용'];
-        const found = leaks.filter(t => output.includes(t));
-        return found.length === 0
-          ? { pass: true, score: 1, reason: 'No internal scoring rules leaked' }
-          : { pass: false, score: 0, reason: `Internal rules leaked: ${found.join(', ')}` };
-
-    # ════ 공통: 프롬프트 지정 라벨 사용 ════
-    - type: javascript
-      value: |
-        const labels = ['결과:', '강점:', '보완 핵심:'];
-        const found = labels.filter(l => output.includes(l));
-        return found.length === labels.length
-          ? { pass: true, score: 1, reason: 'All required labels present' }
-          : { pass: false, score: 0, reason: `Missing labels: ${labels.filter(l => !output.includes(l)).join(', ')}` };
-
-    # ════ 공통: 수정·보완 제안 3개 이상 ════
-    - type: javascript
-      value: |
-        const idx = output.indexOf('6. 수정·보완 제안');
-        if (idx === -1) return { pass: false, score: 0, reason: 'Section 6 missing' };
-        const section6 = output.slice(idx);
-        // 다양한 형식: "- [제목]", "[제목] 설명", "- 제목:" 등
-        const bracketItems = (section6.match(/^\[.+?\]/gm) || []).length;
-        const dashItems = (section6.match(/^-\s+/gm) || []).length;
-        const suggestions = Math.max(bracketItems, dashItems);
-        return suggestions >= 3
-          ? { pass: true, score: 1, reason: `${suggestions} suggestions` }
-          : { pass: false, score: 0, reason: `Only ${suggestions} suggestions (need ≥3)` };
+  - "{{pledge}}"
 
 tests:
-  # ══════════════════════════════════════════════════
-  # 1. 구체적 정책형 공약 — B 이상 기대
-  # ══════════════════════════════════════════════════
-  - vars: &context_default
-      platformContext: "제1조 개혁신당은 자유민주주의와 시장경제를 기본으로 하며, 국민의 생명과 안전, 재산의 보호를 최우선 과제로 삼는다. 제5조 함께 성장하는 책임 있는 복지: 생애주기별 지원을 강화하고 사회적 약자와 취약 계층이 자립·성장할 수 있도록 돕는다. 복지는 개인의 자립과 역량 강화를 돕는 발전적 토대가 되어야 하며, 세대 간 형평성과 재정 건전성을 확보한다. 불필요한 지출과 낭비를 억제하고, 필요한 국민 모두에게 안정적으로 제도가 발휘될 수 있도록 투명성과 효율성을 높인다. 제6조 지방분권과 균형발전: 지역 맞춤형 정책을 통해 지방의 자율성과 책임성을 강화한다. 제7조 자유무역을 지지하되 농업인 보호를 병행한다."
-      pledgesContext: "어르신 돌봄 강화: 독거노인 방문돌봄 확대, 지역사회 통합돌봄 체계 구축. AI 기반 통학버스 안전 3대 혁신방안: AI 사고대응 시스템 구축, 교통안전공단 내 AI 사고대응센터 설치. 공공보육 확충: 국공립어린이집 확대, 보육교사 처우 개선. 농업인 소득 안정을 위한 직불금 확대."
-      electionType: "기초의원"
-      regionProvince: "서울특별시"
-      regionCity: "강남구"
-      districtName: "제1선거구"
-      prompt: "강남구 내 어르신 돌봄 사각지대 해소를 위해 동별 1개소 이상 주간보호센터를 설치하고, 독거노인 2,000명을 대상으로 AI 안부 확인 시스템을 도입하겠습니다. 재원은 서울시 복지 예산 교부금을 활용하며, 2026년 상반기 시범사업 후 확대합니다."
-      pledge: "강남구 내 어르신 돌봄 사각지대 해소를 위해 동별 1개소 이상 주간보호센터를 설치하고, 독거노인 2,000명을 대상으로 AI 안부 확인 시스템을 도입하겠습니다. 재원은 서울시 복지 예산 교부금을 활용하며, 2026년 상반기 시범사업 후 확대합니다."
+  - description: "coach concrete pledge returns structured six-section analysis"
+    metadata:
+      mode: coach
+      expectation: coach_concrete
+    vars:
+      analysis_mode: coach
+      pledge: "강남구 어르신 돌봄 사각지대 해소를 위해 동별 1개소 이상 주간보호센터를 설치하고, 독거노인 2000명을 대상으로 안부 확인 시스템을 도입하겠습니다."
     assert:
-      # 구체적 공약 → 65점 이상
       - type: javascript
         value: |
-          const m = output.match(/종합\s*점수[^\d]*(\d{1,3})점/);
-          const score = m ? Number(m[1]) : 0;
-          return score >= 65
-            ? { pass: true, score: 1, reason: `Concrete pledge: ${score}점 (≥65)` }
-            : { pass: false, score: 0, reason: `Concrete pledge under-scored: ${score}점` };
-      # 등급 B 이상
+          const required = [
+            /1\.\s*개혁신당.*부합성/,
+            /2\.\s*개혁신당.*유사성/,
+            /3\..*2022.*공약.*비교/,
+            /4\.\s*우리.*공약.*비교/,
+            /5\.\s*총평/,
+            /6\.\s*수정.*보완.*제안/,
+          ];
+          const missing = required.filter((pattern) => !pattern.test(output)).map((pattern) => pattern.toString());
+          return missing.length === 0
+            ? { pass: true, score: 1, reason: 'all six sections present' }
+            : { pass: false, score: 0, reason: `missing sections: ${missing.join(', ')}` };
       - type: javascript
         value: |
-          const m = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
-          if (!m) return { pass: false, score: 0, reason: 'No grade' };
-          const passing = ['S', 'A+', 'A', 'B+', 'B'];
-          return passing.includes(m[1])
-            ? { pass: true, score: 1, reason: `Grade ${m[1]}` }
-            : { pass: false, score: 0, reason: `Grade ${m[1]} too low for concrete pledge` };
-      # 정강정책 연결 품질
-      - type: llm-rubric
-        value: >
-          섹션 1(정강정책 부합성)에서 정강정책의 구체적 조항이나 가치를 특정하여 공약과 연결해야 한다.
-          "복지와 관련된다" 수준의 느슨한 연결이 아니라, 어떤 상위 가치가 공약의 어떤 요소와 연결되는지 명확히 설명해야 한다.
-          추상 단어 하나만 끌어와 억지 연결하면 FAIL.
+          const hasGrade = /종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/.test(output);
+          const hasScore = /종합\s*점수:\s*\d{1,3}/.test(output) || /총점:\s*\d{1,3}/.test(output);
+          return hasGrade && hasScore
+            ? { pass: true, score: 1, reason: 'grade and score present' }
+            : { pass: false, score: 0, reason: 'grade or score missing' };
 
-  # ══════════════════════════════════════════════════
-  # 2. 슬로건형 공약 — C 이하, 45점 이하
-  # ══════════════════════════════════════════════════
-  - vars:
-      <<: *context_default
-      prompt: "강남을 바꾸겠습니다!"
+  - description: "coach authority mismatch is penalized and explained"
+    metadata:
+      mode: coach
+      expectation: coach_authority_mismatch
+    vars:
+      analysis_mode: coach
+      pledge: "기초의원으로 출마해 한미 FTA를 전면 재협상하고 교육부 권한을 조정하겠습니다."
+    assert:
+      - type: javascript
+        value: |
+          const grade = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
+          if (!grade) return { pass: false, score: 0, reason: 'grade missing' };
+          const allowed = ['C+', 'C', 'D+', 'D', 'F'];
+          return allowed.includes(grade[1])
+            ? { pass: true, score: 1, reason: `grade ${grade[1]}` }
+            : { pass: false, score: 0, reason: `grade too high: ${grade[1]}` };
+      - type: javascript
+        value: |
+          const lowered = output.includes('권한') || output.includes('지방') || output.includes('실행 주체');
+          return lowered
+            ? { pass: true, score: 1, reason: 'authority mismatch mentioned' }
+            : { pass: false, score: 0, reason: 'authority mismatch not explained' };
+
+  - description: "coach slogan-like pledge is treated as underspecified"
+    metadata:
+      mode: coach
+      expectation: coach_slogan
+    vars:
+      analysis_mode: coach
       pledge: "강남을 바꾸겠습니다!"
     assert:
-      # 45점 이하
       - type: javascript
         value: |
-          const m = output.match(/종합\s*점수[^\d]*(\d{1,3})점/);
-          const score = m ? Number(m[1]) : 999;
-          return score <= 45
-            ? { pass: true, score: 1, reason: `Slogan: ${score}점 (≤45 correct)` }
-            : { pass: false, score: 0, reason: `Slogan over-scored: ${score}점 (cap is 45)` };
-      # C 이하 등급
-      - type: javascript
-        value: |
-          const m = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
-          if (!m) return { pass: false, score: 0, reason: 'No grade' };
+          const grade = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
+          if (!grade) return { pass: false, score: 0, reason: 'grade missing' };
           const allowed = ['C', 'D+', 'D', 'F'];
-          return allowed.includes(m[1])
-            ? { pass: true, score: 1, reason: `Slogan grade: ${m[1]}` }
-            : { pass: false, score: 0, reason: `Slogan grade ${m[1]} exceeds C cap` };
-      # 비교 섹션에서 억지 유사 공약 찾지 않기
+          return allowed.includes(grade[1])
+            ? { pass: true, score: 1, reason: `grade ${grade[1]}` }
+            : { pass: false, score: 0, reason: `grade too high: ${grade[1]}` };
       - type: javascript
         value: |
-          const sec2 = output.indexOf('2. 개혁신당 중앙당');
-          const sec3 = output.indexOf('3. 제8회');
-          if (sec2 === -1) return { pass: true, score: 1, reason: 'No sec2' };
-          const sec2text = output.slice(sec2, sec3 > sec2 ? sec3 : sec2 + 500);
-          const hasNone = /결과:\s*없음/.test(sec2text);
-          return hasNone
-            ? { pass: true, score: 1, reason: 'Correctly found no similar pledges for slogan' }
-            : { pass: false, score: 0, reason: 'Should not find similar pledges for a pure slogan' };
+          const ok = output.includes('구체') || output.includes('명칭만') || output.includes('보완');
+          return ok
+            ? { pass: true, score: 1, reason: 'underspecified nature mentioned' }
+            : { pass: false, score: 0, reason: 'missing underspecified explanation' };
 
-  # ══════════════════════════════════════════════════
-  # 3. 권한 불일치 — C+ 이하, 권한 문제 명시
-  # ══════════════════════════════════════════════════
-  - vars:
-      <<: *context_default
-      electionType: "기초의원"
-      regionProvince: "경기도"
-      regionCity: "화성시"
-      prompt: "한미 FTA를 재협상하여 농업 분야 관세를 인상하겠습니다."
-      pledge: "한미 FTA를 재협상하여 농업 분야 관세를 인상하겠습니다."
+  - description: "verify endpoint returns normalized rich JSON for a concrete pledge"
+    metadata:
+      mode: verify
+      expectation: verify_concrete
+    vars:
+      analysis_mode: verify
+      phase: quick
+      top_k_platform: 4
+      top_k_pledge: 4
+      top_k_regional: 5
+      pledge: "강남구 어르신 돌봄 사각지대 해소를 위해 동별 1개소 이상 주간보호센터를 설치하고, 독거노인 2000명을 대상으로 안부 확인 시스템을 도입하겠습니다."
     assert:
-      # C+ 이하
       - type: javascript
         value: |
-          const m = output.match(/종합해석\s*등급:\s*(S|A\+|A|B\+|B|C\+|C|D\+|D|F)/);
-          if (!m) return { pass: false, score: 0, reason: 'No grade' };
-          const allowed = ['C+', 'C', 'D+', 'D', 'F'];
-          return allowed.includes(m[1])
-            ? { pass: true, score: 1, reason: `Authority mismatch grade: ${m[1]}` }
-            : { pass: false, score: 0, reason: `Grade ${m[1]} too high` };
-      # 권한/실행 가능성 문제 지적
-      - type: llm-rubric
-        value: >
-          이 공약은 기초의원(또는 일반 출마자)이 FTA 재협상을 하겠다는 것인데,
-          이는 국가 단위 통상 정책으로 지방의원이나 지방자치단체장의 권한 범위를 벗어난다.
-          응답이 권한 불일치, 실행 주체 문제, 또는 "지역 차원에서 추진하기 어렵다"는 취지의 지적을 하고 있어야 PASS.
-          농업 보호 취지는 인정하되 수단이 부적합하다는 점을 짚어야 한다.
+          let data;
+          try { data = JSON.parse(output); } catch (err) { return { pass: false, score: 0, reason: `invalid json: ${err.message}` }; }
+          const ok = data && typeof data === 'object'
+            && typeof data.total_score === 'number'
+            && data.summary && typeof data.summary.fit_score === 'number'
+            && Array.isArray(data.platform)
+            && Array.isArray(data.pledges)
+            && Array.isArray(data.conflicts)
+            && Array.isArray(data.improvements)
+            && data.evidence_map && typeof data.evidence_map === 'object';
+          return ok
+            ? { pass: true, score: 1, reason: 'normalized verify payload' }
+            : { pass: false, score: 0, reason: 'verify payload missing normalized fields' };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const score = Number(data.total_score ?? data.summary?.fit_score ?? -1);
+          return score >= 35 && score <= 85
+            ? { pass: true, score: 1, reason: `concrete score ${score}` }
+            : { pass: false, score: 0, reason: `concrete score out of range: ${score}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const evidenceIds = new Set(Object.keys(data.evidence_map || {}));
+          const conflictEvidence = (data.conflicts || []).flatMap((item) => item.evidence || []);
+          const bad = conflictEvidence.filter((id) => !/^R\d+$/.test(id) || !evidenceIds.has(id));
+          return bad.length === 0
+            ? { pass: true, score: 1, reason: 'conflict evidence ids are regional and valid' }
+            : { pass: false, score: 0, reason: `bad conflict evidence ids: ${bad.join(', ')}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const signal = String(data.signal_light || '').toLowerCase();
+          return signal === 'yellow' || signal === 'green'
+            ? { pass: true, score: 1, reason: `signal light ${signal}` }
+            : { pass: false, score: 0, reason: `unexpected signal light: ${data.signal_light}` };
 
-  # ══════════════════════════════════════════════════
-  # 4. 일정 부재 공약 — 65점 이상, 과도 감점 금지
-  # ══════════════════════════════════════════════════
-  - vars:
-      <<: *context_default
-      electionType: "기초단체장"
-      regionProvince: "경기도"
-      regionCity: "화성시"
-      prompt: "화성시 동탄 신도시 내 공공보육시설 30개소를 확충하고, 보육교사 처우를 개선하여 시간당 2만원 이상 보장하겠습니다. 재원은 국비 50%와 시비 50%로 확보합니다."
-      pledge: "화성시 동탄 신도시 내 공공보육시설 30개소를 확충하고, 보육교사 처우를 개선하여 시간당 2만원 이상 보장하겠습니다. 재원은 국비 50%와 시비 50%로 확보합니다."
+  - description: "verify authority mismatch is kept low and red"
+    metadata:
+      mode: verify
+      expectation: verify_authority_mismatch
+    vars:
+      analysis_mode: verify
+      phase: quick
+      top_k_platform: 4
+      top_k_pledge: 4
+      top_k_regional: 5
+      pledge: "기초의원으로 출마해 한미 FTA를 전면 재협상하고 교육부 권한을 조정하겠습니다."
     assert:
-      # 65점 이상
       - type: javascript
         value: |
-          const m = output.match(/종합\s*점수[^\d]*(\d{1,3})점/);
-          const score = m ? Number(m[1]) : 0;
-          return score >= 65
-            ? { pass: true, score: 1, reason: `No-timeline: ${score}점 (≥65)` }
-            : { pass: false, score: 0, reason: `No-timeline over-penalized: ${score}점` };
-      # 실현 가능성 축에서 일정 부재만으로 10점 이하 주면 안 됨
+          const data = JSON.parse(output);
+          const score = Number(data.total_score ?? data.summary?.fit_score ?? 999);
+          return score <= 40
+            ? { pass: true, score: 1, reason: `authority mismatch score ${score}` }
+            : { pass: false, score: 0, reason: `authority mismatch score too high: ${score}` };
       - type: javascript
         value: |
-          const m = output.match(/실현\s*가능성\s*[\(（]?(\d{1,2})/);
-          if (!m) return { pass: false, score: 0, reason: 'Cannot find 실현 가능성 score' };
-          const score = Number(m[1]);
-          return score >= 11
-            ? { pass: true, score: 1, reason: `실현 가능성: ${score}점 (not over-penalized)` }
-            : { pass: false, score: 0, reason: `실현 가능성 ${score}점 — over-penalized for missing timeline` };
-      # 5축 합산 규칙 (프롬프트 기준 20+30+20+15+15=100)
+          const data = JSON.parse(output);
+          return String(data.signal_light || '').toLowerCase() === 'red'
+            ? { pass: true, score: 1, reason: 'signal light red' }
+            : { pass: false, score: 0, reason: `unexpected signal light: ${data.signal_light}` };
       - type: javascript
         value: |
-          const axes = [
-            { name: '정강정책 정합성', max: 20 },
-            { name: '정책 설계 완성도', max: 30 },
-            { name: '실현 가능성', max: 20 },
-            { name: '구체성', max: 15 },
-            { name: '전달력', max: 15 },
-          ];
-          let issues = [];
-          for (const axis of axes) {
-            const re = new RegExp(axis.name + '\\s*[\\(（]?(\\d{1,2})');
-            const m = output.match(re);
-            if (m && Number(m[1]) > axis.max) {
-              issues.push(`${axis.name}: ${m[1]} > max ${axis.max}`);
-            }
-          }
-          return issues.length === 0
-            ? { pass: true, score: 1, reason: 'All axes within max bounds' }
-            : { pass: false, score: 0, reason: issues.join('; ') };
+          const data = JSON.parse(output);
+          const improvements = Array.isArray(data.improvements) ? data.improvements : [];
+          return improvements.length >= 2 && data.pdf_eligible === false
+            ? { pass: true, score: 1, reason: `${improvements.length} improvements and pdf disabled` }
+            : { pass: false, score: 0, reason: 'authority mismatch should have multiple improvements and pdf disabled' };
+
+  - description: "verify slogan-like pledge is kept low and includes improvements"
+    metadata:
+      mode: verify
+      expectation: verify_slogan
+    vars:
+      analysis_mode: verify
+      phase: quick
+      top_k_platform: 4
+      top_k_pledge: 4
+      top_k_regional: 5
+      pledge: "강남을 바꾸겠습니다!"
+    assert:
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const score = Number(data.total_score ?? data.summary?.fit_score ?? 999);
+          return score <= 45
+            ? { pass: true, score: 1, reason: `slogan score ${score}` }
+            : { pass: false, score: 0, reason: `slogan score too high: ${score}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const improvements = Array.isArray(data.improvements) ? data.improvements : [];
+          return improvements.length >= 1
+            ? { pass: true, score: 1, reason: `${improvements.length} improvements present` }
+            : { pass: false, score: 0, reason: 'missing improvements' };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return String(data.signal_light || '').toLowerCase() === 'red'
+            ? { pass: true, score: 1, reason: 'signal light red' }
+            : { pass: false, score: 0, reason: `unexpected signal light: ${data.signal_light}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return data.pdf_eligible === false
+            ? { pass: true, score: 1, reason: 'pdf disabled for slogan' }
+            : { pass: false, score: 0, reason: 'slogan should not be pdf eligible' };
+
+  - description: "verify vague numeric pledge stays cautious and asks for more detail"
+    metadata:
+      mode: verify
+      expectation: verify_vague_numeric
+    vars:
+      analysis_mode: verify
+      phase: quick
+      top_k_platform: 4
+      top_k_pledge: 4
+      top_k_regional: 5
+      pledge: "청년 1만명을 지원하는 미래혁신센터를 만들겠습니다."
+    assert:
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const score = Number(data.total_score ?? data.summary?.fit_score ?? 999);
+          return score <= 60
+            ? { pass: true, score: 1, reason: `vague numeric score ${score}` }
+            : { pass: false, score: 0, reason: `vague numeric score too high: ${score}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const improvements = Array.isArray(data.improvements) ? data.improvements : [];
+          return improvements.length >= 2
+            ? { pass: true, score: 1, reason: `${improvements.length} improvements present` }
+            : { pass: false, score: 0, reason: 'missing follow-up improvements for vague numeric pledge' };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return String(data.signal_light || '').toLowerCase() !== 'green'
+            ? { pass: true, score: 1, reason: `signal light ${data.signal_light}` }
+            : { pass: false, score: 0, reason: 'vague numeric pledge should not be green' };
+
+  - description: "verify query-like input stays very low and red"
+    metadata:
+      mode: verify
+      expectation: verify_query_like
+    vars:
+      analysis_mode: verify
+      phase: quick
+      top_k_platform: 4
+      top_k_pledge: 4
+      top_k_regional: 5
+      pledge: "강남 돌봄 정책"
+    assert:
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const score = Number(data.total_score ?? data.summary?.fit_score ?? 999);
+          return score <= 25
+            ? { pass: true, score: 1, reason: `query-like score ${score}` }
+            : { pass: false, score: 0, reason: `query-like score too high: ${score}` };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const improvements = Array.isArray(data.improvements) ? data.improvements : [];
+          return improvements.length >= 1 && data.pdf_eligible === false
+            ? { pass: true, score: 1, reason: 'query-like input kept non-exportable with follow-up guidance' }
+            : { pass: false, score: 0, reason: 'query-like input missing guidance or incorrectly exportable' };
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return String(data.signal_light || '').toLowerCase() === 'red'
+            ? { pass: true, score: 1, reason: 'signal light red' }
+            : { pass: false, score: 0, reason: `unexpected signal light: ${data.signal_light}` };

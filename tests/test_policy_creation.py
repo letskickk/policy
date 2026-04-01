@@ -363,6 +363,16 @@ def test_policy_lab_requires_admin():
     assert "require_admin" in snippet
 
 
+def test_policy_lab_redirects_anonymous_users_to_login():
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    client = TestClient(app)
+    response = client.get("/policy-lab", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login?next=/policy-lab"
+
+
 def test_dashboard_api_exists():
     """대시보드 API 엔드포인트가 존재하는지 확인."""
     from pathlib import Path

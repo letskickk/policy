@@ -575,6 +575,91 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
             },
         }
 
+    @app.get("/api/policy/hub/search", tags=["policy"])
+    def api_policy_hub_search(
+        q: str = Query(default="", max_length=200),
+        doc_type: str = Query(default="", max_length=40),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ):
+        ensure_db_ready()
+        from backend.policy_ssot import list_policy_documents, list_policy_positions
+
+        query = (q or "").strip().lower()
+        requested_type = (doc_type or "").strip().lower()
+        items = []
+
+        if not requested_type or requested_type == "position":
+            for item in list_policy_positions(status="approved"):
+                haystack = " ".join(
+                    filter(
+                        None,
+                        (
+                            item.get("title"),
+                            item.get("summary"),
+                            item.get("official_summary"),
+                            item.get("key_points"),
+                            item.get("body"),
+                        ),
+                    )
+                ).lower()
+                if query and query not in haystack:
+                    continue
+                items.append(
+                    {
+                        "id": item["id"],
+                        "title": item.get("title") or "",
+                        "doc_type": "position",
+                        "summary": item.get("summary") or item.get("official_summary") or "",
+                        "published_at": item.get("updated_at") or item.get("created_at") or "",
+                        "speaker_name": None,
+                        "source": "position",
+                        "type_label": DOC_TYPE_LABELS.get("position", "position"),
+                    }
+                )
+
+        public_doc_types = {"bill", "meeting_note", "party_rule", "poll_result", "pledge", "platform", "briefing", "statement"}
+        if not requested_type:
+            doc_types = public_doc_types
+        elif requested_type == "commentary":
+            doc_types = {"statement"}
+        elif requested_type == "poll":
+            doc_types = {"poll_result"}
+        elif requested_type == "meeting":
+            doc_types = {"meeting_note"}
+        elif requested_type == "rule":
+            doc_types = {"party_rule"}
+        elif requested_type in public_doc_types:
+            doc_types = {requested_type}
+        else:
+            doc_types = set()
+
+        if doc_types:
+            for item in list_policy_documents(status="active"):
+                if item.get("doc_type") not in doc_types:
+                    continue
+                haystack = " ".join(
+                    filter(None, (item.get("title"), item.get("summary"), item.get("body"), item.get("speaker_name")))
+                ).lower()
+                if query and query not in haystack:
+                    continue
+                items.append(
+                    {
+                        "id": item["id"],
+                        "title": item.get("title") or "",
+                        "doc_type": item.get("doc_type") or "",
+                        "summary": item.get("summary") or "",
+                        "published_at": item.get("published_at") or item.get("created_at") or "",
+                        "speaker_name": item.get("speaker_name"),
+                        "source": "document",
+                        "type_label": DOC_TYPE_LABELS.get(item.get("doc_type") or "", item.get("doc_type") or ""),
+                    }
+                )
+
+        items.sort(key=lambda row: row.get("published_at") or "", reverse=True)
+        sliced = items[offset : offset + limit]
+        return {"items": sliced, "count": len(sliced), "total": len(items)}
+
     # ── 이슈 레이더 API ──
 
     @app.get("/api/policy/issue-radar", tags=["policy", "issue-radar"])
@@ -651,7 +736,17 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         try:
             _ = require_admin(request)
         except HTTPException:
-            _ = require_policy_drafter_access(request)
+            try:
+                _ = require_policy_drafter_access(request)
+            except HTTPException as exc:
+                if exc.status_code == 401:
+                    from urllib.parse import quote
+                    target = request.url.path
+                    query = str(request.url.query or "")
+                    if query:
+                        target += "?" + query
+                    return RedirectResponse(url=f"/login?next={quote(target)}", status_code=302)
+                raise
 
         from backend.policy_drafter import generate_policy_draft
 
@@ -725,11 +820,22 @@ def register_policy_routes(app, require_admin, ensure_db_ready, serve_html):
         try:
             _ = require_admin(request)
         except HTTPException:
-            _ = require_policy_drafter_access(request)
+            try:
+                _ = require_policy_drafter_access(request)
+            except HTTPException as exc:
+                if exc.status_code == 401:
+                    from fastapi.responses import RedirectResponse
+                    from urllib.parse import quote
+
+                    target = request.url.path
+                    query = str(request.url.query or "")
+                    if query:
+                        target += "?" + query
+                    return RedirectResponse(url=f"/login?next={quote(target)}", status_code=302)
+                raise
         res = serve_html("policy-lab.html")
         if res is not None:
             return res
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="policy-lab.html not found")
 
     @app.api_route("/policy-create", methods=["GET", "HEAD"])

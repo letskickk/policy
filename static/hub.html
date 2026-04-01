@@ -105,20 +105,9 @@
   let currentOffset = 0;
   const PAGE_SIZE = 30;
   let allItems = [];
-  let isAdmin = false;
 
   function safe(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
   function truncate(s, n) { s = (s || '').trim(); return s.length > n ? s.slice(0, n) + '…' : s; }
-
-  // Auth check
-  async function checkAuth() {
-    try {
-      const r = await fetch('/api/auth/me');
-      if (!r.ok) return false;
-      const d = await r.json();
-      return !!d.is_admin;
-    } catch { return false; }
-  }
 
   // Render filter chips
   function renderChips() {
@@ -144,20 +133,9 @@
     if (docType) params.set('doc_type', docType);
     params.set('limit', String(limit));
     params.set('offset', String(offset));
-    const r = await fetch('/api/admin/hub/search?' + params.toString());
-    if (r.status === 401 || r.status === 403) {
-      showDenied();
-      return null;
-    }
+    const r = await fetch('/api/policy/hub/search?' + params.toString());
     if (!r.ok) throw new Error('검색 실패');
     return r.json();
-  }
-
-  function showDenied() {
-    document.querySelector('.hub-header').style.display = 'none';
-    document.getElementById('hubGrid').style.display = 'none';
-    document.getElementById('hubLoadMore').style.display = 'none';
-    document.getElementById('hubDenied').style.display = '';
   }
 
   // Render results
@@ -294,11 +272,6 @@
 
   // Init
   async function init() {
-    isAdmin = await checkAuth();
-    if (!isAdmin) {
-      showDenied();
-      return;
-    }
     renderChips();
     doSearch();
   }

@@ -15,6 +15,12 @@ from backend.database import get_connection
 
 logger = logging.getLogger(__name__)
 
+try:
+    from passlib.hash import pbkdf2_sha256 as PASSWORD_HASHER
+except Exception:
+    from passlib.registry import get_crypt_handler
+    PASSWORD_HASHER = get_crypt_handler("pbkdf2_sha256")
+
 STATUS_PENDING = "PENDING"
 STATUS_APPROVED = "APPROVED"
 STATUS_REJECTED = "REJECTED"
@@ -24,15 +30,13 @@ ROLE_ADMIN = "ADMIN"
 
 
 def _hash_password(password: str) -> str:
-    from passlib.hash import pbkdf2_sha256
     # bcrypt 대신 pbkdf2 사용 (72바이트 제한 없음)
-    return pbkdf2_sha256.using(rounds=100000).hash(password)
+    return PASSWORD_HASHER.using(rounds=100000).hash(password)
 
 
 def _verify_password(password: str, hash_: str) -> bool:
-    from passlib.hash import pbkdf2_sha256
     try:
-        return pbkdf2_sha256.verify(password, hash_)
+        return PASSWORD_HASHER.verify(password, hash_)
     except Exception:
         return False
 
