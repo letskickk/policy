@@ -5,6 +5,7 @@
 - Consecutive passes: 3
 - Actual loop: evaluator -> planner -> generator -> evaluator
 - Thresholds: each tier >= 90, overall weighted geometric mean >= 92
+- Stagnation rule: if 3 failed rounds stall within 1.0 overall point, switch to breakthrough redesign
 - Overall weighted geometric mean: 97.71
 
 ## Round 3

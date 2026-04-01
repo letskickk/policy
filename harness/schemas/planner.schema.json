@@ -3,11 +3,16 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "strategy_mode",
     "round_goal",
     "priorities",
     "generator_prompt"
   ],
   "properties": {
+    "strategy_mode": {
+      "type": "string",
+      "enum": ["narrow", "breakthrough"]
+    },
     "round_goal": {
       "type": "string"
     },

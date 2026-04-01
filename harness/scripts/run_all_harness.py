@@ -29,6 +29,8 @@ TIERS = [
     ("UX Quality", Path("harness/scripts/run_ux_harness.py"), RESULTS / "tier-2.json"),
     ("Deploy Safety", Path("harness/scripts/run_deploy_harness.py"), RESULTS / "tier-3.json"),
 ]
+BREAKTHROUGH_FAILURE_WINDOW = 3
+BREAKTHROUGH_MIN_IMPROVEMENT = 1.0
 
 
 def run_python(script: Path) -> int:
@@ -123,8 +125,42 @@ def codex_executable() -> str | None:
     return shutil.which("codex.cmd") or shutil.which("codex")
 
 
-def planner_prompt(round_number: int, evaluation: dict) -> str:
+def should_trigger_breakthrough(history: list[dict], evaluation: dict) -> bool:
+    if evaluation.get("pass"):
+        return False
+    recent_failures = [record for record in history if not record.get("pass")]
+    recent_failures.append(
+        {
+            "overall_score": evaluation.get("overall_score", 0.0),
+            "tiers": evaluation.get("tiers", []),
+        }
+    )
+    if len(recent_failures) < BREAKTHROUGH_FAILURE_WINDOW:
+        return False
+    window = recent_failures[-BREAKTHROUGH_FAILURE_WINDOW:]
+    scores = [float(record.get("overall_score") or 0.0) for record in window]
+    if max(scores) - min(scores) > BREAKTHROUGH_MIN_IMPROVEMENT:
+        return False
+    tier_signatures = {
+        tuple((int(tier["tier"]), round(float(tier["score"]), 2), bool(tier["pass"])) for tier in record.get("tiers", []))
+        for record in window
+    }
+    return len(tier_signatures) <= 2
+
+
+def planner_prompt(round_number: int, evaluation: dict, strategy_mode: str) -> str:
     payload = json.dumps(evaluation, ensure_ascii=False, indent=2)
+    strategy_block = (
+        "Planning mode: BREAKTHROUGH.\n"
+        f"The harness has stalled after {BREAKTHROUGH_FAILURE_WINDOW} failed rounds with less than "
+        f"{BREAKTHROUGH_MIN_IMPROVEMENT:.1f} overall-point movement.\n"
+        "Stop incremental patching and propose a breakthrough plan.\n"
+        "A breakthrough plan may redesign the failing surface end-to-end, replace brittle prompts, "
+        "rework routing or data flow, or restructure a subsystem so the repeated failure mode disappears.\n"
+    ) if strategy_mode == "breakthrough" else (
+        "Planning mode: NARROW.\n"
+        "Use the smallest high-leverage repair set that can move the next evaluation.\n"
+    )
     return f"""You are the planner in a harness loop for the repository at {ROOT}.
 
 Loop contract:
@@ -138,18 +174,20 @@ Scoring rule:
 - overall weighted geometric mean must be >= {OVERALL_THRESHOLD:.0f}
 
 Current round: {round_number}
+{strategy_block}
 Evaluator payload:
 {payload}
 
 Produce a JSON object matching the provided schema.
-Keep the plan narrow. Focus on the 1-2 highest leverage fixes.
+Set `strategy_mode` to `{strategy_mode}`.
+Keep priorities focused on the highest-leverage fixes for the selected strategy.
 Do not ask for human input.
 Do not tell the generator to run this harness script or any recursive planner/generator/evaluator loop.
 Do not tell the generator to run any `harness/scripts/*.py` evaluator script at all.
 """
 
 
-def run_planner(round_number: int, evaluation: dict) -> dict:
+def run_planner(round_number: int, evaluation: dict, strategy_mode: str) -> dict:
     codex = codex_executable()
     if not codex:
         raise RuntimeError("codex executable not found")
@@ -172,7 +210,7 @@ def run_planner(round_number: int, evaluation: dict) -> dict:
         str(SCHEMA),
         "-o",
         str(output_path),
-        planner_prompt(round_number, evaluation),
+        planner_prompt(round_number, evaluation, strategy_mode),
     ]
     completed = subprocess.run(
         command,
@@ -190,12 +228,16 @@ def run_planner(round_number: int, evaluation: dict) -> dict:
 
 def generator_prompt(plan: dict) -> str:
     plan_json = json.dumps(plan, ensure_ascii=False, indent=2)
+    strategy_mode = str(plan.get("strategy_mode") or "narrow")
+    strategy_guidance = (
+        "This is a BREAKTHROUGH round. If the approved plan calls for decisive redesign, do that instead of another tiny patch.\n"
+    ) if strategy_mode == "breakthrough" else ""
     return f"""You are the generator in a harness loop for the repository at {ROOT}.
 
 You must implement only the planner-approved work below.
 Make code changes directly in the repository.
 Do not broaden scope.
-Do not run `harness/scripts/run_all_harness.py` or any nested harness loop from inside the generator.
+{strategy_guidance}Do not run `harness/scripts/run_all_harness.py` or any nested harness loop from inside the generator.
 Do not run any `harness/scripts/*.py` harness script from inside the generator.
 You may run narrow checks for the files you edit, but the outer orchestrator owns the post-edit evaluation.
 After edits, stop. Do not run long explanations.
@@ -264,6 +306,7 @@ def write_planner_artifacts(round_number: int, plan: dict, evaluation: dict) -> 
         f"- Overall score: {evaluation['overall_score']:.2f}",
         f"- Pass: {'yes' if evaluation['pass'] else 'no'}",
         f"- Loop: planner -> generator -> evaluator -> planner",
+        f"- Strategy mode: {plan.get('strategy_mode', 'narrow')}",
         "",
         "## Priorities",
         "",
@@ -287,6 +330,9 @@ def write_results(history: list[dict]) -> None:
     lines.append(f"- Consecutive passes: {latest['consecutive_passes']}")
     lines.append("- Actual loop: evaluator -> planner -> generator -> evaluator")
     lines.append(f"- Thresholds: each tier >= {TIER_THRESHOLD:.0f}, overall weighted geometric mean >= {OVERALL_THRESHOLD:.0f}")
+    lines.append(
+        f"- Stagnation rule: if {BREAKTHROUGH_FAILURE_WINDOW} failed rounds stall within {BREAKTHROUGH_MIN_IMPROVEMENT:.1f} overall point, switch to breakthrough redesign"
+    )
     lines.append(f"- Overall weighted geometric mean: {latest['overall_score']:.2f}")
     lines.append("")
 
@@ -302,6 +348,8 @@ def write_results(history: list[dict]) -> None:
                 lines.append(f"  summary: {tier['summary']}")
         if record.get("planner_status"):
             lines.append(f"- Planner: {record['planner_status']}")
+        if record.get("strategy_mode"):
+            lines.append(f"- Strategy mode: {record['strategy_mode']}")
         if record.get("generator_status"):
             lines.append(f"- Generator: {record['generator_status']}")
         if record.get("post_generator_score") is not None:
@@ -332,13 +380,16 @@ def main() -> int:
             "planner_status": "",
             "generator_status": "",
             "post_generator_score": None,
+            "strategy_mode": "narrow",
         }
         consecutive_passes = consecutive_passes + 1 if evaluation["pass"] else 0
         record["consecutive_passes"] = consecutive_passes
 
         if not evaluation["pass"]:
             try:
-                plan = run_planner(round_number, evaluation)
+                strategy_mode = "breakthrough" if should_trigger_breakthrough(history, evaluation) else "narrow"
+                record["strategy_mode"] = strategy_mode
+                plan = run_planner(round_number, evaluation, strategy_mode)
                 write_planner_artifacts(round_number, plan, evaluation)
                 record["planner_status"] = "completed"
                 generator_result = run_generator(round_number, plan)
