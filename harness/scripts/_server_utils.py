@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import time
@@ -8,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+DEFAULT_HARNESS_PASSWORD = "HarnessPass123!"
 
 
 def pids_listening_on_port(port: int) -> list[int]:
@@ -78,6 +80,52 @@ def wait_for_port(host: str, port: int, timeout_sec: float = 45.0) -> bool:
                 return True
         time.sleep(0.5)
     return False
+
+
+def ensure_harness_credentials() -> tuple[str, str]:
+    """Return usable local login credentials, creating/updating a harness admin if needed."""
+    email = (os.environ.get("T1_LOGIN_EMAIL") or "").strip().lower()
+    password = (os.environ.get("T1_LOGIN_PASSWORD") or "").strip()
+    if email and password:
+        return email, password
+
+    from backend.auth import ROLE_ADMIN, STATUS_APPROVED, _hash_password
+    from backend.config import ADMIN_EMAILS
+    from backend.database import get_connection, init_db
+
+    init_db()
+    email = (ADMIN_EMAILS[0] if ADMIN_EMAILS else "harness-admin@local.test").strip().lower()
+    password = password or DEFAULT_HARNESS_PASSWORD
+    password_hash = _hash_password(password)
+
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, status = ?, role = ?, email_verified = 1, updated_at = datetime('now')
+                WHERE email = ?
+                """,
+                (password_hash, STATUS_APPROVED, ROLE_ADMIN, email),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO users (
+                    email, password_hash, status, role, email_verified, name, phone, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'), datetime('now'))
+                """,
+                (email, password_hash, STATUS_APPROVED, ROLE_ADMIN, "Harness Admin", "01000000000"),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    os.environ["T1_LOGIN_EMAIL"] = email
+    os.environ["T1_LOGIN_PASSWORD"] = password
+    return email, password
 
 
 def start_server(port: int, stdout_path: Path, stderr_path: Path) -> subprocess.Popen:

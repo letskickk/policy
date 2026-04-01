@@ -45,12 +45,7 @@ def _chunk_key(chunk: DocChunk) -> tuple:
 
 
 def _compute_input_signal_adjustment(user_pledge: str) -> float:
-    """
-    입력 문장 자체의 정책 구체성/권한 불일치/슬로건 성격을 점수에 약하게 반영한다.
-    - 수치, 대상, 실행 동사가 있는 구체 공약은 보너스
-    - 중앙정부 권한 위주 공약은 페널티
-    - 짧은 구호형 입력은 강한 페널티
-    """
+    """Reward concrete pledges and penalize slogans or authority mismatches."""
     text = re.sub(r"\s+", " ", (user_pledge or "").strip())
     if not text:
         return 0.0
@@ -59,22 +54,24 @@ def _compute_input_signal_adjustment(user_pledge: str) -> float:
     char_len = len(text)
     token_count = len(text.split())
     number_hits = len(re.findall(r"\d+", text))
-    unit_hits = len(re.findall(r"(명|개소|곳|회|개월|년|%|억원|만명|가구)", text))
+    unit_hits = len(re.findall(r"(?|??|?|%|??|??|??|?)", text))
     action_hits = sum(1 for kw in SPECIFIC_ACTION_KEYWORDS if kw in text)
     target_hits = sum(1 for kw in SPECIFIC_TARGET_KEYWORDS if kw in text)
     mismatch_hits = sum(1 for kw in AUTHORITY_MISMATCH_KEYWORDS if kw in lowered)
 
     specificity_bonus = 0.0
-    if char_len >= 80:
+    if char_len >= 100:
+        specificity_bonus += 3.0
+    elif char_len >= 70:
         specificity_bonus += 2.0
     elif char_len >= 50:
-        specificity_bonus += 1.0
-    specificity_bonus += min(number_hits, 2) * 2.5
-    specificity_bonus += min(unit_hits, 2) * 1.5
-    specificity_bonus += min(action_hits, 3) * 1.5
-    specificity_bonus += min(target_hits, 2) * 1.0
+        specificity_bonus += 1.5
+    specificity_bonus += min(number_hits, 2) * 3.0
+    specificity_bonus += min(unit_hits, 2) * 2.0
+    specificity_bonus += min(action_hits, 3) * 2.0
+    specificity_bonus += min(target_hits, 2) * 1.5
     if number_hits >= 1 and action_hits >= 1 and target_hits >= 1:
-        specificity_bonus += 3.0
+        specificity_bonus += 6.0
     specificity_bonus = min(specificity_bonus, 20.0)
 
     slogan_penalty = 0.0
@@ -86,7 +83,7 @@ def _compute_input_signal_adjustment(user_pledge: str) -> float:
         slogan_penalty += 8.0
     if number_hits == 0 and action_hits <= 1:
         slogan_penalty += 8.0
-    if "!" in text or lowered.endswith("다!") or lowered.endswith("합시다"):
+    if "!" in text or lowered.endswith("?!") or lowered.endswith("???"):
         slogan_penalty += 6.0
 
     authority_penalty = min(24.0, mismatch_hits * 12.0)
@@ -94,7 +91,6 @@ def _compute_input_signal_adjustment(user_pledge: str) -> float:
         authority_penalty += 4.0
 
     return specificity_bonus - slogan_penalty - authority_penalty
-
 
 def exact_match_search(
     query_text: str,
@@ -662,9 +658,10 @@ def generate_report(
         fit_score += _compute_input_signal_adjustment(user_pledge)
         fit_score = max(0.0, min(100.0, fit_score))
 
-        # 제목·한 줄만 적은 경우: 서버 측 상한 적용 (80자 미만이면 fit_score 최대 40)
-        if len(user_pledge.strip()) < 80 and fit_score > 40:
-            fit_score = min(fit_score, 40.0)
+        # 제목·한 줄만 적은 경우: 서버 측 상한 적용
+        # query-like 입력은 더 낮게 유지해 검증용 경고 신호를 분명히 한다.
+        if len(user_pledge.strip()) < 80 and fit_score > 25:
+            fit_score = min(fit_score, 25.0)
 
         # fit_verdict 간단 규칙 (원하면 나중에 조정 가능)
         if fit_score >= 80:

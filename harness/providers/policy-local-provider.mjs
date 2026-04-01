@@ -1,83 +1,55 @@
-const BASE_URL = (process.env.T1_BASE_URL || 'http://127.0.0.1:8011').replace(/\/$/, '');
-const LOGIN_EMAIL = process.env.T1_LOGIN_EMAIL || '';
-const LOGIN_PASSWORD = process.env.T1_LOGIN_PASSWORD || '';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
-function requireAuthConfig() {
-  if (!LOGIN_EMAIL || !LOGIN_PASSWORD) {
-    throw new Error('T1_LOGIN_EMAIL and T1_LOGIN_PASSWORD are required');
-  }
+const ROOT = process.cwd();
+const PYTHON = process.platform === 'win32'
+  ? path.join(ROOT, '.venv', 'Scripts', 'python.exe')
+  : 'python3';
+const BRIDGE = path.join(ROOT, 'harness', 'scripts', 'local_api_bridge.py');
+
+function sanitizeText(value) {
+  return String(value ?? '').replace(/[\uD800-\uDFFF]/g, '\uFFFD');
 }
 
-function extractCookie(response) {
-  const raw = response.headers.get('set-cookie') || '';
-  const first = raw.split(',').map((part) => part.trim()).find((part) => part.startsWith('policy_auth='));
-  if (!first) {
-    return '';
+function sanitizeDeep(value) {
+  if (typeof value === 'string') {
+    return sanitizeText(value);
   }
-  return first.split(';')[0];
+  if (Array.isArray(value)) {
+    return value.map(sanitizeDeep);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [sanitizeText(key), sanitizeDeep(entry)]));
+  }
+  return value;
 }
 
-async function login() {
-  requireAuthConfig();
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: LOGIN_EMAIL,
-      password: LOGIN_PASSWORD,
-      next: '/',
-    }),
+function sanitizePayload(payload) {
+  return sanitizeDeep(payload);
+}
+
+function callBridge(payload) {
+  const completed = spawnSync(PYTHON, [BRIDGE], {
+    cwd: ROOT,
+    env: process.env,
+    input: JSON.stringify(sanitizePayload(payload)),
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
   });
-  if (!response.ok) {
-    throw new Error(`login failed: HTTP ${response.status} ${await response.text()}`);
+  if (completed.error) {
+    throw completed.error;
   }
-  const cookie = extractCookie(response);
-  if (!cookie) {
-    throw new Error('login succeeded but no auth cookie was returned');
+  const raw = (completed.stdout || '').trim();
+  let parsed;
+  try {
+    parsed = raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    throw new Error(`bridge produced invalid JSON: ${raw || completed.stderr || error.message}`);
   }
-  return cookie;
-}
-
-async function callCoach(vars, cookie) {
-  const response = await fetch(`${BASE_URL}/check`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Cookie: cookie,
-    },
-    body: JSON.stringify({
-      pledge: String(vars.pledge || '').trim(),
-    }),
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`/check failed: HTTP ${response.status} ${text}`);
+  if (completed.status !== 0 || parsed.error) {
+    throw new Error(parsed.error || completed.stderr || `bridge exited with ${completed.status}`);
   }
-  const data = JSON.parse(text);
-  return String(data.result || '');
-}
-
-async function callVerify(vars, cookie) {
-  const response = await fetch(`${BASE_URL}/api/pledge/verify`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Cookie: cookie,
-    },
-    body: JSON.stringify({
-      text: String(vars.pledge || '').trim(),
-      top_k_platform: Number(vars.top_k_platform || 4),
-      top_k_pledge: Number(vars.top_k_pledge || 4),
-      top_k_regional: Number(vars.top_k_regional || 5),
-      phase: String(vars.phase || 'quick'),
-      judge: Boolean(vars.judge || false),
-    }),
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`/api/pledge/verify failed: HTTP ${response.status} ${text}`);
-  }
-  return text;
+  return sanitizeText(parsed.output);
 }
 
 export default class PolicyLocalProvider {
@@ -88,14 +60,19 @@ export default class PolicyLocalProvider {
   async callApi(_prompt, context) {
     const vars = (context && context.vars) || {};
     try {
-      const cookie = await login();
       const mode = String(vars.analysis_mode || 'coach').trim().toLowerCase();
-      const output = mode === 'verify'
-        ? await callVerify(vars, cookie)
-        : await callCoach(vars, cookie);
+      const output = callBridge({
+        mode,
+        pledge: sanitizeText(vars.pledge).trim(),
+        top_k_platform: Number(vars.top_k_platform || 4),
+        top_k_pledge: Number(vars.top_k_pledge || 4),
+        top_k_regional: Number(vars.top_k_regional || 5),
+        phase: String(vars.phase || 'quick'),
+        judge: Boolean(vars.judge || false),
+      });
       return { output };
     } catch (error) {
-      return { error: String(error.message || error) };
+      return { error: sanitizeText(error.message || error) };
     }
   }
 }

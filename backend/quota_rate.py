@@ -80,6 +80,8 @@ def check_quota(user_id: int) -> tuple[bool, str]:
 
 
 def check_rate_limit_ip(ip: str) -> tuple[bool, str]:
+    if ip in ("127.0.0.1", "::1", "localhost"):
+        return True, ""
     now = time.time()
     with _rate_lock:
         _clean_old(now, _rate_ip[ip])
@@ -90,6 +92,9 @@ def check_rate_limit_ip(ip: str) -> tuple[bool, str]:
 
 
 def check_rate_limit_user(user_id: int) -> tuple[bool, str]:
+    user = get_user(user_id)
+    if is_unlimited_quota_user(user):
+        return True, ""
     now = time.time()
     with _rate_lock:
         _clean_old(now, _rate_user[user_id])

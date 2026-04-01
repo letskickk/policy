@@ -6,21 +6,22 @@ import py_compile
 import subprocess
 import sys
 from pathlib import Path
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
+
+from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from harness.scripts._server_utils import start_server, stop_server
+from backend.main import app
+from harness.scripts._server_utils import ensure_harness_credentials, start_server, stop_server
 
 RESULTS = ROOT / "harness" / "results"
 TIER_RESULT = RESULTS / "tier-3.json"
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
     PYTHON = Path(sys.executable)
-LOGIN_EMAIL = os.environ.get("T1_LOGIN_EMAIL", "")
-LOGIN_PASSWORD = os.environ.get("T1_LOGIN_PASSWORD", "")
 
 
 def compile_python() -> tuple[bool, str]:
@@ -71,67 +72,43 @@ def smoke_server() -> tuple[bool, str]:
 
 
 def authenticated_api_smoke() -> tuple[bool, str]:
-    if not LOGIN_EMAIL or not LOGIN_PASSWORD:
-        return False, "missing T1 login credentials for authenticated smoke"
+    login_email, login_password = ensure_harness_credentials()
 
-    process = None
     try:
-        process = start_server(8003, RESULTS / "tier-3.auth.server.out.log", RESULTS / "tier-3.auth.server.err.log")
-        login_request = Request(
-            "http://127.0.0.1:8003/api/auth/login",
-            data=json.dumps({"email": LOGIN_EMAIL, "password": LOGIN_PASSWORD, "next": "/"}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urlopen(login_request, timeout=30) as response:
-            if response.status >= 400:
-                return False, f"login failed: {response.status}"
-            raw_cookie = response.headers.get("Set-Cookie") or ""
-        cookie_header = ""
-        for part in raw_cookie.split(","):
-            part = part.strip()
-            if part.startswith("policy_auth="):
-                cookie_header = part.split(";", 1)[0]
-                break
-        if not cookie_header:
-            return False, "login response did not include policy_auth cookie"
+        with TestClient(app) as client:
+            login_response = client.post("/api/auth/login", json={"email": login_email, "password": login_password, "next": "/"})
+            if login_response.status_code != 200:
+                return False, f"login failed: {login_response.status_code}"
 
-        me_request = Request("http://127.0.0.1:8003/api/auth/me", headers={"Cookie": cookie_header}, method="GET")
-        with urlopen(me_request, timeout=30) as response:
-            if response.status != 200:
-                return False, f"/api/auth/me unexpected status: {response.status}"
-            me_payload = json.loads(response.read().decode("utf-8"))
+            me_response = client.get("/api/auth/me")
+            if me_response.status_code != 200:
+                return False, f"/api/auth/me unexpected status: {me_response.status_code}"
+            me_payload = me_response.json()
             if not me_payload.get("id"):
                 return False, "authenticated smoke missing user id"
-            if (me_payload.get("email") or "").lower() != LOGIN_EMAIL.lower():
+            if (me_payload.get("email") or "").lower() != login_email.lower():
                 return False, "authenticated smoke returned unexpected user identity"
 
-        verify_request = Request(
-            "http://127.0.0.1:8003/api/pledge/verify",
-            data=json.dumps(
+            verify_response = client.post(
+                "/api/pledge/verify",
+                json=
                 {
                     "text": "강남 교통을 바꾸겠습니다.",
                     "phase": "quick",
                     "top_k_platform": 4,
                     "top_k_pledge": 4,
                     "top_k_regional": 5,
-                }
-            ).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Cookie": cookie_header},
-            method="POST",
-        )
-        with urlopen(verify_request, timeout=240) as response:
-            if response.status != 200:
-                return False, f"/api/pledge/verify unexpected status: {response.status}"
-            payload = json.loads(response.read().decode("utf-8"))
+                },
+            )
+            if verify_response.status_code != 200:
+                return False, f"/api/pledge/verify unexpected status: {verify_response.status_code}"
+            payload = verify_response.json()
             if "total_score" not in payload or "signal_light" not in payload:
                 return False, "verify smoke missing normalized fields"
 
         return True, "login -> /api/auth/me -> /api/pledge/verify passed"
     except Exception as exc:
         return False, str(exc)
-    finally:
-        stop_server(process)
 
 
 def main() -> int:

@@ -12,13 +12,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from harness.scripts._server_utils import start_server, stop_server
+from harness.scripts._server_utils import ensure_harness_credentials, start_server, stop_server
 
 RESULTS = ROOT / "harness" / "results"
 TIER_RESULT = RESULTS / "tier-2.json"
 BASE_URL = "http://127.0.0.1:8001"
-LOGIN_EMAIL = os.environ.get("T1_LOGIN_EMAIL", "")
-LOGIN_PASSWORD = os.environ.get("T1_LOGIN_PASSWORD", "")
 
 VIEWPORTS = {
     "desktop": {"width": 1440, "height": 960, "is_mobile": False},
@@ -45,11 +43,10 @@ BROKEN_TEXT_MARKERS = ("undefined", "nan", "[object object]")
 
 
 def extract_cookie_header() -> str:
-    if not LOGIN_EMAIL or not LOGIN_PASSWORD:
-        raise RuntimeError("T1_LOGIN_EMAIL and T1_LOGIN_PASSWORD are required for protected UX checks")
+    login_email, login_password = ensure_harness_credentials()
     request = Request(
         f"{BASE_URL}/api/auth/login",
-        data=json.dumps({"email": LOGIN_EMAIL, "password": LOGIN_PASSWORD, "next": "/"}).encode("utf-8"),
+        data=json.dumps({"email": login_email, "password": login_password, "next": "/"}).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
@@ -94,7 +91,7 @@ def audit_page(page, route: dict, viewport_name: str, screenshots_dir: Path) -> 
         issues.append(f"bad status for {route['path']}: {response.status if response else 'no response'}")
 
     title = page.title().strip()
-    lang = page.locator("html").get_attribute("lang") or ""
+    lang = page.evaluate("() => document.documentElement?.getAttribute('lang') || ''") or ""
     body_text = page.locator("body").inner_text().strip()
     normalized_body = " ".join(body_text.split()).lower()
     overflow = page.evaluate("() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth)")

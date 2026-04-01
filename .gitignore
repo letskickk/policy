@@ -23,3 +23,23 @@ harness/tier1-prompt/runs/
 harness/tier2-ux/runs/
 harness/tier3-deploy/runs/
 harness/config.json
+
+# Local agent/editor workspaces
+.agents/
+.claude/
+.worktrees/
+
+# Local temporary harness outputs
+.test_tmp/
+.pytest_tmp*/
+pytest-cache-files-*/
+.tmp_saju_harness/
+harness/progress_mailer.pid
+harness/status_mail.txt
+harness/results/*.log
+harness/results/screenshots/
+harness/*.err.log
+harness/*.out.log
+tmp2f7vtvws/
+tmp-local-server.err.log
+tmp-local-server.out.log

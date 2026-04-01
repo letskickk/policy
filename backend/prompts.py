@@ -110,7 +110,7 @@ DEFAULT_CHECK_USER_PROMPT = """다음 자료만 근거로 평가하세요.
 def _read_prompt_file(filename: str, default: str) -> str:
     path = PROMPTS_DIR / filename
     if path.exists():
-        return path.read_text(encoding="utf-8").strip()
+        return path.read_text(encoding="utf-8-sig").strip()
     return default
 
 

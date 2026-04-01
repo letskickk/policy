@@ -328,6 +328,7 @@ def write_results(history: list[dict]) -> None:
     lines.append(f"- Latest round: {latest['round']}")
     lines.append(f"- Generated: {latest['timestamp']}")
     lines.append(f"- Consecutive passes: {latest['consecutive_passes']}")
+    lines.append(f"- Total rounds completed: {len(history)}")
     lines.append("- Actual loop: evaluator -> planner -> generator -> evaluator")
     lines.append(f"- Thresholds: each tier >= {TIER_THRESHOLD:.0f}, overall weighted geometric mean >= {OVERALL_THRESHOLD:.0f}")
     lines.append(
@@ -409,6 +410,7 @@ def main() -> int:
 
         history.append(record)
         write_results(history)
+
         if consecutive_passes >= 3:
             break
 

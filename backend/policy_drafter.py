@@ -42,14 +42,14 @@ OUTPUT_FORMATS = {
 def _load_drafter_system_prompt() -> str:
     path = PROMPTS_DIR / "정책_생성_시스템.txt"
     if path.exists():
-        return path.read_text(encoding="utf-8").strip()
+        return path.read_text(encoding="utf-8-sig").strip()
     return "당 정책 기획 전문가로서 정책 초안을 작성하세요."
 
 
 def _load_drafter_user_template() -> str:
     path = PROMPTS_DIR / "정책_생성_유저.txt"
     if path.exists():
-        return path.read_text(encoding="utf-8").strip()
+        return path.read_text(encoding="utf-8-sig").strip()
     return "주제: {{TOPIC}}\n{{RESEARCH_CONTEXT}}"
 
 

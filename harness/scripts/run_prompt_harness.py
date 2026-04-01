@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from harness.scripts._server_utils import start_server, stop_server
+from harness.scripts._server_utils import ensure_harness_credentials
 
 HARNESS = ROOT / "harness"
 RESULTS = HARNESS / "results"
@@ -87,7 +87,6 @@ def main() -> int:
         TIER_RESULT.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return 1
 
-    process = None
     command = [
         npx,
         "promptfoo",
@@ -103,22 +102,21 @@ def main() -> int:
     env = dict(**__import__("os").environ)
     env.setdefault("T1_BASE_URL", "http://127.0.0.1:8011")
     env.setdefault("PROMPTFOO_DISABLE_TELEMETRY", "1")
+    login_email, login_password = ensure_harness_credentials()
+    env["T1_LOGIN_EMAIL"] = login_email
+    env["T1_LOGIN_PASSWORD"] = login_password
     completed = None
     for _attempt in range(2):
         clear_analysis_cache()
-        try:
-            process = start_server(8011, RESULTS / "tier-1.server.out.log", RESULTS / "tier-1.server.err.log")
-            completed = subprocess.run(
-                command,
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-                encoding="utf-8",
-                errors="replace",
-                env=env,
-            )
-        finally:
-            stop_server(process)
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+        )
         if completed.returncode == 0:
             break
     if completed is None or completed.returncode != 0:
