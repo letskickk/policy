@@ -2499,10 +2499,15 @@
         var el = document.createElement('div');
         el.className = 'chat-msg ' + cls;
         el.textContent = text;
+        el.dataset.rawText = text || '';
         var msgs = document.getElementById('chatMessages');
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
         return el;
+      }
+
+      function chatSanitizeLayerMarkers(text) {
+        return String(text || '').replace(/\[\s*(사실|제안|확인필요)\s*\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
       }
 
       function chatSetEnabled(on) {
@@ -2570,11 +2575,18 @@
       }
 
       function chatFormatLayers(el) {
-        var text = el.textContent || '';
+        var rawText = el.dataset.rawText || el.textContent || '';
+        var markerRegex = /(\[\s*사실\s*\]|\[\s*제안\s*\]|\[\s*확인필요\s*\])/g;
         var markers = {'[사실]':'fact','[제안]':'suggest','[확인필요]':'verify'};
-        var hasMarker = Object.keys(markers).some(function(m){return text.indexOf(m) !== -1;});
-        if (!hasMarker) return;
-        var parts = text.split(/(\[사실\]|\[제안\]|\[확인필요\])/);
+        var normalized = rawText.replace(/\[\s*사실\s*\]/g, '[사실]').replace(/\[\s*제안\s*\]/g, '[제안]').replace(/\[\s*확인필요\s*\]/g, '[확인필요]');
+        var hasMarker = markerRegex.test(rawText);
+        markerRegex.lastIndex = 0;
+        if (!hasMarker) {
+          var sanitized = chatSanitizeLayerMarkers(rawText);
+          if (sanitized !== rawText) el.innerHTML = sanitized.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+          return;
+        }
+        var parts = normalized.split(/(\[사실\]|\[제안\]|\[확인필요\])/);
         var html = '';
         var currentCls = '';
         for (var i = 0; i < parts.length; i++) {
@@ -2615,7 +2627,8 @@
                 if (onSession) onSession(data.session_id);
               } else if (data.type === 'chunk') {
                 if (!msgEl) msgEl = chatAppendMsg('assistant streaming', '');
-                msgEl.textContent += data.text;
+                msgEl.dataset.rawText = (msgEl.dataset.rawText || '') + data.text;
+                msgEl.textContent = chatSanitizeLayerMarkers(msgEl.dataset.rawText);
                 var msgs = document.getElementById('chatMessages');
                 msgs.scrollTop = msgs.scrollHeight;
               } else if (data.type === 'done') {
