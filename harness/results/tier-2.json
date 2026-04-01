@@ -108,7 +108,7 @@
         "overflow_px": 0,
         "console_errors": [],
         "request_failures": [],
-        "body_length": 4929,
+        "body_length": 4922,
         "screenshot": "harness\\results\\screenshots\\desktop-dashboard.png"
       },
       {
@@ -238,7 +238,7 @@
         "overflow_px": 0,
         "console_errors": [],
         "request_failures": [],
-        "body_length": 4906,
+        "body_length": 4899,
         "screenshot": "harness\\results\\screenshots\\mobile-dashboard.png"
       },
       {

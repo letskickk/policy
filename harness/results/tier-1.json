@@ -1,6 +1,6 @@
 {
   "tier": 1,
-  "score": 93.3,
+  "score": 93.76,
   "pass": true,
   "details": {
     "pass_count": 8,
@@ -8,9 +8,9 @@
     "error_count": 0,
     "total_tests": 8,
     "pass_rate": 100.0,
-    "verify_quality": 88.83,
+    "verify_quality": 89.6,
     "coverage_ok": true,
-    "eval_id": "eval-yct-2026-04-01T15:30:49",
+    "eval_id": "eval-ljU-2026-04-01T21:08:31",
     "raw_output": "harness\\results\\promptfoo-eval.json"
   }
 }
