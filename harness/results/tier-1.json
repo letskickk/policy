@@ -1,0 +1,16 @@
+{
+  "tier": 1,
+  "score": 100.0,
+  "pass": true,
+  "details": {
+    "pass_count": 6,
+    "fail_count": 0,
+    "error_count": 0,
+    "total_tests": 6,
+    "pass_rate": 100.0,
+    "verify_quality": 100.0,
+    "coverage_ok": true,
+    "eval_id": "eval-KK2-2026-04-01T13:50:43",
+    "raw_output": "harness\\results\\promptfoo-eval.json"
+  }
+}

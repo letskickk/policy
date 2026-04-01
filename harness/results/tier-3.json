@@ -1,0 +1,26 @@
+{
+  "tier": 3,
+  "score": 100.0,
+  "pass": true,
+  "details": {
+    "checks": [
+      {
+        "name": "py_compile",
+        "pass": true,
+        "details": ""
+      },
+      {
+        "name": "pytest -q",
+        "pass": true,
+        "details": "........................................................................ [ 71%]\n.............................                                            [100%]\n101 passed in 48.62s"
+      },
+      {
+        "name": "startup smoke",
+        "pass": true,
+        "details": "http://127.0.0.1:8002/ -> 200\nhttp://127.0.0.1:8002/api -> 200\nhttp://127.0.0.1:8002/api/regions -> 200\nhttp://127.0.0.1:8002/policy-lab -> 200"
+      }
+    ],
+    "pass_count": 3,
+    "fail_count": 0
+  }
+}

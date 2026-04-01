@@ -1,0 +1,78 @@
+{
+  "tier": 2,
+  "score": 100.0,
+  "pass": true,
+  "details": {
+    "total_checks": 6,
+    "passed_checks": 6,
+    "failed_checks": 0,
+    "audits": [
+      {
+        "page": "/",
+        "viewport": "desktop",
+        "issues": [],
+        "title": "개혁신당 AI 정책 플랫폼",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\desktop-home.png"
+      },
+      {
+        "page": "/pledge",
+        "viewport": "desktop",
+        "issues": [],
+        "title": "로그인 - 정책 멘토링",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\desktop-pledge.png"
+      },
+      {
+        "page": "/policy-lab",
+        "viewport": "desktop",
+        "issues": [],
+        "title": "로그인 - 정책 멘토링",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\desktop-policy-lab.png"
+      },
+      {
+        "page": "/",
+        "viewport": "mobile",
+        "issues": [],
+        "title": "개혁신당 AI 정책 플랫폼",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\mobile-home.png"
+      },
+      {
+        "page": "/pledge",
+        "viewport": "mobile",
+        "issues": [],
+        "title": "로그인 - 정책 멘토링",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\mobile-pledge.png"
+      },
+      {
+        "page": "/policy-lab",
+        "viewport": "mobile",
+        "issues": [],
+        "title": "로그인 - 정책 멘토링",
+        "lang": "ko",
+        "overflow_px": 0,
+        "console_errors": [],
+        "request_failures": [],
+        "screenshot": "harness\\results\\screenshots\\mobile-policy-lab.png"
+      }
+    ]
+  }
+}

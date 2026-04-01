@@ -3,6 +3,7 @@
 """
 import json
 import logging
+import re
 from typing import Dict, List, Tuple
 
 from openai import OpenAI
@@ -25,10 +26,74 @@ except ImportError:
 # exact-match에서 fuzzy로 인정할 최소 부분 유사도 (0~100)
 EXACT_FUZZY_THRESHOLD = 85
 EXACT_TOP_K = 3
+SPECIFIC_ACTION_KEYWORDS = (
+    "설치", "도입", "확대", "신설", "운영", "지원", "조성", "건립",
+    "개편", "추진", "배치", "확충", "정비", "개소", "확보",
+)
+SPECIFIC_TARGET_KEYWORDS = (
+    "센터", "시설", "돌봄", "주간보호", "장애인", "청년", "노인",
+    "소상공인", "가구", "학생", "주민", "교통", "주택", "보건",
+)
+AUTHORITY_MISMATCH_KEYWORDS = (
+    "fta", "교육부", "검찰", "국방부", "외교부", "통일부", "대통령",
+    "국회", "헌법", "관세", "병역", "외교", "국방", "통상",
+)
 
 
 def _chunk_key(chunk: DocChunk) -> tuple:
     return (chunk.doc_id, chunk.chunk_id)
+
+
+def _compute_input_signal_adjustment(user_pledge: str) -> float:
+    """
+    입력 문장 자체의 정책 구체성/권한 불일치/슬로건 성격을 점수에 약하게 반영한다.
+    - 수치, 대상, 실행 동사가 있는 구체 공약은 보너스
+    - 중앙정부 권한 위주 공약은 페널티
+    - 짧은 구호형 입력은 강한 페널티
+    """
+    text = re.sub(r"\s+", " ", (user_pledge or "").strip())
+    if not text:
+        return 0.0
+
+    lowered = text.lower()
+    char_len = len(text)
+    token_count = len(text.split())
+    number_hits = len(re.findall(r"\d+", text))
+    unit_hits = len(re.findall(r"(명|개소|곳|회|개월|년|%|억원|만명|가구)", text))
+    action_hits = sum(1 for kw in SPECIFIC_ACTION_KEYWORDS if kw in text)
+    target_hits = sum(1 for kw in SPECIFIC_TARGET_KEYWORDS if kw in text)
+    mismatch_hits = sum(1 for kw in AUTHORITY_MISMATCH_KEYWORDS if kw in lowered)
+
+    specificity_bonus = 0.0
+    if char_len >= 80:
+        specificity_bonus += 2.0
+    elif char_len >= 50:
+        specificity_bonus += 1.0
+    specificity_bonus += min(number_hits, 2) * 2.5
+    specificity_bonus += min(unit_hits, 2) * 1.5
+    specificity_bonus += min(action_hits, 3) * 1.5
+    specificity_bonus += min(target_hits, 2) * 1.0
+    if number_hits >= 1 and action_hits >= 1 and target_hits >= 1:
+        specificity_bonus += 3.0
+    specificity_bonus = min(specificity_bonus, 20.0)
+
+    slogan_penalty = 0.0
+    if char_len < 25:
+        slogan_penalty += 20.0
+    elif char_len < 50:
+        slogan_penalty += 10.0
+    if token_count <= 4:
+        slogan_penalty += 8.0
+    if number_hits == 0 and action_hits <= 1:
+        slogan_penalty += 8.0
+    if "!" in text or lowered.endswith("다!") or lowered.endswith("합시다"):
+        slogan_penalty += 6.0
+
+    authority_penalty = min(24.0, mismatch_hits * 12.0)
+    if mismatch_hits and action_hits == 0:
+        authority_penalty += 4.0
+
+    return specificity_bonus - slogan_penalty - authority_penalty
 
 
 def exact_match_search(
@@ -594,6 +659,7 @@ def generate_report(
             platform_score = min(100.0, platform_score + 5.0)
 
         fit_score = 0.50 * platform_score + 0.35 * pledge_score - 0.15 * conflict_penalty
+        fit_score += _compute_input_signal_adjustment(user_pledge)
         fit_score = max(0.0, min(100.0, fit_score))
 
         # 제목·한 줄만 적은 경우: 서버 측 상한 적용 (80자 미만이면 fit_score 최대 40)
