@@ -883,7 +883,7 @@
       }
     }
 
-    @media (max-width: 768px){
+    @media (max-width: 900px){
       body{ padding: 1.25rem 0.9rem 2rem; }
       .top-bar{ align-items: stretch; gap: 0.7rem; }
       .top-bar .top-bar-left{
@@ -1097,7 +1097,7 @@
       }
     }
 
-    @media (max-width: 980px){
+    @media (max-width: 900px){
       .hero-flow{
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -1213,7 +1213,7 @@
       }
     }
 
-    @media (min-width: 720px){
+    @media (min-width: 900px){
       .cta-group{
         grid-template-columns: 1fr 1fr;
       }
@@ -1398,26 +1398,26 @@
   </div>
 
   <!-- 공약 상세 모달 (map.html 동일) -->
-  <div class="pledge-modal-overlay" id="pledgeModalOverlay" onclick="closePledgeModal(event)">
-    <div class="pledge-modal" onclick="event.stopPropagation()">
+  <div class="pledge-modal-overlay" id="pledgeModalOverlay" aria-hidden="true" onclick="closePledgeModal(event)">
+    <div class="pledge-modal" role="dialog" aria-modal="true" aria-labelledby="pledgeModalTitle" onclick="event.stopPropagation()">
       <div class="pledge-modal-header">
         <div>
           <h3 id="pledgeModalTitle"></h3>
           <div class="modal-sub" id="pledgeModalSub"></div>
         </div>
-        <button class="pledge-modal-close" onclick="closePledgeModal()" title="닫기">✕</button>
+        <button class="pledge-modal-close" id="pledgeModalCloseBtn" onclick="closePledgeModal()" title="닫기">✕</button>
       </div>
       <div class="pledge-modal-body" id="pledgeModalBody"></div>
     </div>
   </div>
-  <div class="photo-lightbox" id="photoLightbox" onclick="closePhotoLightbox(event)">
-    <div class="photo-lightbox-dialog" onclick="event.stopPropagation()">
+  <div class="photo-lightbox" id="photoLightbox" aria-hidden="true" onclick="closePhotoLightbox(event)">
+    <div class="photo-lightbox-dialog" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
       <button class="photo-lightbox-close" type="button" onclick="closePhotoLightbox()" title="닫기">✕</button>
       <img class="photo-lightbox-image" id="photoLightboxImage" alt="">
     </div>
   </div>
-  <div class="image-preview-overlay" id="imagePreviewOverlay" onclick="closeImagePreview(event)">
-    <div class="image-preview-dialog" onclick="event.stopPropagation()">
+  <div class="image-preview-overlay" id="imagePreviewOverlay" aria-hidden="true" onclick="closeImagePreview(event)">
+    <div class="image-preview-dialog" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
       <div class="image-preview-top">
         <div class="image-preview-title">이미지 미리보기</div>
         <div class="image-preview-actions">
@@ -1431,6 +1431,7 @@
     </div>
   </div>
 
+  <script src="/static/js/modal-utils.js"></script>
   <script>
     (async function() {
       try {
@@ -2357,8 +2358,11 @@
       pledgeModalTitle.textContent = '';
       pledgeModalSub.textContent = '';
       pledgeModalBody.innerHTML = '<div style="color:#94a3b8;padding:1rem 0;text-align:center;">공약을 불러오는 중...</div>';
-      pledgeModalOverlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      PolicyModal.open(pledgeModalOverlay, {
+        container: '.pledge-modal',
+        initialFocus: '#pledgeModalCloseBtn',
+        onEscape: window.closePledgeModal,
+      });
       try {
         const params = new URLSearchParams();
         if (asOf) params.set('as_of', asOf);
@@ -2387,46 +2391,45 @@
 
     window.closePledgeModal = function(event) {
       if (event && event.target && event.target !== pledgeModalOverlay) return;
-      pledgeModalOverlay.classList.remove('open');
-      document.body.style.overflow = '';
+      PolicyModal.close(pledgeModalOverlay);
     };
 
     function openPhotoLightbox(src, alt) {
       if (!src || !photoLightbox || !photoLightboxImage) return;
       photoLightboxImage.src = src;
       photoLightboxImage.alt = alt || '';
-      photoLightbox.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      PolicyModal.open(photoLightbox, {
+        container: '.photo-lightbox-dialog',
+        initialFocus: '.photo-lightbox-close',
+        onEscape: closePhotoLightbox,
+      });
     }
 
     function closePhotoLightbox(event) {
       if (event && event.target && event.target !== photoLightbox) return;
       if (!photoLightbox || !photoLightboxImage) return;
-      photoLightbox.classList.remove('open');
+      PolicyModal.close(photoLightbox);
       photoLightboxImage.removeAttribute('src');
       photoLightboxImage.alt = '';
-      if (!pledgeModalOverlay.classList.contains('open')) {
-        document.body.style.overflow = '';
-      }
     }
 
     function openImagePreview(imageUrl, filename) {
       if (!imagePreviewOverlay || !imagePreviewImage || !imagePreviewSaveBtn || !imageUrl) return;
       _pendingImagePreview = { imageUrl, filename };
       imagePreviewImage.src = imageUrl;
-      imagePreviewOverlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      PolicyModal.open(imagePreviewOverlay, {
+        container: '.image-preview-dialog',
+        initialFocus: '.image-preview-btn',
+        onEscape: closeImagePreview,
+      });
     }
 
     function closeImagePreview(event) {
       if (event && event.target && event.target !== imagePreviewOverlay) return;
       if (!imagePreviewOverlay || !imagePreviewImage) return;
-      imagePreviewOverlay.classList.remove('open');
+      PolicyModal.close(imagePreviewOverlay);
       imagePreviewImage.removeAttribute('src');
       _pendingImagePreview = null;
-      if (!pledgeModalOverlay.classList.contains('open') && !photoLightbox.classList.contains('open')) {
-        document.body.style.overflow = '';
-      }
     }
 
     document.addEventListener('keydown', function(e) {

@@ -12,7 +12,7 @@
         </div>
       </footer>
     </div>
-    <div class="contact-overlay" data-contact-overlay style="display:none">
+    <div class="contact-overlay" data-contact-overlay aria-hidden="true" style="display:none">
       <div class="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
         <div data-contact-form>
           <h3 id="contactModalTitle">문의하기</h3>
@@ -70,15 +70,29 @@
 
     const openModal = () => {
       resetState();
-      overlay.style.display = "flex";
-      overlay.classList.add("open");
-      document.body.style.overflow = "hidden";
+      if (window.PolicyModal) {
+        window.PolicyModal.open(overlay, {
+          container: ".contact-modal",
+          initialFocus: "[data-contact-email]",
+          onEscape: closeModal,
+          display: "flex",
+          restoreFocusTo: openButton,
+        });
+      } else {
+        overlay.style.display = "flex";
+        overlay.classList.add("open");
+        document.body.style.overflow = "hidden";
+      }
     };
 
     const closeModal = () => {
-      overlay.classList.remove("open");
-      overlay.style.display = "none";
-      document.body.style.overflow = "";
+      if (window.PolicyModal) {
+        window.PolicyModal.close(overlay, { display: "none" });
+      } else {
+        overlay.classList.remove("open");
+        overlay.style.display = "none";
+        document.body.style.overflow = "";
+      }
     };
 
     const sendContact = async () => {
@@ -111,6 +125,10 @@
 
         formWrap.hidden = true;
         successWrap.hidden = false;
+        requestAnimationFrame(() => {
+          const successClose = successWrap.querySelector("[data-contact-close]");
+          if (successClose) successClose.focus();
+        });
         nameInput.value = "";
         emailInput.value = "";
         messageInput.value = "";
@@ -154,13 +172,6 @@
     if (slot && typeof slot.sendContact === "function") return slot.sendContact();
     return Promise.resolve();
   };
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    const slot = document.querySelector("[data-shared-footer]");
-    if (slot && typeof slot.closeContactModal === "function") slot.closeContactModal();
-  });
-
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initSharedFooter, { once: true });
   } else {

@@ -133,15 +133,23 @@ a {
   max-width: 1440px;
 }
 
+.surface,
 .card,
-.panel,
-.surface {
+.panel {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(16px);
+}
+
+.card {
+  box-shadow: var(--shadow);
+}
+
+.panel {
+  min-height: 0;
 }
 
 .surface-quiet {
@@ -650,9 +658,9 @@ textarea::placeholder {
     padding: 0.85rem 0 1.7rem;
   }
 
+  .surface,
   .card,
-  .panel,
-  .surface {
+  .panel {
     padding: 0.9rem;
     border-radius: 16px;
   }
@@ -699,13 +707,13 @@ textarea::placeholder {
 /* ===== OVERDRIVE: 전역 인터랙션 + 모션 시스템 ===== */
 
 /* 카드/패널 호버 — 스프링 느낌 */
-.card, .panel, .surface, .route-item {
+.surface, .card, .panel, .route-item {
   transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
               border-color 0.25s ease,
               box-shadow 0.3s ease,
               background 0.25s ease;
 }
-.card:hover, .panel:hover, .surface:hover {
+.surface:hover, .card:hover, .panel:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow), 0 0 0 1px rgba(255,122,26,0.08);
 }
@@ -817,7 +825,7 @@ textarea:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .card:hover, .panel:hover, .surface:hover, .btn:hover { transform: none; }
+  .surface:hover, .card:hover, .panel:hover, .btn:hover { transform: none; }
 }
 
 /* ===== 공통 풋터 ===== */
@@ -963,7 +971,7 @@ code,
   max-width: 100%;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   input[type="text"],
   input[type="email"],
   input[type="number"],

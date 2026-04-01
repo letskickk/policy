@@ -54,7 +54,7 @@
       gap: 2rem;
     }
 
-    @media (max-width: 1024px){
+    @media (max-width: 900px){
       .container{
         grid-template-columns: 1fr;
       }
@@ -229,9 +229,11 @@
       stroke-width: 2 !important;
     }
 
-    .korea-map path:focus{
+    .korea-map path:focus-visible{
       outline: 3px solid var(--cta-ring);
       outline-offset: 2px;
+      stroke: var(--brand) !important;
+      stroke-width: 2 !important;
     }
 
     /* 배지 (후보자 수 표시) */
@@ -387,20 +389,6 @@
       border-color: rgba(255,255,255,0.32);
     }
 
-    /* 로딩/에러/빈 상태 */
-    .state-message{
-      text-align: center;
-      padding: 3rem 1rem;
-      color: var(--text);
-    }
-
-    .state-message.loading{
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-    }
-
     .spinner{
       width: 32px;
       height: 32px;
@@ -413,19 +401,6 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-
-    .error-message{
-      padding: 1rem 1.25rem;
-      background: rgba(255, 107, 107, 0.14);
-      border: 1px solid rgba(255, 107, 107, 0.40);
-      color: #ffd1d1;
-      border-radius: 14px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .error-message::before{ content:"⚠️"; }
 
     /* 후보자 카드 — 아코디언 */
     .candidates-list{
@@ -622,24 +597,6 @@
       background: rgba(56,189,248,0.18);
     }
 
-    .empty-state{
-      text-align: center;
-      padding: 2.5rem 1.5rem;
-      color: var(--muted);
-    }
-
-    .empty-state-icon{
-      width: 4rem;
-      height: 4rem;
-      margin: 0 auto 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2.25rem;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-
     @media (max-width: 640px){
       body{ padding: 1rem 0.75rem; }
       .top-bar{ padding: 0 0.5rem; gap: 0.75rem; }
@@ -651,12 +608,10 @@
       .container{ gap: 1rem; }
       .map-container, .panel{ padding: 1rem; border-radius: 16px; }
       .panel-header{ padding-bottom: 0.75rem; margin-bottom: 1rem; }
-      .empty-state{ padding: 2rem 1rem; }
-      .empty-state-icon{ width: 3.5rem; height: 3.5rem; font-size: 1.9rem; margin-bottom: 0.75rem; }
       .candidate-card, .candidate-header{ padding-left: 0.75rem; padding-right: 0.75rem; }
     }
 
-    @media (max-width: 768px){
+    @media (max-width: 900px){
       body{ padding: 1.1rem 0.85rem 1.8rem; }
       .top-bar{
         padding: 0;
@@ -1316,16 +1271,16 @@
       </div>
 
       <div id="panel-content">
-        <div class="empty-state">
-          <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
+        <div class="state-empty">
+          <div style="font-size:1.6rem;margin-bottom:0.45rem;">🗺️</div>
+          지도를 클릭하여 해당 지역의 출마자를 확인하세요.
         </div>
       </div>
     </div>
   </div>
 
-  <div class="pledge-modal-overlay" id="pledgeModalOverlay" onclick="closePledgeModal(event)">
-    <div class="pledge-modal" onclick="event.stopPropagation()">
+  <div class="pledge-modal-overlay" id="pledgeModalOverlay" aria-hidden="true" onclick="closePledgeModal(event)">
+    <div class="pledge-modal" role="dialog" aria-modal="true" aria-labelledby="pledgeModalTitle" onclick="event.stopPropagation()">
       <div class="pledge-modal-header">
         <div>
           <h3 id="pledgeModalTitle"></h3>
@@ -1336,14 +1291,14 @@
       <div class="pledge-modal-body" id="pledgeModalBody"></div>
     </div>
   </div>
-  <div class="photo-lightbox" id="photoLightbox" onclick="closePhotoLightbox(event)">
-    <div class="photo-lightbox-dialog" onclick="event.stopPropagation()">
+  <div class="photo-lightbox" id="photoLightbox" aria-hidden="true" onclick="closePhotoLightbox(event)">
+    <div class="photo-lightbox-dialog" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
       <button class="photo-lightbox-close" type="button" onclick="closePhotoLightbox()" title="닫기">✕</button>
       <img class="photo-lightbox-image" id="photoLightboxImage" alt="">
     </div>
   </div>
-  <div class="image-preview-overlay" id="imagePreviewOverlay" onclick="closeImagePreview(event)">
-    <div class="image-preview-dialog" onclick="event.stopPropagation()">
+  <div class="image-preview-overlay" id="imagePreviewOverlay" aria-hidden="true" onclick="closeImagePreview(event)">
+    <div class="image-preview-dialog" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
       <div class="image-preview-top">
         <div class="image-preview-title">이미지 미리보기</div>
         <div class="image-preview-actions">
@@ -1357,6 +1312,7 @@
     </div>
   </div>
 
+  <script src="/static/js/modal-utils.js"></script>
   <script>
     const panelTitle = document.getElementById('panel-title');
     const panelSubtitle = document.getElementById('panel-subtitle');
@@ -1633,9 +1589,9 @@
       districtSelect.disabled = true;
       districtSelect.innerHTML = '<option value="">지역을 먼저 선택하세요</option>';
       panelContent.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🗺️</div>
-          <p>지도를 클릭하여 해당 지역의 출마자를 확인하세요</p>
+        <div class="state-empty">
+          <div style="font-size:1.6rem;margin-bottom:0.45rem;">🗺️</div>
+          지도를 클릭하여 해당 지역의 출마자를 확인하세요.
         </div>
       `;
     }
@@ -1733,7 +1689,7 @@
     // 로딩 상태 표시
     function showLoading() {
       panelContent.innerHTML = `
-        <div class="state-message loading">
+        <div class="state-loading">
           <div class="spinner"></div>
           <span>출마자 정보를 불러오는 중...</span>
         </div>
@@ -1746,7 +1702,7 @@
         ? '<div class="panel-cta-row" style="margin-top:1rem;"><button type="button" class="panel-cta-btn" id="errorRetryBtn">다시 시도</button></div>'
         : '';
       panelContent.innerHTML = `
-        <div class="error-message">${message}</div>
+        <div class="state-error">${message}</div>
         ${retryHtml}
       `;
       const btn = panelContent.querySelector('#errorRetryBtn');
@@ -1801,9 +1757,9 @@
 
       if (candidates.length === 0) {
         panelContent.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <p>해당 지역의 출마자 정보가 없습니다</p>
+          <div class="state-empty">
+            <div style="font-size:1.5rem;margin-bottom:0.4rem;">📋</div>
+            해당 지역의 출마자 정보가 없습니다.
           </div>
         `;
         return;
@@ -1948,7 +1904,7 @@
       panelTitle.textContent = '공약 검색 결과';
       panelSubtitle.textContent = '전체 후보 공약에서 검색한 결과입니다.';
       panelContent.innerHTML = `
-        <div class="state-message loading">
+        <div class="state-loading">
           <div class="spinner"></div>
           <span>공약 검색 결과를 불러오는 중...</span>
         </div>`;
@@ -1958,9 +1914,9 @@
 
       if (!matches.length) {
         panelContent.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">⌕</div>
-            <p>검색 결과가 없습니다. 다른 키워드를 입력해보세요.</p>
+          <div class="state-empty">
+            <div style="font-size:1.5rem;margin-bottom:0.4rem;">⌕</div>
+            검색 결과가 없습니다. 다른 키워드를 입력해보세요.
           </div>`;
       } else {
         const cards = matches.map((row) => `
@@ -2815,28 +2771,11 @@
       const location = c.district_name ? `${regionName} ${c.district_name}` : regionName;
       pledgeModalSub.textContent = `${location} · ${etype}`;
 
-      pledgeModalOverlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
-
-      const closeBtn = document.getElementById('pledgeModalCloseBtn');
-      if (closeBtn) { closeBtn.focus(); }
-
-      const trapHandler = function(e) {
-        if (e.key !== 'Tab' || !pledgeModalOverlay.classList.contains('open')) return;
-        const modal = pledgeModalOverlay.querySelector('.pledge-modal');
-        const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        const list = Array.from(focusables).filter(function(el) { return el.tabIndex >= 0 && !el.disabled; });
-        if (list.length === 0) return;
-        const first = list[0];
-        const last = list[list.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-        } else {
-          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
-      };
-      pledgeModalOverlay._trapHandler = trapHandler;
-      document.addEventListener('keydown', trapHandler);
+      PolicyModal.open(pledgeModalOverlay, {
+        container: '.pledge-modal',
+        initialFocus: '#pledgeModalCloseBtn',
+        onEscape: closePledgeModal,
+      });
 
       let detail = {
         ...c,
@@ -2846,7 +2785,7 @@
       };
 
       if (c.candidate_id) {
-        pledgeModalBody.innerHTML = '<div style="color:#94a3b8;padding:1rem 0;text-align:center;">공약을 불러오는 중...</div>';
+        pledgeModalBody.innerHTML = '<div class="state-loading">공약을 불러오는 중...</div>';
         try {
           const res = await fetch(`/api/candidates/${c.candidate_id}`);
           if (res.ok) {
@@ -2868,9 +2807,12 @@
       const etype = electionTypeLabels[fallback.election_type] || fallback.election_type || '';
       const location = fallback.district_name ? `${regionName} ${fallback.district_name}` : regionName;
       pledgeModalSub.textContent = `${location}${etype ? ` · ${etype}` : ''}`;
-      pledgeModalOverlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
-      pledgeModalBody.innerHTML = '<div style="color:#94a3b8;padding:1rem 0;text-align:center;">공약을 불러오는 중...</div>';
+      PolicyModal.open(pledgeModalOverlay, {
+        container: '.pledge-modal',
+        initialFocus: '#pledgeModalCloseBtn',
+        onEscape: closePledgeModal,
+      });
+      pledgeModalBody.innerHTML = '<div class="state-loading">공약을 불러오는 중...</div>';
       try {
         const res = await fetch(`/api/candidates/${candidateId}`);
         if (res.ok) {
@@ -3027,50 +2969,45 @@
 
     function closePledgeModal(event) {
       if (event && event.target && event.target !== pledgeModalOverlay) return;
-      pledgeModalOverlay.classList.remove('open');
-      document.body.style.overflow = '';
-      if (pledgeModalOverlay._trapHandler) {
-        document.removeEventListener('keydown', pledgeModalOverlay._trapHandler);
-        pledgeModalOverlay._trapHandler = null;
-      }
+      PolicyModal.close(pledgeModalOverlay);
     }
 
     function openPhotoLightbox(src, alt) {
       if (!src || !photoLightbox || !photoLightboxImage) return;
       photoLightboxImage.src = src;
       photoLightboxImage.alt = alt || '';
-      photoLightbox.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      PolicyModal.open(photoLightbox, {
+        container: '.photo-lightbox-dialog',
+        initialFocus: '.photo-lightbox-close',
+        onEscape: closePhotoLightbox,
+      });
     }
 
     function closePhotoLightbox(event) {
       if (event && event.target && event.target !== photoLightbox) return;
       if (!photoLightbox || !photoLightboxImage) return;
-      photoLightbox.classList.remove('open');
+      PolicyModal.close(photoLightbox);
       photoLightboxImage.removeAttribute('src');
       photoLightboxImage.alt = '';
-      if (!pledgeModalOverlay.classList.contains('open')) {
-        document.body.style.overflow = '';
-      }
     }
 
     function openImagePreview(imageUrl, filename) {
       if (!imagePreviewOverlay || !imagePreviewImage || !imagePreviewSaveBtn || !imageUrl) return;
       _pendingImagePreview = { imageUrl, filename };
       imagePreviewImage.src = imageUrl;
-      imagePreviewOverlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      PolicyModal.open(imagePreviewOverlay, {
+        container: '.image-preview-dialog',
+        initialFocus: '.image-preview-btn',
+        onEscape: closeImagePreview,
+      });
     }
 
     function closeImagePreview(event) {
       if (event && event.target && event.target !== imagePreviewOverlay) return;
       if (!imagePreviewOverlay || !imagePreviewImage) return;
-      imagePreviewOverlay.classList.remove('open');
+      PolicyModal.close(imagePreviewOverlay);
       imagePreviewImage.removeAttribute('src');
       _pendingImagePreview = null;
-      if (!pledgeModalOverlay.classList.contains('open') && !photoLightbox.classList.contains('open')) {
-        document.body.style.overflow = '';
-      }
     }
 
     document.addEventListener('keydown', (e) => {
