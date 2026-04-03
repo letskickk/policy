@@ -24,7 +24,7 @@ def _sanitize_value(value: object) -> object:
 
 
 def _load_payload() -> dict:
-    raw = sys.stdin.read()
+    raw = sys.stdin.buffer.read().decode("utf-8")
     if not raw.strip():
         return {}
     return _sanitize_value(json.loads(raw))

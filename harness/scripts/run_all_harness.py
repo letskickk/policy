@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +33,26 @@ TIERS = [
 ]
 BREAKTHROUGH_FAILURE_WINDOW = 3
 BREAKTHROUGH_MIN_IMPROVEMENT = 1.0
+FORBIDDEN_GENERATOR_PATTERNS = (
+    r"harness/scripts/run_all_harness\.py",
+    r"harness/scripts/run_prompt_harness\.py",
+    r"harness/scripts/run_ux_harness\.py",
+    r"harness/scripts/run_deploy_harness\.py",
+    r"tier1-prompt/runs",
+    r"tier2-ux/runs",
+    r"tier3-deploy/runs",
+)
+ARCHITECTURE_PATTERNS = {
+    "pipeline": "Sequential evaluator -> planner -> generator -> evaluator loop for tightly-coupled fixes.",
+    "fan_out_fan_in": "Split tier investigation in parallel, merge the evidence, then execute one focused repair round.",
+    "producer_reviewer": "One step proposes edits and a review step verifies scope, allowed paths, and regression risk.",
+    "supervisor": "Central orchestrator chooses the next move from cross-tier evidence, especially during stagnation.",
+}
+LEGACY_PATH_MAP = {
+    "harness/tier1-prompt/runs/": "harness/results/tier-1.json",
+    "harness/tier2-ux/runs/": "harness/results/tier-2.json",
+    "harness/tier3-deploy/runs/": "harness/results/tier-3.json",
+}
 
 
 def run_python(script: Path) -> int:
@@ -81,6 +103,130 @@ def summarize_failure(data: dict) -> str:
         if text:
             return text[:220]
     return ""
+
+
+def artifact_manifest() -> dict:
+    return {
+        "results_markdown": "harness/RESULTS.md",
+        "planner_artifacts": ["harness/plans/LATEST.json", "harness/plans/LATEST.md"],
+        "generator_artifacts": ["harness/generator/round-XX.last.txt"],
+        "tier_results": {
+            "1": ["harness/results/tier-1.json", "harness/results/promptfoo-eval.json"],
+            "2": ["harness/results/tier-2.json", "harness/results/screenshots/*.png"],
+            "3": ["harness/results/tier-3.json", "harness/results/tier-3.server.out.log", "harness/results/tier-3.server.err.log"],
+        },
+        "editable_targets": {
+            "1": [
+                "prompts/당_부합_점검_시스템.txt",
+                "prompts/당_부합_점검_유저.txt",
+                "prompts/공약_챗봇_시스템.txt",
+                "prompts/정책_생성_시스템.txt",
+                "prompts/정책_생성_유저.txt",
+                "backend/prompts.py",
+                "backend/check_service.py",
+                "backend/policy_drafter.py",
+            ],
+            "2": ["static/*.html", "static/admin/*.html"],
+            "3": ["backend/*.py", "tests/*.py", "scripts/*.py", "harness/**/*.py"],
+        },
+    }
+
+
+def choose_architecture_pattern(evaluation: dict, strategy_mode: str) -> str:
+    failing_tiers = [tier for tier in evaluation.get("tiers", []) if not tier.get("pass")]
+    if strategy_mode == "breakthrough":
+        return "supervisor"
+    if len(failing_tiers) > 1:
+        return "fan_out_fan_in"
+    if any(int(tier.get("tier") or 0) == 3 for tier in failing_tiers):
+        return "producer_reviewer"
+    return "pipeline"
+
+
+def normalize_plan_path(path: str) -> str:
+    return LEGACY_PATH_MAP.get(path, path).replace("\\", "/")
+
+
+def path_exists_or_matches(path: str) -> bool:
+    if any(char in path for char in "*?[]"):
+        return len(glob.glob(str(ROOT / path), recursive=True)) > 0
+    return (ROOT / path).exists()
+
+
+def sanitize_generator_prompt(prompt: str, manifest: dict) -> str:
+    sanitized = (prompt or "").strip()
+    for pattern in FORBIDDEN_GENERATOR_PATTERNS:
+        sanitized = re.sub(pattern, "[managed-by-orchestrator]", sanitized, flags=re.IGNORECASE)
+
+    guidance = [
+        "Read only the current harness artifacts listed below.",
+        f"Results: {manifest['results_markdown']}",
+        "Tier 1 artifacts: " + ", ".join(manifest["tier_results"]["1"]),
+        "Tier 2 artifacts: " + ", ".join(manifest["tier_results"]["2"]),
+        "Tier 3 artifacts: " + ", ".join(manifest["tier_results"]["3"]),
+        "Edit only the files approved in planner priorities.",
+        "Do not run any harness/scripts/*.py evaluator from inside the generator.",
+    ]
+    if sanitized:
+        guidance.append("Planner-specific instructions: " + sanitized)
+    return "\n".join(guidance)
+
+
+def sanitize_plan(plan: dict, evaluation: dict, strategy_mode: str) -> dict:
+    manifest = artifact_manifest()
+    sanitized = {
+        "strategy_mode": strategy_mode,
+        "architecture_pattern": str(plan.get("architecture_pattern") or choose_architecture_pattern(evaluation, strategy_mode)),
+        "round_goal": str(plan.get("round_goal") or "").strip() or "Raise the lowest-scoring tier with the smallest reliable repair set.",
+        "priorities": [],
+        "generator_prompt": "",
+    }
+    if sanitized["architecture_pattern"] not in ARCHITECTURE_PATTERNS:
+        sanitized["architecture_pattern"] = choose_architecture_pattern(evaluation, strategy_mode)
+
+    raw_priorities = plan.get("priorities")
+    if not isinstance(raw_priorities, list):
+        raw_priorities = []
+
+    for item in raw_priorities[:3]:
+        try:
+            tier = int(item.get("tier"))
+        except Exception:
+            continue
+        if tier < 1 or tier > 3:
+            continue
+
+        files: list[str] = []
+        for raw_path in item.get("files") or []:
+            normalized = normalize_plan_path(str(raw_path))
+            if path_exists_or_matches(normalized):
+                files.append(normalized)
+        if not files:
+            files = list(manifest["editable_targets"].get(str(tier), []))
+
+        sanitized["priorities"].append(
+            {
+                "tier": tier,
+                "title": str(item.get("title") or f"T{tier} repair"),
+                "action": str(item.get("action") or "Inspect current evidence, patch the narrowest failing surface, and stop."),
+                "files": files,
+            }
+        )
+
+    if not sanitized["priorities"]:
+        lowest_tier = min(evaluation.get("tiers", []), key=lambda tier: float(tier.get("score") or 0.0))
+        tier_id = str(lowest_tier["tier"])
+        sanitized["priorities"].append(
+            {
+                "tier": int(tier_id),
+                "title": f"T{tier_id} highest-leverage repair",
+                "action": "Inspect the current result artifacts, patch the direct failure source, and keep scope tight.",
+                "files": list(manifest["editable_targets"][tier_id]),
+            }
+        )
+
+    sanitized["generator_prompt"] = sanitize_generator_prompt(str(plan.get("generator_prompt") or ""), manifest)
+    return sanitized
 
 
 def evaluate_once() -> dict:
@@ -150,6 +296,7 @@ def should_trigger_breakthrough(history: list[dict], evaluation: dict) -> bool:
 
 def planner_prompt(round_number: int, evaluation: dict, strategy_mode: str) -> str:
     payload = json.dumps(evaluation, ensure_ascii=False, indent=2)
+    manifest = json.dumps(artifact_manifest(), ensure_ascii=False, indent=2)
     strategy_block = (
         "Planning mode: BREAKTHROUGH.\n"
         f"The harness has stalled after {BREAKTHROUGH_FAILURE_WINDOW} failed rounds with less than "
@@ -178,9 +325,20 @@ Current round: {round_number}
 Evaluator payload:
 {payload}
 
+Repository artifact manifest:
+{manifest}
+
+Available orchestration patterns:
+- pipeline: {ARCHITECTURE_PATTERNS['pipeline']}
+- fan_out_fan_in: {ARCHITECTURE_PATTERNS['fan_out_fan_in']}
+- producer_reviewer: {ARCHITECTURE_PATTERNS['producer_reviewer']}
+- supervisor: {ARCHITECTURE_PATTERNS['supervisor']}
+
 Produce a JSON object matching the provided schema.
 Set `strategy_mode` to `{strategy_mode}`.
+Select one `architecture_pattern` that fits the current failure shape.
 Keep priorities focused on the highest-leverage fixes for the selected strategy.
+Reference only real repository paths or valid globs from the artifact manifest.
 Do not ask for human input.
 Do not tell the generator to run this harness script or any recursive planner/generator/evaluator loop.
 Do not tell the generator to run any `harness/scripts/*.py` evaluator script at all.
@@ -223,7 +381,7 @@ def run_planner(round_number: int, evaluation: dict, strategy_mode: str) -> dict
     )
     if completed.returncode != 0:
         raise RuntimeError((completed.stderr or completed.stdout or "planner failed").strip())
-    return read_json(output_path)
+    return sanitize_plan(read_json(output_path), evaluation, strategy_mode)
 
 
 def generator_prompt(plan: dict) -> str:
@@ -292,9 +450,10 @@ def write_planner_artifacts(round_number: int, plan: dict, evaluation: dict) -> 
     combined = {
         "round": round_number,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "loop": ["planner", "generator", "evaluator", "planner"],
+        "loop": ["evaluator", "planner", "generator", "evaluator"],
         "evaluation": evaluation,
         "planner": plan,
+        "artifact_manifest": artifact_manifest(),
     }
     serialized = json.dumps(combined, ensure_ascii=False, indent=2) + "\n"
     latest_json.write_text(serialized, encoding="utf-8")
@@ -305,8 +464,9 @@ def write_planner_artifacts(round_number: int, plan: dict, evaluation: dict) -> 
         f"- Round: {round_number}",
         f"- Overall score: {evaluation['overall_score']:.2f}",
         f"- Pass: {'yes' if evaluation['pass'] else 'no'}",
-        f"- Loop: planner -> generator -> evaluator -> planner",
+        f"- Loop: evaluator -> planner -> generator -> evaluator",
         f"- Strategy mode: {plan.get('strategy_mode', 'narrow')}",
+        f"- Architecture pattern: {plan.get('architecture_pattern', 'pipeline')}",
         "",
         "## Priorities",
         "",
@@ -315,6 +475,12 @@ def write_planner_artifacts(round_number: int, plan: dict, evaluation: dict) -> 
         lines.append(f"- T{item['tier']} {item['title']}")
         lines.append(f"  action: {item['action']}")
         lines.append(f"  files: {', '.join(item.get('files', [])) or 'none'}")
+    lines.append("")
+    lines.append("## Artifact Manifest")
+    lines.append("")
+    lines.append(f"- Results: {artifact_manifest()['results_markdown']}")
+    for tier, items in artifact_manifest()["tier_results"].items():
+        lines.append(f"- Tier {tier}: {', '.join(items)}")
     lines.append("")
     lines.append("## Generator Prompt")
     lines.append("")
@@ -351,6 +517,8 @@ def write_results(history: list[dict]) -> None:
             lines.append(f"- Planner: {record['planner_status']}")
         if record.get("strategy_mode"):
             lines.append(f"- Strategy mode: {record['strategy_mode']}")
+        if record.get("architecture_pattern"):
+            lines.append(f"- Architecture pattern: {record['architecture_pattern']}")
         if record.get("generator_status"):
             lines.append(f"- Generator: {record['generator_status']}")
         if record.get("post_generator_score") is not None:
@@ -382,6 +550,7 @@ def main() -> int:
             "generator_status": "",
             "post_generator_score": None,
             "strategy_mode": "narrow",
+            "architecture_pattern": "pipeline",
         }
         consecutive_passes = consecutive_passes + 1 if evaluation["pass"] else 0
         record["consecutive_passes"] = consecutive_passes
@@ -391,6 +560,7 @@ def main() -> int:
                 strategy_mode = "breakthrough" if should_trigger_breakthrough(history, evaluation) else "narrow"
                 record["strategy_mode"] = strategy_mode
                 plan = run_planner(round_number, evaluation, strategy_mode)
+                record["architecture_pattern"] = str(plan.get("architecture_pattern") or choose_architecture_pattern(evaluation, strategy_mode))
                 write_planner_artifacts(round_number, plan, evaluation)
                 record["planner_status"] = "completed"
                 generator_result = run_generator(round_number, plan)

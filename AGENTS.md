@@ -74,9 +74,12 @@ For each round:
 1. Run `python harness/scripts/run_all_harness.py --rounds 15`
 2. Read:
    - `harness/RESULTS.md`
-   - latest files under `harness/tier1-prompt/runs/`
-   - latest files under `harness/tier2-ux/runs/`
-   - latest files under `harness/tier3-deploy/runs/`
+   - `harness/results/tier-1.json`
+   - `harness/results/promptfoo-eval.json`
+   - `harness/results/tier-2.json`
+   - `harness/results/screenshots/`
+   - `harness/results/tier-3.json`
+   - related `harness/results/*.log` files when startup or auth smoke fails
 3. Fix the highest-signal failures first:
    - Tier 1 failures: edit prompt files or prompt-loading code
    - Tier 2 failures: edit `static/` pages
@@ -92,6 +95,12 @@ For each round:
 - Do not assume React Native or Supabase Edge Functions exist here
 - Prefer editing `prompts/`, `backend/`, and `static/` directly
 - Keep reports updated in `harness/RESULTS.md`
+
+## Orchestration Patterns
+- `pipeline`: default for a single failing tier with tightly-coupled fixes
+- `fan_out_fan_in`: use when multiple tiers fail and evidence can be gathered in parallel before one edit round
+- `producer_reviewer`: use for risky deploy or prompt changes where one step proposes and one step verifies scope
+- `supervisor`: use after stagnation or breakthrough mode when the next move must be selected from cross-tier evidence
 
 ## Codex Stability
 - For browser verification on this repo, do not call `expect-cli` with its old `--cookies` example. The installed CLI supports `--no-cookies` instead.

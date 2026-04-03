@@ -3,7 +3,7 @@ _enrich_verify_result()가 summary.scores / label /
 improvements 정규화를 올바르게 수행하는지 검증.
 """
 import copy
-from backend.analysis_service import _enrich_verify_result
+from backend.analysis_service import _enrich_verify_result, _quick_verify_result
 
 SAMPLE_RESULT = {
     "summary": {
@@ -65,3 +65,21 @@ def test_empty_result_safe():
     data = _enrich_verify_result({})
     assert data["total_score"] == 0.0
     assert isinstance(data["summary"]["scores"], dict)
+
+
+def test_quick_verify_concrete_numeric_pledge_is_not_red():
+    pledge = (
+        "강남구 어르신 돌봄 사각지대 해소를 위해 동별 1개소 이상 주간보호센터를 설치하고, "
+        "독거노인 2000명을 대상으로 안부 확인 시스템을 도입하겠습니다."
+    )
+    result = _enrich_verify_result(_quick_verify_result(pledge, {}))
+    assert 35.0 <= result["total_score"] <= 85.0
+    assert result["signal_light"] in {"yellow", "green"}
+    assert result["pdf_eligible"] is False
+
+
+def test_quick_verify_authority_mismatch_stays_low():
+    pledge = "FTA 재협상과 교육부 권한 조정은 구청 공약 범위를 넘습니다."
+    result = _enrich_verify_result(_quick_verify_result(pledge, {}))
+    assert result["total_score"] <= 40.0
+    assert result["signal_light"] == "red"

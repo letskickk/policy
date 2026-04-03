@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-04-01T11:27:23.872476+00:00",
+  "round": 1,
+  "loop": [
+    "planner",
+    "generator",
+    "evaluator",
+    "planner"
+  ],
+  "round_pass": false,
+  "planner_input": {
+    "failed_tiers": [
+      {
+        "tier": 1,
+        "name": "Prompt Quality",
+        "score": 0.0,
+        "failure_summary": "npm warn exec The following package was not found and will be installed: promptfoo@0.121.3\nnpm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you wan",
+        "planner_goal": "Prompt Quality 계층 실패를 재현 가능하게 줄이고 다음 라운드에서 PASS로 전환",
+        "generator_contract": [
+          "플래너가 지정한 파일과 가설 범위 안에서만 수정할 것",
+          "평가 실패 원인과 무관한 리팩터링을 섞지 말 것",
+          "수정 후 동일 계층의 통과 조건을 문장으로 다시 검증할 것"
+        ]
+      }
+    ],
+    "carry_forward_constraints": [
+      "평가 결과는 생성기에게 직접 지시하지 않고 플래너의 우선순위 재계획 재료로만 사용",
+      "다음 수정 라운드는 가장 높은 실패 신호 1~2개만 다룰 것",
+      "기존 통과 계층을 깨는 변경은 금지"
+    ]
+  }
+}

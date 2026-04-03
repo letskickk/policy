@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": [
     "strategy_mode",
+    "architecture_pattern",
     "round_goal",
     "priorities",
     "generator_prompt"
@@ -12,6 +13,10 @@
     "strategy_mode": {
       "type": "string",
       "enum": ["narrow", "breakthrough"]
+    },
+    "architecture_pattern": {
+      "type": "string",
+      "enum": ["pipeline", "fan_out_fan_in", "producer_reviewer", "supervisor"]
     },
     "round_goal": {
       "type": "string"

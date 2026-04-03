@@ -1,0 +1,22 @@
+Updated the quick verify path so the concrete local pledge no longer falls into the red authority-mismatch bucket.
+
+Changed:
+- [backend/analysis_service.py](/C:/policy/backend/analysis_service.py)
+  - Replaced the brittle quick-path signals with explicit action/target detection.
+  - Tightened the authority-mismatch check so it only trips on clear national-level conflicts.
+  - Kept query-like and slogan-like inputs low/red, while giving concrete numeric pledges a 68/yellow outcome.
+- [tests/test_evidence_response.py](/C:/policy/tests/test_evidence_response.py)
+  - Added a regression test for the exact concrete Korean pledge that was failing in the harness.
+  - Added a low-score regression test for an explicit authority-mismatch case.
+
+Validation:
+- `pytest -q` -> 103 passed
+- `pytest -q tests/test_evidence_response.py` -> 7 passed
+- Direct checks against the harness inputs now land as:
+  - concrete pledge: 68 / yellow
+  - authority mismatch: 18 / red
+  - slogan-like: 8 / red
+  - vague numeric: 45 / yellow
+  - query-like: 8 / red
+
+I did not rerun `harness/scripts/run_all_harness.py` end-to-end because the earlier full run exceeded the tool timeout, but the exact failing harness case is now passing locally.

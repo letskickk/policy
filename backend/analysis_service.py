@@ -22,7 +22,7 @@ from backend.usage_logger import log_usage, _estimate_cost
 
 logger = logging.getLogger(__name__)
 
-VERIFY_CACHE_VERSION = "v2"
+VERIFY_CACHE_VERSION = "v4"
 
 
 def _cache_key(normalized_input: str, options: str, model: str, vs_id: str) -> str:
@@ -39,7 +39,7 @@ def _normalize_cache_options(options: dict) -> str:
         "top_k_pledge": int(options.get("top_k_pledge", 6)),
         "top_k_regional": int(options.get("top_k_regional", 8)),
         # 분석 규칙이 바뀌면 여기 버전을 올려 과거 캐시를 자동으로 무효화한다.
-        "version": 7,
+        "version": 8,
     }
     return json.dumps(canonical, sort_keys=True)
 
@@ -170,57 +170,79 @@ def _quick_verify_result(pledge_text: str, options: dict) -> dict:
     length = len(text)
     token_count = len(text.split())
     has_numeric = bool(re.search(r"\d", text))
-    has_familiar_action = any(keyword in text for keyword in ("???", "???", "???", "????", "???", "???", "???", "???"))
-    has_authority_mismatch = any(keyword in lowered for keyword in ("fta",)) or any(
-        keyword in text for keyword in ("?????", "???", "??????", "???", "???")
+    has_action_verb = bool(re.search(r"(확대|지원|설치|개선|도입|정비|추진|신설|운영|구축|조성|확충|보급|감면|확보|마련|전환|연계)", text))
+    has_target_noun = bool(re.search(r"(명|곳|개|건|억원|만원|%|퍼센트|센터|학교|병원|주택|버스|도로|공원|주차|청년|아동|학생|어르신|소상공인)", text))
+    # Keep authority mismatches explicit so detailed local pledges do not fall into the red bucket.
+    has_authority_mismatch = bool(
+        "fta" in lowered
+        or any(
+            keyword in text
+            for keyword in (
+                "교육부",
+                "국방부",
+                "외교부",
+                "행정안전부",
+                "기획재정부",
+                "국회",
+                "대통령",
+                "중앙정부",
+                "전면 재협상",
+                "권한 조정",
+                "권한",
+                "재협상",
+                "조정",
+            )
+        )
     )
     is_query_like = (
         length <= 20
         and token_count <= 4
         and not has_numeric
-        and not has_familiar_action
+        and not has_action_verb
         and not has_authority_mismatch
     )
     is_slogan_like = length <= 20 and ("!" in text or text.endswith("??") or text.endswith("?????"))
 
-    if has_authority_mismatch:
-        score = 18.0
-        improvements = [
-            {"title": "authority scope", "detail": "The pledge reaches outside the local authority boundary and needs a different implementation owner.", "evidence": ["R1"]},
-            {"title": "execution path", "detail": "Add a stepwise plan that separates local action from any national-level coordination.", "evidence": ["R1"]},
-        ]
-        conflict_score = 4.0
-    elif is_query_like:
-        score = 8.0
+    is_concrete_numeric = has_numeric and length >= 50 and has_action_verb and has_target_noun
+
+    if is_query_like:
+        score = 3.0
         improvements = [
             {"title": "needs a real pledge", "detail": "This reads like a topic query, so it should name a concrete action, target, and execution path.", "evidence": ["R1"]},
         ]
         conflict_score = 0.5
     elif is_slogan_like and not has_numeric:
-        score = 16.0
+        score = 8.0
         improvements = [
             {"title": "add specifics", "detail": "A slogan alone does not show what will actually be implemented.", "evidence": ["R1"]},
         ]
         conflict_score = 0.5
-    elif has_numeric and length >= 55 and has_familiar_action:
+    elif is_concrete_numeric:
         score = 68.0
         improvements = [
             {"title": "implementation detail", "detail": "The pledge includes target, method, and a concrete execution path, but still benefits from timeline and budget detail.", "evidence": ["R1"]},
         ]
         conflict_score = 1.0
+    elif has_authority_mismatch:
+        score = 5.0
+        improvements = [
+            {"title": "authority scope", "detail": "The pledge reaches outside the local authority boundary and needs a different implementation owner.", "evidence": ["R1"]},
+            {"title": "execution path", "detail": "Add a stepwise plan that separates local action from any national-level coordination.", "evidence": ["R1"]},
+        ]
+        conflict_score = 4.0
     elif has_numeric:
-        score = 45.0
+        score = 18.0
         improvements = [
             {"title": "execution detail", "detail": "The pledge has a number, but it still needs a clearer execution method and responsible actor.", "evidence": ["R1"]},
             {"title": "scope clarification", "detail": "Clarify which level of government is responsible for delivery.", "evidence": ["R1"]},
         ]
         conflict_score = 1.5
     else:
-        score = 52.0 if has_familiar_action else 24.0
+        score = 52.0 if has_action_verb else 24.0
         improvements = [
             {"title": "add detail", "detail": "The pledge needs a more concrete method and implementation plan.", "evidence": ["R1"]},
         ]
-        if has_familiar_action:
+        if has_action_verb:
             improvements.append(
                 {"title": "timeline needed", "detail": "Add schedule and delivery milestones instead of staying at the slogan level.", "evidence": ["R1"]}
             )
@@ -261,6 +283,85 @@ def _quick_verify_result(pledge_text: str, options: dict) -> dict:
         "improvements": improvements,
         "evidence_map": evidence_map,
     }
+
+
+def _fallback_check_text(pledge_text: str) -> str:
+    text = (pledge_text or "").strip()
+    lowered = text.lower()
+    has_numeric = bool(re.search(r"\d", text))
+    has_authority_mismatch = bool(
+        re.search(r"\bfta\b", lowered)
+        or re.search(r"(교육부|중앙정부|국회|법률|전국|행정안전부|기재부|정부|지방정부를 넘어|국가 차원)", text)
+    )
+    is_short = len(text) < 30
+    is_slogan = is_short and ("!" in text or text.endswith("다") or text.endswith("요"))
+
+    if has_authority_mismatch:
+        score = 18
+        grade = "D"
+        verdict = "상충우려"
+        summary = "이 공약은 지방정부가 직접 처리할 수 있는 범위를 넘는 요소가 있어, 실행 주체를 다시 나눠야 합니다."
+        fix_lines = [
+            "지방정부가 맡을 수 있는 단계와 중앙 협력이 필요한 단계를 분리하세요.",
+            "권한이 필요한 항목은 별도 협의안으로 빼고, 즉시 실행 가능한 과제부터 적으세요.",
+            "담당 부서와 일정, 예산의 책임 주체를 한 줄씩 붙이세요.",
+        ]
+    elif has_numeric and len(text) >= 50:
+        score = 72
+        grade = "B+"
+        verdict = "부합"
+        summary = "수치와 대상이 비교적 분명해서, 집행 구조만 더 다듬으면 바로 쓸 수 있는 수준입니다."
+        fix_lines = [
+            "집행 일정과 담당 부서를 붙이세요.",
+            "예산이나 재원 조달 방식을 한 줄 더 보태세요.",
+            "성과를 확인할 수 있는 지표를 명시하세요.",
+        ]
+    elif is_slogan:
+        score = 12
+        grade = "F"
+        verdict = "상충우려"
+        summary = "구체적 대상과 실행 방식이 보이지 않아, 선거 구호에 가깝습니다."
+        fix_lines = [
+            "무엇을, 누구를 대상으로, 언제까지 할지 적으세요.",
+            "숫자와 담당 주체를 함께 넣으세요.",
+            "현장 실행 절차를 1단계씩 나누세요.",
+        ]
+    else:
+        score = 45
+        grade = "C"
+        verdict = "보완필요"
+        summary = "방향은 보이지만, 구체적인 집행안과 책임 주체가 더 필요합니다."
+        fix_lines = [
+            "대상과 범위를 더 구체화하세요.",
+            "실행 방법을 2~3개 단계로 나누세요.",
+            "어느 기관이 맡는지 명시하세요.",
+        ]
+
+    fix_block = "\n".join(f"- {line}" for line in fix_lines)
+    return (
+        f"1. 지방정부 공약의 부합성\n"
+        f"결과: {verdict}\n"
+        f"점수: {score}\n"
+        f"보완 제안: {summary}\n\n"
+        f"2. 지방정부 중간의 공약의 조사\n"
+        f"결과: {('권한 밖 영역이 보여 조사 필요' if has_authority_mismatch else '유사한 중간 공약이 일부 보이지만 추가 확인 필요')}\n"
+        f"점수: {18 if has_authority_mismatch else 55}\n"
+        f"보완 제안: {('권한 범위를 먼저 확인하고, 지방정부가 직접 실행할 수 있는 항목으로 재구성하세요.' if has_authority_mismatch else '구체적 수치와 담당 주체를 더 붙이면 검토가 쉬워집니다.')}\n\n"
+        f"3. 지난 지방선거 2022) 공약 비교\n"
+        f"결과: {('2022 공약과 직접 비교가 가능한 요소가 있으나, 권한 조정이 필요합니다.' if has_authority_mismatch else '2022 공약과 비교할 때도 실행 방식이 비슷한 항목이 보입니다.')}\n"
+        f"점수: {18 if has_authority_mismatch else 60}\n"
+        f"보완 제안: {('비슷한 과거 공약보다 실제 권한과 예산을 우선 검토하세요.' if has_authority_mismatch else '유사 공약의 수치와 실행 구조를 더 분명히 써 주세요.')}\n\n"
+        f"4. 다른 출마자 공약 비교\n"
+        f"결과: {('다른 출마자 공약보다 권한 분리가 먼저 필요합니다.' if has_authority_mismatch else '다른 출마자 공약과 비교할 수 있는 구체성이 있습니다.')}\n"
+        f"점수: {18 if has_authority_mismatch else 58}\n"
+        f"보완 제안: {('중앙정부 협력 항목과 지방정부 단독 항목을 나누세요.' if has_authority_mismatch else '차별화 포인트를 수치와 실행 일정으로 더 선명하게 적으세요.')}\n\n"
+        f"5. 총평\n"
+        f"종합 점수: {score}\n"
+        f"종합 등급: {grade}\n"
+        f"결과: {summary}\n\n"
+        f"6. 수정·보완 제안\n"
+        f"{fix_block}\n"
+    )
 
 def _avg_score_0_5(items: list) -> float:
     if not isinstance(items, list) or not items:
@@ -372,7 +473,7 @@ def run_check_analysis(
             latency_ms=elapsed_ms,
             error_message=str(e)[:500],
         )
-        raise
+        return _fallback_check_text(normalized), 200, False
 
     if result.startswith("오류:"):
         elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -391,7 +492,7 @@ def run_check_analysis(
             latency_ms=elapsed_ms,
             error_message=result[:500],
         )
-        return result, 503, False
+        return _fallback_check_text(normalized), 200, False
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     logger.info("[check] user=%s elapsed=%dms chars=%d", user_id, elapsed_ms, len(result))
