@@ -19,7 +19,8 @@
     td { vertical-align: top; }
     .name-cell { font-weight: 700; color: #f8fafc; white-space: nowrap; }
     .email-cell { color: #cbd5e1; word-break: break-all; }
-    .meta-cell { color: #cbd5e1; min-width: 320px; white-space: nowrap; }
+    .meta-cell { color: #cbd5e1; min-width: 360px; white-space: nowrap !important; word-break: keep-all; }
+    .meta-inline { display: inline-block; white-space: nowrap !important; }
     .count-cell, .cost-cell { white-space: nowrap; }
     select { padding: 0.4rem 0.75rem; border-radius: 10px; background: rgba(0,0,0,0.22); color: #fff; border: 1px solid rgba(148,163,184,0.28); margin-bottom: 1rem; }
     @media (max-width: 640px) {
@@ -64,10 +65,10 @@
       return labels[position] || position || '-';
     }
     function formatCandidacy(row) {
-      const parts = [formatElection(row.election_position)];
+      const election = formatElection(row.election_position);
       const location = [row.region_name, row.district_name].filter(Boolean).join(' / ');
-      if (location) parts.push(location);
-      return parts.join(' | ');
+      if (election && location) return `${election} | ${location}`;
+      return election || location || '-';
     }
     async function load() {
       const period = document.getElementById('period').value;
@@ -81,7 +82,7 @@
         tr.innerHTML = `
           <td class="name-cell">${esc(row.name || '-')}</td>
           <td class="email-cell">${esc(row.email || row.user_id)}</td>
-          <td class="meta-cell">${formatCandidacy(row)}</td>
+          <td class="meta-cell"><span class="meta-inline">${esc(formatCandidacy(row))}</span></td>
           <td class="count-cell">${esc(row.count)}</td>
           <td class="cost-cell">${(row.cost_estimate || 0).toFixed(6)}</td>
         `;
