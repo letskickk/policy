@@ -19,7 +19,7 @@
     td { vertical-align: top; }
     .name-cell { font-weight: 700; color: #f8fafc; white-space: nowrap; }
     .email-cell { color: #cbd5e1; word-break: break-all; }
-    .meta-cell { color: #cbd5e1; line-height: 1.45; min-width: 240px; }
+    .meta-cell { color: #cbd5e1; min-width: 320px; white-space: nowrap; }
     .count-cell, .cost-cell { white-space: nowrap; }
     select { padding: 0.4rem 0.75rem; border-radius: 10px; background: rgba(0,0,0,0.22); color: #fff; border: 1px solid rgba(148,163,184,0.28); margin-bottom: 1rem; }
     @media (max-width: 640px) {
@@ -67,7 +67,7 @@
       const parts = [formatElection(row.election_position)];
       const location = [row.region_name, row.district_name].filter(Boolean).join(' / ');
       if (location) parts.push(location);
-      return parts.join('<br>');
+      return parts.join(' | ');
     }
     async function load() {
       const period = document.getElementById('period').value;
