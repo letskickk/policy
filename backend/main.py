@@ -1362,6 +1362,9 @@ def api_admin_usage_stats(request: Request):
             user_info[uid] = {
                 "email": u["email"] if u else str(uid),
                 "name": (u.get("name") or "").strip() if u else "",
+                "election_position": (u.get("election_position") or "").strip() if u else "",
+                "region_name": (u.get("region_name") or "").strip() if u else "",
+                "district_name": (u.get("district_name") or "").strip() if u else "",
             }
         return {
             "period_days": days,
@@ -1370,6 +1373,9 @@ def api_admin_usage_stats(request: Request):
                     "user_id": r["user_id"],
                     "email": user_info.get(r["user_id"], {}).get("email", str(r["user_id"])),
                     "name": user_info.get(r["user_id"], {}).get("name", ""),
+                    "election_position": user_info.get(r["user_id"], {}).get("election_position", ""),
+                    "region_name": user_info.get(r["user_id"], {}).get("region_name", ""),
+                    "district_name": user_info.get(r["user_id"], {}).get("district_name", ""),
                     "count": r["cnt"],
                     "cost_estimate": r["cost"] or 0,
                 }

@@ -13,8 +13,14 @@
     .links { margin-bottom: 1rem; }
     .links a { color: #ffb37a; text-decoration: none; font-weight: 700; margin-right: 1rem; }
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; min-width: 400px; }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
     th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+    th { color: #f8fafc; font-size: 0.92rem; }
+    td { vertical-align: top; }
+    .name-cell { font-weight: 700; color: #f8fafc; white-space: nowrap; }
+    .email-cell { color: #cbd5e1; word-break: break-all; }
+    .meta-cell { color: #cbd5e1; line-height: 1.45; min-width: 240px; }
+    .count-cell, .cost-cell { white-space: nowrap; }
     select { padding: 0.4rem 0.75rem; border-radius: 10px; background: rgba(0,0,0,0.22); color: #fff; border: 1px solid rgba(148,163,184,0.28); margin-bottom: 1rem; }
     @media (max-width: 640px) {
       body { padding: 1rem; }
@@ -38,7 +44,7 @@
       <div class="table-scroll">
       <table>
         <thead>
-          <tr><th>사용자</th><th>호출 횟수</th><th>비용 추정</th></tr>
+          <tr><th>이름</th><th>이메일</th><th>출마 정보</th><th>호출 횟수</th><th>비용 추정</th></tr>
         </thead>
         <tbody id="list"></tbody>
       </table>
@@ -47,6 +53,22 @@
   </div>
   <script>
     function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function formatElection(position) {
+      const labels = {
+        metro_mayor: '광역단체장',
+        regional_council: '광역의원',
+        local_mayor: '기초단체장',
+        local_council: '기초의원',
+        party_official: '당직자',
+      };
+      return labels[position] || position || '-';
+    }
+    function formatCandidacy(row) {
+      const parts = [formatElection(row.election_position)];
+      const location = [row.region_name, row.district_name].filter(Boolean).join(' / ');
+      if (location) parts.push(location);
+      return parts.join('<br>');
+    }
     async function load() {
       const period = document.getElementById('period').value;
       const r = await fetch(`/api/admin/usage/stats?period=${period}`, { credentials: 'include' });
@@ -55,9 +77,14 @@
       const tbody = document.getElementById('list');
       tbody.innerHTML = '';
       for (const row of d.by_user || []) {
-        const label = row.name ? `${row.name} (${row.email || row.user_id})` : (row.email || row.user_id);
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${esc(label)}</td><td>${esc(row.count)}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
+        tr.innerHTML = `
+          <td class="name-cell">${esc(row.name || '-')}</td>
+          <td class="email-cell">${esc(row.email || row.user_id)}</td>
+          <td class="meta-cell">${formatCandidacy(row)}</td>
+          <td class="count-cell">${esc(row.count)}</td>
+          <td class="cost-cell">${(row.cost_estimate || 0).toFixed(6)}</td>
+        `;
         tbody.appendChild(tr);
       }
     }
