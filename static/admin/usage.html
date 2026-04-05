@@ -55,8 +55,9 @@
       const tbody = document.getElementById('list');
       tbody.innerHTML = '';
       for (const row of d.by_user || []) {
+        const label = row.name ? `${row.name} (${row.email || row.user_id})` : (row.email || row.user_id);
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${esc(row.email || row.user_id)}</td><td>${esc(row.count)}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
+        tr.innerHTML = `<td>${esc(label)}</td><td>${esc(row.count)}</td><td>${(row.cost_estimate || 0).toFixed(6)}</td>`;
         tbody.appendChild(tr);
       }
     }

@@ -1359,10 +1359,22 @@ def api_admin_usage_stats(request: Request):
         user_info = {}
         for uid in users:
             u = get_user(uid)
-            user_info[uid] = u["email"] if u else str(uid)
+            user_info[uid] = {
+                "email": u["email"] if u else str(uid),
+                "name": (u.get("name") or "").strip() if u else "",
+            }
         return {
             "period_days": days,
-            "by_user": [{"user_id": r["user_id"], "email": user_info.get(r["user_id"], str(r["user_id"])), "count": r["cnt"], "cost_estimate": r["cost"] or 0} for r in rows],
+            "by_user": [
+                {
+                    "user_id": r["user_id"],
+                    "email": user_info.get(r["user_id"], {}).get("email", str(r["user_id"])),
+                    "name": user_info.get(r["user_id"], {}).get("name", ""),
+                    "count": r["cnt"],
+                    "cost_estimate": r["cost"] or 0,
+                }
+                for r in rows
+            ],
         }
     finally:
         conn.close()
