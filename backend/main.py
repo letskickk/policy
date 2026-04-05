@@ -68,6 +68,154 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+PUBLIC_NOMINATION_NOTE = "공천 확정"
+
+
+def _normalize_header_label(value) -> str:
+    text = str(value or "").strip().lower()
+    return re.sub(r"[\s_/()\-]+", "", text)
+
+
+def _applicant_cell_str(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _excel_truthy(value) -> int:
+    normalized = _normalize_header_label(value)
+    return int(normalized in {"y", "yes", "true", "1", "o", "v", "예", "완료", "제출", "있음"})
+
+
+def _extract_applicants_from_workbook(content: bytes, filename: str) -> tuple[list[dict], int]:
+    if not filename or not filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="지원서 엑셀은 .xlsx 파일만 업로드 가능합니다.")
+
+    try:
+        import io
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="서버에 openpyxl이 설치되지 않았습니다. pip install openpyxl")
+
+    try:
+        workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"엑셀 파일을 열 수 없습니다: {str(exc)[:100]}")
+
+    try:
+        sheet = workbook.active
+        rows_iter = sheet.iter_rows(values_only=True)
+        header_row = next(rows_iter, None)
+        if not header_row:
+            raise HTTPException(status_code=400, detail="엑셀 첫 줄에서 헤더를 찾을 수 없습니다.")
+
+        normalized_headers = [_normalize_header_label(cell) for cell in header_row]
+        aliases = {
+            "name": {"이름", "성명", "후보자명", "지원자명"},
+            "phone": {"휴대폰", "휴대전화", "전화번호", "연락처", "핸드폰"},
+            "email": {"이메일", "email", "메일"},
+            "region_province": {"시도", "지역", "광역시도", "시도명"},
+            "district_info": {"선거구", "선거구정보", "지역구", "출마지역", "선거구명"},
+            "election_position": {"출마직", "출마직위", "선거직", "직책", "직위"},
+            "doc_submitted": {"서류제출", "서류", "제출여부", "서류제출여부"},
+            "interview_done": {"면접", "면접완료", "면접여부"},
+            "status_note": {"상태", "상태메모", "비고", "메모", "진행상태"},
+        }
+
+        column_map: dict[str, int] = {}
+        for field, candidates in aliases.items():
+            for idx, header in enumerate(normalized_headers):
+                if header in {_normalize_header_label(item) for item in candidates}:
+                    column_map[field] = idx
+                    break
+
+        if "name" not in column_map:
+            if len(header_row) < 9:
+                raise HTTPException(status_code=400, detail="지원자 이름 컬럼을 찾을 수 없습니다. 업로드 양식을 확인해주세요.")
+            column_map = {
+                "name": 1,
+                "phone": 4,
+                "email": 5,
+                "region_province": 6,
+                "district_info": 7,
+                "election_position": 8,
+                "doc_submitted": 9,
+                "interview_done": 10,
+                "status_note": 11,
+            }
+
+        def cell(row, key: str) -> str:
+            idx = column_map.get(key)
+            if idx is None or idx >= len(row):
+                return ""
+            return _applicant_cell_str(row[idx])
+
+        applicants: list[dict] = []
+        skipped_rows = 0
+        for row in rows_iter:
+            if not row or not any(item not in (None, "") for item in row):
+                continue
+            name = cell(row, "name")
+            if not name:
+                skipped_rows += 1
+                continue
+            applicants.append(
+                {
+                    "name": name,
+                    "phone": cell(row, "phone"),
+                    "email": cell(row, "email"),
+                    "region_province": cell(row, "region_province"),
+                    "district_info": cell(row, "district_info"),
+                    "election_position": cell(row, "election_position"),
+                    "doc_submitted": _excel_truthy(cell(row, "doc_submitted")),
+                    "interview_done": _excel_truthy(cell(row, "interview_done")),
+                    "status_note": cell(row, "status_note"),
+                }
+            )
+
+        if not applicants:
+            raise HTTPException(status_code=400, detail="업로드된 엑셀에서 저장할 지원자 행을 찾지 못했습니다.")
+
+        return applicants, skipped_rows
+    finally:
+        workbook.close()
+
+
+def _sql_normalized_phone_expr(expr: str) -> str:
+    return f"replace(replace(replace(replace(trim(coalesce({expr}, '')), '-', ''), ' ', ''), '(', ''), ')', '')"
+
+
+def _sql_normalized_name_expr(expr: str) -> str:
+    return f"lower(replace(trim(coalesce({expr}, '')), ' ', ''))"
+
+
+def _sql_public_nomination_condition(user_alias: str = "u") -> str:
+    return f"""
+        (
+            {user_alias}.applicant_match_id IS NOT NULL
+            OR TRIM(COALESCE(pa.status_note, '')) = ''
+            OR EXISTS (
+                SELECT 1
+                FROM party_applicants pa_public
+                WHERE TRIM(COALESCE(pa_public.status_note, '')) = '{PUBLIC_NOMINATION_NOTE}'
+                  AND (
+                      (
+                          lower(trim(coalesce(pa_public.email, ''))) <> ''
+                          AND lower(trim(coalesce(pa_public.email, ''))) = lower(trim(coalesce({user_alias}.email, '')))
+                          AND {_sql_normalized_name_expr('pa_public.name')} = {_sql_normalized_name_expr(f'{user_alias}.name')}
+                      )
+                      OR (
+                          {_sql_normalized_phone_expr('pa_public.phone')} <> ''
+                          AND {_sql_normalized_phone_expr('pa_public.phone')} = {_sql_normalized_phone_expr(f'{user_alias}.phone')}
+                          AND {_sql_normalized_name_expr('pa_public.name')} = {_sql_normalized_name_expr(f'{user_alias}.name')}
+                      )
+                  )
+            )
+        )
+    """
+
 app = FastAPI(
     title="개혁신당 공약 멘토링",
     description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
@@ -1212,6 +1360,48 @@ async def api_admin_applicants_upload(request: Request, file: UploadFile = File(
     from backend.applicant_verify import reverify_all_users
 
     content = await file.read()
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="지원서 엑셀은 .xlsx 파일만 업로드 가능합니다.")
+
+    applicants, skipped_rows = _extract_applicants_from_workbook(content, file.filename)
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM party_applicants")
+        inserted = 0
+        for applicant in applicants:
+            conn.execute(
+                """INSERT INTO party_applicants (name, phone, email, region_province, district_info, election_position, doc_submitted, interview_done, status_note)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    applicant["name"],
+                    applicant["phone"],
+                    applicant["email"],
+                    applicant["region_province"],
+                    applicant["district_info"],
+                    applicant["election_position"],
+                    applicant["doc_submitted"],
+                    applicant["interview_done"],
+                    applicant["status_note"],
+                ),
+            )
+            inserted += 1
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Applicant upload DB save failed")
+        raise HTTPException(status_code=500, detail=f"DB 저장 실패: {str(e)[:200]}")
+    finally:
+        conn.close()
+
+    try:
+        reverified = reverify_all_users()
+    except Exception:
+        logger.exception("Applicant reverify failed after upload")
+        reverified = 0
+    skipped_suffix = f", 빈 이름 행 {skipped_rows}건 건너뜀" if skipped_rows else ""
+    return {"message": f"지원서 {inserted}건 저장, 기존 사용자 {reverified}명 재검증 완료{skipped_suffix}"}
     try:
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
     except Exception as e:
@@ -2402,7 +2592,8 @@ def _weekly_snapshot_limit(candidate_id: int, as_of: str) -> Optional[int]:
 def _is_public_nomination_status(status_note: Optional[str], applicant_match_id: Optional[int] = None) -> bool:
     if applicant_match_id is not None:
         return True
-    return (status_note or "").strip() == "공천 확정"
+    note = (status_note or "").strip()
+    return not note or note == PUBLIC_NOMINATION_NOTE
 
 
 def _public_candidate_sql_condition() -> str:
@@ -2416,7 +2607,27 @@ def _public_candidate_sql_condition() -> str:
                        AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                    WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
         )
-        AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+        AND (
+            u.applicant_match_id IS NOT NULL
+            OR TRIM(COALESCE(pa.status_note, '')) = ''
+            OR EXISTS (
+                SELECT 1
+                FROM party_applicants pa_public
+                WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                  AND (
+                      (
+                          lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                          AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                      OR (
+                          replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                          AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                  )
+            )
+        )
     """
 
 
@@ -3163,7 +3374,27 @@ def get_regions():
                              AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                          WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
             GROUP BY c.region_code
             """
         ).fetchall()
@@ -3209,7 +3440,27 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                              AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                          WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
                   AND c.region_code = ?
                 GROUP BY c.election_type
                 """,
@@ -3231,7 +3482,27 @@ def get_election_type_counts(region_code: Optional[str] = Query(default=None)):
                              AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                          WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
                 GROUP BY c.election_type
                 """
             ).fetchall()
@@ -3270,7 +3541,27 @@ def get_districts(
                              AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                          WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
               AND c.district_name IS NOT NULL
               AND TRIM(c.district_name) <> ''
         """
@@ -3356,7 +3647,27 @@ def get_candidates(
                              AND EXISTS (SELECT 1 FROM candidate_pledge_review_history h
                                          WHERE h.pledge_id = cp.id AND h.approval_status = 'APPROVED')))
               )
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
         """
         params: list[object] = [code]
         if selected_election_type:
@@ -3537,7 +3848,27 @@ def _fetch_public_pledge_share_payload(pledge_id: int):
             LEFT JOIN region_codes rc ON rc.region_code = c.region_code
             WHERE cp.id = ?
               AND cp.approval_status = 'APPROVED'
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+              AND (
+                  u.applicant_match_id IS NOT NULL
+                  OR TRIM(COALESCE(pa.status_note, '')) = ''
+                  OR EXISTS (
+                      SELECT 1
+                      FROM party_applicants pa_public
+                      WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                        AND (
+                            (
+                                lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                                AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                            OR (
+                                replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                                AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                                AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                            )
+                        )
+                  )
+              )
               AND c.approval_status IN ('APPROVED', 'MIXED')
             LIMIT 1
             """,
@@ -4842,7 +5173,27 @@ def api_leaderboard(
                     WHERE cp.total_score IS NOT NULL
                       AND cp.approval_status = 'APPROVED'
                       AND c.approval_status = 'APPROVED'
-                      AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+        AND (
+            u.applicant_match_id IS NOT NULL
+            OR TRIM(COALESCE(pa.status_note, '')) = ''
+            OR EXISTS (
+                SELECT 1
+                FROM party_applicants pa_public
+                WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                  AND (
+                      (
+                          lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                          AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                      OR (
+                          replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                          AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                  )
+            )
+        )
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ?
                       AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?
                     GROUP BY c.id
@@ -4910,7 +5261,27 @@ def api_leaderboard(
             WHERE cp.total_score IS NOT NULL
               AND cp.approval_status = 'APPROVED'
               AND c.approval_status = 'APPROVED'
-              AND (u.applicant_match_id IS NOT NULL OR TRIM(COALESCE(pa.status_note, '')) = '공천 확정')
+        AND (
+            u.applicant_match_id IS NOT NULL
+            OR TRIM(COALESCE(pa.status_note, '')) = ''
+            OR EXISTS (
+                SELECT 1
+                FROM party_applicants pa_public
+                WHERE TRIM(COALESCE(pa_public.status_note, '')) = '공천 확정'
+                  AND (
+                      (
+                          lower(trim(COALESCE(pa_public.email, ''))) <> ''
+                          AND lower(trim(COALESCE(pa_public.email, ''))) = lower(trim(COALESCE(u.email, '')))
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                      OR (
+                          replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') <> ''
+                          AND replace(replace(replace(replace(trim(COALESCE(pa_public.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '') = replace(replace(replace(replace(trim(COALESCE(u.phone, '')), '-', ''), ' ', ''), '(', ''), ')', '')
+                          AND lower(replace(trim(COALESCE(pa_public.name, '')), ' ', '')) = lower(replace(trim(COALESCE(u.name, '')), ' ', ''))
+                      )
+                  )
+            )
+        )
         """
         params: list = []
 
@@ -5081,17 +5452,12 @@ def hub_archive_redirect():
     return RedirectResponse("/hub", status_code=301)
 
 def _candidate_public_rows_sql() -> str:
-    public_note = "\uacf5\ucc9c \ud655\uc815"
     return f"""
         FROM candidates c
         LEFT JOIN users u ON u.id = c.user_id
         LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
         WHERE c.approval_status IN ('APPROVED', 'MIXED')
-          AND (
-              u.applicant_match_id IS NOT NULL
-              OR TRIM(COALESCE(pa.status_note, '')) = ''
-              OR TRIM(COALESCE(pa.status_note, '')) = '{public_note}'
-          )
+          AND {_sql_public_nomination_condition('u')}
     """
 
 
@@ -5099,7 +5465,7 @@ def _legacy_public_nomination_status(status_note: Optional[str], applicant_match
     if applicant_match_id is not None:
         return True
     note = (status_note or "").strip()
-    return not note or note == "\uacf5\ucc9c \ud655\uc815"
+    return not note or note == PUBLIC_NOMINATION_NOTE
 
 
 def get_regions():
