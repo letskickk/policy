@@ -1,5 +1,5 @@
 """
-개혁신당 정책 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
+개혁신당 공약 멘토링 API. 공약 텍스트를 받아 GPT 기반 부합 점검 결과를 반환한다.
 접근제어: 회원가입→관리자 승인→쿼터/레이트리밋 적용.
 """
 import json
@@ -69,7 +69,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="개혁신당 정책 멘토링",
+    title="개혁신당 공약 멘토링",
     description="출마자 공약의 중앙당 정강정책·공약과의 적합도 점검 API",
     version="1.3.0",
 )
@@ -414,7 +414,7 @@ def index():
     res = _serve_html("index.html")
     if res is not None:
         return res
-    return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
+    return {"service": "개혁신당 공약 멘토링", "endpoint": "POST /check"}
 
 
 def _login_redirect(path: str, query: str = ""):
@@ -1406,7 +1406,7 @@ def map_page():
 
 @app.get("/api")
 def api_info():
-    return {"service": "개혁신당 정책 멘토링", "endpoint": "POST /check"}
+    return {"service": "개혁신당 공약 멘토링", "endpoint": "POST /check"}
 
 
 @app.get("/test")
@@ -3596,7 +3596,7 @@ def share_pledge_page(pledge_id: int, request: Request):
   <title>{_html.escape(title_text)}</title>
   <meta name="description" content="{_html.escape(description_text)}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="개혁신당 정책 멘토링">
+<meta property="og:site_name" content="개혁신당 공약 멘토링">
   <meta property="og:title" content="{_html.escape(title_text)}">
   <meta property="og:description" content="{_html.escape(description_text)}">
   <meta property="og:url" content="{_html.escape(share_url)}">

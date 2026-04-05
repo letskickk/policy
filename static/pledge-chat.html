@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>공약 설계 코치 - 개혁신당</title>
+  <title>공약 생성 코치 - 개혁신당</title>
   <link rel="stylesheet" href="/static/css/common.css?v=2">
   <style>
     .chat-shell {
@@ -324,7 +324,7 @@
   <div class="chat-shell">
     <div class="chat-header">
       <a href="/static/tools.html" class="back-link">AI 도구</a>
-      <h1>공약 설계 코치</h1>
+      <h1>공약 생성 코치</h1>
       <span class="sessions-toggle" onclick="toggleSessions()">이전 대화</span>
     </div>
 
@@ -687,7 +687,7 @@
         greetArea.innerHTML = '<h2 style="font-size:1.2rem;margin-bottom:0.5rem;">' + escapeHtml(intro) + '</h2>'
           + '<p style="color:var(--muted);line-height:1.6;margin:0;">'
           + '이 도구는 선거구 기준 생활 이슈, 지방의회 자료, 관련 기사, 우리당 자료, 공공데이터를 바탕으로 정책 방향을 좁혀가는 보조도구입니다.'
-          + '<br>AI 코치가 질문을 던지며 함께 공약을 만들어갑니다.'
+          + '<br>공약 생성 코치가 질문을 던지며 함께 공약을 만들어갑니다.'
           + '</p>';
 
         var choices = [
@@ -717,7 +717,7 @@
         });
       } catch (e) {
         greetArea.innerHTML = '<h2 style="font-size:1.2rem;">AI와 함께 공약을 만들어 보세요</h2>'
-          + '<p style="color:var(--muted);line-height:1.6;">주제를 입력하면 AI 코치가 질문을 던지며 지역 이슈와 정책 방향을 함께 좁혀갑니다.</p>';
+          + '<p style="color:var(--muted);line-height:1.6;">주제를 입력하면 공약 생성 코치가 질문을 던지며 지역 이슈와 정책 방향을 함께 좁혀갑니다.</p>';
       }
     })();
   </script>

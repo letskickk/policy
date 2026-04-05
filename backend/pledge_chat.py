@@ -77,7 +77,7 @@ def _load_chat_system_prompt() -> str:
     path = PROMPTS_DIR / "공약_챗봇_시스템.txt"
     if path.exists():
         return path.read_text(encoding="utf-8").strip()
-    return "개혁신당 정책 기획 코치 역할이다. 출마자와 대화하면서 지역 이슈, 정책 방향, 우선순위와 근거를 함께 정리한다. 바로 완성 공약을 단정적으로 써주기보다 선택지와 방향성을 제안한다."
+    return "개혁신당 공약 생성 코치 역할이다. 출마자와 대화하면서 지역 이슈, 정책 방향, 우선순위와 근거를 함께 정리한다. 바로 완성 공약을 단정적으로 써주기보다 선택지와 방향성을 제안한다."
 
 
 def _load_district_dong_map() -> dict:
@@ -630,7 +630,7 @@ def _build_conversation_summary(session_id: str) -> str:
     conversation_text = "\n".join(parts)
 
     # 대화 내용을 방향 정리용 텍스트로 변환
-    summary = f"""아래는 출마자와 AI 코치의 정책 방향 정리 대화 내용이다. 이 대화에서 논의된 내용을 바탕으로 지역 이슈, 정책 방향, 우선순위, 참고 근거를 구조화하라.
+    summary = f"""아래는 출마자와 공약 생성 코치의 정책 방향 정리 대화 내용이다. 이 대화에서 논의된 내용을 바탕으로 지역 이슈, 정책 방향, 우선순위, 참고 근거를 구조화하라.
 
 --- 대화 내용 ---
 {conversation_text[:6000]}
