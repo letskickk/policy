@@ -35,10 +35,10 @@ def register_tools_routes(app, require_approved, _client_ip):
 
     @app.post("/api/tools/generate/stream")
     def tools_generate_stream(body: ToolsGenerateRequest, request: Request):
-        from backend.config import OPENAI_MODEL
+        from backend.config import OPENAI_MODEL, CHAT_MODEL
         from backend.policy_drafter import generate_policy_draft
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.usage_logger import log_usage, _estimate_cost, parse_usage_marker
 
         user = require_approved(request)
         ip = _client_ip(request)
@@ -283,15 +283,18 @@ def register_tools_routes(app, require_approved, _client_ip):
             had_error = False
             actual_in = 0
             actual_out = 0
+            actual_model = CHAT_MODEL
             try:
                 # 세션 ID를 먼저 전송
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id}, ensure_ascii=False)}\n\n"
 
                 for chunk in first_message_stream(session_id, body.topic.strip()):
                     if chunk.startswith("[USAGE]"):
-                        parts = chunk[7:].split(",")
-                        actual_in = int(parts[0]) if len(parts) > 0 else 0
-                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        usage = parse_usage_marker(chunk)
+                        if usage:
+                            actual_in = usage["token_in"]
+                            actual_out = usage["token_out"]
+                            actual_model = usage["model"] or actual_model
                         continue
                     full_text += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
@@ -305,12 +308,12 @@ def register_tools_routes(app, require_approved, _client_ip):
             out_chars = len(full_text)
             token_in = actual_in if actual_in else len(body.topic) // 4
             token_out = actual_out if actual_out else out_chars // 4
-            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
+            cost = _estimate_cost(token_in, token_out, actual_model) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
                 endpoint="/api/pledge-chat/start", action="chat_start",
                 input_chars=len(body.topic), output_chars=out_chars,
-                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                model=actual_model, token_in=token_in if not had_error else 0,
                 token_out=token_out if not had_error else 0,
                 cost_estimate=cost,
                 status_code=500 if had_error else 200, latency_ms=elapsed_ms,
@@ -325,8 +328,8 @@ def register_tools_routes(app, require_approved, _client_ip):
     def pledge_chat_message(session_id: str, body: ChatMessageRequest, request: Request):
         from backend.pledge_chat import chat_stream, get_session
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage, _estimate_cost
-        from backend.config import OPENAI_MODEL
+        from backend.usage_logger import log_usage, _estimate_cost, parse_usage_marker
+        from backend.config import OPENAI_MODEL, CHAT_MODEL
 
         user = require_approved(request)
         ip = _client_ip(request)
@@ -354,12 +357,15 @@ def register_tools_routes(app, require_approved, _client_ip):
             had_error = False
             actual_in = 0
             actual_out = 0
+            actual_model = CHAT_MODEL
             try:
                 for chunk in chat_stream(session_id, body.message.strip()):
                     if chunk.startswith("[USAGE]"):
-                        parts = chunk[7:].split(",")
-                        actual_in = int(parts[0]) if len(parts) > 0 else 0
-                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        usage = parse_usage_marker(chunk)
+                        if usage:
+                            actual_in = usage["token_in"]
+                            actual_out = usage["token_out"]
+                            actual_model = usage["model"] or actual_model
                         continue
                     full_text += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
@@ -373,12 +379,12 @@ def register_tools_routes(app, require_approved, _client_ip):
             out_chars = len(full_text)
             token_in = actual_in if actual_in else len(body.message) // 4
             token_out = actual_out if actual_out else out_chars // 4
-            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
+            cost = _estimate_cost(token_in, token_out, actual_model) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
                 endpoint=f"/api/pledge-chat/{session_id}/message", action="chat_message",
                 input_chars=len(body.message), output_chars=out_chars,
-                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                model=actual_model, token_in=token_in if not had_error else 0,
                 token_out=token_out if not had_error else 0,
                 cost_estimate=cost,
                 status_code=500 if had_error else 200, latency_ms=elapsed_ms,
@@ -393,8 +399,8 @@ def register_tools_routes(app, require_approved, _client_ip):
     def pledge_chat_finalize(session_id: str, request: Request):
         from backend.pledge_chat import finalize_stream, get_session
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage, _estimate_cost
-        from backend.config import OPENAI_MODEL
+        from backend.usage_logger import log_usage, _estimate_cost, parse_usage_marker
+        from backend.config import OPENAI_MODEL, CHAT_MODEL
 
         user = require_approved(request)
         ip = _client_ip(request)
@@ -420,12 +426,15 @@ def register_tools_routes(app, require_approved, _client_ip):
             had_error = False
             actual_in = 0
             actual_out = 0
+            actual_model = CHAT_MODEL
             try:
                 for chunk in finalize_stream(session_id):
                     if chunk.startswith("[USAGE]"):
-                        parts = chunk[7:].split(",")
-                        actual_in = int(parts[0]) if len(parts) > 0 else 0
-                        actual_out = int(parts[1]) if len(parts) > 1 else 0
+                        usage = parse_usage_marker(chunk)
+                        if usage:
+                            actual_in = usage["token_in"]
+                            actual_out = usage["token_out"]
+                            actual_model = usage["model"] or actual_model
                         continue
                     if chunk.startswith("[ERROR]"):
                         had_error = True
@@ -444,12 +453,12 @@ def register_tools_routes(app, require_approved, _client_ip):
             out_chars = len(full_text)
             token_in = actual_in if actual_in else out_chars // 2
             token_out = actual_out if actual_out else out_chars // 2
-            cost = _estimate_cost(token_in, token_out, OPENAI_MODEL) if not had_error else None
+            cost = _estimate_cost(token_in, token_out, actual_model) if not had_error else None
             log_usage(
                 user_id=user["id"], ip=ip,
                 endpoint=f"/api/pledge-chat/{session_id}/finalize", action="chat_finalize",
                 input_chars=0, output_chars=out_chars,
-                model=OPENAI_MODEL, token_in=token_in if not had_error else 0,
+                model=actual_model, token_in=token_in if not had_error else 0,
                 token_out=token_out if not had_error else 0,
                 cost_estimate=cost,
                 status_code=500 if had_error else 200, latency_ms=elapsed_ms,

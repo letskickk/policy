@@ -443,7 +443,7 @@ def chat_stream(session_id: str, user_message: str):
         _save_message(session_id, "assistant", assistant_text)
 
     # 실제 토큰 사용량 전달 (tools_routes에서 파싱)
-    yield f"[USAGE]{usage_in},{usage_out}"
+    yield f"[USAGE]{json.dumps({'model': model, 'input_tokens': usage_in, 'output_tokens': usage_out}, ensure_ascii=False)}"
 
 
 def first_message_stream(session_id: str, topic: str):
@@ -546,7 +546,7 @@ def finalize_stream(session_id: str):
         finally:
             conn.close()
 
-    yield f"[USAGE]{usage_in},{usage_out}"
+    yield f"[USAGE]{json.dumps({'model': CHAT_MODEL, 'input_tokens': usage_in, 'output_tokens': usage_out}, ensure_ascii=False)}"
 
 
 # ---------------------------------------------------------------------------

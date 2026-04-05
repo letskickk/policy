@@ -1797,7 +1797,7 @@ def check_pledge_stream(body: PledgeCheckRequest, request: Request):
 
     def generate():
         from backend.check_service import check_pledge_alignment_stream
-        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.usage_logger import log_usage, _estimate_cost, parse_usage_marker
 
         accumulated: list[str] = []
         final_text = ""
@@ -1820,9 +1820,10 @@ def check_pledge_stream(body: PledgeCheckRequest, request: Request):
                     from_cache = True
                     yield f"data: {_json.dumps({'type': 'cached'}, ensure_ascii=False)}\n\n"
                 elif item.startswith("[USAGE]"):
-                    parts = item[7:].split(",")
-                    actual_in = int(parts[0]) if len(parts) > 0 else 0
-                    actual_out = int(parts[1]) if len(parts) > 1 else 0
+                    usage = parse_usage_marker(item)
+                    if usage:
+                        actual_in = usage["token_in"]
+                        actual_out = usage["token_out"]
                     continue
                 elif item.startswith("[FINAL]"):
                     final_text = item[len("[FINAL]"):]
