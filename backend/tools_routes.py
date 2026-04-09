@@ -258,7 +258,7 @@ def register_tools_routes(app, require_approved, _client_ip):
         from backend.pledge_chat import create_session, first_message_stream
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
         from backend.usage_logger import log_usage, _estimate_cost
-        from backend.config import OPENAI_MODEL
+        from backend.config import OPENAI_MODEL, CHAT_MODEL
 
         user = require_approved(request)
         ip = _client_ip(request)
