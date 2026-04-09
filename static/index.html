@@ -451,6 +451,10 @@
     .score-value.green { color: #86efac; }
     .score-value.yellow { color: #fde047; }
     .score-value.red { color: #fca5a5; }
+    .score-grade { font-size: 1.25rem; font-weight: 950; letter-spacing: -0.02em; }
+    .score-grade.green { color: #86efac; }
+    .score-grade.yellow { color: #fde047; }
+    .score-grade.red { color: #fca5a5; }
     .score-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
     .pledge-count { font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
     .rank-updated { font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; }
@@ -1493,6 +1497,7 @@
     // 시명 중복 제거: "안양시동안구 안양시바선거구" → "안양시동안구 바선거구"
     window.cleanDN = function(s) { if (!s) return ''; var p = s.trim().split(/\s+/), m = p[0].match(/^(.+?[시군])/); if (m) { var c = m[1]; for (var i = 1; i < p.length; i++) { if (p[i].startsWith(c) && p[i].length > c.length) p[i] = p[i].slice(c.length); } } return p.join(' '); };
     const scoreClass = s => s >= 80 ? 'green' : s >= 60 ? 'yellow' : 'red';
+    const scoreGrade = s => s >= 80 ? 'A' : s >= 60 ? 'B' : s >= 40 ? 'C' : 'D';
     const rankClass = r => r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : 'normal';
 
     const section = document.getElementById('leaderboardSection');
@@ -1608,9 +1613,17 @@
             </div>
           </div>
           <div class="rank-score">
-            <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
-            <div class="score-label">평균점수</div>
-            <div class="pledge-count">${r.scored_pledge_count}개</div>
+            ${r.rank <= 3 ? `
+              <div class="score-value ${scoreClass(r.avg_score)}">${r.avg_score}</div>
+              <div class="score-label">평균점수</div>
+              <div class="pledge-count">${r.scored_pledge_count}개</div>
+            ` : r.rank <= 5 ? `
+              <div class="score-grade ${scoreClass(r.avg_score)}">${scoreGrade(r.avg_score)}</div>
+              <div class="score-label">등급</div>
+              <div class="pledge-count">${r.scored_pledge_count}개</div>
+            ` : `
+              <div class="pledge-count">${r.scored_pledge_count}개</div>
+            `}
           </div>
         </div>`;
       });
@@ -2463,5 +2476,79 @@
   </script>
   <div data-shared-footer></div>
   <script src="/static/js/shared-footer.js?v=2"></script>
+
+  <!-- 차단 모달: 오픈 시 이 블록 전체 삭제 -->
+  <style>
+    body.site-locked { overflow: hidden !important; }
+    .site-gate-overlay {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(13,34,64,0.92);
+      backdrop-filter: blur(12px);
+      padding: 1.5rem;
+    }
+    .site-gate-card {
+      max-width: 480px; width: 100%;
+      background: linear-gradient(160deg, #0f2a4a 0%, #122f52 100%);
+      border: 1px solid rgba(255,114,16,0.3);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(255,114,16,0.08);
+    }
+    .site-gate-icon { font-size: 2.8rem; margin-bottom: 0.8rem; }
+    .site-gate-title {
+      font-size: 1.4rem; font-weight: 950; color: #fff;
+      margin-bottom: 1.2rem; letter-spacing: -0.02em;
+    }
+    .site-gate-list {
+      text-align: left; margin: 0 auto 1.4rem;
+      max-width: 380px; list-style: none; padding: 0;
+    }
+    .site-gate-list li {
+      position: relative; padding: 0.45rem 0 0.45rem 1.4rem;
+      font-size: 0.88rem; color: #cbd5e1; line-height: 1.5;
+    }
+    .site-gate-list li::before {
+      content: '\25B8'; position: absolute; left: 0; color: #ff7210; font-weight: 700;
+    }
+    .site-gate-list li .gate-sub {
+      display: block; font-size: 0.78rem; color: #94a3b8; margin-top: 0.15rem;
+    }
+    .site-gate-list li .gate-detail {
+      display: block; font-size: 0.78rem; color: #94a3b8; margin-top: 0.2rem; padding-left: 0.2rem;
+    }
+    .site-gate-list li .gate-detail span {
+      display: block; padding: 0.1rem 0;
+    }
+    .site-gate-bottom {
+      font-size: 1rem; font-weight: 800; color: #ff7210;
+      letter-spacing: -0.01em;
+    }
+  </style>
+  <div class="site-gate-overlay" id="siteGateOverlay">
+    <div class="site-gate-card">
+      <div class="site-gate-icon">&#127881;</div>
+      <div class="site-gate-title">공약 코칭이 오픈됩니다!</div>
+      <ul class="site-gate-list">
+        <li>공약 코칭 기능이 곧 오픈됩니다</li>
+        <li>기존 분석 점수가 초기화됩니다
+          <span class="gate-sub">분석 내용은 그대로 유지됩니다</span>
+        </li>
+        <li>새로 분석받아야 랭킹에 반영됩니다</li>
+        <li>새로운 점수 표시 방식:
+          <span class="gate-detail">
+            <span>- 1~3위: 점수 공개</span>
+            <span>- 4~5위: 등급(A/B/C/D)만 표시</span>
+            <span>- 6위 이하: 점수 비공개</span>
+          </span>
+        </li>
+      </ul>
+      <div class="site-gate-bottom">곧 오픈됩니다!</div>
+    </div>
+  </div>
+  <script>document.body.classList.add('site-locked');</script>
+  <!-- /차단 모달 끝 -->
+
 </body>
 </html>

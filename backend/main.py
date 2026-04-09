@@ -2632,7 +2632,7 @@ def _public_candidate_sql_condition() -> str:
 
 
 def _leaderboard_reset_monday():
-    return datetime(2026, 3, 23).date()
+    return datetime(2026, 4, 7).date()
 
 
 def _fetch_candidate_analysis_snapshot(
