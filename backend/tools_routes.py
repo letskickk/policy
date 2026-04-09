@@ -257,7 +257,7 @@ def register_tools_routes(app, require_approved, _client_ip):
     def pledge_chat_start(body: ChatStartRequest, request: Request):
         from backend.pledge_chat import create_session, first_message_stream
         from backend.quota_rate import check_quota, check_rate_limit_ip, check_rate_limit_user
-        from backend.usage_logger import log_usage, _estimate_cost
+        from backend.usage_logger import log_usage, _estimate_cost, parse_usage_marker
         from backend.config import OPENAI_MODEL, CHAT_MODEL
 
         user = require_approved(request)
