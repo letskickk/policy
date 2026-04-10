@@ -266,6 +266,26 @@ def _save_message(session_id: str, role: str, content: str) -> None:
 # ---------------------------------------------------------------------------
 # RAG context (reuse policy_drafter)
 # ---------------------------------------------------------------------------
+def _extract_region_from_topic(topic: str) -> tuple[str | None, str | None]:
+    """topic 텍스트에서 시도/시군구 지역명 추출. (region, district) 반환."""
+    from backend.public_data_api import _PROVINCE_MAP, normalize_region
+    import re
+
+    # 시군구 패턴: "해남군", "강북구", "수원시" 등
+    district_match = re.search(r"[가-힣]{2,5}[시군구]", topic)
+    # 시도 패턴: "전라남도", "경기도", "서울" 등
+    province_match = re.search(
+        r"(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)"
+        r"(?:특별시|광역시|특별자치시|특별자치도|도)?", topic
+    )
+
+    district = district_match.group(0) if district_match else None
+    province_raw = province_match.group(0) if province_match else None
+    province = _PROVINCE_MAP.get(province_raw, province_raw) if province_raw else None
+
+    return province, district
+
+
 def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
     """policy_drafter의 _get_rag_contexts + research_topic 재사용."""
     try:
@@ -278,10 +298,17 @@ def _fetch_rag_context(topic: str, user_id: int | None = None) -> dict:
     try:
         from backend.research_assistant import research_topic
         user = get_user(user_id) if user_id else {}
+
+        # 지역: 프로필 우선, 없으면 topic 텍스트에서 추출
+        region = (user or {}).get("region_name") or None
+        district_name = (user or {}).get("district_name") or None
+        if not region and not district_name:
+            region, district_name = _extract_region_from_topic(topic)
+
         research = research_topic(
             topic=topic,
-            region=(user or {}).get("region_name") or None,
-            district_name=(user or {}).get("district_name") or None,
+            region=region,
+            district_name=district_name,
             election_type=(user or {}).get("election_position") or None,
             years=2,
         )
@@ -371,11 +398,11 @@ def _build_system_message(rag: dict, user_id: int | None = None) -> str:
     if rag.get("messages"):
         context_parts.append(f"[참고: 공식 논평·보도자료]\n{rag['messages'][:3000]}")
     if rag.get("assembly"):
-        context_parts.append(f"[참고: 지방의회 논의 — 사용자가 의회·조례를 직접 물었을 때만 인용하라. 첫 턴에서 꺼내지 마라.]\n{rag['assembly'][:3000]}")
+        context_parts.append(f"[참고: 지방의회 논의 — 사용자가 의회·조례·안건을 직접 물었을 때만 인용하라.]\n{rag['assembly'][:3000]}")
     if rag.get("research"):
         context_parts.append(f"[참고: 연구 자료]\n{rag['research'][:3000]}")
     if rag.get("public_data"):
-        context_parts.append(f"[참고: 공공데이터 — 사용자가 해당 분야를 파고들 때만 수치를 인용하라. 첫 턴에서 꺼내지 마라.]\n{rag['public_data'][:4000]}")
+        context_parts.append(f"[참고: 공공데이터 — 관련 수치를 답변에 구체적으로 인용하라. 예: '해남군 공원 58개소(873,893㎡)가 있지만 면 지역 접근성은...' 식으로 숫자를 직접 언급해야 신뢰도가 높아진다. 무관한 수치는 나열하지 말 것.]\n{rag['public_data'][:4000]}")
 
     if context_parts:
         context_section = "\n\n---\n아래는 대화 중 참고할 자료이다. 대화에서 자연스럽게 활용하되 내부 태그를 노출하지 마라.\n\n" + "\n\n".join(context_parts)

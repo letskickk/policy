@@ -252,11 +252,11 @@ def _empty_result(source: str, reason: str = "") -> dict:
 # ---------------------------------------------------------------------------
 # 1. 소상공인 상권정보 (apis.data.go.kr)
 # ---------------------------------------------------------------------------
-# https://apis.data.go.kr/B553077/api/open/sdsc/storeListInDong
+# https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong  (sdsc2 = 최신 버전)
 # divId: ctprvnCd(시도), signguCd(시군구), adongCd(행정동)
 # ---------------------------------------------------------------------------
 
-SEMAS_BASE = "https://apis.data.go.kr/B553077/api/open/sdsc"
+SEMAS_BASE = "https://apis.data.go.kr/B553077/api/open/sdsc2"
 
 
 def _fetch_semas_commercial(region_info: dict) -> dict:
@@ -381,7 +381,7 @@ _SIDO_CODE_MAP = {
 }
 # 시군구 코드 매핑 (공식 코드표 기준)
 _GUGUN_CODE_MAP = {
-    # 서울 (1100)
+    # 서울 (1100) — 기존 코드 유지 (서울 전용 API와 별도)
     "종로구": "1101", "중구": "1102", "용산구": "1103", "성동구": "1104",
     "동대문구": "1105", "성북구": "1106", "도봉구": "1107", "은평구": "1108",
     "서대문구": "1109", "마포구": "1110", "강서구": "1111", "구로구": "1112",
@@ -389,17 +389,78 @@ _GUGUN_CODE_MAP = {
     "강동구": "1117", "송파구": "1118", "서초구": "1119", "양천구": "1120",
     "중랑구": "1121", "노원구": "1122", "광진구": "1123", "강북구": "1124",
     "금천구": "1125",
-    # 부산 (1200)
+    # 부산 (1200) — 기존 코드 유지
     "중구_부산": "1201", "서구_부산": "1202", "동구_부산": "1203", "영도구": "1204",
     "진구": "1205", "동래구": "1206", "남구_부산": "1207", "북구_부산": "1208",
     "해운대구": "1209", "사하구": "1210", "금정구": "1211", "강서구_부산": "1212",
     "연제구": "1213", "수영구": "1214", "사상구": "1215", "기장군": "1216",
-    # 광주 (2400)
+    # 대구 (2200) — TAAS 스캔 확인
+    "중구_대구": "2201", "동구_대구": "2202", "서구_대구": "2203", "남구_대구": "2204",
+    "북구_대구": "2205", "수성구": "2206", "달서구": "2207", "달성군": "2208",
+    # 인천 (2300) — TAAS 스캔 확인
+    "중구_인천": "2301", "동구_인천": "2302", "미추홀구": "2303", "부평구": "2304",
+    "남동구": "2305", "서구_인천": "2306", "연수구": "2307", "계양구": "2308",
+    "강화군": "2309", "옹진군": "2310",
+    # 광주 (2400) — 기존 코드 유지
     "동구_광주": "2401", "서구_광주": "2402", "북구_광주": "2403",
     "광산구": "2404", "남구_광주": "2405",
-    # 대전 (2500)
+    # 대전 (2500) — 기존 코드 유지
     "동구_대전": "2501", "중구_대전": "2502", "서구_대전": "2503",
     "유성구": "2504", "대덕구": "2505",
+    # 울산 (2600) — TAAS 스캔 확인
+    "중구_울산": "2601", "남구_울산": "2602", "동구_울산": "2603",
+    "북구_울산": "2604", "울주군": "2605",
+    # 경기 (1300) — TAAS 스캔 확인
+    "수원시": "1302", "성남시": "1303", "의정부시": "1304", "안양시": "1305",
+    "부천시": "1306", "안산시": "1307", "평택시": "1308", "광명시": "1309",
+    "구리시": "1310", "양주시": "1311", "여주시": "1313", "화성시": "1315",
+    "시흥시": "1316", "파주시": "1317", "고양시": "1318", "광주시_경기": "1319",
+    "연천군": "1320", "포천시": "1321", "가평군": "1322", "양평군": "1323",
+    "이천시": "1324", "용인시": "1325", "안성시": "1326", "김포시": "1327",
+    "동두천시": "1330", "과천시": "1332", "군포시": "1333", "남양주시": "1334",
+    "오산시": "1335", "의왕시": "1336", "하남시": "1337",
+    # 강원 (1400) — TAAS 스캔 확인
+    "춘천시": "1401", "원주시": "1402", "동해시": "1403", "강릉시": "1404",
+    "속초시": "1405", "태백시": "1406", "삼척시": "1407", "홍천군": "1412",
+    "횡성군": "1413", "영월군": "1415", "평창군": "1416", "정선군": "1417",
+    "철원군": "1418", "화천군": "1419", "양구군": "1420", "인제군": "1421",
+    "고성군_강원": "1422", "양양군": "1423",
+    # 충북 (1500) — TAAS 스캔 확인
+    "청주시": "1501", "충주시": "1502", "제천시": "1503", "보은군": "1512",
+    "옥천군": "1513", "영동군": "1514", "진천군": "1515", "괴산군": "1516",
+    "음성군": "1517", "단양군": "1520", "증평군": "1521",
+    # 충남 (1600) — TAAS 스캔 확인
+    "천안시": "1602", "아산시": "1603", "보령시": "1604", "공주시": "1605",
+    "서산시": "1606", "금산군": "1611", "태안군": "1612", "논산시": "1615",
+    "부여군": "1616", "서천군": "1617", "청양군": "1619", "홍성군": "1620",
+    "예산군": "1621", "당진시": "1623", "계룡시": "1624",
+    # 전북 (1700) — TAAS 스캔 확인
+    "전주시": "1701", "군산시": "1702", "정읍시": "1704", "남원시": "1705",
+    "김제시": "1706", "완주군": "1711", "진안군": "1712", "무주군": "1713",
+    "장수군": "1714", "임실군": "1715", "순창군": "1717", "고창군": "1719",
+    "부안군": "1720", "익산시": "1723",
+    # 전남 (1800) — TAAS 스캔 확인
+    "목포시": "1802", "여수시": "1803", "순천시": "1804", "나주시": "1806",
+    "광양시": "1808", "담양군": "1812", "곡성군": "1813", "구례군": "1814",
+    "고흥군": "1818", "보성군": "1819", "화순군": "1820", "장흥군": "1821",
+    "강진군": "1822", "해남군": "1823", "영암군": "1824", "무안군": "1825",
+    "함평군": "1827", "영광군": "1828", "장성군": "1829", "완도군": "1830",
+    "진도군": "1831", "신안군": "1832",
+    # 경북 (1900) — TAAS 스캔 확인
+    "포항시": "1902", "경주시": "1903", "김천시": "1904", "안동시": "1905",
+    "구미시": "1906", "영주시": "1907", "영천시": "1908", "문경시": "1909",
+    "상주시": "1910", "군위군": "1912", "의성군": "1913", "청송군": "1915",
+    "영양군": "1916", "영덕군": "1917", "청도군": "1922", "고령군": "1923",
+    "성주군": "1924", "칠곡군": "1925", "예천군": "1930", "봉화군": "1932",
+    "울진군": "1933", "울릉군": "1934", "경산시": "1935",
+    # 경남 (2000) — TAAS 스캔 확인
+    "진주시": "2003", "통영시": "2006", "김해시": "2008", "밀양시": "2009",
+    "거제시": "2010", "의령군": "2012", "함안군": "2013", "창녕군": "2014",
+    "양산시": "2016", "고성군_경남": "2022", "사천시": "2023", "남해군": "2024",
+    "하동군": "2025", "산청군": "2026", "함양군": "2027", "거창군": "2028",
+    "합천군": "2029", "창원시": "2030",
+    # 제주 (2100) — TAAS 스캔 확인
+    "제주시": "2101", "서귀포시": "2102",
 }
 
 
@@ -441,10 +502,12 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
                 try:
                     import urllib.parse as _up
                     encoded_key = _up.quote(DATA_GO_KR_API_KEY)
+                    # gugun_code 없으면 시도 전체 조회 후 district 이름으로 필터
+                    num_rows = "13" if gugun_code else "100"
                     api_url = (
                         f"{TAAS_LGSTAT_URL}?ServiceKey={encoded_key}"
                         f"&searchYearCd={year}&siDo={sido_code}"
-                        f"&type=json&numOfRows=13&pageNo=1"
+                        f"&type=json&numOfRows={num_rows}&pageNo=1"
                     )
                     if gugun_code:
                         api_url += f"&guGun={gugun_code}"
@@ -458,20 +521,26 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
                             items = items_wrap.get("item", [])
                         elif isinstance(items_wrap, list):
                             items = items_wrap
-                    # "전체사고" 항목만 추출
+                    # "전체사고" 항목 추출 — gugun_code 없으면 district 이름 매칭
                     for item in (items if isinstance(items, list) else [items]):
                         if not isinstance(item, dict):
                             continue
-                        if item.get("acc_cl_nm") == "전체사고":
-                            acc = item.get("acc_cnt", "")
-                            dth = item.get("dth_dnv_cnt", "")
-                            inj = item.get("injpsn_cnt", "")
-                            region_label = item.get("sido_sgg_nm", district or province)
-                            summary_lines.append(
-                                f"  - {year}년: 사고 {acc}건, 사망 {dth}명, 부상 {inj}명"
-                            )
-                            recent_data.append(item)
-                            break
+                        if item.get("acc_cl_nm") != "전체사고":
+                            continue
+                        # gugun_code 없을 때 district 이름으로 필터
+                        if not gugun_code and district:
+                            sgg_nm = item.get("sido_sgg_nm", "")
+                            if district not in sgg_nm:
+                                continue
+                        acc = item.get("acc_cnt", "")
+                        dth = item.get("dth_dnv_cnt", "")
+                        inj = item.get("injpsn_cnt", "")
+                        region_label = item.get("sido_sgg_nm", district or province)
+                        summary_lines.append(
+                            f"  - {year}년: 사고 {acc}건, 사망 {dth}명, 부상 {inj}명"
+                        )
+                        recent_data.append(item)
+                        break
                 except Exception as e:
                     logger.warning("lgStat API year=%s error: %s", year, e)
 
@@ -486,67 +555,7 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
                 _set_cached(ck, result)
                 return result
 
-    # 2) koroad 다발지역 (한국 서버에서만 접근 가능)
-    if TAAS_API_KEY:
-        province_code = region_info["province_code"]
-        current_year = datetime.now().year
-        all_accidents = {}
-
-        for label, endpoint in TAAS_KOROAD_ENDPOINTS.items():
-            url = TAAS_KOROAD_BASE + endpoint
-            params = {
-                "authKey": TAAS_API_KEY,
-                "searchYearCd": str(current_year - 2),
-                "siDo": province_code or "11",
-                "guGun": "",
-                "type": "json",
-                "numOfRows": "200",
-                "pageNo": "1",
-            }
-            raw = _http_get_json(url, params, timeout=5)
-            if not raw:
-                continue
-            try:
-                items_wrapper = raw.get("items", {})
-                items = items_wrapper.get("item", []) if isinstance(items_wrapper, dict) else []
-                if isinstance(items, dict):
-                    items = [items]
-                district_short = region_info["district_short"]
-                filtered = [
-                    item for item in (items or [])
-                    if (district and (district in (item.get("spot_nm") or "") or district in (item.get("sido_sgg_nm") or "")))
-                    or (district_short and (district_short in (item.get("spot_nm") or "") or district_short in (item.get("sido_sgg_nm") or "")))
-                    or not district
-                ]
-                if filtered:
-                    all_accidents[label] = filtered[:5]
-            except Exception as e:
-                logger.warning("TAAS %s parse error: %s", label, e)
-
-        if all_accidents:
-            total = sum(len(v) for v in all_accidents.values())
-            summary_lines = [f"{district or region_info['province']} 교통사고 다발지역 ({total}건):"]
-            for label, items in all_accidents.items():
-                summary_lines.append(f"  [{label}] {len(items)}건")
-                for item in items[:3]:
-                    spot = item.get("spot_nm") or "위치 미상"
-                    cnt = item.get("occrrnc_cnt") or ""
-                    death = item.get("dth_dnv_cnt") or ""
-                    line = f"    - {spot}"
-                    if cnt:
-                        line += f" (사고 {cnt}건"
-                        if death:
-                            line += f", 사망 {death}명"
-                        line += ")"
-                    summary_lines.append(line)
-            result = {
-                "source": source, "available": True, "data": all_accidents,
-                "summary": "\n".join(summary_lines),
-                "category_count": len(all_accidents), "total_spots": total,
-            }
-            _set_cached(ck, result)
-            return result
-
+    # koroad 다발지역 API는 AWS 서버에서 접근 불가 (타임아웃) → 제거
     return _empty_result(source, "API 호출 실패")
 
 
@@ -765,19 +774,209 @@ def _fetch_seoul_facilities(region_info: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 5. 생활시설 통계 (KOSIS 도시계획현황 + 한국도시통계 + e-지방지표)
+# ---------------------------------------------------------------------------
+# 공원:          orgId=460, tblId=TX_315_2009_H1126  (도시계획현황, 시군구별)
+# 체육시설:      orgId=460, tblId=TX_315_2009_H1055  (도시계획현황, 시군구별)
+# 도서관:        orgId=110, tblId=DT_110001_A033     (한국도시통계, 시군구별)
+# 노인여가복지:  orgId=101, tblId=DT_1YL20961        (e-지방지표, 시군구별)
+# ---------------------------------------------------------------------------
+
+
+def _fetch_kosis_facilities(region_info: dict) -> dict:
+    """공원·체육시설·도서관 현황 — KOSIS 도시계획현황·한국도시통계."""
+    from backend.config import KOSIS_API_KEY
+
+    source = "facilities"
+    if not KOSIS_API_KEY:
+        return _empty_result(source, "KOSIS API 키 미설정")
+
+    district = region_info["district"]
+    province = region_info["province"]
+    if not province and not district:
+        return _empty_result(source, "지역 미지정")
+
+    ck = _cache_key("kosis_facilities", province=province, district=district)
+    cached = _get_cached(ck)
+    if cached:
+        cached["from_cache"] = True
+        return cached
+
+    target = district or province
+    current_year = datetime.now().year
+    start_year = str(current_year - 2)
+    end_year = str(current_year - 1)
+
+    # (key, orgId, tblId, objL2 필요 여부)
+    _tables = [
+        ("park",    "460", "TX_315_2009_H1126", True),   # 공원 (시군구×공원종류)
+        ("sports",  "460", "TX_315_2009_H1055", True),   # 체육시설 (시군구×종류)
+        ("library", "110", "DT_110001_A033",    False),  # 공공도서관 (시군구만)
+        ("welfare", "101", "DT_1YL20961",       False),  # 노인여가복지시설수 (e-지방지표)
+    ]
+
+    # 도서관은 최근 연도 데이터가 최대 2023년까지 있음
+    lib_end_year = str(min(int(end_year), 2023))
+
+    all_data: dict[str, list] = {}
+    for key, org_id, tbl_id, need_obj2 in _tables:
+        params = {
+            "method": "getList",
+            "apiKey": KOSIS_API_KEY,
+            "format": "json",
+            "jsonVD": "Y",
+            "orgId": org_id,
+            "tblId": tbl_id,
+            "prdSe": "Y",
+            "startPrdDe": start_year if key != "library" else "2022",
+            "endPrdDe": end_year if key != "library" else lib_end_year,
+            "objL1": "ALL",
+            "itmId": "ALL",
+        }
+        if need_obj2:
+            params["objL2"] = "ALL"
+        raw = _http_get_json(KOSIS_BASE, params, timeout=15,
+                             headers={"Referer": "https://kosis.kr/"})
+        if not isinstance(raw, list):
+            continue
+        # 시군구 필터 (district 우선, 없으면 시도)
+        filtered = []
+        for item in raw:
+            c1 = item.get("C1_NM") or ""
+            if district and district in c1:
+                filtered.append(item)
+            elif not district and province and province in c1:
+                filtered.append(item)
+        if filtered:
+            all_data[key] = filtered
+
+    if not all_data:
+        result = _empty_result(source, "데이터 없음")
+        _set_cached(ck, result)
+        return result
+
+    summary_parts = []
+
+    # 공원
+    if "park" in all_data:
+        park_items = all_data["park"]
+        # 최신 연도 "계" 행 우선
+        total_cnt = total_area = None
+        by_kind: dict[str, dict] = {}
+        for x in park_items:
+            if x.get("C2_NM") == "계" and x.get("ITM_NM") == "시설수":
+                total_cnt = x.get("DT")
+            if x.get("C2_NM") == "계" and x.get("ITM_NM") == "면적":
+                total_area = x.get("DT")
+            kind = x.get("C2_NM", "")
+            if kind and kind != "계":
+                by_kind.setdefault(kind, {})
+                if x.get("ITM_NM") == "시설수":
+                    by_kind[kind]["cnt"] = x.get("DT", "")
+        lines = [f"{target} 공원 현황:"]
+        if total_cnt:
+            lines.append(f"  - 총 공원: {total_cnt}개소" + (f", {int(total_area):,}㎡" if total_area else ""))
+        for kind, vals in list(by_kind.items())[:5]:
+            cnt = vals.get("cnt", "")
+            if cnt:
+                lines.append(f"  - {kind}: {cnt}개소")
+        summary_parts.append("\n".join(lines))
+
+    # 체육시설
+    if "sports" in all_data:
+        sport_items = all_data["sports"]
+        total_cnt = total_area = None
+        by_kind: dict[str, dict] = {}
+        for x in sport_items:
+            if x.get("C2_NM") == "계" and x.get("ITM_NM") == "시설수":
+                total_cnt = x.get("DT")
+            if x.get("C2_NM") == "계" and x.get("ITM_NM") == "면적":
+                total_area = x.get("DT")
+            kind = x.get("C2_NM", "")
+            if kind and kind != "계":
+                by_kind.setdefault(kind, {})
+                if x.get("ITM_NM") == "시설수":
+                    by_kind[kind]["cnt"] = x.get("DT", "")
+        lines = [f"{target} 공공체육시설 현황:"]
+        if total_cnt:
+            lines.append(f"  - 총 체육시설: {total_cnt}개" + (f", {int(total_area):,}㎡" if total_area else ""))
+        for kind, vals in list(by_kind.items())[:5]:
+            cnt = vals.get("cnt", "")
+            if cnt:
+                lines.append(f"  - {kind}: {cnt}개")
+        summary_parts.append("\n".join(lines))
+
+    # 도서관
+    if "library" in all_data:
+        lib_items = all_data["library"]
+        lib_cnt = lib_seats = lib_per_capita = None
+        for x in lib_items:
+            nm = x.get("ITM_NM") or ""
+            if "도서관 수" in nm:
+                lib_cnt = x.get("DT")
+            elif "열람석 수" in nm and "1인당" not in nm:
+                lib_seats = x.get("DT")
+            elif "1인당" in nm:
+                lib_per_capita = x.get("DT")
+        lines = [f"{target} 공공도서관 현황:"]
+        if lib_cnt:
+            lines.append(f"  - 도서관 수: {lib_cnt}개소")
+        if lib_seats:
+            lines.append(f"  - 총 열람석: {lib_seats}석")
+        if lib_per_capita:
+            lines.append(f"  - 1인당 열람석: {lib_per_capita}석")
+        summary_parts.append("\n".join(lines))
+
+    # 노인여가복지시설
+    if "welfare" in all_data:
+        wf_items = all_data["welfare"]
+        wf_cnt = wf_per_thousand = None
+        for x in wf_items:
+            nm = x.get("ITM_NM") or ""
+            if "노인여가복지시설수" in nm and "천명당" not in nm:
+                wf_cnt = x.get("DT")
+            elif "천명당" in nm:
+                wf_per_thousand = x.get("DT")
+        lines = [f"{target} 노인·복지시설 현황:"]
+        if wf_cnt:
+            lines.append(f"  - 노인여가복지시설: {wf_cnt}개소")
+        if wf_per_thousand:
+            lines.append(f"  - 노인 천 명당: {wf_per_thousand}개소")
+        if lines[1:]:
+            summary_parts.append("\n".join(lines))
+
+    result = {
+        "source": source,
+        "available": True,
+        "data": all_data,
+        "summary": "\n\n".join(summary_parts),
+    }
+    _set_cached(ck, result)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # 통합 조회 함수
 # ---------------------------------------------------------------------------
 
 # 주제 → API 매핑
 _TOPIC_API_MAP = {
-    "kosis": ["인구", "세대", "고령", "청년", "노인", "1인가구", "전입", "전출", "주민", "연령", "출산", "인구구조"],
+    "kosis": ["인구", "세대", "고령", "청년", "노인", "1인가구", "전입", "전출", "주민", "연령", "출산", "인구구조",
+              "복지", "돌봄", "어르신", "보육", "요양", "장애", "독거"],
     "taas": ["교통", "사고", "안전", "보행", "어린이", "통학", "보호구역", "횡단보도", "도로", "주차", "자전거"],
     "semas": ["상권", "상가", "자영업", "골목", "경제", "업종", "폐업", "창업", "소상공인", "시장"],
-    "seoul": ["시설", "도서관", "체육", "공원", "복지", "문화", "주차장", "CCTV", "돌봄", "경로당", "어린이집"],
+    "seoul": ["도서관", "체육", "공원", "문화", "주차장", "CCTV", "경로당", "어린이집"],  # 서울 전용
+    "facilities": ["체육시설", "스포츠", "경기장", "체육관", "수영장",
+                   "도서관", "문화시설", "문화센터",
+                   "공원", "녹지", "산책로",
+                   "공공시설", "시설 접근", "접근성",
+                   "노인복지", "복지시설", "경로당", "여가시설",
+                   "돌봄", "어르신", "요양", "복지 현안"],
 }
 
 
-_GENERAL_TOPIC_WORDS = {"이슈", "현황", "생활", "공약", "정책", "문제", "과제", "환경", "지역"}
+# 포괄 주제어 — 전체 API 호출. "공약"/"정책"처럼 모든 챗봇 메시지에 포함되는 단어는 제외.
+_GENERAL_TOPIC_WORDS = {"생활이슈", "생활현안", "주민생활", "지역현안", "종합현황"}
 
 
 def _select_relevant_apis(all_fetchers: dict, topic: str, keywords: list[str] | None) -> dict:
@@ -834,8 +1033,11 @@ def query_public_data_context(
         "semas": lambda: _fetch_semas_commercial(region_info),
         "taas": lambda: _fetch_taas_accidents(region_info),
         "kosis": lambda: _fetch_kosis_population(region_info),
-        "seoul": lambda: _fetch_seoul_facilities(region_info),
+        "facilities": lambda: _fetch_kosis_facilities(region_info),
     }
+    # 서울 시설 API는 서울 지역에서만 의미있음
+    if region_info.get("is_seoul"):
+        all_fetchers["seoul"] = lambda: _fetch_seoul_facilities(region_info)
 
     fetchers = _select_relevant_apis(all_fetchers, topic, keywords)
 
@@ -857,7 +1059,7 @@ def query_public_data_context(
     target = region_info["district"] or region_info["province"]
     sections = []
 
-    for name in ["kosis", "semas", "taas", "seoul"]:
+    for name in ["kosis", "semas", "taas", "facilities", "seoul"]:
         res = sources.get(name, {})
         if res.get("available") and res.get("summary"):
             sections.append(res["summary"])

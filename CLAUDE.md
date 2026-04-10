@@ -1,5 +1,22 @@
 # 개혁신당 정책 멘토링 시스템 — Claude 작업 가이드
 
+## 에이전트 모델 분배 규칙
+
+Claude Code 자신이 **Opus(오케스트레이터)** 역할을 맡고, Agent 도구 호출 시 작업 크기에 따라 모델을 명시적으로 지정한다.
+
+| 모델 | 역할 | 적용 작업 |
+|------|------|-----------|
+| `haiku` | 단순 작업 | 파일 탐색, 상수/타입 수정, 1~2줄 버그 픽스, 단순 검색 |
+| `sonnet` | 중간 작업 | 신규 기능 구현, API 엔드포인트, 서비스 함수, UI 로직 |
+| `opus` | 오케스트레이터 | 아키텍처 설계, 플랜 수립, 복잡한 비즈니스 로직, 에이전트 조율 |
+
+```python
+# 예시
+Agent(subagent_type="general-purpose", model="haiku", ...)   # 탐색
+Agent(subagent_type="general-purpose", model="sonnet", ...)  # 구현
+Agent(subagent_type="Plan", model="opus", ...)               # 설계
+```
+
 ## 프로젝트 목적
 출마자 공약을 AI로 점검: 당 부합 여부 판단, 중복·유사 탐지, 보완점 제시.  
 운영: https://policy.reformparty.kr/

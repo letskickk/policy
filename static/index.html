@@ -2534,6 +2534,25 @@
       font-size: 1rem; font-weight: 800; color: #ff7210;
       letter-spacing: -0.01em;
     }
+    @media (max-width: 540px) {
+      .site-gate-overlay {
+        padding: 1rem 0.75rem;
+        align-items: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .site-gate-card {
+        padding: 1.4rem 1.1rem 1.6rem;
+        border-radius: 16px;
+        margin: auto 0;
+      }
+      .site-gate-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+      .site-gate-title { font-size: 1.25rem; }
+      .site-gate-subtitle { font-size: 0.9rem; margin-bottom: 0.9rem; }
+      .site-gate-list li { font-size: 0.92rem; padding: 0.35rem 0 0.35rem 1.3rem; }
+      .site-gate-list li .gate-sub,
+      .site-gate-list li .gate-detail { font-size: 0.85rem; }
+    }
   </style>
   <div class="site-gate-overlay" id="siteGateOverlay">
     <div class="site-gate-card">

@@ -1195,6 +1195,28 @@
     .nav-links .nav-link:hover{color:var(--text-strong);background:rgba(255,255,255,0.06);}
     .nav-links .nav-link.active{color:var(--brand-light,#ff7a1a);background:rgba(255,122,26,0.1);}
     @media(max-width:640px){.nav-links{gap:0.15rem;}.nav-links .nav-link{font-size:0.78rem;padding:0.3rem 0.45rem;}}
+
+    /* 지역 의회 현황 — 채팅 인라인 카드 */
+    .chat-assembly-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:0.8rem 0.9rem;margin-top:0.5rem;font-size:0.83rem;}
+    .assembly-loading-indicator{color:var(--muted);font-size:0.9rem;}
+    .dot-anim::after{content:'';animation:dotCycle 1.2s steps(4,end) infinite;}
+    @keyframes dotCycle{0%{content:'';}25%{content:'.';}50%{content:'..';}75%{content:'...';}}
+    .chat-assembly-title{font-weight:700;color:var(--text-strong);margin-bottom:0.6rem;font-size:0.88rem;}
+    .chat-assembly-section{margin-bottom:0.8rem;}
+    .chat-assembly-section-label{font-size:0.75rem;color:var(--brand-light,#ff7a1a);font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:0.35rem;}
+    .chat-assembly-member{background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.65rem;margin-bottom:0.5rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;}
+    .chat-assembly-member-name{font-weight:700;color:var(--text-strong);}
+    .chat-assembly-member-meta{color:var(--muted);font-size:0.78rem;}
+    .assembly-table-wrap{overflow-x:auto;}
+    .assembly-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+    .assembly-table th{text-align:left;padding:0.35rem 0.45rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;}
+    .assembly-table td{padding:0.35rem 0.45rem;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top;line-height:1.4;}
+    .assembly-table tr:last-child td{border-bottom:none;}
+    .assembly-table td:first-child{white-space:nowrap;color:var(--muted);font-size:0.75rem;}
+    .assembly-tag{display:inline-block;font-size:0.7rem;padding:0.08rem 0.35rem;border-radius:4px;background:rgba(255,255,255,0.07);color:var(--muted);}
+    .assembly-tag-bill{background:rgba(99,179,237,0.15);color:#63b3ed;}
+    .assembly-tag-minutes{background:rgba(154,230,180,0.15);color:#9ae6b4;}
+    @media(max-width:640px){.assembly-table{font-size:0.75rem;}.assembly-table th,.assembly-table td{padding:0.28rem 0.32rem;}}
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1390,6 +1412,7 @@
   <script src="/static/js/modal-utils.js"></script>
   <script>
     let meData = { is_admin: false, can_use_policy_tools: false };
+    let _meDataReady = false;
     const paneGenerateEl = document.getElementById('paneGenerate');
     const generateTabEl = document.getElementById('tabGenerate');
 
@@ -1403,7 +1426,10 @@
       document.getElementById('paneCheck').style.display = name === 'check' ? '' : 'none';
       paneGenerateEl.style.display = name === 'generate' ? '' : 'none';
       paneGenerateEl.setAttribute('aria-hidden', name === 'generate' ? 'false' : 'true');
-      history.replaceState(null, '', name === 'generate' ? (location.pathname + '#coach') : location.pathname);
+      // meData 로드 전에는 hash 변경하지 않음 — #coach URL 공유 시 덮어쓰기 방지
+      if (_meDataReady) {
+        history.replaceState(null, '', name === 'generate' ? (location.pathname + '#coach') : location.pathname);
+      }
     }
 
     function syncTabFromLocation() {
@@ -1418,7 +1444,8 @@
       });
     });
 
-    syncTabFromLocation();
+    // 초기 호출 제거 — meData 로드 후 syncTabFromLocation()이 호출되므로
+    // hash가 있는 URL 공유 시 meData 확인 전에 hash를 지우는 버그 방지
     window.addEventListener('hashchange', syncTabFromLocation);
 
     function _fmtTokens(n) {
@@ -1469,6 +1496,165 @@
       } catch(e) {}
     }
 
+    let _pendingAssemblyPrompt = null; // 세션 시작 후 의회데이터 포함 메시지 전송용
+
+    // ── 지역 의회 현황 — 채팅 인라인 렌더링 ──────────────────────────────
+    let _assemblyCacheData = null;
+
+    function _assemblyBuildLocalTable(bills) {
+      if (!bills || !bills.length) return '<p style="color:var(--muted);font-size:0.82rem;">지방의회 안건 데이터가 없습니다.</p>';
+      const rows = bills.map(b => {
+        const rawDate = (b.date || '').replace(/-/g, '');
+        const date = /^\d{8}$/.test(rawDate)
+          ? rawDate.substring(0,4) + '-' + rawDate.substring(4,6) + '-' + rawDate.substring(6,8)
+          : (b.date || '-');
+        const council = b.council ? `<small style="color:var(--muted);">${_esc(b.council)}</small><br>` : '';
+        const speaker = b.speaker ? `<span style="color:var(--muted);font-size:0.78rem;">${_esc(b.speaker)}</span>` : '';
+        const type = b.type === 'bill' ? '<span class="assembly-tag assembly-tag-bill">의안</span>'
+                   : b.type === 'minutes' ? '<span class="assembly-tag assembly-tag-minutes">회의록</span>'
+                   : `<span class="assembly-tag">${_esc(b.type||'')}</span>`;
+        return `<tr><td>${date}</td><td>${council}${speaker}</td><td>${_esc(b.title||'')}</td><td>${type}</td></tr>`;
+      }).join('');
+      return `<div class="assembly-table-wrap"><table class="assembly-table">
+        <thead><tr><th>날짜</th><th>의회/발언자</th><th>안건명</th><th>종류</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
+    function _assemblyBuildNationalSection(national) {
+      if (!national || !national.available || !national.member) return '';
+      const m = national.member;
+      const meta = [m.party, m.committee, m.district].filter(Boolean).join(' · ');
+      let memberHtml = `<div class="chat-assembly-section">
+        <div class="chat-assembly-section-label">지역구 국회의원</div>
+        <div class="chat-assembly-member">
+          <span class="chat-assembly-member-name">${_esc(m.name)}</span>
+          <span class="chat-assembly-member-meta">${_esc(meta)}</span>
+        </div>`;
+      const bills = national.bills || [];
+      if (bills.length) {
+        const brows = bills.slice(0,5).map(b => {
+          const date = (b.propose_date||'').substring(0,10);
+          return `<tr><td>${date}</td><td>${_esc(b.title||'')}</td><td><span class="assembly-tag">${_esc(b.status||'')}</span></td></tr>`;
+        }).join('');
+        memberHtml += `<div class="assembly-table-wrap"><table class="assembly-table">
+          <thead><tr><th>발의일</th><th>법안명</th><th>처리상태</th></tr></thead>
+          <tbody>${brows}</tbody>
+        </table></div>`;
+      }
+      memberHtml += '</div>';
+      return memberHtml;
+    }
+
+    function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function chatAppendAssemblyCard(data, focusMode) {
+      // focusMode: 'local' | 'national' | 'all'
+      const region = data.region || '';
+      const localBills = data.local_assembly && data.local_assembly.bills || [];
+      const national = data.national_assembly;
+
+      let html = `<div class="chat-assembly-card">`;
+      html += `<div class="chat-assembly-title">📋 지역 의회 현황 ${region ? '· ' + _esc(region) : ''}</div>`;
+
+      if (focusMode !== 'national') {
+        html += `<div class="chat-assembly-section">
+          <div class="chat-assembly-section-label">지방의회 최근 안건</div>
+          ${_assemblyBuildLocalTable(localBills)}
+        </div>`;
+      }
+      if (focusMode !== 'local') {
+        html += _assemblyBuildNationalSection(national);
+      }
+      html += '</div>';
+
+      const msgEl = document.createElement('div');
+      msgEl.className = 'chat-msg assistant';
+      msgEl.innerHTML = html;
+      const msgs = document.getElementById('chatMessages');
+      if (msgs) { msgs.appendChild(msgEl); msgs.scrollTop = msgs.scrollHeight; }
+    }
+
+    async function chatShowAssemblyData(focusMode, aiPrompt) {
+      // 로딩 메시지
+      const loadingEl = document.createElement('div');
+      loadingEl.className = 'chat-msg assistant';
+      loadingEl.innerHTML = '<span class="assembly-loading-indicator">의회 데이터 로딩 중<span class="dot-anim"></span></span>';
+      const msgs = document.getElementById('chatMessages');
+      if (msgs) { msgs.appendChild(loadingEl); msgs.scrollTop = msgs.scrollHeight; }
+
+      let data = null;
+      try {
+        data = _assemblyCacheData;
+        if (!data) {
+          const r = await fetch('/api/assembly/district-overview', { credentials: 'include' });
+          if (r.ok) {
+            data = await r.json();
+            _assemblyCacheData = data;
+          } else {
+            console.warn('[assembly] API error', r.status, await r.text().catch(()=>''));
+          }
+        }
+      } catch(e) {
+        console.error('[assembly] fetch error', e);
+      }
+
+      loadingEl.remove();
+
+      if (data) {
+        chatAppendAssemblyCard(data, focusMode);
+      } else {
+        const errEl = document.createElement('div');
+        errEl.className = 'chat-msg assistant';
+        errEl.style.color = 'var(--muted)';
+        errEl.textContent = '의회 데이터를 불러올 수 없습니다. (로그인 또는 네트워크 확인)';
+        if (msgs) { msgs.appendChild(errEl); msgs.scrollTop = msgs.scrollHeight; }
+      }
+
+      // AI 분석 요청 — 어셈블리 데이터 + 프롬프트를 단 한 번만 전송 (중복 응답 방지)
+      // chatSend(serverMsg, displayMsg): 서버엔 전체 컨텍스트, UI엔 짧은 프롬프트만 표시
+      if (aiPrompt && data) {
+        const assemblyText = _assemblyDataToText(data, focusMode);
+        const fullMsg = assemblyText ? (assemblyText + '\n\n' + aiPrompt) : aiPrompt;
+        window.chatSend(fullMsg, aiPrompt);
+      }
+    }
+
+    function _assemblyDataToText(data, focusMode) {
+      // 의회 데이터를 AI가 읽을 수 있는 텍스트로 변환
+      const lines = [];
+      const localBills = data.local_assembly && data.local_assembly.bills || [];
+      const national = data.national_assembly;
+
+      if (focusMode !== 'national' && localBills.length) {
+        lines.push('[지방의회 최근 안건]');
+        localBills.forEach(function(b) {
+          const rawDate = (b.date || '').replace(/-/g, '').substring(0, 8);
+          const date = rawDate.length === 8
+            ? rawDate.substring(0,4) + '-' + rawDate.substring(4,6) + '-' + rawDate.substring(6,8)
+            : '날짜미상';
+          const speaker = b.speaker ? ' / ' + b.speaker : '';
+          lines.push('- [' + date + ']' + speaker + ' ' + (b.title || '') + ' (' + (b.type || '') + ')');
+        });
+      }
+
+      if (focusMode !== 'local' && national && national.available && national.member) {
+        const m = national.member;
+        lines.push('');
+        lines.push('[지역구 국회의원]');
+        lines.push(m.name + ' (' + [m.party, m.committee, m.district].filter(Boolean).join(', ') + ')');
+        const bills = national.bills || [];
+        if (bills.length) {
+          lines.push('[국회의원 발의법안]');
+          bills.slice(0, 5).forEach(function(b) {
+            lines.push('- ' + (b.propose_date || '').substring(0,10) + ' ' + (b.title || '') + ' [' + (b.status || '') + ']');
+          });
+        }
+      }
+
+      return lines.join('\n');
+    }
+
     (async function() {
       try {
         const r = await fetch('/api/auth/me', { credentials: 'include' });
@@ -1486,7 +1672,6 @@
           if (generateTabEl) {
             generateTabEl.style.display = meData.can_use_policy_tools ? '' : 'none';
           }
-          syncTabFromLocation();
           // 인사말 렌더링 (meData 로드 완료)
           if (window._chatGreetingReady) window._chatGreetingReady();
           // 생성 탭 프로필 배지
@@ -1500,6 +1685,9 @@
           }
         }
       } catch (e) {}
+      // meData 로드 완료 후 탭 동기화 (로그인/미로그인 모두 여기서 처리)
+      _meDataReady = true;
+      syncTabFromLocation();
       // chatRenderGreeting는 아래 IIFE 안에서 호출됨
     })();
     const pledgeEl = document.getElementById('pledge');
@@ -2344,8 +2532,8 @@
         ];
 
         var subTopics = [
-          { label: '⭐ 핵심 현안 종합', msg: (loc ? loc + ' ' : '') + '이 지역의 핵심 현안을 종합적으로 정리해줘. 의회 논의, 생활 현안, 공공데이터를 모두 종합해서' },
-          { label: '📋 의회 논의 중심', msg: (loc ? loc + ' ' : '') + '이 지역 의회에서 최근 논의된 조례안, 회의록 안건 중심으로 현안을 정리해줘' },
+          { label: '⭐ 핵심 현안 종합', assemblyMode: 'all', msg: (loc ? loc + ' ' : '') + '위 지방의회 안건과 국회의원 발의 법안을 참고해서, 이 지역의 핵심 현안을 종합 정리해줘. 공약 소재로 연결할 수 있는 것도 짚어줘.' },
+          { label: '📋 의회 논의 중심', assemblyMode: 'local', msg: (loc ? loc + ' ' : '') + '위 지방의회 안건을 바탕으로, 주요 논의 쟁점과 공약 연결 포인트를 정리해줘.' },
           { label: '🏘️ 생활 현안', msg: (loc ? loc + ' ' : '') + '주민 생활 밀착 이슈 중심으로 현안을 알려줘. 주차, 통학, 골목, 소음, 시설 접근성 등' },
           { label: '🚗 교통·안전', msg: (loc ? loc + ' ' : '') + '교통·안전 현안을 알려줘. 교통사고 다발 지점, 보행 안전, 신호체계 등 구체적으로' },
           { label: '💼 상권·경제', msg: (loc ? loc + ' ' : '') + '상권·골목경제 현안을 알려줘. 자영업, 전통시장, 창업 환경 등' },
@@ -2361,6 +2549,7 @@
         }
 
         function sendTopicPrompt(promptText) {
+          _pendingAssemblyPrompt = null; // 의회 대기 취소 — 다른 주제 선택 시 혼입 방지
           document.getElementById('chatInput').value = promptText;
           chatTopicChangePending = true;
           chatSend();
@@ -2380,10 +2569,13 @@
 
           subTopics.forEach(function(t) {
             var tb = document.createElement('button');
-            tb.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;';
+            var isAssembly = !!t.assemblyMode;
+            tb.style.cssText = 'display:block;width:100%;padding:0.65rem 0.9rem;margin-top:0.4rem;border:1px solid var(--input-border,#ddd);border-radius:8px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;min-height:44px;';
             tb.textContent = t.label;
             tb.addEventListener('click', function() {
-              if (t.msg) {
+              if (t.assemblyMode) {
+                chatShowAssemblyData(t.assemblyMode, t.msg || null);
+              } else if (t.msg) {
                 sendTopicPrompt(t.msg);
               } else {
                 focusTopicInput('관심 있는 분야나 정책 아이디어를 입력하세요');
@@ -2417,9 +2609,15 @@
           subTopics.forEach(function(t) {
             var qb = document.createElement('button');
             qb.textContent = t.label;
+            qb.style.cssText = 'display:block;width:100%;padding:0.5rem 0.75rem;margin-top:0.3rem;'
+              + 'border:1px solid var(--input-border,#ddd);border-radius:7px;'
+              + 'background:var(--input-bg,rgba(0,0,0,0.18));color:var(--text,#f1f5f9);'
+              + 'font-size:0.87rem;cursor:pointer;text-align:left;min-height:44px;';
             qb.addEventListener('click', function() {
               popup.style.display = 'none';
-              if (t.msg) {
+              if (t.assemblyMode) {
+                chatShowAssemblyData(t.assemblyMode, t.msg || null);
+              } else if (t.msg) {
                 sendTopicPrompt(t.msg);
               } else {
                 focusTopicInput('관심 분야를 입력하세요 (예: 복지, 교통, 상권)');
@@ -2434,7 +2632,9 @@
           btn.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,#f9f9f9);color:var(--text,#333);font-size:0.88rem;cursor:pointer;text-align:left;';
           btn.textContent = c.num + '. ' + c.label;
           btn.addEventListener('click', function() {
-            if (c.action === 'topicPicker') {
+            if (c.assemblyMode) {
+              chatShowAssemblyData(c.assemblyMode, c.msg || null);
+            } else if (c.action === 'topicPicker') {
               renderGreetingTopicPicker();
             } else if (c.msg) {
               sendTopicPrompt(c.msg);
@@ -2606,6 +2806,13 @@
         var buf = '';
         var msgEl = null;
 
+        // 첫 chunk 오기 전 로딩 인디케이터
+        var loadingEl = document.createElement('div');
+        loadingEl.className = 'chat-msg assistant';
+        loadingEl.innerHTML = '<span class="assembly-loading-indicator">답변 생성 중<span class="dot-anim"></span></span>';
+        var msgs = document.getElementById('chatMessages');
+        if (msgs) { msgs.appendChild(loadingEl); msgs.scrollTop = msgs.scrollHeight; }
+
         while (true) {
           var r = await reader.read();
           if (r.done) break;
@@ -2621,38 +2828,52 @@
               if (data.type === 'session' && data.session_id) {
                 if (onSession) onSession(data.session_id);
               } else if (data.type === 'chunk') {
-                if (!msgEl) msgEl = chatAppendMsg('assistant streaming', '');
+                if (!msgEl) {
+                  // 첫 chunk: 로딩 인디케이터를 실제 메시지로 교체
+                  if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
+                  loadingEl = null;
+                  msgEl = chatAppendMsg('assistant streaming', '');
+                }
                 msgEl.dataset.rawText = (msgEl.dataset.rawText || '') + data.text;
                 msgEl.textContent = chatSanitizeLayerMarkers(msgEl.dataset.rawText);
                 var msgs = document.getElementById('chatMessages');
                 msgs.scrollTop = msgs.scrollHeight;
               } else if (data.type === 'done') {
+                if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
+                loadingEl = null;
                 if (msgEl) { msgEl.classList.remove('streaming'); chatFormatLayers(msgEl); }
                 msgEl = null;
                 chatMsgCount++;
                 fetchQuota();
               } else if (data.type === 'error') {
+                if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
+                loadingEl = null;
                 chatAppendMsg('notice', '오류: ' + data.detail);
               }
             } catch(e) {}
           }
         }
+        // 스트림 종료 시 로딩 잔여물 정리
+        if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
         chatIsStreaming = false;
       }
 
       // ── 메시지 전송 (세션 없으면 자동 시작) ──
-      window.chatSend = async function() {
+      // serverMsg: 서버에 보낼 전체 메시지 (어셈블리 데이터 포함 가능)
+      // displayMsg: 채팅 UI에 표시할 짧은 메시지 (생략 시 serverMsg와 동일)
+      window.chatSend = async function(serverMsg, displayMsg) {
         if (chatIsStreaming) return;
         var input = document.getElementById('chatInput');
-        var msg = (input.value || '').trim();
+        var msg = serverMsg || (input.value || '').trim();
+        var uiMsg = displayMsg || msg;
         if (!msg) return;
         if (chatTopicChangePending) {
           window.chatStartNew();
           chatTopicChangePending = false;
         }
-        input.value = '';
+        if (!serverMsg) input.value = ''; // 직접 입력 시만 인풋 클리어
 
-        chatAppendMsg('user', msg);
+        chatAppendMsg('user', uiMsg);
         chatSetEnabled(false);
 
         try {
@@ -2677,9 +2898,9 @@
             await chatHandleSSE(resp, function(sid) {
               chatSessionId = sid;
               chatStarted = true;
-              // 공약문 생성 버튼 표시
               document.getElementById('chatBtnFinalize').style.display = '';
             });
+
           } else {
             // 기존 세션에 메시지 전송
             var resp = await fetch('/api/pledge-chat/' + chatSessionId + '/message', {

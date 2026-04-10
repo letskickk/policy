@@ -251,7 +251,7 @@ def register_tools_routes(app, require_approved, _client_ip):
         output_format: Literal["정책", "정책포지션", "지역공약", "논평", "메시지"] = "정책"
 
     class ChatMessageRequest(BaseModel):
-        message: str = Field(..., min_length=1, max_length=2000)
+        message: str = Field(..., min_length=1, max_length=8000)
 
     @app.post("/api/pledge-chat/start")
     def pledge_chat_start(body: ChatStartRequest, request: Request):
@@ -486,3 +486,61 @@ def register_tools_routes(app, require_approved, _client_ip):
         # 시스템 메시지는 프론트에 노출하지 않음
         visible_msgs = [m for m in messages if m["role"] != "system"]
         return {"session": session, "messages": visible_msgs}
+
+    # ── 지역 의회 현황 ───────────────────────────────────────────────────────
+
+    @app.get("/api/assembly/district-overview")
+    def assembly_district_overview(request: Request):
+        """
+        로그인한 사용자의 선거구 기준 지방의회 안건 + 국회의원/발의법안 반환.
+        승인 불필요, 로그인만 있으면 접근 가능.
+        """
+        from backend.assembly_api import search_local_assembly
+        from backend.national_assembly_api import query_national_assembly_overview
+
+        user = require_approved(request)
+
+        region = (user.get("region_name") or "").strip()
+        district = (user.get("district_name") or "").strip()
+        election_pos = (user.get("election_position") or "").strip()
+
+        # 지방의회 검색 대상 결정:
+        # 기초의원/기초단체장 → district_name(시군구)으로 기초의회 검색
+        # 광역의원/광역단체장/기타 → region_name(시도)으로 광역의회 검색
+        BASIC_POSITIONS = {"local_council", "local_mayor"}
+        if election_pos in BASIC_POSITIONS and district:
+            # "해남군 가선거구" → "해남군" 부분만 추출
+            district_base = district.split()[0] if district else district
+            assembly_search_region = district_base
+        else:
+            assembly_search_region = region
+
+        # 지방의회 안건 (기존 assembly_api 활용)
+        local_result = search_local_assembly(region=assembly_search_region or None, keywords=[], years=1, limit=40)
+        local_bills = local_result.get("results", [])
+
+        # 기초의회인 경우 지역명 포함 결과만 필터링 (다른 지역 문서 제거)
+        if election_pos in BASIC_POSITIONS and district_base:
+            filter_kw = district_base.rstrip("군시구")  # "해남군" → "해남"
+            filtered = [
+                b for b in local_bills
+                if filter_kw in (b.get("title") or "")
+                or filter_kw in (b.get("council") or "")
+                or filter_kw in (b.get("speaker") or "")
+            ]
+            local_bills = filtered[:20] if filtered else local_bills[:20]
+        else:
+            local_bills = local_bills[:20]
+
+        # 국회의원 + 발의법안
+        national = query_national_assembly_overview(region=region, district=district)
+
+        return {
+            "region": region,
+            "district": district,
+            "local_assembly": {
+                "available": local_result.get("available", False),
+                "bills": local_bills,
+            },
+            "national_assembly": national,
+        }

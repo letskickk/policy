@@ -25,6 +25,7 @@ _rate_user: dict[int, list[float]] = defaultdict(list)
 UNLIMITED_QUOTA_TEST_EMAILS = {
     "gtest@test.kr",
     "ktest@test.kr",
+    "atest@test.kr",
 }
 
 

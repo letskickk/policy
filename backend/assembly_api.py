@@ -362,7 +362,7 @@ def _parse_minutes_response(data) -> list[dict]:
             items.append({
                 "title": row.get("MTGNM", "") or "",  # 회의명 (본회의, 상임위 등)
                 "speaker": "",
-                "date": row.get("MTG_DE", "") or "",
+                "date": _normalize_clik_date(row.get("MTG_DE", "")),
                 "council": row.get("RASMBLY_NM", "") or "",
                 "summary": f"제{row.get('RASMBLY_SESN', '')}회 {row.get('MTGNM', '')} 제{row.get('MINTS_ODR', '')}차",
                 "type": "회의록",
@@ -373,16 +373,40 @@ def _parse_minutes_response(data) -> list[dict]:
     return items
 
 
+def _normalize_clik_date(raw: str) -> str:
+    """
+    CLIK API 날짜 정규화. 유효한 YYYYMMDD 형식만 반환.
+    - "19000101" → "" (API 기본값, 실제 날짜 없음)
+    - "202211119" (9자리) → "20221119" (앞 8자리)
+    - "" / None → ""
+    """
+    if not raw:
+        return ""
+    raw = str(raw).strip()
+    if raw == "19000101" or raw.startswith("1900"):
+        return ""
+    if len(raw) == 9:
+        return raw[:8]  # 9자리 오타 → 앞 8자리
+    if len(raw) == 8 and raw.isdigit():
+        return raw
+    return ""
+
+
 def _parse_bill_response(data) -> list[dict]:
     """의안 (bill.do) JSON 응답 파싱."""
     items = []
     try:
         rows, meta = _extract_clik_rows(data)
         for row in rows:
+            date = _normalize_clik_date(row.get("ITNC_DE", ""))
+            # 날짜 없으면 회기 번호로 대체 표시 (예: "제8회")
+            if not date:
+                numpr = row.get("RASMBLY_NUMPR", "")
+                date = f"제{numpr}회" if numpr else ""
             items.append({
                 "title": row.get("BI_SJ", "") or "",
                 "speaker": row.get("PROPSR", "") or "",
-                "date": row.get("ITNC_DE", "") or "",
+                "date": date,
                 "council": "",  # bill 목록에는 RASMBLY_NM 없음, RASMBLY_ID만
                 "summary": row.get("BI_KND_NM", "") or "",  # 의안종류 (조례안, 건의안 등)
                 "type": "의안",
