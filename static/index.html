@@ -1365,18 +1365,18 @@
       </div>
 
       <div class="cta-group">
-        <a href="/pledge" class="cta" id="btnPledge">공약 멘토링</a>
+        <a href="/pledge" class="cta" id="btnPledge">공약 분석</a>
+        <a href="/pledge#generate" class="cta" id="btnTools" style="background:rgba(255,114,16,0.15);border-color:rgba(255,114,16,0.5);color:#ffb37a;">공약 생성 코치</a>
         <a href="/map" class="cta secondary" style="background:rgba(96,165,250,0.12);border-color:rgba(96,165,250,0.3);color:#93c5fd;">지역·선거구 공약 보기</a>
         <a href="/proposals" class="cta secondary" style="background:rgba(167,139,250,0.12);border-color:rgba(167,139,250,0.3);color:#c4b5fd;">정책 제안</a>
       </div>
       <div class="sample-preview" id="adminToolGroup" style="margin-top:0.8rem;">
         <div class="sample-head">
-          <span class="sample-title">추가 기능</span>
-          <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">준비 중</span>
+          <span class="sample-title">준비 중</span>
+          <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">예정</span>
         </div>
         <div class="sample-body" style="display:flex;gap:0.45rem;flex-wrap:wrap;">
           <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;position:relative;padding-right:5.7rem;">정책 자료허브</a>
-          <a href="/pledge#generate" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;">공약 생성 코치</a>
         </div>
       </div>
 
@@ -1481,22 +1481,15 @@
           if (pledgeBtn) pledgeBtn.href = '/pledge';
           window._userEmail = email;
           window._userName = d.name || '';
-          // 코치: 승인 사용자 전체 허용 / 정책 허브: 준비 중
-          const adminStatus = document.getElementById('adminToolStatus');
           const isApproved = !!(d.is_admin || d.status === 'APPROVED');
-          if (isApproved) {
-            if (adminStatus) { adminStatus.textContent = '코치 오픈'; adminStatus.style.color = '#86efac'; }
-            // 코치 버튼 활성화
-            const btnTools = document.getElementById('btnTools');
-            if (btnTools) btnTools.classList.add('item-enabled');
-          } else {
-            // 비승인 사용자: 코치 버튼 클릭 시 안내
-            const btnTools = document.getElementById('btnTools');
-            if (btnTools) btnTools.addEventListener('click', function(e) {
+          const btnTools = document.getElementById('btnTools');
+          if (!isApproved && btnTools) {
+            // 비승인: 코치 버튼 클릭 시 안내
+            btnTools.addEventListener('click', function(e) {
               e.preventDefault(); alert('공약 생성 코치는 승인된 회원에게 제공됩니다. 회원가입 후 승인을 기다려 주세요.');
             });
           }
-          // 정책 자료허브는 아직 준비 중
+          // 정책 자료허브는 준비 중
           const btnPolicyHub = document.getElementById('btnPolicyHub');
           if (btnPolicyHub) btnPolicyHub.addEventListener('click', function(e) {
             e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');
@@ -1505,11 +1498,14 @@
           authRow.style.display = '';
           authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
-          // 비로그인: 클릭 시 로그인 유도
-          const adminGroup2 = document.getElementById('adminToolGroup');
-          if (adminGroup2) adminGroup2.addEventListener('click', function(e) {
-            const link = e.target.closest('a');
-            if (link) { e.preventDefault(); alert('로그인 후 이용 가능합니다.'); }
+          // 비로그인: 코치 클릭 시 로그인 유도
+          const btnTools2 = document.getElementById('btnTools');
+          if (btnTools2) btnTools2.addEventListener('click', function(e) {
+            e.preventDefault(); alert('로그인 후 이용 가능합니다.');
+          });
+          const btnPolicyHub2 = document.getElementById('btnPolicyHub');
+          if (btnPolicyHub2) btnPolicyHub2.addEventListener('click', function(e) {
+            e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');
           });
         }
       } catch (e) {}
