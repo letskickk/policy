@@ -125,8 +125,8 @@
       html += '<div class="summary-card">';
       html += '<div class="summary-card-head"><span class="summary-axis">' + escapeHtml(row.label) + '</span><span class="summary-score ' + cls + '">' + escapeHtml(scoreStr) + '</span></div>';
       html += '<div class="summary-card-body">';
-      if (row.strength && row.strength !== '-') html += '<div class="summary-strength">' + escapeHtml(row.strength) + '</div>';
-      if (row.supplement && row.supplement !== '-') html += '<div class="summary-supplement">' + escapeHtml(row.supplement) + '</div>';
+      if (row.strength && row.strength !== '-') html += '<div class="summary-row"><span class="summary-row-label strength">강점</span><span class="summary-row-text">' + escapeHtml(row.strength) + '</span></div>';
+      if (row.supplement && row.supplement !== '-') html += '<div class="summary-row"><span class="summary-row-label supplement">보완</span><span class="summary-row-text">' + escapeHtml(row.supplement) + '</span></div>';
       html += '</div></div>';
     });
     html += '</div>';
