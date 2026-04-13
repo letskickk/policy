@@ -766,6 +766,14 @@
     .modal-pledge-score.score-high{ background: rgba(34,197,94,0.2); color: #4ade80; }
     .modal-pledge-score.score-mid{ background: rgba(250,204,21,0.2); color: #facc15; }
     .modal-pledge-score.score-low{ background: rgba(239,68,68,0.2); color: #f87171; }
+    .candidate-rank-badge{
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.2rem 0.55rem; border-radius: 10px; font-size: 0.78rem; font-weight: 700;
+      white-space: nowrap; margin-top: 0.3rem;
+    }
+    .candidate-rank-badge.rank-top{ background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .candidate-rank-badge.rank-mid{ background: rgba(134,239,172,0.15); color: #86efac; border: 1px solid rgba(134,239,172,0.25); }
+    .candidate-rank-badge.rank-past{ background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); }
     .modal-pledge-content{
       margin-top: 0.6rem; padding-top: 0.6rem;
       border-top: 1px solid rgba(148,163,184,0.1);
@@ -1285,6 +1293,7 @@
         <div>
           <h3 id="pledgeModalTitle"></h3>
           <div class="modal-sub" id="pledgeModalSub"></div>
+          <div id="pledgeModalRankBadge"></div>
         </div>
         <button class="pledge-modal-close" id="pledgeModalCloseBtn" onclick="closePledgeModal()" title="닫기">✕</button>
       </div>
@@ -2279,6 +2288,7 @@
     const pledgeModalOverlay = document.getElementById('pledgeModalOverlay');
     const pledgeModalTitle = document.getElementById('pledgeModalTitle');
     const pledgeModalSub = document.getElementById('pledgeModalSub');
+    const pledgeModalRankBadge = document.getElementById('pledgeModalRankBadge');
     const pledgeModalBody = document.getElementById('pledgeModalBody');
 
     function buildPledgeShareUrl(candidateId, pledgeId) {
@@ -2759,6 +2769,40 @@
       window.open(url, '_blank', 'noopener,noreferrer');
     };
 
+    function renderCandidateRankBadge(rankData) {
+      if (!pledgeModalRankBadge) return;
+      if (!rankData || !rankData.has_score) {
+        pledgeModalRankBadge.innerHTML = '';
+        return;
+      }
+      const rank = rankData.current_week_rank;
+      if (rank != null && rank >= 1 && rank <= 3) {
+        pledgeModalRankBadge.innerHTML =
+          `<span class="candidate-rank-badge rank-top">🏆 이번주 ${rank}위</span>`;
+      } else if (rank != null && rank >= 4 && rank <= 10) {
+        pledgeModalRankBadge.innerHTML =
+          `<span class="candidate-rank-badge rank-mid">이번주 ${rank}위</span>`;
+      } else if (rankData.champion_weeks && rankData.champion_weeks.length > 0) {
+        const latest = rankData.champion_weeks[0];
+        pledgeModalRankBadge.innerHTML =
+          `<span class="candidate-rank-badge rank-past">${latest.week_label} 1위</span>`;
+      } else {
+        pledgeModalRankBadge.innerHTML = '';
+      }
+    }
+
+    async function fetchAndRenderRankBadge(candidateId) {
+      if (!pledgeModalRankBadge || !candidateId) return;
+      pledgeModalRankBadge.innerHTML = '';
+      try {
+        const res = await fetch(`/api/candidates/${candidateId}/rank`);
+        if (res.ok) {
+          const data = await res.json();
+          renderCandidateRankBadge(data);
+        }
+      } catch (_) {}
+    }
+
     async function openPledgeModal(candidateIdx) {
       const c = _renderedCandidates[candidateIdx];
       if (!c) return;
@@ -2770,6 +2814,7 @@
       const etype = electionTypeLabels[c.election_type] || c.election_type || '';
       const location = c.district_name ? `${regionName} ${c.district_name}` : regionName;
       pledgeModalSub.textContent = `${location} · ${etype}`;
+      if (pledgeModalRankBadge) pledgeModalRankBadge.innerHTML = '';
 
       PolicyModal.open(pledgeModalOverlay, {
         container: '.pledge-modal',
@@ -2792,6 +2837,7 @@
             detail = await res.json();
           }
         } catch (e) { /* 실패 시 기존 데이터 사용 */ }
+        fetchAndRenderRankBadge(c.candidate_id);
       }
 
       renderModalPledges(detail, { pledgeId: getPledgeFromURL() });
@@ -2807,12 +2853,14 @@
       const etype = electionTypeLabels[fallback.election_type] || fallback.election_type || '';
       const location = fallback.district_name ? `${regionName} ${fallback.district_name}` : regionName;
       pledgeModalSub.textContent = `${location}${etype ? ` · ${etype}` : ''}`;
+      if (pledgeModalRankBadge) pledgeModalRankBadge.innerHTML = '';
       PolicyModal.open(pledgeModalOverlay, {
         container: '.pledge-modal',
         initialFocus: '#pledgeModalCloseBtn',
         onEscape: closePledgeModal,
       });
       pledgeModalBody.innerHTML = '<div class="state-loading">공약을 불러오는 중...</div>';
+      fetchAndRenderRankBadge(candidateId);
       try {
         const res = await fetch(`/api/candidates/${candidateId}`);
         if (res.ok) {
@@ -2835,20 +2883,14 @@
         pledges.map((p, i) => {
           const title = escapeHtml(p.title || p);
           const content = (p.content || '').trim();
-          const score = p.total_score;
           const createdAt = formatPledgeCreatedAt(p.created_at);
-          let scoreBadge = '';
           let metaLine = '';
-          if (score != null) {
-            const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
-            scoreBadge = `<span class="modal-pledge-score ${cls}">${Math.round(score)}점</span>`;
-          }
           if (createdAt) {
             metaLine = `<div class="modal-pledge-meta">등록 ${createdAt}</div>`;
           }
           return `
             <div class="modal-pledge-item">
-              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}${scoreBadge}</div>
+              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}</div>
               ${metaLine}
               ${content
                 ? `<div class="modal-pledge-content">${escapeHtml(content)}</div>`
@@ -2870,16 +2912,10 @@
         pledges.map((p, i) => {
           const title = escapeHtml(p.title || p);
           const content = (p.content || '').trim();
-          const score = p.total_score;
           const createdAt = formatPledgeCreatedAt(p.created_at);
           const pledgeId = p.id != null ? String(p.id) : '';
           const isTarget = targetPledgeId && pledgeId === targetPledgeId;
-          let scoreBadge = '';
           let metaLine = '';
-          if (score != null) {
-            const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
-            scoreBadge = `<span class="modal-pledge-score ${cls}">${Math.round(score)}점</span>`;
-          }
           if (createdAt) {
             metaLine = `<div class="modal-pledge-meta">등록 ${createdAt}</div>`;
           }
@@ -2888,7 +2924,7 @@
             : '';
           return `
             <div class="modal-pledge-item${isTarget ? ' is-target' : ''}"${pledgeId ? ` data-pledge-id="${pledgeId}"` : ''}>
-              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}${scoreBadge}</div>
+              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}</div>
               ${metaLine}
               ${shareButton ? `<div class="modal-pledge-actions">${shareButton}</div>` : ''}
               ${content
@@ -2918,22 +2954,16 @@
         pledges.map((p, i) => {
           const title = escapeHtml(p.title || p);
           const content = (p.content || '').trim();
-          const score = p.total_score;
           const createdAt = formatPledgeCreatedAt(p.created_at);
           const pledgeId = p.id != null ? String(p.id) : '';
           const isTarget = targetPledgeId && pledgeId === targetPledgeId;
-          let scoreBadge = '';
           let metaLine = '';
-          if (score != null) {
-            const cls = score >= 70 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low';
-            scoreBadge = `<span class="modal-pledge-score ${cls}">${Math.round(score)}점</span>`;
-          }
           if (createdAt) {
             metaLine = `<div class="modal-pledge-meta">등록 ${createdAt}</div>`;
           }
           return `
             <div class="modal-pledge-item${isTarget ? ' is-target' : ''}"${pledgeId ? ` data-pledge-id="${pledgeId}"` : ''}>
-              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}${scoreBadge}</div>
+              <div class="modal-pledge-title"><span class="modal-pledge-num">${i + 1}</span>${title}</div>
               ${metaLine}
               ${pledgeId ? `<div class="modal-pledge-actions">
                 <button class="modal-pledge-action js-share-pledge" type="button" data-candidate-id="${detail.candidate_id || 0}" data-pledge-id="${pledgeId}" data-pledge-title="${escapeHtml(p.title || '')}" data-candidate-name="${escapeHtml(detail.name || '')}">링크 공유</button>

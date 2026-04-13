@@ -5371,6 +5371,106 @@ def api_leaderboard(
         conn.close()
 
 
+@app.get("/api/candidates/{candidate_id}/rank", tags=["candidates"])
+def api_candidate_rank(candidate_id: int):
+    """후보자의 현재 주 랭킹 순위 및 주간 챔피언 이력 반환 (공개 API)."""
+    _ensure_db_ready()
+    import datetime as _dt
+    from backend.database import get_connection
+
+    conn = get_connection()
+    try:
+        reset_monday = _leaderboard_reset_monday()
+        today = _dt.date.today()
+        current_monday = today - _dt.timedelta(days=today.weekday())
+
+        # 점수 데이터가 있는지 확인
+        has_score = conn.execute(
+            "SELECT 1 FROM candidate_pledges WHERE candidate_id = ? AND total_score IS NOT NULL AND approval_status = 'APPROVED' LIMIT 1",
+            (candidate_id,),
+        ).fetchone() is not None
+
+        if not has_score or today < reset_monday:
+            return {
+                "candidate_id": candidate_id,
+                "current_week_rank": None,
+                "current_week_label": _week_label(current_monday),
+                "champion_weeks": [],
+                "has_score": has_score,
+            }
+
+        # 챔피언 이력 조회 (최근 4주)
+        four_weeks_ago = (current_monday - _dt.timedelta(days=28)).isoformat()
+        champion_rows = conn.execute(
+            """SELECT week_start FROM weekly_champions
+               WHERE candidate_id = ? AND week_start >= ? AND week_start >= ?
+               ORDER BY week_start DESC LIMIT 4""",
+            (candidate_id, four_weeks_ago, reset_monday.isoformat()),
+        ).fetchall()
+        champion_weeks = [
+            {
+                "week_label": _week_label(_dt.date.fromisoformat(r["week_start"])),
+                "week_start": r["week_start"],
+            }
+            for r in champion_rows
+        ]
+
+        # 이번 주 랭킹 계산 (leaderboard 쿼리 재활용)
+        ranking_end = today
+        approved_review_subquery = """
+            SELECT pledge_id, MAX(reviewed_at) AS approved_reviewed_at
+            FROM candidate_pledge_review_history
+            WHERE approval_status = 'APPROVED'
+              AND pledge_id IS NOT NULL
+            GROUP BY pledge_id
+        """
+        sql = f"""
+            SELECT c.id AS candidate_id,
+                   ROUND(AVG(cp.total_score), 1) AS avg_score,
+                   COUNT(cp.id) AS scored_pledge_count
+            FROM candidates c
+            LEFT JOIN users u ON u.id = c.user_id
+            LEFT JOIN party_applicants pa ON pa.id = u.applicant_match_id
+            JOIN candidate_pledges cp ON cp.candidate_id = c.id
+            LEFT JOIN ({approved_review_subquery}) prh ON prh.pledge_id = cp.id
+            WHERE cp.total_score IS NOT NULL
+              AND cp.approval_status = 'APPROVED'
+              AND c.approval_status = 'APPROVED'
+              AND EXISTS (
+                  SELECT 1
+                  FROM candidate_pledges cpw
+                  LEFT JOIN ({approved_review_subquery}) prhw ON prhw.pledge_id = cpw.id
+                  WHERE cpw.candidate_id = c.id
+                    AND cpw.total_score IS NOT NULL
+                    AND cpw.approval_status = 'APPROVED'
+                    AND date(COALESCE(prhw.approved_reviewed_at, cpw.analyzed_at, cpw.created_at)) >= ?
+                    AND date(COALESCE(prhw.approved_reviewed_at, cpw.analyzed_at, cpw.created_at)) <= ?
+              )
+            GROUP BY c.id
+            HAVING scored_pledge_count > 0
+            ORDER BY avg_score DESC, scored_pledge_count DESC
+            LIMIT 50
+        """
+        params = [max(current_monday, RANKING_SCORE_START_DATE).isoformat(), ranking_end.isoformat()]
+        rows = conn.execute(sql, tuple(params)).fetchall()
+
+        current_week_rank = None
+        for rank, r in enumerate(rows, 1):
+            if r["candidate_id"] == candidate_id:
+                current_week_rank = rank
+                break
+
+        return {
+            "candidate_id": candidate_id,
+            "current_week_rank": current_week_rank,
+            "current_week_label": _week_label(current_monday),
+            "champion_weeks": champion_weeks,
+            "has_score": has_score,
+        }
+    finally:
+        conn.close()
+
+
 @app.post("/api/admin/repair-pledge-scores", tags=["admin"])
 def api_admin_repair_pledge_scores(request: Request):
     """analysis_result가 있지만 total_score가 NULL인 공약의 점수를 재파싱하여 복구한다."""
