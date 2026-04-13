@@ -146,14 +146,12 @@
     .sample-preview{ margin-top:1.1rem; border:1px solid rgba(148,163,184,0.22); border-top:1px solid rgba(255,179,122,0.34); border-radius:14px; background:rgba(15,23,42,0.35); overflow:hidden; }
     #adminToolGroup{ padding-top:0.1rem; box-shadow: inset 0 1px 0 rgba(255,179,122,0.08); }
     #adminToolGroup .sample-item{ position:relative; padding-right:5.7rem; }
-    #btnPolicyHub::after{ content:"준비 중"; position:absolute; top:50%; right:0.7rem; transform:translateY(-50%); padding:0.22rem 0.55rem; border-radius:999px; border:1px solid rgba(255,179,122,0.34); background:rgba(249,115,22,0.14); color:#ffb37a; font-size:0.7rem; font-weight:900; letter-spacing:0.01em; }
     .sample-head{ display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.65rem 0.85rem; border-bottom:1px solid rgba(148,163,184,0.22); }
     .sample-title{ font-size:0.88rem; font-weight:900; color:var(--text-strong); }
     .sample-score{ font-size:0.82rem; font-weight:900; color:#86efac; }
     .sample-body{ padding:0.75rem 0.85rem; }
     .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; word-break:keep-all; }
-    #adminToolGroup .sample-item{ opacity:0.5; cursor:not-allowed; }
-    #adminToolGroup .sample-item.item-enabled{ opacity:1; cursor:pointer; }
+    #adminToolGroup .sample-item{ opacity:1; cursor:pointer; }
 
     /* 오픈 공지 배너 */
     .open-notice{ margin-top:0.9rem; border-radius:14px; border:1px solid rgba(255,179,122,0.4); background:rgba(255,114,16,0.07); padding:0.85rem 1rem; }
@@ -1381,11 +1379,11 @@
       </div>
       <div class="sample-preview" id="adminToolGroup" style="margin-top:0.8rem;">
         <div class="sample-head">
-          <span class="sample-title">준비 중</span>
-          <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">예정</span>
+          <span class="sample-title">추가 도구</span>
+          <span class="sample-score" id="adminToolStatus" style="color:#86efac;">오픈</span>
         </div>
         <div class="sample-body" style="display:flex;gap:0.45rem;flex-wrap:wrap;">
-          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;position:relative;padding-right:5.7rem;">정책 자료허브</a>
+          <a href="/hub" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;">정책 자료허브</a>
         </div>
       </div>
 
@@ -1492,20 +1490,10 @@
           window._userName = d.name || '';
           const isApproved = !!(d.is_admin || d.status === 'APPROVED');
           const btnTools = document.getElementById('btnTools');
-          // 정책 자료허브는 준비 중
-          const btnPolicyHub = document.getElementById('btnPolicyHub');
-          if (btnPolicyHub) btnPolicyHub.addEventListener('click', function(e) {
-            e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');
-          });
         } else {
           authRow.style.display = '';
           authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/pledge';
-          // 비로그인: pledge.html 모달에서 게이트 처리
-          const btnPolicyHub2 = document.getElementById('btnPolicyHub');
-          if (btnPolicyHub2) btnPolicyHub2.addEventListener('click', function(e) {
-            e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');
-          });
         }
       } catch (e) {}
     })();
