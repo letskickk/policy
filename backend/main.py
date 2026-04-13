@@ -593,14 +593,8 @@ def pledge_page(request: Request):
         if res is not None:
             return res
     user = get_current_user(request)
-    if not user:
-        return _login_redirect(request.url.path, str(request.url.query or ""))
-    # ADMIN_EMAILS/관리자는 승인 대기 화면으로 보내지 않음
-    if (
-        user["status"] != STATUS_APPROVED
-        and user["email"] not in ADMIN_EMAILS
-        and user["role"] != ROLE_ADMIN
-    ):
+    # 비로그인·미승인도 페이지 접근 허용 — JS 게이트가 탭별로 처리
+    if user and user["status"] != STATUS_APPROVED and user["email"] not in ADMIN_EMAILS and user["role"] != ROLE_ADMIN:
         return RedirectResponse(url="/pending", status_code=302)
     res = _serve_html("pledge.html")
     if res is not None:
