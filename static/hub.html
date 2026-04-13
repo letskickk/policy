@@ -273,10 +273,31 @@
     document.getElementById('hubDetail').classList.remove('open');
   };
 
-  // Init
+  // Auth gate — admin only
   async function init() {
+    try {
+      const r = await fetch('/api/me', { credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json();
+        if (!d.is_admin) {
+          showDenied(); return;
+        }
+      } else {
+        showDenied(); return;
+      }
+    } catch {
+      showDenied(); return;
+    }
     renderChips();
     doSearch();
+  }
+
+  function showDenied() {
+    document.querySelector('.hub-header').style.display = 'none';
+    document.getElementById('hubStatus').style.display = 'none';
+    document.getElementById('hubGrid').style.display = 'none';
+    document.getElementById('hubLoadMore').style.display = 'none';
+    document.getElementById('hubDenied').style.display = '';
   }
 
   init();
