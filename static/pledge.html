@@ -2790,6 +2790,8 @@
         if (ghost) ghost.style.opacity = '0';
         clearInterval(_ghostTimer);
       }
+      window.chatUpdateGhost = chatUpdateGhost;
+      window.chatHideGhost = chatHideGhost;
 
       // ── OVERDRIVE: 모델 인디케이터 ──
       function chatShowModelBadge(text) {
