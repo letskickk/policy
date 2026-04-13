@@ -146,13 +146,26 @@
     .sample-preview{ margin-top:1.1rem; border:1px solid rgba(148,163,184,0.22); border-top:1px solid rgba(255,179,122,0.34); border-radius:14px; background:rgba(15,23,42,0.35); overflow:hidden; }
     #adminToolGroup{ padding-top:0.1rem; box-shadow: inset 0 1px 0 rgba(255,179,122,0.08); }
     #adminToolGroup .sample-item{ position:relative; padding-right:5.7rem; }
-    #adminToolGroup .sample-item::after{ content:"출시 예정"; position:absolute; top:50%; right:0.7rem; transform:translateY(-50%); padding:0.22rem 0.55rem; border-radius:999px; border:1px solid rgba(255,179,122,0.34); background:rgba(249,115,22,0.14); color:#ffb37a; font-size:0.7rem; font-weight:900; letter-spacing:0.01em; }
+    #btnPolicyHub::after{ content:"준비 중"; position:absolute; top:50%; right:0.7rem; transform:translateY(-50%); padding:0.22rem 0.55rem; border-radius:999px; border:1px solid rgba(255,179,122,0.34); background:rgba(249,115,22,0.14); color:#ffb37a; font-size:0.7rem; font-weight:900; letter-spacing:0.01em; }
     .sample-head{ display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.65rem 0.85rem; border-bottom:1px solid rgba(148,163,184,0.22); }
     .sample-title{ font-size:0.88rem; font-weight:900; color:var(--text-strong); }
     .sample-score{ font-size:0.82rem; font-weight:900; color:#86efac; }
     .sample-body{ padding:0.75rem 0.85rem; }
     .sample-item{ padding:0.52rem 0.62rem; border:1px solid rgba(148,163,184,0.2); border-radius:10px; background:rgba(255,255,255,0.04); margin-bottom:0.45rem; font-size:0.86rem; word-break:keep-all; }
-    #adminToolGroup .sample-item{ opacity:0.5; cursor:not-allowed !important; }
+    #adminToolGroup .sample-item{ opacity:0.5; cursor:not-allowed; }
+    #adminToolGroup .sample-item.item-enabled{ opacity:1; cursor:pointer; }
+
+    /* 오픈 공지 배너 */
+    .open-notice{ margin-top:0.9rem; border-radius:14px; border:1px solid rgba(255,179,122,0.4); background:rgba(255,114,16,0.07); padding:0.85rem 1rem; }
+    .open-notice-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:0.6rem; }
+    .open-notice-badge{ font-size:0.82rem; font-weight:900; color:#ffb37a; letter-spacing:0.01em; }
+    .open-notice-close{ background:none; border:none; color:#94a3b8; font-size:1rem; cursor:pointer; padding:0; line-height:1; }
+    .open-notice-close:hover{ color:#e2e8f0; }
+    .open-notice-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0.38rem; }
+    .open-notice-list li{ font-size:0.84rem; color:#cbd5e1; line-height:1.55; padding-left:0.9rem; position:relative; }
+    .open-notice-list li::before{ content:'·'; position:absolute; left:0; color:#ff7210; font-weight:900; }
+    .open-notice-list li strong{ color:#e2e8f0; font-weight:800; }
+    .open-notice-new strong{ color:#86efac !important; }
 
     .auth-links{ margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
     .auth-link{ color:#ffb37a; font-weight:700; text-decoration:none; }
@@ -1362,9 +1375,22 @@
           <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">준비 중</span>
         </div>
         <div class="sample-body" style="display:flex;gap:0.45rem;flex-wrap:wrap;">
-          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">정책 자료허브 (준비 중)</a>
-          <a href="/pledge#generate" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">공약 생성 코치</a>
+          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;position:relative;padding-right:5.7rem;">정책 자료허브</a>
+          <a href="/pledge#generate" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;">공약 생성 코치</a>
         </div>
+      </div>
+
+      <!-- 오픈 공지 배너 -->
+      <div class="open-notice" id="openNotice">
+        <div class="open-notice-header">
+          <span class="open-notice-badge">🎉 정식 오픈 안내</span>
+          <button class="open-notice-close" onclick="dismissOpenNotice()" aria-label="닫기">✕</button>
+        </div>
+        <ul class="open-notice-list">
+          <li><strong>공약 분석 점수 초기화</strong> — 분석 내용은 그대로 유지됩니다. 새 점수 기준으로 다시 분석받으시면 랭킹에 반영됩니다.</li>
+          <li><strong>점수 공개 방식 변경</strong> — 1~3위: 점수 공개 / 4~5위: 등급(A/B/C/D)만 표시 / 6위 이하: 비공개</li>
+          <li class="open-notice-new"><strong>신규 오픈: 공약 생성 코치</strong> — AI 1:1 공약 개발 코칭과 공공데이터 기반 지역 맞춤형 코칭이 승인 회원에게 열렸습니다.</li>
+        </ul>
       </div>
     </div>
 
@@ -1460,6 +1486,15 @@
           const isApproved = !!(d.is_admin || d.status === 'APPROVED');
           if (isApproved) {
             if (adminStatus) { adminStatus.textContent = '코치 오픈'; adminStatus.style.color = '#86efac'; }
+            // 코치 버튼 활성화
+            const btnTools = document.getElementById('btnTools');
+            if (btnTools) btnTools.classList.add('item-enabled');
+          } else {
+            // 비승인 사용자: 코치 버튼 클릭 시 안내
+            const btnTools = document.getElementById('btnTools');
+            if (btnTools) btnTools.addEventListener('click', function(e) {
+              e.preventDefault(); alert('공약 생성 코치는 승인된 회원에게 제공됩니다. 회원가입 후 승인을 기다려 주세요.');
+            });
           }
           // 정책 자료허브는 아직 준비 중
           const btnPolicyHub = document.getElementById('btnPolicyHub');
@@ -1470,14 +1505,29 @@
           authRow.style.display = '';
           authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
           if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
+          // 비로그인: 클릭 시 로그인 유도
           const adminGroup2 = document.getElementById('adminToolGroup');
           if (adminGroup2) adminGroup2.addEventListener('click', function(e) {
             const link = e.target.closest('a');
-            if (link) { e.preventDefault(); alert('아직 준비 중인 기능입니다. 곧 공개될 예정이에요!'); }
+            if (link) { e.preventDefault(); alert('로그인 후 이용 가능합니다.'); }
           });
         }
       } catch (e) {}
     })();
+  </script>
+
+  <script>
+  // 오픈 공지 배너 dismiss
+  (function() {
+    var notice = document.getElementById('openNotice');
+    if (!notice) return;
+    if (localStorage.getItem('openNotice_v1_dismissed')) { notice.style.display = 'none'; }
+  })();
+  function dismissOpenNotice() {
+    localStorage.setItem('openNotice_v1_dismissed', '1');
+    var n = document.getElementById('openNotice');
+    if (n) n.style.display = 'none';
+  }
   </script>
 
   <script>
