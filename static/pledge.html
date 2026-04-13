@@ -592,17 +592,20 @@
     .section-line:first-child{ margin-top:0; }
     .section-line.item{ margin-top:0.5rem; }
 
-    /* 총평 테이블 */
-    .summary-table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
-    .summary-table th{ padding:0.45rem 0.6rem; text-align:left; color:var(--muted,#94a3b8); font-weight:700; border-bottom:1px solid rgba(148,163,184,0.25); font-size:0.8rem; }
-    .summary-table td{ padding:0.55rem 0.6rem; border-bottom:1px solid rgba(148,163,184,0.12); vertical-align:top; line-height:1.5; }
-    .summary-axis{ font-weight:700; color:var(--text-strong); white-space:nowrap; }
-    .summary-score{ font-weight:900; white-space:nowrap; font-size:0.95rem; }
-    .summary-score.good{ color:#4ade80; }
-    .summary-score.mid{ color:#facc15; }
-    .summary-score.low{ color:#f87171; }
-    .summary-strength{ color:#86efac; font-size:0.85rem; }
-    .summary-supplement{ color:#fca5a5; font-size:0.85rem; }
+    /* 총평 카드 레이아웃 */
+    .summary-cards{ display:flex; flex-direction:column; gap:0.6rem; }
+    .summary-card{ border:1px solid rgba(148,163,184,0.2); border-radius:10px; overflow:hidden; }
+    .summary-card-head{ display:flex; align-items:center; justify-content:space-between; padding:0.5rem 0.75rem; background:rgba(2,6,23,0.3); }
+    .summary-axis{ font-weight:800; font-size:0.95rem; color:var(--text-strong); }
+    .summary-score{ font-weight:900; font-size:1rem; white-space:nowrap; padding:0.15rem 0.5rem; border-radius:6px; }
+    .summary-score.good{ color:#4ade80; background:rgba(34,197,94,0.12); }
+    .summary-score.mid{ color:#facc15; background:rgba(250,204,21,0.12); }
+    .summary-score.low{ color:#f87171; background:rgba(248,113,113,0.12); }
+    .summary-card-body{ padding:0.55rem 0.75rem; display:flex; flex-direction:column; gap:0.35rem; }
+    .summary-strength{ font-size:0.9rem; color:#86efac; line-height:1.55; }
+    .summary-supplement{ font-size:0.9rem; color:#fca5a5; line-height:1.55; }
+    .summary-strength::before{ content:"강점 "; font-weight:700; opacity:0.7; }
+    .summary-supplement::before{ content:"보완 "; font-weight:700; opacity:0.7; }
     .summary-footer{ display:flex; align-items:center; gap:0.7rem; margin-top:0.8rem; padding-top:0.6rem; border-top:1px solid rgba(148,163,184,0.2); }
     .summary-total{ font-size:1rem; font-weight:900; color:var(--text-strong); }
     .summary-grade{ font-size:0.9rem; font-weight:900; }
@@ -2261,19 +2264,24 @@
         const tot = tm ? Number(tm[1]) : null;
         const grade = gm ? gm[1].trim() : null;
 
-        let tbl = '<table class="summary-table"><thead><tr><th>평가 항목</th><th>점수</th><th>강점</th><th>보완 핵심</th></tr></thead><tbody>';
+        let html = '<div class="summary-cards">';
         rows.forEach(row => {
           const pct = (row.score != null && row.max) ? row.score / row.max : null;
           const cls = pct == null ? '' : pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low';
           const scoreStr = row.score != null ? row.score + (row.max ? '/' + row.max : '') : '-';
-          tbl += `<tr><td class="summary-axis">${escapeHtml(row.label)}</td><td class="summary-score ${cls}">${escapeHtml(scoreStr)}</td><td class="summary-strength">${escapeHtml(row.strength||'-')}</td><td class="summary-supplement">${escapeHtml(row.supplement||'-')}</td></tr>`;
+          html += `<div class="summary-card">`;
+          html += `<div class="summary-card-head"><span class="summary-axis">${escapeHtml(row.label)}</span><span class="summary-score ${cls}">${escapeHtml(scoreStr)}</span></div>`;
+          html += `<div class="summary-card-body">`;
+          if (row.strength && row.strength !== '-') html += `<div class="summary-strength">${escapeHtml(row.strength)}</div>`;
+          if (row.supplement && row.supplement !== '-') html += `<div class="summary-supplement">${escapeHtml(row.supplement)}</div>`;
+          html += `</div></div>`;
         });
-        tbl += '</tbody></table>';
+        html += '</div>';
         if (tot != null || grade) {
           const sig = tot != null ? (tot >= 80 ? 'green' : tot >= 60 ? 'yellow' : 'red') : '';
-          tbl += `<div class="summary-footer">${tot != null ? `<span class="summary-total">종합 점수: ${tot}점</span>` : ''}${grade ? `<span class="summary-grade badge ${sig}">${escapeHtml(grade)}</span>` : ''}</div>`;
+          html += `<div class="summary-footer">${tot != null ? `<span class="summary-total">종합 점수: ${tot}점</span>` : ''}${grade ? `<span class="summary-grade badge ${sig}">${escapeHtml(grade)}</span>` : ''}</div>`;
         }
-        return tbl;
+        return html;
       }
 
       const normalizedBaseText = normalizeOutputText(baseText);

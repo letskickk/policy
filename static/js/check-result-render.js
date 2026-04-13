@@ -117,20 +117,19 @@
       return fallback;
     }
 
-    var html = '<table class="summary-table">';
-    html += '<thead><tr><th>평가 항목</th><th>점수</th><th>강점</th><th>보완 핵심</th></tr></thead><tbody>';
+    var html = '<div class="summary-cards">';
     rows.forEach(function(row) {
       var pct = (row.score != null && row.max) ? row.score / row.max : null;
       var cls = pct == null ? '' : (pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low');
       var scoreStr = row.score != null ? (row.score + (row.max ? '/' + row.max : '')) : '-';
-      html += '<tr>';
-      html += '<td class="summary-axis">' + escapeHtml(row.label) + '</td>';
-      html += '<td class="summary-score ' + cls + '">' + escapeHtml(scoreStr) + '</td>';
-      html += '<td class="summary-strength">' + escapeHtml(row.strength || '-') + '</td>';
-      html += '<td class="summary-supplement">' + escapeHtml(row.supplement || '-') + '</td>';
-      html += '</tr>';
+      html += '<div class="summary-card">';
+      html += '<div class="summary-card-head"><span class="summary-axis">' + escapeHtml(row.label) + '</span><span class="summary-score ' + cls + '">' + escapeHtml(scoreStr) + '</span></div>';
+      html += '<div class="summary-card-body">';
+      if (row.strength && row.strength !== '-') html += '<div class="summary-strength">' + escapeHtml(row.strength) + '</div>';
+      if (row.supplement && row.supplement !== '-') html += '<div class="summary-supplement">' + escapeHtml(row.supplement) + '</div>';
+      html += '</div></div>';
     });
-    html += '</tbody></table>';
+    html += '</div>';
 
     if (totalScore != null || grade) {
       var sig = totalScore != null ? (totalScore >= 80 ? 'green' : totalScore >= 60 ? 'yellow' : 'red') : '';
