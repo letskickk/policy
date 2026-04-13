@@ -2129,11 +2129,11 @@
           findByKeyword("종합", "점수");
 
         // 5축 점수 (라벨 라인 기준)
-        platformFitScore = findByKeyword("정강정책", "부합도");
+        platformFitScore = findByKeyword("정강정책", "정합성");
         designScore = findByKeyword("정책", "설계", "완성도");
-        feasibilityScore = findByKeyword("실행", "가능성");
+        feasibilityScore = findByKeyword("실현", "가능성");
         specificityScore = findByKeyword("구체성");
-        messageScore = findByKeyword("메시지", "경쟁력");
+        messageScore = findByKeyword("전달력");
       }
 
       // 총평 축점수 기반 가중 합(총평 내부 규칙) 계산
@@ -2169,20 +2169,21 @@
       if (hasScores) {
         const scoreCards = [];
         const scores = [
-          { label: '정강정책 부합도', value: platformFitScore },
-          { label: '정책 설계 완성도', value: designScore },
-          { label: '실행 가능성', value: feasibilityScore },
-          { label: '구체성', value: specificityScore },
-          { label: '메시지 경쟁력', value: messageScore }
+          { label: '정강정책 정합성', value: platformFitScore, max: 20 },
+          { label: '정책 설계 완성도', value: designScore,      max: 30 },
+          { label: '실현 가능성',      value: feasibilityScore, max: 20 },
+          { label: '구체성',            value: specificityScore, max: 15 },
+          { label: '전달력',            value: messageScore,     max: 15 }
         ];
-        
+
         scores.forEach(item => {
           if (item.value !== null) {
-            const cls = item.value >= 80 ? 'good' : (item.value >= 60 ? 'mid' : 'low');
+            const pct = item.value / item.max;
+            const cls = pct >= 0.8 ? 'good' : (pct >= 0.6 ? 'mid' : 'low');
             scoreCards.push(`
               <div class="score-card ${cls}">
                 <span class="score-card-label">${item.label}</span>
-                <span class="score-card-value">${item.value.toFixed(0)}</span>
+                <span class="score-card-value">${item.value.toFixed(0)}<small>/${item.max}</small></span>
               </div>
             `);
           }
@@ -2212,21 +2213,85 @@
         return sections.filter(sec => (sec.body.join('\n').trim() || sec.title));
       }
 
+      const SUMMARY_AXES = [
+        { label: '정강정책 정합성', max: 20 },
+        { label: '정책 설계 완성도', max: 30 },
+        { label: '실현 가능성',      max: 20 },
+        { label: '구체성',            max: 15 },
+        { label: '전달력',            max: 15 }
+      ];
+      const summaryAxeRe = new RegExp('(' + SUMMARY_AXES.map(a => a.label).join('|') + ')');
+
+      function buildSummaryTable(bodyLines) {
+        const rows = [];
+        let cur = null;
+        bodyLines.forEach(line => {
+          const t = line.trim();
+          if (!t) return;
+          const m = t.match(summaryAxeRe);
+          if (m) {
+            if (cur) rows.push(cur);
+            const ax = SUMMARY_AXES.find(a => t.includes(a.label));
+            const sm = t.match(/(\d+(?:\.\d+)?)\s*[점\/]/);
+            cur = { label: ax ? ax.label : m[1], max: ax ? ax.max : null, score: sm ? Number(sm[1]) : null, strength: '', supplement: '' };
+            return;
+          }
+          if (!cur) return;
+          if (/^강점\s*:/.test(t))       { cur.strength = t.replace(/^강점\s*:\s*/, ''); return; }
+          if (/^보완\s*핵심\s*:/.test(t)) { cur.supplement = t.replace(/^보완\s*핵심\s*:\s*/, ''); return; }
+        });
+        if (cur) rows.push(cur);
+        return rows;
+      }
+
+      function renderSummarySection(sec) {
+        const bodyLines = (sec.body || []).join('\n').split('\n');
+        const rows = buildSummaryTable(bodyLines);
+        if (!rows.length) return null; // 파싱 실패 → 텍스트 폴백
+
+        const totalLine = bodyLines.find(l => l.includes('종합 점수') && l.includes(':')) || '';
+        const gradeLine = bodyLines.find(l => l.includes('종합해석 등급') || l.includes('종합 등급')) || '';
+        const tm = totalLine.match(/(\d+(?:\.\d+)?)/);
+        const gm = gradeLine.match(/:\s*(.+)$/);
+        const tot = tm ? Number(tm[1]) : null;
+        const grade = gm ? gm[1].trim() : null;
+
+        let tbl = '<table class="summary-table"><thead><tr><th>평가 항목</th><th>점수</th><th>강점</th><th>보완 핵심</th></tr></thead><tbody>';
+        rows.forEach(row => {
+          const pct = (row.score != null && row.max) ? row.score / row.max : null;
+          const cls = pct == null ? '' : pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low';
+          const scoreStr = row.score != null ? row.score + (row.max ? '/' + row.max : '') : '-';
+          tbl += `<tr><td class="summary-axis">${escapeHtml(row.label)}</td><td class="summary-score ${cls}">${escapeHtml(scoreStr)}</td><td class="summary-strength">${escapeHtml(row.strength||'-')}</td><td class="summary-supplement">${escapeHtml(row.supplement||'-')}</td></tr>`;
+        });
+        tbl += '</tbody></table>';
+        if (tot != null || grade) {
+          const sig = tot != null ? (tot >= 80 ? 'green' : tot >= 60 ? 'yellow' : 'red') : '';
+          tbl += `<div class="summary-footer">${tot != null ? `<span class="summary-total">종합 점수: ${tot}점</span>` : ''}${grade ? `<span class="summary-grade badge ${sig}">${escapeHtml(grade)}</span>` : ''}</div>`;
+        }
+        return tbl;
+      }
+
       const normalizedBaseText = normalizeOutputText(baseText);
       const fullText = normalizedBaseText || '';
       const sections = splitSections(fullText);
       if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
         html += '<div class="section-cards">' + sections.map((sec, idx) => {
-          const bodyLines = (sec.body || []).join('\n').split('\n');
+          const isSummary = sec.title && sec.title.includes('총평');
           let bodyHtml = '';
-          for (let i = 0; i < bodyLines.length; i++) {
-            const line = bodyLines[i];
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            const isItem = /^[-·•]/.test(trimmed);
-            bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
+          if (isSummary) {
+            bodyHtml = renderSummarySection(sec) || '';
           }
-          bodyHtml = bodyHtml || '-';
+          if (!bodyHtml) {
+            const bodyLines = (sec.body || []).join('\n').split('\n');
+            for (let i = 0; i < bodyLines.length; i++) {
+              const line = bodyLines[i];
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              const isItem = /^[-·•]/.test(trimmed);
+              bodyHtml += `<div class="section-line${isItem ? ' item' : ''}">${escapeHtml(line)}</div>`;
+            }
+            bodyHtml = bodyHtml || '-';
+          }
           return `
             <div class="section-card">
               <div class="section-card-head">
