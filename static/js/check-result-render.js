@@ -35,6 +35,15 @@
     return sections.filter(function(sec) { return (sec.body.join('\n').trim() || sec.title); });
   }
 
+  // 평가 축 정의 (max 포함)
+  var AXES = [
+    { key: 'platformFitScore', label: '정강정책 정합성', max: 20, keywords: ['정강정책', '정합성'] },
+    { key: 'designScore',      label: '정책 설계 완성도', max: 30, keywords: ['정책', '설계', '완성도'] },
+    { key: 'feasibilityScore', label: '실현 가능성',      max: 20, keywords: ['실현', '가능성'] },
+    { key: 'specificityScore', label: '구체성',            max: 15, keywords: ['구체성'] },
+    { key: 'messageScore',     label: '전달력',            max: 15, keywords: ['전달력'] }
+  ];
+
   function parseScoresFromText(text) {
     const lines = String(text || '').split(/\r?\n/).map(function(s) { return s.trim(); });
     const pickNum = function(line) {
@@ -42,33 +51,95 @@
       const m = line.match(/(\d+(?:\.\d+)?)/);
       return m ? Number(m[1]) : null;
     };
-    const findByKeyword = function() {
-      const keywords = Array.prototype.slice.call(arguments);
+    const findByKeywords = function(keywords) {
       const line = lines.find(function(l) { return keywords.every(function(k) { return l.indexOf(k) !== -1; }); });
       return pickNum(line);
     };
-    return {
-      totalScore: findByKeyword('결과', '종합', '점수') ?? findByKeyword('종합', '점수'),
-      platformFitScore: findByKeyword('정강정책', '부합도'),
-      designScore: findByKeyword('정책', '설계', '완성도'),
-      feasibilityScore: findByKeyword('실행', '가능성'),
-      specificityScore: findByKeyword('구체성'),
-      messageScore: findByKeyword('메시지', '경쟁력')
-    };
+    const result = { totalScore: findByKeywords(['결과', '종합', '점수']) };
+    if (result.totalScore == null) result.totalScore = findByKeywords(['종합', '점수']);
+    AXES.forEach(function(ax) {
+      result[ax.key] = findByKeywords(ax.keywords);
+    });
+    return result;
   }
 
-  function weightedTotalFromAxes(scores) {
-    const axes = [
-      { v: scores.platformFitScore, w: 0.30 },
-      { v: scores.designScore, w: 0.25 },
-      { v: scores.feasibilityScore, w: 0.20 },
-      { v: scores.specificityScore, w: 0.15 },
-      { v: scores.messageScore, w: 0.10 }
-    ].filter(function(x) { return x.v !== null && x.v !== undefined; });
-    if (!axes.length) return null;
-    const wSum = axes.reduce(function(a, b) { return a + b.w; }, 0);
-    const vSum = axes.reduce(function(a, b) { return a + (b.v * b.w); }, 0);
-    return Math.round((vSum / wSum) * 10) / 10;
+  // 총평 섹션 파싱 → 테이블 데이터
+  function parseSummaryTable(bodyLines) {
+    var rows = [];
+    var current = null;
+    var re = new RegExp('(' + AXES.map(function(a) { return a.label; }).join('|') + ')');
+    bodyLines.forEach(function(line) {
+      var t = line.trim();
+      if (!t) return;
+      var m = t.match(re);
+      if (m) {
+        if (current) rows.push(current);
+        var ax = AXES.find(function(a) { return t.indexOf(a.label) !== -1; });
+        var scoreM = t.match(/(\d+(?:\.\d+)?)\s*[점\/]/);
+        current = { label: ax ? ax.label : m[1], max: ax ? ax.max : null, score: scoreM ? Number(scoreM[1]) : null, strength: '', supplement: '' };
+        return;
+      }
+      if (current) {
+        if (t.indexOf('강점:') === 0 || t.indexOf('강점 :') === 0) {
+          current.strength = t.replace(/^강점\s*:\s*/, '');
+        } else if (t.indexOf('보완 핵심:') === 0 || t.indexOf('보완핵심:') === 0 || t.indexOf('보완 핵심 :') === 0) {
+          current.supplement = t.replace(/^보완\s*핵심\s*:\s*/, '');
+        } else if (current.strength && !t.match(re)) {
+          // 이어지는 텍스트
+          if (!current.supplement) current.strength += ' ' + t;
+        }
+      }
+    });
+    if (current) rows.push(current);
+    return rows;
+  }
+
+  function buildSummaryTableHtml(sec) {
+    var bodyLines = (sec.body || []).join('\n').split('\n');
+    var rows = parseSummaryTable(bodyLines);
+
+    // 종합 점수 / 등급 줄 추출
+    var totalLine = bodyLines.find(function(l) { return l.indexOf('종합 점수') !== -1; }) || '';
+    var gradeLine = bodyLines.find(function(l) { return l.indexOf('종합해석 등급') !== -1 || l.indexOf('종합 등급') !== -1; }) || '';
+    var totalM = totalLine.match(/(\d+(?:\.\d+)?)/);
+    var gradeM = gradeLine.match(/:\s*(.+)$/);
+    var totalScore = totalM ? Number(totalM[1]) : null;
+    var grade = gradeM ? gradeM[1].trim() : null;
+
+    if (!rows.length) {
+      // 파싱 실패 시 텍스트 폴백
+      var fallback = '';
+      bodyLines.forEach(function(line) {
+        var t = line.trim();
+        if (!t) return;
+        fallback += '<div class="section-line">' + escapeHtml(line) + '</div>';
+      });
+      return fallback;
+    }
+
+    var html = '<table class="summary-table">';
+    html += '<thead><tr><th>평가 항목</th><th>점수</th><th>강점</th><th>보완 핵심</th></tr></thead><tbody>';
+    rows.forEach(function(row) {
+      var pct = (row.score != null && row.max) ? row.score / row.max : null;
+      var cls = pct == null ? '' : (pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low');
+      var scoreStr = row.score != null ? (row.score + (row.max ? '/' + row.max : '')) : '-';
+      html += '<tr>';
+      html += '<td class="summary-axis">' + escapeHtml(row.label) + '</td>';
+      html += '<td class="summary-score ' + cls + '">' + escapeHtml(scoreStr) + '</td>';
+      html += '<td class="summary-strength">' + escapeHtml(row.strength || '-') + '</td>';
+      html += '<td class="summary-supplement">' + escapeHtml(row.supplement || '-') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    if (totalScore != null || grade) {
+      var sig = totalScore != null ? (totalScore >= 80 ? 'green' : totalScore >= 60 ? 'yellow' : 'red') : '';
+      html += '<div class="summary-footer">';
+      if (totalScore != null) html += '<span class="summary-total">종합 점수: ' + totalScore + '점</span>';
+      if (grade) html += '<span class="summary-grade badge ' + sig + '">' + escapeHtml(grade) + '</span>';
+      html += '</div>';
+    }
+    return html;
   }
 
   function isVerifyStyleJson(text) {
@@ -86,7 +157,6 @@
     const text = normalized || '';
     const scores = parseScoresFromText(text);
     let totalScore = scores.totalScore;
-    if (totalScore == null) totalScore = weightedTotalFromAxes(scores);
     const signal = totalScore != null ? (totalScore >= 80 ? 'green' : (totalScore >= 60 ? 'yellow' : 'red')) : 'red';
     const signalLabel = signal === 'green' ? '양호' : (signal === 'yellow' ? '보완 권고' : '보완 필요');
 
@@ -94,18 +164,15 @@
     if (totalScore != null) {
       html += '<div class="score-board"><div class="score">총점: ' + totalScore.toFixed(1) + '점</div><span class="badge ' + signal + '">' + signalLabel + '</span></div>';
     }
-    const hasScores = [scores.platformFitScore, scores.designScore, scores.feasibilityScore, scores.specificityScore, scores.messageScore].some(function(v) { return v != null; });
+
+    // 축별 점수 카드 (정규화된 % 기준으로 색상)
+    const hasScores = AXES.some(function(ax) { return scores[ax.key] != null; });
     if (hasScores) {
-      const items = [
-        { label: '정강정책 부합도', value: scores.platformFitScore },
-        { label: '정책 설계 완성도', value: scores.designScore },
-        { label: '실행 가능성', value: scores.feasibilityScore },
-        { label: '구체성', value: scores.specificityScore },
-        { label: '메시지 경쟁력', value: scores.messageScore }
-      ];
-      const cards = items.filter(function(item) { return item.value != null; }).map(function(item) {
-        const cls = item.value >= 80 ? 'good' : (item.value >= 60 ? 'mid' : 'low');
-        return '<div class="score-card ' + cls + '"><span class="score-card-label">' + escapeHtml(item.label) + '</span><span class="score-card-value">' + item.value.toFixed(0) + '</span></div>';
+      const cards = AXES.filter(function(ax) { return scores[ax.key] != null; }).map(function(ax) {
+        const v = scores[ax.key];
+        const pct = v / ax.max;
+        const cls = pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low';
+        return '<div class="score-card ' + cls + '"><span class="score-card-label">' + escapeHtml(ax.label) + '</span><span class="score-card-value">' + v + '<small>/' + ax.max + '</small></span></div>';
       });
       if (cards.length) html += '<div class="score-cards-row">' + cards.join('') + '</div>';
     }
@@ -114,16 +181,21 @@
     if (sections.length > 1 || (sections[0] && sections[0].title !== '요약')) {
       html += '<div class="section-cards">';
       sections.forEach(function(sec, idx) {
-        const bodyLines = (sec.body || []).join('\n').split('\n');
+        const isSummary = sec.title && (sec.title.indexOf('총평') !== -1);
         let bodyHtml = '';
-        for (var i = 0; i < bodyLines.length; i++) {
-          var line = bodyLines[i];
-          var trimmed = line.trim();
-          if (!trimmed) continue;
-          var isItem = /^[-·•]/.test(trimmed);
-          bodyHtml += '<div class="section-line' + (isItem ? ' item' : '') + '">' + escapeHtml(line) + '</div>';
+        if (isSummary) {
+          bodyHtml = buildSummaryTableHtml(sec);
+        } else {
+          const bodyLines = (sec.body || []).join('\n').split('\n');
+          for (var i = 0; i < bodyLines.length; i++) {
+            var line = bodyLines[i];
+            var trimmed = line.trim();
+            if (!trimmed) continue;
+            var isItem = /^[-·•]/.test(trimmed);
+            bodyHtml += '<div class="section-line' + (isItem ? ' item' : '') + '">' + escapeHtml(line) + '</div>';
+          }
+          bodyHtml = bodyHtml || '-';
         }
-        bodyHtml = bodyHtml || '-';
         html += '<section class="section-card">' +
           '<div class="section-card-head"><div class="section-card-title">' + escapeHtml(sec.title || '섹션') + '</div><span class="line-tag">' + (idx + 1) + '</span></div>' +
           '<div class="section-card-body">' + bodyHtml + '</div></section>';

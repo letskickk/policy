@@ -587,6 +587,22 @@
     .section-line:first-child{ margin-top:0; }
     .section-line.item{ margin-top:0.5rem; }
 
+    /* 총평 테이블 */
+    .summary-table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+    .summary-table th{ padding:0.45rem 0.6rem; text-align:left; color:var(--muted,#94a3b8); font-weight:700; border-bottom:1px solid rgba(148,163,184,0.25); font-size:0.8rem; }
+    .summary-table td{ padding:0.55rem 0.6rem; border-bottom:1px solid rgba(148,163,184,0.12); vertical-align:top; line-height:1.5; }
+    .summary-axis{ font-weight:700; color:var(--text-strong); white-space:nowrap; }
+    .summary-score{ font-weight:900; white-space:nowrap; font-size:0.95rem; }
+    .summary-score.good{ color:#4ade80; }
+    .summary-score.mid{ color:#facc15; }
+    .summary-score.low{ color:#f87171; }
+    .summary-strength{ color:#86efac; font-size:0.85rem; }
+    .summary-supplement{ color:#fca5a5; font-size:0.85rem; }
+    .summary-footer{ display:flex; align-items:center; gap:0.7rem; margin-top:0.8rem; padding-top:0.6rem; border-top:1px solid rgba(148,163,184,0.2); }
+    .summary-total{ font-size:1rem; font-weight:900; color:var(--text-strong); }
+    .summary-grade{ font-size:0.9rem; font-weight:900; }
+    .score-card-value small{ font-size:0.65em; opacity:0.7; font-weight:600; }
+
     .draft-modal{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; }
     .draft-modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,0.6); }
     .draft-modal-box{ position:relative; max-width:840px; width:100%; max-height:85vh; overflow:auto; background:var(--bg2); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow2); }
