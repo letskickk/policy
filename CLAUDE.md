@@ -235,9 +235,22 @@ uvicorn backend.main:app --reload
 - [x] overdrive: 카드/버튼 스프링, 챗봇 메시지 애니, 스크롤 진행 바, 고스트 추천 질문
 - [x] GitHub push (b4dfd4f) + 서버 배포 완료
 
+### 정식 오픈 작업 완료 (2026-04-13)
+- [x] 사이트 게이트 모달(오픈 차단 모달) 완전 제거 (CSS 포함)
+- [x] 접근 제어: 이메일 화이트리스트 → `status === 'APPROVED'` 기반 전환 (index.html, pledge.html)
+- [x] 홈 오픈 공지 배너 추가 (dismissable, localStorage): 점수 초기화·공개방식 변경·코치 신규 오픈 안내
+- [x] 홈 CTA 버튼 2×2 그리드 재배치: 공약 분석 | 공약 생성 코치 / 지역 비교 | 정책 제안
+- [x] 코치 버튼 링크 수정: `#generate` → `#coach`
+- [x] 공약 분석 disclaimer 문구 변경: "참고 자료·보조 용도" → "후보자의 판단과 언어로 다듬을수록 더 좋은 공약이 됩니다"
+- [x] pledge.html textarea placeholder에서 v1.9/v2.0 베타 문구 제거
+- [x] 비로그인 사용자 /pledge 접근 허용 (백엔드): JS 게이트가 탭별로 auth 처리
+- [x] 코치 탭 JS 로그인 게이트: 비로그인→로그인 안내, 미승인→승인 대기 안내
+- [x] 푸터 위치 수정: body flex column + main flex:1
+- [x] 출시 전 QA 완료: Critical/High 이슈 없음
+
 ### 다음 작업 (TODO)
-- [ ] `/distill` — pledge.html 인지부하 감소 (탭 2개+3단계 플로우 단순화, CTA 명확화)
-- [ ] `/normalize` — 컴포넌트 일관성 (card/panel/surface 중복 정리, 브레이크포인트 통일 640/900 두 개로)
-- [ ] `/harden` — 모달 포커스 트랩 구현, map.html SVG 포커스 스타일, 에러/빈 상태 엣지케이스
-- [ ] `/polish` — 최종 품질 점검 (항상 마지막)
+- [ ] `/distill` — pledge.html 인지부하 감소
+- [ ] `/normalize` — 컴포넌트 일관성
+- [ ] `/harden` — 모달 포커스 트랩, 에러/빈 상태 엣지케이스
+- [ ] `/polish` — 최종 품질 점검
 - [ ] `/critique` 재실행 → 점수 개선 확인
