@@ -1358,12 +1358,12 @@
       </div>
       <div class="sample-preview" id="adminToolGroup" style="margin-top:0.8rem;">
         <div class="sample-head">
-          <span class="sample-title">오픈 예정</span>
+          <span class="sample-title">추가 기능</span>
           <span class="sample-score" id="adminToolStatus" style="color:#fbbf24;">준비 중</span>
         </div>
         <div class="sample-body" style="display:flex;gap:0.45rem;flex-wrap:wrap;">
-          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">정책 자료허브</a>
-<a href="/pledge#generate" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">공약 생성 코치</a>
+          <a href="/policy-lab" class="sample-item" id="btnPolicyHub" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">정책 자료허브 (준비 중)</a>
+          <a href="/pledge#generate" class="sample-item" id="btnTools" style="text-decoration:none;color:inherit;flex:1;min-width:140px;text-align:center;cursor:pointer;">공약 생성 코치</a>
         </div>
       </div>
     </div>
@@ -1455,22 +1455,17 @@
           if (pledgeBtn) pledgeBtn.href = '/pledge';
           window._userEmail = email;
           window._userName = d.name || '';
-          // Admin tools group gate
+          // 코치: 승인 사용자 전체 허용 / 정책 허브: 준비 중
           const adminStatus = document.getElementById('adminToolStatus');
-          const adminGroup = document.getElementById('adminToolGroup');
-          const canUsePolicyTools = !!(d.is_admin || d.email === 'gtest@test.kr');
-          if (canUsePolicyTools) {
-            if (adminGroup) adminGroup.querySelectorAll('.sample-item').forEach(function(item) {
-              item.style.opacity = '1';
-              item.style.cursor = 'pointer';
-            });
-            if (adminStatus) { adminStatus.textContent = '사용 가능'; adminStatus.style.color = '#86efac'; }
-          } else {
-            if (adminGroup) adminGroup.addEventListener('click', function(e) {
-              const link = e.target.closest('a');
-              if (link) { e.preventDefault(); alert('아직 준비 중인 기능입니다. 곧 공개될 예정이에요!'); }
-            });
+          const isApproved = !!(d.is_admin || d.status === 'APPROVED');
+          if (isApproved) {
+            if (adminStatus) { adminStatus.textContent = '코치 오픈'; adminStatus.style.color = '#86efac'; }
           }
+          // 정책 자료허브는 아직 준비 중
+          const btnPolicyHub = document.getElementById('btnPolicyHub');
+          if (btnPolicyHub) btnPolicyHub.addEventListener('click', function(e) {
+            e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');
+          });
         } else {
           authRow.style.display = '';
           authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
@@ -2477,112 +2472,6 @@
   <div data-shared-footer></div>
   <script src="/static/js/shared-footer.js?v=2"></script>
 
-  <!-- 차단 모달: 오픈 시 이 블록 전체 삭제 -->
-  <style>
-    body.site-locked { overflow: hidden !important; }
-    .site-gate-overlay {
-      position: fixed; inset: 0; z-index: 99999;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(13,34,64,0.92);
-      backdrop-filter: blur(12px);
-      padding: 1.5rem;
-    }
-    .site-gate-card {
-      max-width: 480px; width: 100%;
-      background: linear-gradient(160deg, #0f2a4a 0%, #122f52 100%);
-      border: 1px solid rgba(255,114,16,0.3);
-      border-radius: 20px;
-      padding: 2.5rem 2rem;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(255,114,16,0.08);
-    }
-    .site-gate-icon { font-size: 2.8rem; margin-bottom: 0.8rem; }
-    .site-gate-title {
-      font-size: 1.7rem; font-weight: 950; color: #fff;
-      margin-bottom: 0.4rem; letter-spacing: -0.02em;
-    }
-    .site-gate-subtitle {
-      font-size: 1.1rem; font-weight: 700; color: #ff7210;
-      margin-bottom: 1.4rem;
-    }
-    .site-gate-section-label {
-      font-size: 0.82rem; font-weight: 800; color: #ff7210;
-      margin: 1rem 0 0.3rem; padding-left: 0.2rem; text-align: left;
-      max-width: 380px; margin-left: auto; margin-right: auto;
-    }
-    .site-gate-list {
-      text-align: left; margin: 0 auto 1.4rem;
-      max-width: 380px; list-style: none; padding: 0;
-    }
-    .site-gate-list li {
-      position: relative; padding: 0.5rem 0 0.5rem 1.4rem;
-      font-size: 1.05rem; color: #cbd5e1; line-height: 1.6;
-    }
-    .site-gate-list li::before {
-      content: '\25B8'; position: absolute; left: 0; color: #ff7210; font-weight: 700;
-    }
-    .site-gate-list li .gate-sub {
-      display: block; font-size: 0.92rem; color: #94a3b8; margin-top: 0.15rem;
-    }
-    .site-gate-list li .gate-detail {
-      display: block; font-size: 0.92rem; color: #94a3b8; margin-top: 0.2rem; padding-left: 0.2rem;
-    }
-    .site-gate-list li .gate-detail span {
-      display: block; padding: 0.12rem 0;
-    }
-    .site-gate-bottom {
-      font-size: 1rem; font-weight: 800; color: #ff7210;
-      letter-spacing: -0.01em;
-    }
-    @media (max-width: 540px) {
-      .site-gate-overlay {
-        padding: 1rem 0.75rem;
-        align-items: flex-start;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .site-gate-card {
-        padding: 1.4rem 1.1rem 1.6rem;
-        border-radius: 16px;
-        margin: auto 0;
-      }
-      .site-gate-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-      .site-gate-title { font-size: 1.25rem; }
-      .site-gate-subtitle { font-size: 0.9rem; margin-bottom: 0.9rem; }
-      .site-gate-list li { font-size: 0.92rem; padding: 0.35rem 0 0.35rem 1.3rem; }
-      .site-gate-list li .gate-sub,
-      .site-gate-list li .gate-detail { font-size: 0.85rem; }
-    }
-  </style>
-  <div class="site-gate-overlay" id="siteGateOverlay">
-    <div class="site-gate-card">
-      <div class="site-gate-icon">&#127881;</div>
-      <div class="site-gate-title">개혁신당 정책 멘토링 정식 오픈</div>
-      <div class="site-gate-subtitle">베타테스트를 마치고 정식 오픈합니다!</div>
-      <div class="site-gate-section-label">&#9654; 공약분석 (점수 시스템)</div>
-      <ul class="site-gate-list">
-        <li>기존 분석 점수가 초기화됩니다
-          <span class="gate-sub">분석 내용은 그대로 유지됩니다</span>
-        </li>
-        <li>새로 분석받아야 랭킹에 반영됩니다</li>
-        <li>새로운 점수 표시 방식:
-          <span class="gate-detail">
-            <span>- 1~3위: 점수 공개</span>
-            <span>- 4~5위: 등급(A/B/C/D)만 표시</span>
-            <span>- 6위 이하: 점수 비공개</span>
-          </span>
-        </li>
-      </ul>
-      <div class="site-gate-section-label">&#9654; 공약 코칭 (신규 오픈)</div>
-      <ul class="site-gate-list">
-        <li>AI 기반 1:1 공약 개발 코칭</li>
-        <li>각종 공공데이터 기반 지역 맞춤형 코칭</li>
-      </ul>
-      <div class="site-gate-bottom">곧 오픈됩니다!</div>
-    </div>
-  </div>
-  <script>document.body.classList.add('site-locked');</script>
-  <!-- /차단 모달 끝 -->
 
 </body>
 </html>

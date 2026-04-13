@@ -1668,7 +1668,7 @@
             row.style.display = 'block';
             fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
-          meData.can_use_policy_tools = !!(d.is_admin || d.email === 'gtest@test.kr' || d.email === 'ktest@test.kr' || d.email === 'gjtest@test.kr' || d.email === 'gaat2050@naver.com' || d.email === 'test@test.kr' || d.email === 'atest@test.kr');
+          meData.can_use_policy_tools = !!(d.is_admin || d.status === 'APPROVED');
           if (generateTabEl) {
             generateTabEl.style.display = meData.can_use_policy_tools ? '' : 'none';
           }
