@@ -1130,10 +1130,18 @@
       .top-bar{
         gap: 0.6rem;
       }
-      .top-bar .nav-wrap,
       .top-bar .nav-btns,
       .top-bar .nav-login-row{
         width: 100%;
+      }
+      .top-bar .nav-wrap{
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .top-bar .nav-links{
+        display: contents;
       }
       .top-bar .nav-login-row{
         display: grid;
@@ -1154,9 +1162,10 @@
         width: auto;
       }
       .top-bar .nav-link{
-        width: 100%;
-        min-height: 44px;
-        flex-basis: 100%;
+        flex: 1 1 calc(50% - 0.5rem);
+        min-height: 40px;
+        text-align: center;
+        justify-content: center;
       }
       .hero{
         padding: 1.1rem;
@@ -1483,12 +1492,6 @@
           window._userName = d.name || '';
           const isApproved = !!(d.is_admin || d.status === 'APPROVED');
           const btnTools = document.getElementById('btnTools');
-          if (!isApproved && btnTools) {
-            // 비승인: 코치 버튼 클릭 시 안내
-            btnTools.addEventListener('click', function(e) {
-              e.preventDefault(); alert('공약 생성 코치는 승인된 회원에게 제공됩니다. 회원가입 후 승인을 기다려 주세요.');
-            });
-          }
           // 정책 자료허브는 준비 중
           const btnPolicyHub = document.getElementById('btnPolicyHub');
           if (btnPolicyHub) btnPolicyHub.addEventListener('click', function(e) {
@@ -1497,8 +1500,8 @@
         } else {
           authRow.style.display = '';
           authRow.innerHTML = '<a href="/signup" class="auth-btn auth-btn-signup">회원가입</a><a href="/login" class="auth-btn auth-btn-login">로그인</a>';
-          if (pledgeBtn) pledgeBtn.href = '/login?next=/pledge';
-          // 비로그인: 코치는 pledge#coach로 그대로 이동 (pledge.html에서 게이트 처리)
+          if (pledgeBtn) pledgeBtn.href = '/pledge';
+          // 비로그인: pledge.html 모달에서 게이트 처리
           const btnPolicyHub2 = document.getElementById('btnPolicyHub');
           if (btnPolicyHub2) btnPolicyHub2.addEventListener('click', function(e) {
             e.preventDefault(); alert('정책 자료허브는 준비 중입니다.');

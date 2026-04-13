@@ -112,8 +112,14 @@ def research_topic(
     # 4-2. 광역의회 (시/도의회)
     if region:
         try:
+            # 광역시/특별시 접미사 제거해 의회 ID 검색 정확도 향상 (광주광역시 → 광주)
+            _region_for_assembly = region
+            for _sfx in ("광역시", "특별자치시", "특별자치도", "특별시", "광역도"):
+                if region.endswith(_sfx):
+                    _region_for_assembly = region[:-len(_sfx)]
+                    break
             metro_assembly = query_assembly_context(
-                region=region, district_name=district_name,
+                region=_region_for_assembly, district_name=district_name,
                 election_type=election_type, keywords=keywords[:5], years=years,
             )
             if metro_assembly.get("context_text"):

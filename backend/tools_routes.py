@@ -247,7 +247,7 @@ def register_tools_routes(app, require_approved, _client_ip):
     # ── 공약 개발 챗봇 ─────────────────────────────────────────
 
     class ChatStartRequest(BaseModel):
-        topic: str = Field(..., min_length=1, max_length=500)
+        topic: str = Field(..., min_length=1, max_length=8000)
         output_format: Literal["정책", "정책포지션", "지역공약", "논평", "메시지"] = "정책"
 
     class ChatMessageRequest(BaseModel):
@@ -273,7 +273,10 @@ def register_tools_routes(app, require_approved, _client_ip):
         if not ok:
             raise HTTPException(status_code=429, detail=msg)
 
-        session = create_session(user["id"], body.topic.strip(), body.output_format)
+        topic_full = body.topic.strip()
+        # DB 세션 제목은 첫 100자만 (긴 어셈블리 데이터 포함 메시지 대응)
+        topic_label = topic_full[:100]
+        session = create_session(user["id"], topic_label, body.output_format)
         session_id = session["session_id"]
 
         t0 = time.perf_counter()
@@ -288,7 +291,7 @@ def register_tools_routes(app, require_approved, _client_ip):
                 # 세션 ID를 먼저 전송
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id}, ensure_ascii=False)}\n\n"
 
-                for chunk in first_message_stream(session_id, body.topic.strip()):
+                for chunk in first_message_stream(session_id, topic_full):
                     if chunk.startswith("[USAGE]"):
                         usage = parse_usage_marker(chunk)
                         if usage:
@@ -490,38 +493,67 @@ def register_tools_routes(app, require_approved, _client_ip):
     # ── 지역 의회 현황 ───────────────────────────────────────────────────────
 
     @app.get("/api/assembly/district-overview")
-    def assembly_district_overview(request: Request):
+    def assembly_district_overview(request: Request, refresh: bool = False):
         """
         로그인한 사용자의 선거구 기준 지방의회 안건 + 국회의원/발의법안 반환.
-        승인 불필요, 로그인만 있으면 접근 가능.
+        DB에 24시간 캐시. ?refresh=true 로 강제 갱신.
         """
+        import json as _json
+        from backend.database import get_connection
         from backend.assembly_api import search_local_assembly
         from backend.national_assembly_api import query_national_assembly_overview
 
         user = require_approved(request)
+        user_id = user["id"]
 
+        # ── 캐시 조회 ──
+        if not refresh:
+            conn = get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT data_json, cached_at FROM assembly_data_cache WHERE user_id = ?",
+                    (user_id,)
+                ).fetchone()
+            finally:
+                conn.close()
+
+            if row:
+                from datetime import datetime, timezone
+                cached_at = datetime.fromisoformat(row["cached_at"].replace("Z", "+00:00")) \
+                    if "+" in row["cached_at"] or "Z" in row["cached_at"] \
+                    else datetime.fromisoformat(row["cached_at"]).replace(tzinfo=timezone.utc)
+                age_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600
+                if age_hours < 48:
+                    return _json.loads(row["data_json"])
+
+        # ── 외부 API 호출 ──
         region = (user.get("region_name") or "").strip()
         district = (user.get("district_name") or "").strip()
         election_pos = (user.get("election_position") or "").strip()
 
-        # 지방의회 검색 대상 결정:
-        # 기초의원/기초단체장 → district_name(시군구)으로 기초의회 검색
-        # 광역의원/광역단체장/기타 → region_name(시도)으로 광역의회 검색
         BASIC_POSITIONS = {"local_council", "local_mayor"}
+
+        def _shorten_for_assembly(r: str) -> str:
+            """광역시/특별시 접미사 제거해 의회 검색어로 변환. '광주광역시' → '광주'"""
+            r = r.strip()
+            for _sfx in ("광역시", "특별자치시", "특별자치도", "특별시", "광역도"):
+                if r.endswith(_sfx):
+                    return r[:-len(_sfx)]
+            return r
+
         if election_pos in BASIC_POSITIONS and district:
-            # "해남군 가선거구" → "해남군" 부분만 추출
             district_base = district.split()[0] if district else district
             assembly_search_region = district_base
         else:
-            assembly_search_region = region
+            # metro_mayor, regional_council: 광역시명 접미사 제거해 검색 정확도 향상
+            assembly_search_region = _shorten_for_assembly(region) if region else region
+            district_base = ""
 
-        # 지방의회 안건 (기존 assembly_api 활용)
         local_result = search_local_assembly(region=assembly_search_region or None, keywords=[], years=1, limit=40)
         local_bills = local_result.get("results", [])
 
-        # 기초의회인 경우 지역명 포함 결과만 필터링 (다른 지역 문서 제거)
         if election_pos in BASIC_POSITIONS and district_base:
-            filter_kw = district_base.rstrip("군시구")  # "해남군" → "해남"
+            filter_kw = district_base.rstrip("군시구")
             filtered = [
                 b for b in local_bills
                 if filter_kw in (b.get("title") or "")
@@ -532,10 +564,9 @@ def register_tools_routes(app, require_approved, _client_ip):
         else:
             local_bills = local_bills[:20]
 
-        # 국회의원 + 발의법안
         national = query_national_assembly_overview(region=region, district=district)
 
-        return {
+        result = {
             "region": region,
             "district": district,
             "local_assembly": {
@@ -544,3 +575,20 @@ def register_tools_routes(app, require_approved, _client_ip):
             },
             "national_assembly": national,
         }
+
+        # ── 캐시 저장 ──
+        conn = get_connection()
+        try:
+            conn.execute(
+                """INSERT INTO assembly_data_cache (user_id, data_json, cached_at)
+                   VALUES (?, ?, datetime('now'))
+                   ON CONFLICT(user_id) DO UPDATE SET
+                     data_json = excluded.data_json,
+                     cached_at = excluded.cached_at""",
+                (user_id, _json.dumps(result, ensure_ascii=False))
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return result

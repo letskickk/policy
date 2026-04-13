@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공천자 현황 - 개혁신당</title>
+  <link rel="stylesheet" href="/static/css/common.css?v=2">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root{
+      --bg1:#0d2240;
+      --bg2:#073053;
+      --bg3:#0a3b69;
+      --text:#f1f5f9;
+      --text-strong:#ffffff;
+      --muted:#cbd5e1;
+      --brand:#ff7210;
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.04);
+      --border: rgba(148,163,184,0.18);
+      --cta:#ffffff;
+      --cta-text:#0f172a;
+      --cta-ring: rgba(56, 189, 248, 0.35);
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --selected: rgba(255,114,16,0.3);
+      --selected-border: #ff7210;
+    }
+
+    body{
+      font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(1000px 500px at 20% 10%, rgba(255,114,16,0.10), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(56,189,248,0.10), transparent 60%),
+                  linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+      color: var(--text);
+      padding: 1.5rem 1rem;
+    }
+
+    .container{
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 2rem;
+    }
+
+    @media (max-width: 900px){
+      .container{ grid-template-columns: 1fr; }
+    }
+
+    /* 상단 바 */
+    .top-bar{
+      max-width: 1400px;
+      margin: 0 auto 0.9rem;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .top-bar .brand{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .top-bar .brand-logo{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      text-decoration: none;
+      color: inherit;
+      line-height: 1;
+    }
+    .top-bar .brand-logo img{ height: 24px; width: auto; }
+    .top-bar .brand-title{
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: rgba(255,255,255,0.92);
+    }
+    .top-bar .brand-tag{
+      display: block;
+      margin-top: 0.22rem;
+      font-size: 0.76rem;
+      color: #ffb37a;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+      opacity: 0.95;
+    }
+    .top-bar .top-bar-left{
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .top-bar .map-heading h1{
+      font-size: 1.35rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin: 0 0 0.2rem 0;
+      letter-spacing: -0.03em;
+    }
+    .top-bar .map-heading .subtitle{
+      font-size: 0.9rem;
+      color: var(--text);
+      opacity: 0.9;
+      margin: 0;
+    }
+    .top-bar .nav{
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .nav-link{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 0.85rem;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(148,163,184,0.22);
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .nav-link:hover{
+      background: rgba(255,255,255,0.10);
+      color: var(--text-strong);
+    }
+    .nav-links{display:flex;gap:0.3rem;align-items:center;margin-right:auto;}
+    .nav-links .nav-link{color:var(--muted);font-size:0.85rem;font-weight:600;padding:0.35rem 0.65rem;border-radius:8px;background:none;border:none;min-height:auto;}
+    .nav-links .nav-link:hover{color:var(--text-strong);background:rgba(255,255,255,0.06);}
+    .nav-links .nav-link.active{color:#ff7a1a;background:rgba(255,122,26,0.1);}
+
+    /* 지도 */
+    .map-container{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .map-wrapper{ position: relative; width: 100%; max-width: 100%; margin: 0 auto; }
+    .korea-map{ width: 100%; height: auto; display: block; }
+    .map-legend{
+      display:flex; justify-content:center; gap:1rem; padding:0.6rem 0 0.2rem;
+      font-size:0.75rem; color:rgba(255,255,255,0.45);
+    }
+    .map-legend-item{ display:flex; align-items:center; gap:0.35rem; }
+    .map-legend-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .korea-map path{
+      stroke-width: 1;
+      cursor: pointer;
+      transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+    }
+    .korea-map path:hover{
+      fill: rgba(255,114,16,0.25) !important;
+      stroke: var(--brand) !important;
+      stroke-width: 2 !important;
+    }
+    .korea-map path.selected{
+      fill: var(--selected) !important;
+      stroke: var(--selected-border) !important;
+      stroke-width: 2 !important;
+    }
+    .korea-map path:focus-visible{
+      outline: 3px solid var(--cta-ring);
+      outline-offset: 2px;
+      stroke: var(--brand) !important;
+      stroke-width: 2 !important;
+    }
+    .region-badge{
+      font-size: 0.75rem;
+      font-weight: 900;
+      fill: var(--text-strong);
+      pointer-events: none;
+    }
+
+    /* 패널 */
+    .panel{
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      min-height: 0;
+    }
+    #panel-content{
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .panel-header{
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title{
+      font-size: 1.5rem;
+      font-weight: 950;
+      color: var(--text-strong);
+      margin-bottom: 0.25rem;
+    }
+    .panel-subtitle{
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .filter-row{
+      margin-top: 0.9rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
+    }
+    .filter-row label{
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .filter-select{
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.35);
+      color: var(--text);
+      outline: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .filter-select option{ background: #0f172a; color: #e2e8f0; }
+    .filter-select:focus{ box-shadow: 0 0 0 3px var(--cta-ring); border-color: rgba(255,255,255,0.32); }
+
+    /* 로딩/에러/빈 상태 */
+    .state-loading{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      gap: 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .state-empty{
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .state-error{
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #f87171;
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+    .spinner{
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 카드 — map.html과 동일 구조 */
+    .candidates-list{
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .candidate-card{
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      transition: all 0.2s ease;
+      overflow: hidden;
+    }
+    .candidate-card:hover{ border-color: rgba(255,114,16,0.4); }
+    .candidate-header{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      gap: 0.5rem;
+    }
+    .candidate-header:hover{ background: rgba(255,255,255,0.03); }
+    .candidate-name{ flex: 1; min-width: 0; }
+    .candidate-name .cand-position{
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: keep-all;
+    }
+    .candidate-name .cand-realname{
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: var(--text-strong);
+      line-height: 1.3;
+    }
+    .confirmed-badge{
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      background: rgba(34,197,94,0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34,197,94,0.2);
+      white-space: nowrap;
+    }
+    .candidate-card.hidden-card{ display: none; }
+
+    .show-more-btn{
+      display: block;
+      width: 100%;
+      padding: 0.7rem;
+      margin-top: 0.5rem;
+      border-radius: 12px;
+      border: 1px dashed rgba(148,163,184,0.3);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .show-more-btn:hover{
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-color: rgba(148,163,184,0.5);
+    }
+
+    footer{
+      max-width: 1400px;
+      margin: 2rem auto 0;
+      padding: 1.5rem;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.85rem;
+      border-top: 1px solid rgba(148,163,184,0.12);
+    }
+    footer a{ color: #ffb37a; text-decoration: none; font-weight: 700; }
+    footer a:hover{ text-decoration: underline; }
+
+    @media (max-width: 900px){
+      body{ padding: 1.1rem 0.85rem 1.8rem; }
+      .top-bar{ padding: 0; align-items: stretch; }
+      .top-bar .top-bar-left{ width: 100%; gap: 0.75rem; }
+      .top-bar .brand{ width: 100%; }
+      .top-bar .nav{ width: 100%; }
+      .nav-link{ flex: 1 1 calc(50% - 0.25rem); min-width: 0; }
+      .container{ gap: 1rem; }
+      .map-container, .panel{ padding: 1.1rem; border-radius: 16px; }
+      .panel-header{ margin-bottom: 1.1rem; }
+      .panel-title{ font-size: 1.15rem; line-height: 1.35; }
+      .panel-subtitle{ font-size: 0.88rem; }
+      .filter-row{ gap: 0.45rem; margin-bottom: 0.85rem; }
+      .filter-select{ min-height: 44px; font-size: 0.95rem; }
+    }
+    @media (max-width: 640px){
+      body{ padding: 1rem 0.75rem; }
+      .top-bar{ padding: 0 0.5rem; gap: 0.75rem; }
+      .top-bar .top-bar-left{ flex-direction: column; align-items: flex-start; gap: 0.5rem; width: 100%; }
+      .top-bar .brand-tag{ display: none; }
+      .top-bar .map-heading h1{ font-size: 1.15rem; }
+      .top-bar .map-heading .subtitle{ font-size: 0.8rem; }
+      .top-bar .nav{ width: 100%; justify-content: flex-start; }
+      .container{ gap: 1rem; }
+      .map-container, .panel{ padding: 1rem; border-radius: 16px; }
+      .filter-select{ min-height: 46px; }
+      .nominator-card{ padding: 0.75rem; }
+      .nav-link{ flex-basis: 100%; }
+    }
+  </style>
+  <link rel="stylesheet" href="/static/reform-redesign.css" />
+</head>
+<body class="rf-workspace-page">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="brand">
+        <a href="/" class="brand-logo">
+          <img src="/static/logo.svg" alt="개혁신당 로고">
+          <span class="brand-inner">
+            <span class="brand-title">개혁신당</span>
+            <span class="brand-tag">공천자 현황</span>
+          </span>
+        </a>
+      </div>
+      <div class="map-heading">
+        <h1>공천자 현황</h1>
+        <p class="subtitle">개혁신당 공천 확정 인원을 지역별로 확인하세요</p>
+      </div>
+    </div>
+    <nav class="nav">
+      <nav class="nav-links" aria-label="주요 메뉴">
+        <a href="/" class="nav-link">홈</a>
+        <a href="/map" class="nav-link">지역 지도</a>
+        <a href="/nominator-map" class="nav-link active" aria-current="page">공천자 현황</a>
+        <a href="/pledge" class="nav-link">공약 멘토링</a>
+      </nav>
+      <a href="/dashboard" class="nav-link">MY PAGE</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <!-- 지도 -->
+    <div class="map-container">
+      <div class="map-wrapper">
+        <svg id="koreaMap" class="korea-map" viewBox="0 0 524 631" xmlns="http://www.w3.org/2000/svg" aria-label="한국 지도"></svg>
+      </div>
+      <div class="map-legend">
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#f97316"></span> 선택 지역</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:rgba(255,114,16,0.6)"></span> 공천자 많음</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:rgba(255,255,255,0.06)"></span> 해당 없음</span>
+      </div>
+    </div>
+
+    <!-- 패널 -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title" id="panel-title">공천자 현황</h2>
+        <p class="panel-subtitle" id="panel-subtitle">지도를 클릭하거나 지역을 선택하세요</p>
+
+        <div class="filter-row">
+          <label for="regionSelect">지역 선택</label>
+          <select id="regionSelect" class="filter-select" aria-label="지역 선택">
+            <option value="">전체 지역</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <label for="positionSelect">출마직</label>
+          <select id="positionSelect" class="filter-select" aria-label="출마직 선택">
+            <option value="">전체</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <label for="nameSearch">이름 검색</label>
+          <input type="text" id="nameSearch" class="filter-select" placeholder="이름으로 검색" aria-label="이름 검색">
+        </div>
+      </div>
+
+      <div id="panel-content">
+        <div class="state-empty">
+          <div style="font-size:1.6rem;margin-bottom:0.45rem;">🗺️</div>
+          지도를 클릭하거나 지역을 선택하여<br>공천자 목록을 확인하세요.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>개혁신당 AI 정책 플랫폼 · <a href="https://policy.reformparty.kr/">policy.reformparty.kr</a></p>
+  </footer>
+
+  <script>
+    const panelTitle = document.getElementById('panel-title');
+    const panelSubtitle = document.getElementById('panel-subtitle');
+    const panelContent = document.getElementById('panel-content');
+    const koreaMap = document.getElementById('koreaMap');
+    const regionSelect = document.getElementById('regionSelect');
+    const positionSelect = document.getElementById('positionSelect');
+    const nameSearch = document.getElementById('nameSearch');
+
+    const REQUEST_TIMEOUT_MS = 15000;
+    let mapPaths = [];
+    let selectedRegionCode = null;
+    let nominatorStats = {};        // { region_code: count }
+    let allNominators = [];         // 전체 공천자 (필터링용)
+    let positionOptions = [];       // 출마직 목록
+
+    const regionNames = {
+      '11': '서울특별시', '26': '부산광역시', '27': '대구광역시',
+      '28': '인천광역시', '29': '광주광역시', '30': '대전광역시',
+      '31': '울산광역시', '36': '세종특별자치시', '41': '경기도',
+      '42': '강원특별자치도', '43': '충청북도', '44': '충청남도',
+      '45': '전북특별자치도', '46': '전라남도', '47': '경상북도',
+      '48': '경상남도', '50': '제주특별자치도',
+    };
+
+    const mapIdToRegionCode = {
+      seoul: '11', busan: '26', daegu: '27', incheon: '28',
+      gwangju: '29', daejeon: '30', ulsan: '31', sejong: '36',
+      gyeonggi: '41', gangwon: '42', 'north-chungcheong': '43',
+      'south-chungcheong': '44', 'north-jeolla': '45', 'south-jeolla': '46',
+      'north-gyeongsang': '47', 'south-gyeongsang': '48', jeju: '50',
+    };
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function fetchJson(url, timeoutMs = REQUEST_TIMEOUT_MS) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // 지도 렌더링
+    async function renderMap() {
+      try {
+        const mod = await import('https://unpkg.com/@svg-maps/south-korea@2.0.0/index.js');
+        const mapData = mod.default;
+        koreaMap.setAttribute('viewBox', '0 0 486 631');
+        koreaMap.innerHTML = mapData.locations
+          .filter(loc => mapIdToRegionCode[loc.id])
+          .map(loc => {
+            const rc = mapIdToRegionCode[loc.id];
+            return `<path data-region-code="${rc}" d="${loc.path}" aria-label="${regionNames[rc] || loc.name}" tabindex="0"></path>`;
+          })
+          .join('');
+      } catch (e) {
+        // fallback
+        koreaMap.innerHTML = `
+          <path data-region-code="11" d="M235 140 l20 -5 l15 20 l-8 18 l-25 4 z" aria-label="서울특별시" tabindex="0"></path>
+          <path data-region-code="41" d="M170 110 l60 -15 l80 20 l20 55 l-25 45 l-95 10 l-55 -18 l-15 -45 z" aria-label="경기도" tabindex="0"></path>
+          <path data-region-code="42" d="M310 40 l110 20 l35 85 l-18 90 l-60 20 l-47 -38 l-28 -74 z" aria-label="강원특별자치도" tabindex="0"></path>
+          <path data-region-code="44" d="M130 250 l105 -25 l40 30 l-18 62 l-60 22 l-54 -20 z" aria-label="충청남도" tabindex="0"></path>
+          <path data-region-code="43" d="M245 220 l85 -10 l42 36 l-15 60 l-65 20 l-43 -32 z" aria-label="충청북도" tabindex="0"></path>
+          <path data-region-code="45" d="M95 330 l95 -20 l55 28 l-10 70 l-66 26 l-55 -24 z" aria-label="전북특별자치도" tabindex="0"></path>
+          <path data-region-code="46" d="M65 410 l95 -18 l52 28 l-8 85 l-60 28 l-60 -24 z" aria-label="전라남도" tabindex="0"></path>
+          <path data-region-code="47" d="M330 245 l108 -10 l44 45 l12 95 l-38 50 l-92 -8 l-44 -45 z" aria-label="경상북도" tabindex="0"></path>
+          <path data-region-code="48" d="M280 410 l115 -6 l52 36 l-10 74 l-76 30 l-66 -20 l-20 -48 z" aria-label="경상남도" tabindex="0"></path>
+          <path data-region-code="26" d="M435 520 l22 -4 l10 18 l-12 22 l-22 -2 z" aria-label="부산광역시" tabindex="0"></path>
+          <path data-region-code="27" d="M352 350 l26 -6 l10 20 l-12 16 l-22 2 z" aria-label="대구광역시" tabindex="0"></path>
+          <path data-region-code="31" d="M468 476 l18 -6 l10 16 l-10 20 l-16 2 z" aria-label="울산광역시" tabindex="0"></path>
+          <path data-region-code="29" d="M152 416 l24 -4 l8 20 l-14 14 l-20 -2 z" aria-label="광주광역시" tabindex="0"></path>
+          <path data-region-code="30" d="M260 275 l22 -4 l8 16 l-10 14 l-18 2 z" aria-label="대전광역시" tabindex="0"></path>
+          <path data-region-code="36" d="M243 258 l14 -2 l6 10 l-8 10 l-12 0 z" aria-label="세종특별자치시" tabindex="0"></path>
+          <path data-region-code="28" d="M165 155 l28 -5 l10 15 l-10 18 l-25 2 z" aria-label="인천광역시" tabindex="0"></path>
+          <path data-region-code="50" d="M215 575 l88 -6 l25 20 l-20 22 l-66 8 l-24 -18 z" aria-label="제주특별자치도" tabindex="0"></path>
+        `;
+      }
+      mapPaths = Array.from(document.querySelectorAll('.korea-map path[data-region-code]'));
+      bindMapEvents();
+      updateMapColors();
+    }
+
+    function bindMapEvents() {
+      mapPaths.forEach(path => {
+        path.addEventListener('click', () => {
+          const rc = path.getAttribute('data-region-code');
+          if (selectedRegionCode === rc) {
+            clearRegion();
+          } else {
+            selectRegion(rc);
+          }
+        });
+        path.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const rc = path.getAttribute('data-region-code');
+            if (selectedRegionCode === rc) clearRegion();
+            else selectRegion(rc);
+          }
+        });
+      });
+    }
+
+    function updateMapColors() {
+      const counts = mapPaths.map(p => nominatorStats[p.getAttribute('data-region-code')] || 0);
+      const maxCount = Math.max(1, ...counts);
+      mapPaths.forEach(path => {
+        const rc = path.getAttribute('data-region-code');
+        const cnt = nominatorStats[rc] || 0;
+        const name = regionNames[rc] || rc;
+        path.setAttribute('title', cnt > 0 ? `${name} (${cnt}명)` : name);
+        if (cnt === 0) {
+          path.style.fill = 'rgba(255,255,255,0.06)';
+          path.style.stroke = 'rgba(255,255,255,0.18)';
+        } else {
+          let intensity = maxCount <= 1 ? 1 : (cnt - 1) / (maxCount - 1);
+          intensity = Math.min(1, Math.max(0, intensity));
+          const alpha = 0.12 + intensity * 0.32;
+          path.style.fill = `rgba(255,114,16,${alpha})`;
+          path.style.stroke = `rgba(255,114,16,${0.25 + intensity * 0.4})`;
+        }
+      });
+    }
+
+    function selectRegion(rc) {
+      selectedRegionCode = rc;
+      regionSelect.value = rc;
+      mapPaths.forEach(p => p.classList.remove('selected'));
+      const selectedPath = document.querySelector(`path[data-region-code="${rc}"]`);
+      if (selectedPath) { selectedPath.classList.add('selected'); selectedPath.focus(); }
+      updateURL();
+      updatePositionCounts();
+      renderNominators();
+    }
+
+    function clearRegion() {
+      selectedRegionCode = null;
+      regionSelect.value = '';
+      mapPaths.forEach(p => p.classList.remove('selected'));
+      updateURL();
+      updatePositionCounts();
+      renderNominators();
+    }
+
+    function updateURL() {
+      const url = new URL(window.location);
+      if (selectedRegionCode) url.searchParams.set('region_code', selectedRegionCode);
+      else url.searchParams.delete('region_code');
+      window.history.replaceState({}, '', url);
+    }
+
+    // 전체 공천자 데이터 로드 (한 번만)
+    async function loadAllNominators() {
+      try {
+        const data = await fetchJson('/api/nominators');
+        allNominators = Array.isArray(data) ? data : [];
+        // 출마직 목록 + 카운트 구성
+        const posCounts = {};
+        allNominators.forEach(n => {
+          if (n.election_position) posCounts[n.election_position] = (posCounts[n.election_position] || 0) + 1;
+        });
+        const positions = Object.keys(posCounts).sort();
+        positionOptions = positions;
+        positionSelect.innerHTML = `<option value="">전체 (${allNominators.length})</option>`;
+        positions.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = `${p} (${posCounts[p]})`;
+          positionSelect.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('공천자 데이터 로드 실패:', e);
+        allNominators = [];
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const data = await fetchJson('/api/nominators/stats');
+        nominatorStats = data || {};
+      } catch (e) {
+        nominatorStats = {};
+      }
+    }
+
+    function getFilteredNominators() {
+      const rc = selectedRegionCode;
+      const pos = positionSelect.value;
+      const q = nameSearch.value.trim().toLowerCase();
+      return allNominators.filter(n => {
+        if (rc && n.region_code !== rc) return false;
+        if (pos && n.election_position !== pos) return false;
+        if (q && !n.name.toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function renderNominators() {
+      const filtered = getFilteredNominators();
+      const regionName = selectedRegionCode ? (regionNames[selectedRegionCode] || selectedRegionCode) : '전체 지역';
+
+      panelTitle.textContent = regionName;
+      panelSubtitle.textContent = `공천 확정 ${filtered.length}명`;
+
+      if (filtered.length === 0) {
+        panelContent.innerHTML = `
+          <div class="state-empty">
+            <div style="font-size:1.5rem;margin-bottom:0.4rem;">📋</div>
+            해당 조건의 공천자가 없습니다.
+          </div>
+        `;
+        return;
+      }
+
+      const INITIAL_SHOW = 10;
+      const SHOW_MORE_THRESHOLD = 10;
+      const needShowMore = filtered.length > SHOW_MORE_THRESHOLD;
+
+      const cards = filtered.map((n, idx) => {
+        const hiddenClass = needShowMore && idx >= INITIAL_SHOW ? ' hidden-card' : '';
+        const posLine = [n.district_info, n.election_position].filter(Boolean).join(' · ');
+        return `
+          <div class="candidate-card${hiddenClass}">
+            <div class="candidate-header">
+              <span class="candidate-name">
+                ${posLine ? `<div class="cand-position">${escapeHtml(posLine)}</div>` : ''}
+                <div class="cand-realname">${escapeHtml(n.name)}</div>
+              </span>
+              <span class="confirmed-badge">공천 확정</span>
+            </div>
+          </div>`;
+      }).join('');
+
+      const showMoreBtn = needShowMore
+        ? `<button class="show-more-btn" onclick="showAllCards(this)">나머지 ${filtered.length - INITIAL_SHOW}명 더 보기</button>`
+        : '';
+
+      panelContent.innerHTML = `<div class="candidates-list">${cards}${showMoreBtn}</div>`;
+    }
+
+    function showAllCards(btn) {
+      const list = btn.closest('.candidates-list');
+      if (list) list.querySelectorAll('.candidate-card.hidden-card').forEach(c => c.classList.remove('hidden-card'));
+      btn.remove();
+    }
+
+    function updatePositionCounts() {
+      const rc = selectedRegionCode;
+      const base = rc ? allNominators.filter(n => n.region_code === rc) : allNominators;
+      const posCounts = {};
+      base.forEach(n => {
+        if (n.election_position) posCounts[n.election_position] = (posCounts[n.election_position] || 0) + 1;
+      });
+      const cur = positionSelect.value;
+      positionSelect.innerHTML = `<option value="">전체 (${base.length})</option>`;
+      positionOptions.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = `${p} (${posCounts[p] || 0})`;
+        positionSelect.appendChild(opt);
+      });
+      positionSelect.value = cur;
+    }
+
+    // 필터 이벤트
+    regionSelect.addEventListener('change', () => {
+      const rc = regionSelect.value;
+      if (rc) selectRegion(rc);
+      else clearRegion();
+    });
+
+    positionSelect.addEventListener('change', () => renderNominators());
+
+    let _searchTimer = null;
+    nameSearch.addEventListener('input', () => {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => renderNominators(), 200);
+    });
+
+    // 지역 셀렉트 옵션 채우기
+    function populateRegionSelect() {
+      regionSelect.innerHTML = '<option value="">전체 지역</option>';
+      Object.entries(regionNames).forEach(([code, name]) => {
+        const cnt = nominatorStats[code] || 0;
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = cnt > 0 ? `${name} (${cnt})` : name;
+        regionSelect.appendChild(opt);
+      });
+    }
+
+    // URL에서 초기 상태 복원
+    function restoreFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      const rc = params.get('region_code');
+      if (rc && regionNames[rc]) {
+        selectedRegionCode = rc;
+        regionSelect.value = rc;
+        const path = document.querySelector(`path[data-region-code="${rc}"]`);
+        if (path) path.classList.add('selected');
+      }
+    }
+
+    // 초기화
+    async function init() {
+      panelContent.innerHTML = `<div class="state-loading"><div class="spinner"></div><span>데이터를 불러오는 중...</span></div>`;
+      await Promise.all([loadStats(), loadAllNominators()]);
+      await renderMap();
+      populateRegionSelect();
+      restoreFromURL();
+      renderNominators();
+    }
+
+    init();
+  </script>
+</body>
+</html>

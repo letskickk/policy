@@ -489,6 +489,12 @@ def init_db() -> None:
             scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS assembly_data_cache (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            data_json TEXT NOT NULL,
+            cached_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS policy_review_comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             position_id INTEGER NOT NULL REFERENCES policy_positions(id) ON DELETE CASCADE,

@@ -11,6 +11,8 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
+
+RANKING_SCORE_START_DATE = datetime(2026, 4, 13).date()
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
@@ -497,7 +499,7 @@ def require_approved(request: Request) -> dict:
 
 
 class PledgeCheckRequest(BaseModel):
-    pledge: str = Field(..., max_length=3000, description="점검할 출마자 공약 텍스트")
+    pledge: str = Field(..., max_length=8000, description="점검할 출마자 공약 텍스트")
 
 
 class PledgeCheckResponse(BaseModel):
@@ -5195,7 +5197,7 @@ def api_leaderboard(
                     ORDER BY avg_score DESC, cnt DESC
                     LIMIT 1
                     """,
-                    (last_monday_str, last_sunday_str),
+                    (max(last_monday_str, RANKING_SCORE_START_DATE.isoformat()), last_sunday_str),
                 ).fetchone()
                 if champ and champ["avg_score"] and champ["avg_score"] > 0:
                     try:
@@ -5292,10 +5294,10 @@ def api_leaderboard(
                     AND date(COALESCE(prhw.approved_reviewed_at, cpw.analyzed_at, cpw.created_at)) <= ?
               )
             """
-            params.extend([target_monday.isoformat(), ranking_end.isoformat()])
+            params.extend([max(target_monday, RANKING_SCORE_START_DATE).isoformat(), ranking_end.isoformat()])
         else:
             sql += " AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) >= ? AND date(COALESCE(prh.approved_reviewed_at, cp.analyzed_at, cp.created_at)) <= ?"
-            params.extend([target_monday.isoformat(), ranking_end.isoformat()])
+            params.extend([max(target_monday, RANKING_SCORE_START_DATE).isoformat(), ranking_end.isoformat()])
 
         if is_current_week:
             # 이번 주: 챔피언 제외 (단, 이번 주에 공약을 업데이트한 챔피언은 다시 포함)

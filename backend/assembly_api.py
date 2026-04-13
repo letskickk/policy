@@ -161,7 +161,13 @@ def _resolve_rasmbly_id(region: Optional[str]) -> str:
         return ""
     # "서울특별시 강북구" → "강북"
     parts = region.strip().split()
-    search_kw = parts[-1].replace("구", "").replace("시", "").replace("군", "") if parts else ""
+    last = parts[-1] if parts else ""
+    # 광역시/특별시 등 다중 문자 접미사를 먼저 제거
+    for _sfx in ("광역시", "특별자치시", "특별자치도", "특별시", "광역도"):
+        if last.endswith(_sfx):
+            last = last[:-len(_sfx)]
+            break
+    search_kw = last.replace("구", "").replace("시", "").replace("군", "").replace("도", "") if last else ""
     if not search_kw or len(search_kw) < 2:
         return ""
 

@@ -74,6 +74,7 @@ def normalize_region(region: Optional[str], district_name: Optional[str] = None)
         token = parts[0]
         if token in _PROVINCE_MAP or token in _PROVINCE_MAP.values():
             province = token
+            # district는 비워둠 — 광역시 전체 단위로 province 필터 사용
         else:
             district = token
 
@@ -268,11 +269,16 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
         return _empty_result(source, "API 키 미설정")
 
     district = region_info["district"]
+    province = region_info["province"]
     province_code = region_info["province_code"]
-    if not district:
+
+    # metro_mayor: district="" but province is 광역시/특별시 → 시 전체 조회
+    is_metro_wide = not district and bool(province_code)
+    if not district and not province_code:
         return _empty_result(source, "지역 미지정")
 
-    ck = _cache_key("semas_v2", district=district, province=region_info["province"])
+    display_name = district or province
+    ck = _cache_key("semas_v2", district=district, province=province)
     cached = _get_cached(ck)
     if cached:
         cached["from_cache"] = True
@@ -284,7 +290,7 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
         "ServiceKey": SEMAS_API_KEY,
         "divId": "ctprvnCd",
         "key": province_code or "11",
-        "numOfRows": "200",
+        "numOfRows": "500",  # metro_mayor는 더 많이 받아 전체 업종 파악
         "pageNo": "1",
         "type": "json",
     }
@@ -302,28 +308,60 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
             items = item_list if isinstance(item_list, list) else []
 
     # 지역 필터
+    # metro_wide(시 전체): 필터 없이 전체 반환, 구별 분포도 집계
     filtered = []
     district_short = region_info["district_short"]
-    for item in items:
-        addr = (item.get("rdnmAdr") or item.get("lnoAdr") or
-                item.get("rdnWhlAddr") or "")
-        gu = item.get("signguNm") or ""
-        if district in addr or district in gu or district_short in addr:
-            filtered.append(item)
+    if is_metro_wide:
+        filtered = items  # 시 전체 데이터 그대로 사용
+    else:
+        for item in items:
+            addr = (item.get("rdnmAdr") or item.get("lnoAdr") or
+                    item.get("rdnWhlAddr") or "")
+            gu = item.get("signguNm") or ""
+            if district in addr or district in gu or district_short in addr:
+                filtered.append(item)
 
     # 업종 분포 요약
     summary_lines = []
     if filtered:
+        total = len(filtered)
         biz_counts = {}
+        gu_counts = {}
         for item in filtered:
             biz = item.get("indsLclsNm") or item.get("indsMclsNm") or "기타"
             biz_counts[biz] = biz_counts.get(biz, 0) + 1
+            if is_metro_wide:
+                gu = item.get("signguNm") or ""
+                if gu:
+                    gu_counts[gu] = gu_counts.get(gu, 0) + 1
         top_biz = sorted(biz_counts.items(), key=lambda x: x[1], reverse=True)[:8]
-        summary_lines.append(f"{district} 상가 현황 ({len(filtered)}개 업소):")
+        summary_lines.append(f"{display_name} 상권 업종 분포 (SEMAS 기준):")
         for biz, cnt in top_biz:
-            summary_lines.append(f"  - {biz}: {cnt}개")
+            pct = round(cnt / total * 100)
+            summary_lines.append(f"  - {biz}: {cnt}개 ({pct}%)")
+        # 생활밀착형 vs 전문형 분류
+        life_keys = {"소매", "음식", "수리·개인"}
+        life_cnt = sum(c for b, c in biz_counts.items() if b in life_keys)
+        life_pct = round(life_cnt / total * 100)
+        summary_lines.append(
+            f"  [업종 특성] 생활밀착형(음식·소매·수리) {life_cnt}개({life_pct}%) "
+            f"— 자영업 의존도가 높은 생활상권 구조"
+        )
+        if is_metro_wide and gu_counts:
+            top_gu = sorted(gu_counts.items(), key=lambda x: x[1], reverse=True)
+            gu_str = ", ".join(f"{g} {c}개({round(c/total*100)}%)" for g, c in top_gu[:5])
+            summary_lines.append(f"  [구별 분포] {gu_str}")
+            # 가장 많은 구 vs 가장 적은 구 간 격차 강조
+            if len(top_gu) >= 2:
+                top_nm, top_c = top_gu[0]
+                bot_nm, bot_c = top_gu[-1]
+                summary_lines.append(
+                    f"  [집중도] 최다 {top_nm}({round(top_c/total*100)}%) vs "
+                    f"최소 {bot_nm}({round(bot_c/total*100)}%) — "
+                    f"상권 분포 불균형 {round((top_c-bot_c)/total*100)}%p"
+                )
     elif items:
-        summary_lines.append(f"상가 데이터 {len(items)}건 조회됨 ({district} 필터 결과 없음)")
+        summary_lines.append(f"상가 데이터 {len(items)}건 조회됨 ({display_name} 필터 결과 없음)")
     else:
         summary_lines.append("상가 데이터 없음")
 
@@ -332,6 +370,7 @@ def _fetch_semas_commercial(region_info: dict) -> dict:
         "available": bool(filtered),
         "data": filtered[:30],
         "summary": "\n".join(summary_lines),
+        "context_text": "\n".join(summary_lines),
         "item_count": len(filtered),
     }
     _set_cached(ck, result)
@@ -494,55 +533,127 @@ def _fetch_taas_accidents(region_info: dict) -> dict:
 
         if sido_code:
             from datetime import datetime as _dt
+            import urllib.parse as _up
             current_year = _dt.now().year
+            encoded_key = _up.quote(DATA_GO_KR_API_KEY)
+            sido_prefix = sido_code[:2]
+
+            # 광역시장/광역단체장: district 없음 → 모든 구코드 병렬 조회 후 합산
+            is_metro_wide = not district and not gugun_code
+
+            def _fetch_taas_year_gu(year: int, gu_code: str) -> list:
+                """단일 구·연도 TAAS 조회. 전체사고 항목 반환."""
+                try:
+                    url = (
+                        f"{TAAS_LGSTAT_URL}?ServiceKey={encoded_key}"
+                        f"&searchYearCd={year}&siDo={sido_code}&guGun={gu_code}"
+                        f"&type=json&numOfRows=13&pageNo=1"
+                    )
+                    raw = _http_get_json(url, {}, timeout=10)
+                    if not raw:
+                        return []
+                    items_wrap = raw.get("items", {}) if isinstance(raw, dict) else {}
+                    if isinstance(items_wrap, dict):
+                        items = items_wrap.get("item", [])
+                    elif isinstance(items_wrap, list):
+                        items = items_wrap
+                    else:
+                        items = []
+                    return [i for i in (items if isinstance(items, list) else [items])
+                            if isinstance(i, dict) and i.get("acc_cl_nm") == "전체사고"]
+                except Exception as e:
+                    logger.warning("TAAS gu=%s year=%s: %s", gu_code, year, e)
+                    return []
+
             summary_lines = []
             recent_data = []
-            # 최근 3년 조회
-            for year in range(current_year - 1, current_year - 4, -1):
-                try:
-                    import urllib.parse as _up
-                    encoded_key = _up.quote(DATA_GO_KR_API_KEY)
-                    # gugun_code 없으면 시도 전체 조회 후 district 이름으로 필터
-                    num_rows = "13" if gugun_code else "100"
-                    api_url = (
-                        f"{TAAS_LGSTAT_URL}?ServiceKey={encoded_key}"
-                        f"&searchYearCd={year}&siDo={sido_code}"
-                        f"&type=json&numOfRows={num_rows}&pageNo=1"
-                    )
-                    if gugun_code:
-                        api_url += f"&guGun={gugun_code}"
-                    raw = _http_get_json(api_url, {}, timeout=10)
-                    if not raw:
+
+            if is_metro_wide:
+                # 이 시도에 속하는 모든 구 코드 수집 (앞 2자리 일치)
+                metro_gu_codes = {
+                    k: v for k, v in _GUGUN_CODE_MAP.items()
+                    if v.startswith(sido_prefix) and v != sido_code
+                }
+                # 최근 2년만 병렬 조회 (속도 우선)
+                years = list(range(current_year - 1, current_year - 3, -1))
+                tasks = [(y, gc) for y in years for gc in metro_gu_codes.values()]
+                gu_year_results: dict = {}  # (year, gu_code) → item
+                with ThreadPoolExecutor(max_workers=min(12, len(tasks) or 1)) as pool:
+                    futures = {pool.submit(_fetch_taas_year_gu, y, gc): (y, gc)
+                               for y, gc in tasks}
+                    for fut in as_completed(futures, timeout=20):
+                        y, gc = futures[fut]
+                        try:
+                            rows = fut.result()
+                            if rows:
+                                gu_year_results[(y, gc)] = rows[0]
+                        except Exception:
+                            pass
+
+                for year in years:
+                    year_items = {gc: gu_year_results[(year, gc)]
+                                  for gc in metro_gu_codes.values()
+                                  if (year, gc) in gu_year_results}
+                    if not year_items:
                         continue
-                    items = []
-                    if isinstance(raw, dict):
-                        items_wrap = raw.get("items", {})
-                        if isinstance(items_wrap, dict):
-                            items = items_wrap.get("item", [])
-                        elif isinstance(items_wrap, list):
-                            items = items_wrap
-                    # "전체사고" 항목 추출 — gugun_code 없으면 district 이름 매칭
-                    for item in (items if isinstance(items, list) else [items]):
-                        if not isinstance(item, dict):
-                            continue
-                        if item.get("acc_cl_nm") != "전체사고":
-                            continue
-                        # gugun_code 없을 때 district 이름으로 필터
-                        if not gugun_code and district:
-                            sgg_nm = item.get("sido_sgg_nm", "")
-                            if district not in sgg_nm:
-                                continue
-                        acc = item.get("acc_cnt", "")
-                        dth = item.get("dth_dnv_cnt", "")
-                        inj = item.get("injpsn_cnt", "")
-                        region_label = item.get("sido_sgg_nm", district or province)
-                        summary_lines.append(
-                            f"  - {year}년: 사고 {acc}건, 사망 {dth}명, 부상 {inj}명"
+                    total_acc = sum(int(v.get("acc_cnt", 0) or 0) for v in year_items.values())
+                    total_dth = sum(int(v.get("dth_dnv_cnt", 0) or 0) for v in year_items.values())
+                    total_inj = sum(int(v.get("injpsn_cnt", 0) or 0) for v in year_items.values())
+                    # 구별 사고 건수 내림차순 정렬
+                    gu_ranking = sorted(
+                        [(v.get("sido_sgg_nm", gc), int(v.get("acc_cnt", 0) or 0))
+                         for gc, v in year_items.items()],
+                        key=lambda x: x[1], reverse=True
+                    )
+                    top_gu_str = ", ".join(
+                        f"{nm.split()[-1]} {cnt}건" for nm, cnt in gu_ranking[:5]
+                    )
+                    summary_lines.append(
+                        f"  - {year}년: 전체 {total_acc}건, 사망 {total_dth}명, 부상 {total_inj}명\n"
+                        f"    [구별] {top_gu_str}"
+                    )
+                    recent_data.extend(year_items.values())
+            else:
+                # 기초의원/기초단체장: 구코드 직접 조회
+                for year in range(current_year - 1, current_year - 4, -1):
+                    try:
+                        num_rows = "13" if gugun_code else "100"
+                        api_url = (
+                            f"{TAAS_LGSTAT_URL}?ServiceKey={encoded_key}"
+                            f"&searchYearCd={year}&siDo={sido_code}"
+                            f"&type=json&numOfRows={num_rows}&pageNo=1"
                         )
-                        recent_data.append(item)
-                        break
-                except Exception as e:
-                    logger.warning("lgStat API year=%s error: %s", year, e)
+                        if gugun_code:
+                            api_url += f"&guGun={gugun_code}"
+                        raw = _http_get_json(api_url, {}, timeout=10)
+                        if not raw:
+                            continue
+                        items = []
+                        if isinstance(raw, dict):
+                            items_wrap = raw.get("items", {})
+                            if isinstance(items_wrap, dict):
+                                items = items_wrap.get("item", [])
+                            elif isinstance(items_wrap, list):
+                                items = items_wrap
+                        for item in (items if isinstance(items, list) else [items]):
+                            if not isinstance(item, dict):
+                                continue
+                            if item.get("acc_cl_nm") != "전체사고":
+                                continue
+                            if not gugun_code and district:
+                                sgg_nm = item.get("sido_sgg_nm", "")
+                                if district not in sgg_nm:
+                                    continue
+                            acc = item.get("acc_cnt", "")
+                            dth = item.get("dth_dnv_cnt", "")
+                            inj = item.get("injpsn_cnt", "")
+                            summary_lines.append(
+                                f"  - {year}년: 사고 {acc}건, 사망 {dth}명, 부상 {inj}명"
+                            )
+                            recent_data.append(item)
+                            break
+                    except Exception as e:
+                        logger.warning("lgStat API year=%s error: %s", year, e)
 
             if summary_lines:
                 region_label = district or province
@@ -813,13 +924,16 @@ def _fetch_kosis_facilities(region_info: dict) -> dict:
         ("sports",  "460", "TX_315_2009_H1055", True),   # 체육시설 (시군구×종류)
         ("library", "110", "DT_110001_A033",    False),  # 공공도서관 (시군구만)
         ("welfare", "101", "DT_1YL20961",       False),  # 노인여가복지시설수 (e-지방지표)
+        ("childcare", "101", "DT_1YL20951",     False),  # 유아 천명당 보육시설수 (e-지방지표)
+        ("social_welfare", "101", "DT_1YL20941", False), # 인구 십만명당 사회복지시설수 (e-지방지표)
     ]
 
     # 도서관은 최근 연도 데이터가 최대 2023년까지 있음
     lib_end_year = str(min(int(end_year), 2023))
 
     all_data: dict[str, list] = {}
-    for key, org_id, tbl_id, need_obj2 in _tables:
+    def _fetch_one_table(args):
+        key, org_id, tbl_id, need_obj2 = args
         params = {
             "method": "getList",
             "apiKey": KOSIS_API_KEY,
@@ -835,20 +949,30 @@ def _fetch_kosis_facilities(region_info: dict) -> dict:
         }
         if need_obj2:
             params["objL2"] = "ALL"
-        raw = _http_get_json(KOSIS_BASE, params, timeout=15,
+        raw = _http_get_json(KOSIS_BASE, params, timeout=12,
                              headers={"Referer": "https://kosis.kr/"})
         if not isinstance(raw, list):
-            continue
-        # 시군구 필터 (district 우선, 없으면 시도)
+            return key, []
+        # 시군구 필터 — province 전체명으로 정밀 매칭 (동명이지 오필터 방지)
         filtered = []
         for item in raw:
             c1 = item.get("C1_NM") or ""
-            if district and district in c1:
+            if province and district:
+                matched = district in c1 and province in c1
+            elif province:
+                matched = c1 == province or c1.startswith(province + " ")
+            elif district:
+                matched = district in c1
+            else:
+                matched = False
+            if matched:
                 filtered.append(item)
-            elif not district and province and province in c1:
-                filtered.append(item)
-        if filtered:
-            all_data[key] = filtered
+        return key, filtered
+
+    with ThreadPoolExecutor(max_workers=len(_tables)) as pool:
+        for key, filtered in pool.map(_fetch_one_table, _tables, timeout=25):
+            if filtered:
+                all_data[key] = filtered
 
     if not all_data:
         result = _empty_result(source, "데이터 없음")
@@ -942,6 +1066,52 @@ def _fetch_kosis_facilities(region_info: dict) -> dict:
             lines.append(f"  - 노인여가복지시설: {wf_cnt}개소")
         if wf_per_thousand:
             lines.append(f"  - 노인 천 명당: {wf_per_thousand}개소")
+        if lines[1:]:
+            summary_parts.append("\n".join(lines))
+
+    # 보육시설 (유아 천명당 보육시설수)
+    if "childcare" in all_data:
+        cc_items = all_data["childcare"]
+        cc_cnt = cc_per_thousand = cc_pop = None
+        for x in cc_items:
+            nm = (x.get("ITM_NM") or "").replace("<br>", "").replace("＜br＞", "")
+            dt = x.get("DT")
+            if "보육시설" in nm and "천명당" not in nm and "인구" not in nm:
+                cc_cnt = dt
+            elif "유아 천명당" in nm:
+                cc_per_thousand = dt
+            elif "0~5세" in nm or "주민등록인구" in nm:
+                cc_pop = dt
+        lines = [f"{target} 보육시설 현황:"]
+        if cc_cnt:
+            lines.append(f"  - 어린이집·보육시설: {cc_cnt}개소")
+        if cc_pop:
+            lines.append(f"  - 0~5세 영유아: {int(cc_pop):,}명")
+        if cc_per_thousand:
+            lines.append(f"  - 유아 천 명당 보육시설: {cc_per_thousand}개소")
+        if lines[1:]:
+            summary_parts.append("\n".join(lines))
+
+    # 사회복지시설 (인구 십만명당)
+    if "social_welfare" in all_data:
+        sw_items = all_data["social_welfare"]
+        sw_cnt = sw_per_100k = sw_pop = None
+        for x in sw_items:
+            nm = (x.get("ITM_NM") or "").replace("<br>", "").replace("＜br＞", "")
+            dt = x.get("DT")
+            if "사회복지시설수" in nm and "십만명당" not in nm and "인구" not in nm:
+                sw_cnt = dt
+            elif "십만명당" in nm:
+                sw_per_100k = dt
+            elif "주민등록인구" in nm:
+                sw_pop = dt
+        lines = [f"{target} 사회복지시설 현황:"]
+        if sw_cnt:
+            lines.append(f"  - 사회복지시설: {sw_cnt}개소")
+        if sw_pop:
+            lines.append(f"  - 인구: {int(sw_pop):,}명")
+        if sw_per_100k:
+            lines.append(f"  - 인구 10만 명당: {sw_per_100k}개소")
         if lines[1:]:
             summary_parts.append("\n".join(lines))
 
@@ -1047,7 +1217,7 @@ def query_public_data_context(
     sources = {}
     with ThreadPoolExecutor(max_workers=len(fetchers)) as pool:
         futures = {pool.submit(fn): name for name, fn in fetchers.items()}
-        for future in as_completed(futures, timeout=15):
+        for future in as_completed(futures, timeout=35):
             name = futures[future]
             try:
                 sources[name] = future.result()

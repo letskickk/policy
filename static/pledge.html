@@ -1219,6 +1219,22 @@
     .assembly-tag-bill{background:rgba(99,179,237,0.15);color:#63b3ed;}
     .assembly-tag-minutes{background:rgba(154,230,180,0.15);color:#9ae6b4;}
     @media(max-width:640px){.assembly-table{font-size:0.75rem;}.assembly-table th,.assembly-table td{padding:0.28rem 0.32rem;}}
+
+    /* ── authModal: login.html 완전 동일 스타일 ── */
+    #authModal .pw-wrap { position:relative; margin-bottom:1rem; }
+    #authModal .pw-wrap input { margin-bottom:0; }
+    #authModal .pw-toggle { position:absolute; right:0.6rem; top:50%; transform:translateY(-50%); background:none; border:none; color:#94a3b8; cursor:pointer; font-size:0.9rem; padding:0.25rem; width:auto; }
+    #authModal .pw-toggle:hover { color:#fff; }
+    #authModal input[type="email"],
+    #authModal input[type="password"] { width:100%; padding:0.75rem; padding-right:2.75rem; border-radius:10px; border:1px solid #2a4a6b; background:#122b47; color:#fff; margin-bottom:1rem; box-sizing:border-box; transition:border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+    #authModal input:-webkit-autofill { -webkit-text-fill-color:#fff; box-shadow:0 0 0 1000px #122b47 inset; }
+    #authModal input:focus { outline:none; border-color:#f97316; box-shadow:0 0 0 3px rgba(249,115,22,0.18); background:#163252; }
+    #authModalSubmit { width:100%; padding:0.9rem; font-weight:900; background:linear-gradient(135deg,#f97316 0%,#fb923c 100%); color:#fff; border:none; border-radius:12px; cursor:pointer; box-shadow:0 12px 24px rgba(249,115,22,0.26); transition:transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease; margin-bottom:1rem; font-size:1rem; }
+    #authModalSubmit:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 16px 30px rgba(249,115,22,0.3); filter:brightness(1.04); }
+    #authModalSubmit:disabled { opacity:0.7; cursor:not-allowed; }
+    #authModal .feature-strip { margin-top:1.2rem; padding-top:1rem; border-top:1px solid #1e3a5a; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.5rem; }
+    #authModal .feature-chip { display:flex; flex-direction:column; align-items:center; gap:0.25rem; text-align:center; font-size:0.8rem; line-height:1.45; color:#cbd5e1; }
+    #authModal .feature-chip .icon { font-size:1rem; line-height:1; }
   </style>
   <link rel="stylesheet" href="/static/reform-redesign.css" />
 </head>
@@ -1335,14 +1351,40 @@
     </section>
     </div><!-- /paneCheck -->
 
-    <div id="paneGenerate" style="display:none;" aria-hidden="true">
-      <!-- 코치 접근 게이트 -->
-      <div id="coachGate" style="display:none;text-align:center;padding:3rem 1rem;min-height:60vh;flex-direction:column;align-items:center;justify-content:center;">
-        <div style="font-size:2.2rem;margin-bottom:0.8rem;">🔒</div>
-        <div id="coachGateMsg" style="font-size:1.05rem;font-weight:700;color:var(--text-strong);margin-bottom:0.5rem;"></div>
-        <div id="coachGateSub" style="font-size:0.9rem;color:var(--muted);margin-bottom:1.4rem;"></div>
-        <div id="coachGateActions"></div>
+    <!-- 인증 모달 -->
+    <div id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle"
+         style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(4,22,43,0.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem;">
+      <div style="background:#0d2240;border:1px solid #1e3a5a;border-radius:18px;padding:2rem;max-width:420px;width:100%;box-shadow:0 22px 44px rgba(0,0,0,0.22);position:relative;">
+        <button id="authModalClose" aria-label="닫기" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.4rem;">&times;</button>
+        <h2 id="authModalTitle" style="font-size:1.5rem;margin-bottom:0.75rem;color:#f8fafc;font-weight:700;"></h2>
+        <p id="authModalSub" style="margin-bottom:1.2rem;font-size:0.9rem;color:#94a3b8;line-height:1.6;"></p>
+        <!-- 비로그인: 인라인 로그인 폼 -->
+        <form id="authModalForm" style="display:none;" autocomplete="on">
+          <label style="display:block;font-weight:700;margin-bottom:0.5rem;color:#e2e8f0;">이메일</label>
+          <input id="authModalEmail" type="email" placeholder="이메일" autocomplete="email" required>
+          <label style="display:block;font-weight:700;margin-bottom:0.5rem;color:#e2e8f0;">비밀번호</label>
+          <div class="pw-wrap">
+            <input id="authModalPw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
+            <button type="button" id="authModalPwToggle" class="pw-toggle" aria-label="비밀번호 표시">보기</button>
+          </div>
+          <div id="authModalErr" style="display:none;background:#3d1515;color:#ffd1d1;padding:0.75rem;border-radius:10px;font-size:0.9rem;margin-bottom:0.75rem;"></div>
+          <button type="submit" id="authModalSubmit">로그인하고 계속하기</button>
+        </form>
+        <!-- 미승인: 안내 메시지 -->
+        <div id="authModalActions" style="display:none;gap:0.75rem;justify-content:center;flex-wrap:wrap;"></div>
+        <!-- 하단 링크 (비로그인 상태에서만 표시) -->
+        <div id="authModalLinks" style="display:none;margin-top:1.2rem;font-size:0.9rem;color:#94a3b8;">
+          계정이 없으신가요? <a href="/signup" style="color:#ffb37a;text-decoration:none;font-weight:700;">회원가입</a> | <a href="/" style="color:#ffb37a;text-decoration:none;font-weight:700;">메인으로</a>
+        </div>
+        <div class="feature-strip" id="authModalFeatureStrip" aria-label="핵심 기능" style="display:none;margin-top:1.2rem;padding-top:1rem;border-top:1px solid #1e3a5a;">
+          <div class="feature-chip"><span class="icon" aria-hidden="true">🧭</span><span>정책 점검</span></div>
+          <div class="feature-chip"><span class="icon" aria-hidden="true">🗺️</span><span>지역 비교</span></div>
+          <div class="feature-chip"><span class="icon" aria-hidden="true">✨</span><span>AI 생성</span></div>
+        </div>
       </div>
+    </div>
+
+    <div id="paneGenerate" style="display:none;" aria-hidden="true">
       <header class="hero">
         <h1>
           <span class="hero-title-line"><span class="hero-accent">개혁신당 AI</span></span>
@@ -1434,37 +1476,145 @@
       if (_meDataReady) {
         history.replaceState(null, '', name === 'generate' ? (location.pathname + '#coach') : location.pathname);
       }
-      // 코치 탭 게이트 처리
+      // 코치 탭: chatContainer/header 항상 표시
       if (name === 'generate') {
-        var gate = document.getElementById('coachGate');
         var chatCont = document.getElementById('chatContainer');
         var coachHeader = paneGenerateEl.querySelector('header.hero');
-        var isLoggedIn = !!(meData && meData.email);
-        var isApproved = !!(meData && (meData.is_admin || meData.status === 'APPROVED'));
-        if (!isLoggedIn) {
-          gate.style.display = 'flex';
-          if (chatCont) chatCont.style.display = 'none';
-          if (coachHeader) coachHeader.style.display = 'none';
-          document.getElementById('coachGateMsg').textContent = '로그인이 필요합니다';
-          document.getElementById('coachGateSub').textContent = '공약 생성 코치는 로그인 후 이용하실 수 있습니다.';
-          document.getElementById('coachGateActions').innerHTML =
-            '<a href="/login?next=' + encodeURIComponent(location.pathname + '#coach') + '" style="display:inline-block;padding:0.75rem 1.8rem;background:#fff;color:#0f172a;font-weight:900;border-radius:12px;text-decoration:none;font-size:1rem;">로그인</a>' +
-            '&nbsp;&nbsp;<a href="/signup" style="display:inline-block;padding:0.75rem 1.8rem;background:rgba(255,255,255,0.1);color:#e2e8f0;font-weight:800;border-radius:12px;text-decoration:none;font-size:1rem;border:1px solid rgba(148,163,184,0.35);">회원가입</a>';
-        } else if (!isApproved) {
-          gate.style.display = 'flex';
-          if (chatCont) chatCont.style.display = 'none';
-          if (coachHeader) coachHeader.style.display = 'none';
-          document.getElementById('coachGateMsg').textContent = '승인 대기 중입니다';
-          document.getElementById('coachGateSub').textContent = '공약 생성 코치는 승인된 회원에게 제공됩니다. 담당자 확인 후 순차적으로 승인됩니다.';
-          document.getElementById('coachGateActions').innerHTML =
-            '<a href="/" style="display:inline-block;padding:0.75rem 1.8rem;background:rgba(255,255,255,0.1);color:#e2e8f0;font-weight:800;border-radius:12px;text-decoration:none;font-size:1rem;border:1px solid rgba(148,163,184,0.35);">홈으로</a>';
-        } else {
-          gate.style.display = 'none';
-          if (chatCont) chatCont.style.display = '';
-          if (coachHeader) coachHeader.style.display = '';
-        }
+        if (chatCont) chatCont.style.display = '';
+        if (coachHeader) coachHeader.style.display = '';
       }
     }
+
+    // ── 인증 모달 ──────────────────────────────────────────────────
+    var _authPendingAction = null; // 로그인 성공 후 실행할 액션
+
+    function _authIsOk() {
+      return !!(meData && (meData.is_admin || meData.status === 'APPROVED'));
+    }
+
+    function showAuthModal(context) {
+      // context: 'check' | 'coach'
+      _authPendingAction = context;
+      var isLoggedIn = !!(meData && meData.email);
+      var form = document.getElementById('authModalForm');
+      var actions = document.getElementById('authModalActions');
+      var err = document.getElementById('authModalErr');
+      var title = document.getElementById('authModalTitle');
+      var sub = document.getElementById('authModalSub');
+      if (err) err.style.display = 'none';
+
+      if (!isLoggedIn) {
+        title.textContent = '로그인이 필요합니다';
+        sub.textContent = context === 'coach'
+          ? '로그인 후 바로 코칭을 시작합니다.'
+          : '로그인 후 바로 분석을 시작합니다.';
+        form.style.display = 'block';
+        actions.style.display = 'none';
+        document.getElementById('authModalLinks').style.display = 'block';
+        document.getElementById('authModalFeatureStrip').style.display = 'grid';
+        // 이메일 필드 포커스
+        setTimeout(function() {
+          var em = document.getElementById('authModalEmail');
+          if (em) em.focus();
+        }, 80);
+      } else {
+        // 로그인됐지만 미승인
+        title.textContent = '승인 대기 중입니다';
+        sub.textContent = '관리자 확인 후 순차적으로 승인됩니다. 승인 완료 후 이용하실 수 있습니다.';
+        form.style.display = 'none';
+        actions.style.display = 'flex';
+        actions.innerHTML =
+          '<a href="/" style="display:inline-block;padding:0.72rem 1.7rem;font-weight:900;border-radius:12px;text-decoration:none;font-size:0.97rem;background:rgba(255,255,255,0.1);color:#e2e8f0;border:1px solid rgba(148,163,184,0.35);">홈으로</a>';
+        document.getElementById('authModalLinks').style.display = 'none';
+        document.getElementById('authModalFeatureStrip').style.display = 'none';
+      }
+
+      document.getElementById('authModal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function hideAuthModal() {
+      document.getElementById('authModal').style.display = 'none';
+      document.body.style.overflow = '';
+      _authPendingAction = null;
+    }
+
+    // 비밀번호 보기/숨기기
+    document.getElementById('authModalPwToggle').addEventListener('click', function() {
+      var pw = document.getElementById('authModalPw');
+      if (pw.type === 'password') { pw.type = 'text'; this.textContent = '숨기기'; }
+      else { pw.type = 'password'; this.textContent = '보기'; }
+    });
+
+    // 인라인 로그인 제출
+    document.getElementById('authModalForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var email = document.getElementById('authModalEmail').value.trim();
+      var pw = document.getElementById('authModalPw').value;
+      var err = document.getElementById('authModalErr');
+      var btn = document.getElementById('authModalSubmit');
+      err.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = '로그인 중...';
+      try {
+        var r = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: pw }),
+          credentials: 'include'
+        });
+        var d = await r.json().catch(function() { return {}; });
+        if (!r.ok) {
+          err.textContent = d.detail || '로그인에 실패했습니다.';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = '로그인하고 계속하기';
+          return;
+        }
+        // 로그인 성공 → meData 갱신
+        var me = await fetch('/api/auth/me', { credentials: 'include' });
+        if (me.ok) {
+          meData = await me.json();
+          meData.can_use_policy_tools = !!(meData.is_admin || meData.status === 'APPROVED');
+          // 로그인 UI 갱신
+          var loginRow = document.getElementById('loginRow');
+          if (loginRow) {
+            var safeEmail = String(meData.email||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            loginRow.innerHTML = '<form action="/api/auth/logout" method="POST" style="display:inline"><button type="submit" class="logout-link">로그아웃</button></form>';
+            loginRow.style.display = 'block';
+          }
+        }
+        hideAuthModal();
+        // 승인된 사용자 → 대기 중이던 액션 자동 실행
+        if (_authIsOk()) {
+          var pending = _authPendingAction;
+          _authPendingAction = null;
+          if (pending === 'check') {
+            var btnEl2 = document.getElementById('btn');
+            if (btnEl2) btnEl2.click();
+          } else if (pending === 'coach') {
+            window.chatSend && window.chatSend();
+          }
+        } else {
+          // 로그인은 됐으나 미승인 → 모달 다시 표시
+          showAuthModal(_authPendingAction || 'check');
+        }
+      } catch(ex) {
+        err.textContent = '서버 연결에 실패했습니다.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '로그인하고 계속하기';
+      }
+    });
+
+    document.getElementById('authModalClose').addEventListener('click', hideAuthModal);
+    document.getElementById('authModal').addEventListener('click', function(e) {
+      if (e.target === this) hideAuthModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') hideAuthModal();
+    });
+    // ── /인증 모달 ─────────────────────────────────────────────────
 
     function syncTabFromLocation() {
       const wantsCoach = location.hash === '#coach' || new URLSearchParams(location.search).get('tab') === 'generate';
@@ -1588,7 +1738,8 @@
       const national = data.national_assembly;
 
       let html = `<div class="chat-assembly-card">`;
-      html += `<div class="chat-assembly-title">📋 지역 의회 현황 ${region ? '· ' + _esc(region) : ''}</div>`;
+      const cachedNote = _assemblyCacheData && _assemblyCacheData._cached ? `<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem;">(캐시됨 · <button onclick="window.chatRefreshAssembly()" style="background:none;border:none;color:#ffb37a;cursor:pointer;font-size:0.75rem;padding:0;">새로고침</button>)</span>` : '';
+      html += `<div class="chat-assembly-title">📋 지역 의회 현황 ${region ? '· ' + _esc(region) : ''}${cachedNote}</div>`;
 
       if (focusMode !== 'national') {
         html += `<div class="chat-assembly-section">
@@ -1608,7 +1759,7 @@
       if (msgs) { msgs.appendChild(msgEl); msgs.scrollTop = msgs.scrollHeight; }
     }
 
-    async function chatShowAssemblyData(focusMode, aiPrompt) {
+    async function chatShowAssemblyData(focusMode, aiPrompt, noCard) {
       // 로딩 메시지
       const loadingEl = document.createElement('div');
       loadingEl.className = 'chat-msg assistant';
@@ -1623,6 +1774,7 @@
           const r = await fetch('/api/assembly/district-overview', { credentials: 'include' });
           if (r.ok) {
             data = await r.json();
+            data._cached = true;
             _assemblyCacheData = data;
           } else {
             console.warn('[assembly] API error', r.status, await r.text().catch(()=>''));
@@ -1634,9 +1786,9 @@
 
       loadingEl.remove();
 
-      if (data) {
+      if (data && !noCard) {
         chatAppendAssemblyCard(data, focusMode);
-      } else {
+      } else if (!data) {
         const errEl = document.createElement('div');
         errEl.className = 'chat-msg assistant';
         errEl.style.color = 'var(--muted)';
@@ -1652,6 +1804,19 @@
         window.chatSend(fullMsg, aiPrompt);
       }
     }
+
+    window.chatRefreshAssembly = async function() {
+      _assemblyCacheData = null;
+      const r = await fetch('/api/assembly/district-overview?refresh=true', { credentials: 'include' });
+      if (r.ok) {
+        const data = await r.json();
+        data._cached = false;
+        _assemblyCacheData = data;
+        chatAppendMsg('notice', '의회 데이터가 최신으로 업데이트되었습니다.');
+      } else {
+        chatAppendMsg('notice', '갱신 실패. 잠시 후 다시 시도하세요.');
+      }
+    };
 
     function _assemblyDataToText(data, focusMode) {
       // 의회 데이터를 AI가 읽을 수 있는 텍스트로 변환
@@ -1720,13 +1885,14 @@
       _meDataReady = true;
       if (generateTabEl) generateTabEl.style.display = '';  // 항상 탭 노출
       syncTabFromLocation();
-      // chatRenderGreeting는 아래 IIFE 안에서 호출됨
+      // 인사말 렌더링 — 비로그인 포함 항상 실행 (클릭 시 authModal로 가드됨)
+      if (window._chatGreetingReady) window._chatGreetingReady();
     })();
     const pledgeEl = document.getElementById('pledge');
     const resultEl = document.getElementById('result');
     const btnEl = document.getElementById('btn');
     const charCounterEl = document.getElementById('charCounter');
-    const MAX_CHARS = 3000;
+    const MAX_CHARS = 8000;
     let lastResultFullText = '';
     pledgeEl.maxLength = MAX_CHARS;
     if (charCounterEl) {
@@ -2315,6 +2481,7 @@
     const pledgeTitleEl = document.getElementById('pledgeTitle');
 
     btnEl.addEventListener('click', async function () {
+      if (!_authIsOk()) { showAuthModal('check'); return; }
       const titleText = (pledgeTitleEl.value || '').trim();
       const contentText = (pledgeEl.value || '').trim();
       if (!titleText) {
@@ -2564,8 +2731,7 @@
         ];
 
         var subTopics = [
-          { label: '⭐ 핵심 현안 종합', assemblyMode: 'all', msg: (loc ? loc + ' ' : '') + '위 지방의회 안건과 국회의원 발의 법안을 참고해서, 이 지역의 핵심 현안을 종합 정리해줘. 공약 소재로 연결할 수 있는 것도 짚어줘.' },
-          { label: '📋 의회 논의 중심', assemblyMode: 'local', msg: (loc ? loc + ' ' : '') + '위 지방의회 안건을 바탕으로, 주요 논의 쟁점과 공약 연결 포인트를 정리해줘.' },
+{ label: '📋 지방의회 쟁점', assemblyMode: 'all', msg: (loc ? loc + ' ' : '') + '위 지방의회 안건을 바탕으로, 주요 논의 쟁점과 공약 연결 포인트를 정리해줘. 관련된 국회의원 발의 법안이 있다면 함께 언급해줘.' },
           { label: '🏘️ 생활 현안', msg: (loc ? loc + ' ' : '') + '주민 생활 밀착 이슈 중심으로 현안을 알려줘. 주차, 통학, 골목, 소음, 시설 접근성 등' },
           { label: '🚗 교통·안전', msg: (loc ? loc + ' ' : '') + '교통·안전 현안을 알려줘. 교통사고 다발 지점, 보행 안전, 신호체계 등 구체적으로' },
           { label: '💼 상권·경제', msg: (loc ? loc + ' ' : '') + '상권·골목경제 현안을 알려줘. 자영업, 전통시장, 창업 환경 등' },
@@ -2605,8 +2771,9 @@
             tb.style.cssText = 'display:block;width:100%;padding:0.65rem 0.9rem;margin-top:0.4rem;border:1px solid var(--input-border,#ddd);border-radius:8px;background:var(--input-bg,rgba(0,0,0,0.22));color:var(--text,#f1f5f9);font-size:0.88rem;cursor:pointer;text-align:left;min-height:44px;';
             tb.textContent = t.label;
             tb.addEventListener('click', function() {
+              if (!_authIsOk()) { showAuthModal('coach'); return; }
               if (t.assemblyMode) {
-                chatShowAssemblyData(t.assemblyMode, t.msg || null);
+                chatShowAssemblyData(t.assemblyMode, t.msg || null, t.noCard);
               } else if (t.msg) {
                 sendTopicPrompt(t.msg);
               } else {
@@ -2646,9 +2813,10 @@
               + 'background:var(--input-bg,rgba(0,0,0,0.18));color:var(--text,#f1f5f9);'
               + 'font-size:0.87rem;cursor:pointer;text-align:left;min-height:44px;';
             qb.addEventListener('click', function() {
+              if (!_authIsOk()) { showAuthModal('coach'); return; }
               popup.style.display = 'none';
               if (t.assemblyMode) {
-                chatShowAssemblyData(t.assemblyMode, t.msg || null);
+                chatShowAssemblyData(t.assemblyMode, t.msg || null, t.noCard);
               } else if (t.msg) {
                 sendTopicPrompt(t.msg);
               } else {
@@ -2664,6 +2832,7 @@
           btn.style.cssText = 'display:block;width:100%;padding:0.55rem 0.8rem;margin-top:0.35rem;border:1px solid var(--input-border,#ddd);border-radius:6px;background:var(--input-bg,#f9f9f9);color:var(--text,#333);font-size:0.88rem;cursor:pointer;text-align:left;';
           btn.textContent = c.num + '. ' + c.label;
           btn.addEventListener('click', function() {
+            if (!_authIsOk()) { showAuthModal('coach'); return; }
             if (c.assemblyMode) {
               chatShowAssemblyData(c.assemblyMode, c.msg || null);
             } else if (c.action === 'topicPicker') {
@@ -2833,19 +3002,22 @@
         if (html) el.innerHTML = html;
       }
 
-      async function chatHandleSSE(resp, onSession) {
+      async function chatHandleSSE(resp, onSession, existingLoadingEl) {
         chatIsStreaming = true;
         var reader = resp.body.getReader();
         var decoder = new TextDecoder();
         var buf = '';
         var msgEl = null;
 
-        // 첫 chunk 오기 전 로딩 인디케이터
-        var loadingEl = document.createElement('div');
-        loadingEl.className = 'chat-msg assistant';
-        loadingEl.innerHTML = '<span class="assembly-loading-indicator">답변 생성 중<span class="dot-anim"></span></span>';
-        var msgs = document.getElementById('chatMessages');
-        if (msgs) { msgs.appendChild(loadingEl); msgs.scrollTop = msgs.scrollHeight; }
+        // 외부에서 이미 만든 로딩 인디케이터가 있으면 재사용, 없으면 새로 생성
+        var loadingEl = existingLoadingEl || null;
+        if (!loadingEl) {
+          loadingEl = document.createElement('div');
+          loadingEl.className = 'chat-msg assistant';
+          loadingEl.innerHTML = '<span class="assembly-loading-indicator">답변 생성 중<span class="dot-anim"></span></span>';
+          var msgs = document.getElementById('chatMessages');
+          if (msgs) { msgs.appendChild(loadingEl); msgs.scrollTop = msgs.scrollHeight; }
+        }
 
         while (true) {
           var r = await reader.read();
@@ -2882,7 +3054,7 @@
               } else if (data.type === 'error') {
                 if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
                 loadingEl = null;
-                chatAppendMsg('notice', '오류: ' + data.detail);
+                chatAppendMsg('notice', '오류: ' + (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)));
               }
             } catch(e) {}
           }
@@ -2897,6 +3069,7 @@
       // displayMsg: 채팅 UI에 표시할 짧은 메시지 (생략 시 serverMsg와 동일)
       window.chatSend = async function(serverMsg, displayMsg) {
         if (chatIsStreaming) return;
+        if (!_authIsOk()) { showAuthModal('coach'); return; }
         var input = document.getElementById('chatInput');
         var msg = serverMsg || (input.value || '').trim();
         var uiMsg = displayMsg || msg;
@@ -2909,6 +3082,13 @@
 
         chatAppendMsg('user', uiMsg);
         chatSetEnabled(false);
+
+        // 즉시 로딩 인디케이터 표시 (fetch 완료 전부터)
+        var preloadEl = document.createElement('div');
+        preloadEl.className = 'chat-msg assistant';
+        preloadEl.innerHTML = '<span class="assembly-loading-indicator">답변 생성 중<span class="dot-anim"></span></span>';
+        var _msgs = document.getElementById('chatMessages');
+        if (_msgs) { _msgs.appendChild(preloadEl); _msgs.scrollTop = _msgs.scrollHeight; }
 
         try {
           // 세션이 아직 없으면 → start API로 세션 시작
@@ -2926,14 +3106,16 @@
               var next = encodeURIComponent(location.pathname + location.search);
               if (resp.status === 401) { window.location.href = '/login?next=' + next; return; }
               if (resp.status === 403) { window.location.href = '/pending'; return; }
-              throw new Error(err.detail || resp.statusText);
+              var errMsg = err.detail ? (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)) : resp.statusText;
+              throw new Error(errMsg);
             }
 
             await chatHandleSSE(resp, function(sid) {
               chatSessionId = sid;
               chatStarted = true;
               document.getElementById('chatBtnFinalize').style.display = '';
-            });
+            }, preloadEl);
+            preloadEl = null;
 
           } else {
             // 기존 세션에 메시지 전송
@@ -2947,13 +3129,16 @@
             if (!resp.ok) {
               var err = {};
               try { err = await resp.json(); } catch(e) {}
-              throw new Error(err.detail || resp.statusText);
+              var errMsg = err.detail ? (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)) : resp.statusText;
+              throw new Error(errMsg);
             }
 
-            await chatHandleSSE(resp);
+            await chatHandleSSE(resp, null, preloadEl);
+            preloadEl = null;
           }
         } catch(e) {
-          chatAppendMsg('notice', '오류: ' + e.message);
+          if (preloadEl && preloadEl.parentNode) preloadEl.parentNode.removeChild(preloadEl);
+          chatAppendMsg('notice', '오류: ' + (e && e.message ? e.message : String(e)));
         } finally {
           chatSetEnabled(true);
           input.focus();
@@ -2975,7 +3160,8 @@
           if (!resp.ok) {
             var err = {};
             try { err = await resp.json(); } catch(e) {}
-            throw new Error(err.detail || resp.statusText);
+            var errMsg = err.detail ? (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)) : resp.statusText;
+            throw new Error(errMsg);
           }
 
           var finalEl = document.getElementById('chatFinalResult');
@@ -2997,7 +3183,7 @@
               try {
                 var data = JSON.parse(lines[i].slice(6));
                 if (data.type === 'chunk') finalEl.textContent += data.text;
-                else if (data.type === 'error') finalEl.textContent += '\n[오류] ' + data.detail;
+                else if (data.type === 'error') finalEl.textContent += '\n[오류] ' + (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
               } catch(e) {}
             }
           }
@@ -3005,7 +3191,7 @@
           // 최종 결과 영역으로 스크롤
           document.getElementById('chatFinalSection').scrollIntoView({ behavior: 'smooth' });
         } catch(e) {
-          chatAppendMsg('notice', '오류: ' + e.message);
+          chatAppendMsg('notice', '오류: ' + (e && e.message ? e.message : String(e)));
         } finally {
           chatSetEnabled(true);
         }

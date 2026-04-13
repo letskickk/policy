@@ -117,6 +117,27 @@ def _fetch_platform_pledges() -> tuple[str, str]:
 
 def _get_district_dongs(election_position: str, region_name: str, district_name: str) -> list[str]:
     """선거구에 포함된 행정동 목록 반환."""
+    # metro_mayor: 광역시 전체 구 목록 반환 (동 매핑 없으므로 구 단위 하드코딩)
+    _METRO_DISTRICTS = {
+        "광주광역시": ["동구", "서구", "남구", "북구", "광산구"],
+        "대구광역시": ["중구", "동구", "서구", "남구", "북구", "수성구", "달서구", "달성군"],
+        "부산광역시": ["중구", "서구", "동구", "영도구", "부산진구", "동래구", "남구", "북구", "해운대구", "사하구", "금정구", "강서구", "연제구", "수영구", "사상구", "기장군"],
+        "인천광역시": ["중구", "동구", "미추홀구", "연수구", "남동구", "부평구", "계양구", "서구", "강화군", "옹진군"],
+        "대전광역시": ["동구", "중구", "서구", "유성구", "대덕구"],
+        "울산광역시": ["중구", "남구", "동구", "북구", "울주군"],
+        "세종특별자치시": ["조치원읍", "연서면", "연동면", "부강면", "금남면", "장군면", "연기면", "전의면", "소정면", "한솔동", "새롬동", "나성동", "가람동", "아름동", "종촌동", "고운동", "소담동", "보람동", "대평동", "반곡동"],
+        "서울특별시": ["종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구", "강북구", "도봉구", "노원구", "은평구", "서대문구", "마포구", "양천구", "강서구", "구로구", "금천구", "영등포구", "동작구", "관악구", "서초구", "강남구", "송파구", "강동구"],
+    }
+    if "metro" in (election_position or ""):
+        # region_name에서 광역시명 추출
+        parts = (region_name or "").strip().split()
+        sido = parts[0] if parts else ""
+        # _PROVINCE_MAP 정규화 없이 직접 매핑
+        for metro_key, dists in _METRO_DISTRICTS.items():
+            if metro_key.startswith(sido) or sido.startswith(metro_key.replace("광역시", "").replace("특별시", "").replace("특별자치시", "")):
+                return dists
+        return []
+
     mapping = _load_district_dong_map()
     # election_position → 매핑 키
     if "local" in (election_position or ""):
