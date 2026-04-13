@@ -1335,7 +1335,7 @@
 
     <div id="paneGenerate" style="display:none;" aria-hidden="true">
       <!-- 코치 접근 게이트 -->
-      <div id="coachGate" style="display:none;text-align:center;padding:3rem 1rem;">
+      <div id="coachGate" style="display:none;text-align:center;padding:3rem 1rem;min-height:60vh;flex-direction:column;align-items:center;justify-content:center;">
         <div style="font-size:2.2rem;margin-bottom:0.8rem;">🔒</div>
         <div id="coachGateMsg" style="font-size:1.05rem;font-weight:700;color:var(--text-strong);margin-bottom:0.5rem;"></div>
         <div id="coachGateSub" style="font-size:0.9rem;color:var(--muted);margin-bottom:1.4rem;"></div>
@@ -1440,7 +1440,7 @@
         var isLoggedIn = !!(meData && meData.email);
         var isApproved = !!(meData && (meData.is_admin || meData.status === 'APPROVED'));
         if (!isLoggedIn) {
-          gate.style.display = '';
+          gate.style.display = 'flex';
           if (chatCont) chatCont.style.display = 'none';
           if (coachHeader) coachHeader.style.display = 'none';
           document.getElementById('coachGateMsg').textContent = '로그인이 필요합니다';
@@ -1449,7 +1449,7 @@
             '<a href="/login?next=' + encodeURIComponent(location.pathname + '#coach') + '" style="display:inline-block;padding:0.75rem 1.8rem;background:#fff;color:#0f172a;font-weight:900;border-radius:12px;text-decoration:none;font-size:1rem;">로그인</a>' +
             '&nbsp;&nbsp;<a href="/signup" style="display:inline-block;padding:0.75rem 1.8rem;background:rgba(255,255,255,0.1);color:#e2e8f0;font-weight:800;border-radius:12px;text-decoration:none;font-size:1rem;border:1px solid rgba(148,163,184,0.35);">회원가입</a>';
         } else if (!isApproved) {
-          gate.style.display = '';
+          gate.style.display = 'flex';
           if (chatCont) chatCont.style.display = 'none';
           if (coachHeader) coachHeader.style.display = 'none';
           document.getElementById('coachGateMsg').textContent = '승인 대기 중입니다';
