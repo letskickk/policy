@@ -71,6 +71,8 @@
       margin: 0;
       padding: 0;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       color: var(--text);
       line-height: 1.6;
       font-size: 16px;
@@ -1246,7 +1248,7 @@
     </nav>
   </div>
 
-  <main>
+  <main style="flex:1;">
     <div class="mentoring-tab-bar" id="mentoringTabBar">
       <button class="mentoring-tab active" data-tab="check">공약 분석</button>
       <button class="mentoring-tab" data-tab="generate" id="tabGenerate" style="display:none;">공약 생성 코치</button>
