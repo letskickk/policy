@@ -1334,6 +1334,13 @@
     </div><!-- /paneCheck -->
 
     <div id="paneGenerate" style="display:none;" aria-hidden="true">
+      <!-- 코치 접근 게이트 -->
+      <div id="coachGate" style="display:none;text-align:center;padding:3rem 1rem;">
+        <div style="font-size:2.2rem;margin-bottom:0.8rem;">🔒</div>
+        <div id="coachGateMsg" style="font-size:1.05rem;font-weight:700;color:var(--text-strong);margin-bottom:0.5rem;"></div>
+        <div id="coachGateSub" style="font-size:0.9rem;color:var(--muted);margin-bottom:1.4rem;"></div>
+        <div id="coachGateActions"></div>
+      </div>
       <header class="hero">
         <h1>
           <span class="hero-title-line"><span class="hero-accent">개혁신당 AI</span></span>
@@ -1416,29 +1423,54 @@
     const generateTabEl = document.getElementById('tabGenerate');
 
     function switchTab(name) {
-      if (name === 'generate' && !meData.can_use_policy_tools) {
-        name = 'check';
-      }
       document.querySelectorAll('.mentoring-tab').forEach(function(tab) {
         tab.classList.toggle('active', tab.dataset.tab === name);
       });
       document.getElementById('paneCheck').style.display = name === 'check' ? '' : 'none';
       paneGenerateEl.style.display = name === 'generate' ? '' : 'none';
       paneGenerateEl.setAttribute('aria-hidden', name === 'generate' ? 'false' : 'true');
-      // meData 로드 전에는 hash 변경하지 않음 — #coach URL 공유 시 덮어쓰기 방지
       if (_meDataReady) {
         history.replaceState(null, '', name === 'generate' ? (location.pathname + '#coach') : location.pathname);
+      }
+      // 코치 탭 게이트 처리
+      if (name === 'generate') {
+        var gate = document.getElementById('coachGate');
+        var chatCont = document.getElementById('chatContainer');
+        var coachHeader = paneGenerateEl.querySelector('header.hero');
+        var isLoggedIn = !!(meData && meData.email);
+        var isApproved = !!(meData && (meData.is_admin || meData.status === 'APPROVED'));
+        if (!isLoggedIn) {
+          gate.style.display = '';
+          if (chatCont) chatCont.style.display = 'none';
+          if (coachHeader) coachHeader.style.display = 'none';
+          document.getElementById('coachGateMsg').textContent = '로그인이 필요합니다';
+          document.getElementById('coachGateSub').textContent = '공약 생성 코치는 로그인 후 이용하실 수 있습니다.';
+          document.getElementById('coachGateActions').innerHTML =
+            '<a href="/login?next=' + encodeURIComponent(location.pathname + '#coach') + '" style="display:inline-block;padding:0.75rem 1.8rem;background:#fff;color:#0f172a;font-weight:900;border-radius:12px;text-decoration:none;font-size:1rem;">로그인</a>' +
+            '&nbsp;&nbsp;<a href="/signup" style="display:inline-block;padding:0.75rem 1.8rem;background:rgba(255,255,255,0.1);color:#e2e8f0;font-weight:800;border-radius:12px;text-decoration:none;font-size:1rem;border:1px solid rgba(148,163,184,0.35);">회원가입</a>';
+        } else if (!isApproved) {
+          gate.style.display = '';
+          if (chatCont) chatCont.style.display = 'none';
+          if (coachHeader) coachHeader.style.display = 'none';
+          document.getElementById('coachGateMsg').textContent = '승인 대기 중입니다';
+          document.getElementById('coachGateSub').textContent = '공약 생성 코치는 승인된 회원에게 제공됩니다. 담당자 확인 후 순차적으로 승인됩니다.';
+          document.getElementById('coachGateActions').innerHTML =
+            '<a href="/" style="display:inline-block;padding:0.75rem 1.8rem;background:rgba(255,255,255,0.1);color:#e2e8f0;font-weight:800;border-radius:12px;text-decoration:none;font-size:1rem;border:1px solid rgba(148,163,184,0.35);">홈으로</a>';
+        } else {
+          gate.style.display = 'none';
+          if (chatCont) chatCont.style.display = '';
+          if (coachHeader) coachHeader.style.display = '';
+        }
       }
     }
 
     function syncTabFromLocation() {
       const wantsCoach = location.hash === '#coach' || new URLSearchParams(location.search).get('tab') === 'generate';
-      switchTab(wantsCoach && meData.can_use_policy_tools ? 'generate' : 'check');
+      switchTab(wantsCoach ? 'generate' : 'check');
     }
 
     document.querySelectorAll('.mentoring-tab').forEach(function(tab) {
       tab.addEventListener('click', function() {
-        if (this.dataset.tab === 'generate' && !meData.can_use_policy_tools) return;
         switchTab(this.dataset.tab);
       });
     });
@@ -1668,9 +1700,7 @@
             fetchQuota();  // 로그인 확인 후 쿼터 표시
           }
           meData.can_use_policy_tools = !!(d.is_admin || d.status === 'APPROVED');
-          if (generateTabEl) {
-            generateTabEl.style.display = meData.can_use_policy_tools ? '' : 'none';
-          }
+          if (generateTabEl) generateTabEl.style.display = '';
           // 인사말 렌더링 (meData 로드 완료)
           if (window._chatGreetingReady) window._chatGreetingReady();
           // 생성 탭 프로필 배지
@@ -1686,6 +1716,7 @@
       } catch (e) {}
       // meData 로드 완료 후 탭 동기화 (로그인/미로그인 모두 여기서 처리)
       _meDataReady = true;
+      if (generateTabEl) generateTabEl.style.display = '';  // 항상 탭 노출
       syncTabFromLocation();
       // chatRenderGreeting는 아래 IIFE 안에서 호출됨
     })();
