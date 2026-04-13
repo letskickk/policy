@@ -293,6 +293,10 @@
   }
 
   function showDenied() {
+    document.querySelector('.hub-header').style.display = 'none';
+    document.getElementById('hubGrid').style.display = 'none';
+    document.getElementById('hubLoadMore').style.display = 'none';
+    document.getElementById('hubDetail').style.display = 'none';
     document.getElementById('hubDenied').style.display = '';
   }
 
