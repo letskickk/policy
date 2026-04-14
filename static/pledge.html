@@ -535,42 +535,6 @@
       color: var(--text-strong);
       font-weight: 900;
     }
-    .score-cards-row{
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0.5rem;
-      margin-top: 0.75rem;
-    }
-    .score-card{
-      padding: 0.85rem 0.75rem;
-      border-radius: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.3rem;
-      border: 1px solid rgba(148,163,184,0.25);
-      background: rgba(255,255,255,0.05);
-      line-height: 1.2;
-      text-align: center;
-    }
-    .score-card-label{
-      color: var(--text);
-      font-weight: 700;
-      font-size: 0.8rem;
-      white-space: nowrap;
-    }
-    .score-card-value{
-      color: var(--text-strong);
-      font-weight: 900;
-      font-size: 1.65rem;
-    }
-    .score-card-value small{ font-size: 0.6em; opacity: 0.6; font-weight: 600; }
-    .score-card.good{ border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.06); }
-    .score-card.good .score-card-value{ color: #4ade80; }
-    .score-card.mid{ border-color: rgba(250,204,21,0.45); background: rgba(250,204,21,0.06); }
-    .score-card.mid .score-card-value{ color: #facc15; }
-    .score-card.low{ border-color: rgba(248,113,113,0.45); background: rgba(248,113,113,0.06); }
-    .score-card.low .score-card-value{ color: #f87171; }
     .analysis-text{
       margin-top:0.5rem; white-space:pre-wrap; word-break:break-word;
       line-height:1.7; font-size:1rem; color:var(--text-strong);
@@ -2112,78 +2076,21 @@
       if (window.CheckResultRender && window.CheckResultRender.isVerifyStyleJson && window.CheckResultRender.isVerifyStyleJson(baseText)) {
         baseText = '이 결과는 표시할 수 없는 형식입니다. 점검을 다시 실행해 주세요.';
       }
-      // 총평 섹션에서 점수 파싱
       let totalScore = null;
-      let platformFitScore = null;
-      let designScore = null;
-      let feasibilityScore = null;
-      let specificityScore = null;
-      let messageScore = null;
 
       if (baseText) {
         const lines = String(baseText).split(/\r?\n/).map(s => s.trim());
-
-        // 축 점수 전용 파서: 여러 형식 지원 + 범위(0-20) 오파싱 방지
-        const pickAxisScore = (line) => {
-          if (!line) return null;
-          // "(16점)" 형식
-          const m1 = line.match(/\((\d+(?:\.\d+)?)점\)/);
-          if (m1) return Number(m1[1]);
-          // "(0-20): 16" 또는 "(0-30): 22" 형식 — 범위 뒤 숫자
-          const m2 = line.match(/\(\d+-\d+\)\s*:\s*(\d+(?:\.\d+)?)/);
-          if (m2) return Number(m2[1]);
-          // "정합성: 16" 형식 — 콜론 직후 단독 숫자
-          const m3 = line.match(/:\s*(\d+(?:\.\d+)?)(?:\s|$)/);
-          if (m3) return Number(m3[1]);
-          return null;
-        };
-        const findAxisScore = (...keywords) => {
-          const candidates = lines.filter(l => keywords.every(k => l.includes(k)));
-          for (const line of candidates) {
-            const v = pickAxisScore(line);
-            if (v != null) return v;
-          }
-          return null;
-        };
         const findByKeyword = (...keywords) => {
           const line = lines.find(l => keywords.every(k => l.includes(k)));
           if (!line) return null;
           const m = line.match(/(\d+(?:\.\d+)?)/);
           return m ? toNumber(Number(m[1])) : null;
         };
-
-        // 총평 종합점수
         totalScore =
           findByKeyword("결과", "종합", "점수") ??
           findByKeyword("종합", "점수");
-
-        // 5축 점수 — pickAxisScore로 범위 오파싱 방지
-        platformFitScore = findAxisScore("정강정책", "정합성");
-        designScore      = findAxisScore("정책", "설계", "완성도");
-        feasibilityScore = findAxisScore("실현", "가능성");
-        specificityScore = findAxisScore("구체성");
-        messageScore     = findAxisScore("전달력");
       }
 
-      // 총평 축점수 기반 가중 합(총평 내부 규칙) 계산
-      function weightedTotalFromAxes() {
-        const axes = [
-          { v: platformFitScore, w: 0.30 },
-          { v: designScore, w: 0.25 },
-          { v: feasibilityScore, w: 0.20 },
-          { v: specificityScore, w: 0.15 },
-          { v: messageScore, w: 0.10 }
-        ].filter(x => x.v !== null);
-        if (!axes.length) return null;
-        const wSum = axes.reduce((a, b) => a + b.w, 0);
-        const vSum = axes.reduce((a, b) => a + (b.v * b.w), 0);
-        return Math.round((vSum / wSum) * 10) / 10;
-      }
-
-      // 1순위: 총평의 종합 점수, 2순위: 총평 5축 가중합, 3순위: verify 점수
-      if (totalScore === null) {
-        totalScore = weightedTotalFromAxes();
-      }
       if (totalScore === null) {
         totalScore = toNumber(data && data.total_score) ?? toNumber(data && data.fit_score);
       }
@@ -2194,34 +2101,6 @@
         : '';
 
       let html = board;
-      const hasScores = platformFitScore !== null || designScore !== null || feasibilityScore !== null || specificityScore !== null || messageScore !== null;
-      if (hasScores) {
-        const scoreCards = [];
-        const scores = [
-          { label: '정강정책 정합성', value: platformFitScore, max: 20 },
-          { label: '정책 설계 완성도', value: designScore,      max: 30 },
-          { label: '실현 가능성',      value: feasibilityScore, max: 20 },
-          { label: '구체성',            value: specificityScore, max: 15 },
-          { label: '전달력',            value: messageScore,     max: 15 }
-        ];
-
-        scores.forEach(item => {
-          if (item.value !== null) {
-            const pct = item.value / item.max;
-            const cls = pct >= 0.8 ? 'good' : (pct >= 0.6 ? 'mid' : 'low');
-            scoreCards.push(`
-              <div class="score-card ${cls}">
-                <span class="score-card-label">${item.label}</span>
-                <span class="score-card-value">${item.value.toFixed(0)}<small>/${item.max}</small></span>
-              </div>
-            `);
-          }
-        });
-        
-        if (scoreCards.length > 0) {
-          html += `<div class="score-cards-row">${scoreCards.join('')}</div>`;
-        }
-      }
 
       function splitSections(text) {
         const lines = String(text || '').split(/\r?\n/);
