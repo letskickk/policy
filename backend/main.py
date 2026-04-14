@@ -3115,8 +3115,11 @@ def admin_reject_candidate(candidate_id: int, request: Request, body: Optional[R
     return {"ok": True, "approval_status": "REJECTED"}
 
 
+# 새 엔진 배포일 — 이 날짜 이전 분석 결과는 재분석 필요
+ANALYSIS_ENGINE_CUTOFF = "2026-04-13"
+
 @app.post("/api/admin/pledges/{pledge_id}/approve", tags=["admin", "candidates"])
-def admin_approve_pledge(pledge_id: int, request: Request):
+def admin_approve_pledge(pledge_id: int, request: Request, force: bool = False):
     _ensure_db_ready()
     _ = require_admin(request)
     from backend.database import get_connection
@@ -3125,7 +3128,7 @@ def admin_approve_pledge(pledge_id: int, request: Request):
     try:
         row = conn.execute(
             """
-            SELECT cp.id, cp.candidate_id
+            SELECT cp.id, cp.candidate_id, cp.analyzed_at, cp.title
             FROM candidate_pledges cp
             WHERE cp.id = ?
             """,
@@ -3133,6 +3136,17 @@ def admin_approve_pledge(pledge_id: int, request: Request):
         ).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="공약을 찾을 수 없습니다.")
+
+        # 구버전 엔진 분석 결과 차단 (force=true 로 어드민이 명시적으로 우회 가능)
+        analyzed_at = row["analyzed_at"] or ""
+        if not force and analyzed_at and analyzed_at[:10] < ANALYSIS_ENGINE_CUTOFF:
+            raise HTTPException(
+                status_code=409,
+                detail=f"이 공약은 구버전 엔진({analyzed_at[:10]})으로 분석되었습니다. "
+                       f"새 엔진({ANALYSIS_ENGINE_CUTOFF} 이후) 재분석 후 승인해 주세요. "
+                       f"강제 승인은 ?force=true 파라미터를 사용하세요."
+            )
+
         candidate_id = int(row["candidate_id"])
         _snapshot_candidate_pledges(conn, candidate_id, approval_status="APPROVED", source_action="PLEDGE_APPROVE")
         conn.execute(

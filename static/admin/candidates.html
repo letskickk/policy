@@ -373,9 +373,15 @@
             const sc = p.total_score;
             const pst = (p.approval_status || 'PENDING').toUpperCase();
             const pLabel = getStatusLabel(pst);
+            const ENGINE_CUTOFF = '2026-04-13';
+            const analyzedAt = (p.analyzed_at || '').slice(0, 10);
+            const isStale = analyzedAt && analyzedAt < ENGINE_CUTOFF;
             const scoreTag = sc != null
               ? `<span style="margin-left:0.5rem;font-size:0.8rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:5px;background:${sc>=80?'rgba(34,197,94,0.15)':sc>=60?'rgba(250,204,21,0.15)':'rgba(239,68,68,0.15)'};color:${sc>=80?'#86efac':sc>=60?'#fde047':'#fca5a5'}">${sc}점</span>`
               : '<span style="margin-left:0.5rem;font-size:0.75rem;color:#fde047;">미분석</span>';
+            const staleTag = isStale
+              ? `<span style="margin-left:0.4rem;font-size:0.72rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:5px;background:rgba(239,68,68,0.2);color:#fca5a5;" title="분석일: ${analyzedAt} — 재분석 필요">⚠ 구버전</span>`
+              : '';
             const pledgeStatusTag = `<span class="badge-${pst.toLowerCase()}" style="margin-left:0.5rem;">${pLabel}</span>`;
             const pledgeApproveBtn = pst !== 'APPROVED'
               ? `<button class="btn-approve" onclick="event.stopPropagation();doApprovePledge(${p.id})">승인</button>`
@@ -388,7 +394,7 @@
               : '';
             return `
             <div class="pledge-detail">
-              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}${scoreTag}${pledgeStatusTag}</div>
+              <div class="pledge-title-row">${i + 1}. ${_escHtml(p.title)}${scoreTag}${staleTag}${pledgeStatusTag}</div>
               <div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap;">${pledgeApproveBtn}${pledgeRejectBtn}</div>
               ${p.content ? `<div class="pledge-content-text">${_escHtml(p.content)}</div>` : '<div class="no-content">세부내용 없음</div>'}
               ${pledgeReasonHtml}
@@ -437,11 +443,18 @@
         else alert('승인 실패');
       } catch (e) { alert('서버 오류'); }
     }
-    async function doApprovePledge(pledgeId) {
+    async function doApprovePledge(pledgeId, force = false) {
       try {
-        const r = await fetch('/api/admin/pledges/' + pledgeId + '/approve', { method: 'POST', credentials: 'include' });
+        const url = '/api/admin/pledges/' + pledgeId + '/approve' + (force ? '?force=true' : '');
+        const r = await fetch(url, { method: 'POST', credentials: 'include' });
         if (r.ok) { await loadAllCandidates(); loadCandidatesList(); }
-        else alert('공약 승인 실패');
+        else if (r.status === 409) {
+          const data = await r.json();
+          const msg = (data.detail || '구버전 엔진 분석 결과입니다.') + '\n\n강제 승인하시겠습니까?';
+          if (confirm(msg)) doApprovePledge(pledgeId, true);
+        } else {
+          alert('공약 승인 실패');
+        }
       } catch (e) { alert('서버 오류'); }
     }
     async function doReject(cid) {
