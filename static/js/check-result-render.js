@@ -84,6 +84,7 @@
       if (!current) return;
       if (/^강점\s*:/.test(t))              { mode = 'strength';   current.strength   = t.replace(/^강점\s*:\s*/, ''); return; }
       if (/^보완\s*(?:핵심\s*)?:/.test(t))  { mode = 'supplement'; current.supplement = t.replace(/^보완\s*(?:핵심\s*)?:\s*/, ''); return; }
+      if (/^종합/.test(t)) { mode = null; return; }
       if (mode === 'strength')   { current.strength   += ' ' + t; return; }
       if (mode === 'supplement') { current.supplement += ' ' + t; return; }
     });

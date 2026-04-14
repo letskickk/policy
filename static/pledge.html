@@ -2163,6 +2163,8 @@
           if (!cur) return;
           if (/^강점\s*:/.test(t))                    { mode = 'strength';   cur.strength   = t.replace(/^강점\s*:\s*/, ''); return; }
           if (/^보완\s*(?:핵심\s*)?:/.test(t))         { mode = 'supplement'; cur.supplement = t.replace(/^보완\s*(?:핵심\s*)?:\s*/, ''); return; }
+          // 종합 점수/등급 줄은 continuation 중단
+          if (/^종합/.test(t)) { mode = null; return; }
           // 이어지는 텍스트 — 현재 mode에 추가
           if (mode === 'strength')   { cur.strength   += ' ' + t; return; }
           if (mode === 'supplement') { cur.supplement += ' ' + t; return; }
