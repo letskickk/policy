@@ -45,20 +45,38 @@
   ];
 
   function parseScoresFromText(text) {
-    const lines = String(text || '').split(/\r?\n/).map(function(s) { return s.trim(); });
-    const pickNum = function(line) {
+    var lines = String(text || '').split(/\r?\n/).map(function(s) { return s.trim(); });
+    var pickNum = function(line) {
       if (!line) return null;
-      const m = line.match(/(\d+(?:\.\d+)?)/);
+      var m = line.match(/(\d+(?:\.\d+)?)/);
       return m ? Number(m[1]) : null;
     };
-    const findByKeywords = function(keywords) {
-      const line = lines.find(function(l) { return keywords.every(function(k) { return l.indexOf(k) !== -1; }); });
+    var pickAxisScore = function(line) {
+      if (!line) return null;
+      var m1 = line.match(/\((\d+(?:\.\d+)?)점\)/);
+      if (m1) return Number(m1[1]);
+      var m2 = line.match(/\(\d+-\d+\)\s*:\s*(\d+(?:\.\d+)?)/);
+      if (m2) return Number(m2[1]);
+      var m3 = line.match(/:\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+      if (m3) return Number(m3[1]);
+      return null;
+    };
+    var findAxisScore = function(keywords) {
+      var candidates = lines.filter(function(l) { return keywords.every(function(k) { return l.indexOf(k) !== -1; }); });
+      for (var i = 0; i < candidates.length; i++) {
+        var v = pickAxisScore(candidates[i]);
+        if (v != null) return v;
+      }
+      return null;
+    };
+    var findByKeywords = function(keywords) {
+      var line = lines.find(function(l) { return keywords.every(function(k) { return l.indexOf(k) !== -1; }); });
       return pickNum(line);
     };
-    const result = { totalScore: findByKeywords(['결과', '종합', '점수']) };
+    var result = { totalScore: findByKeywords(['결과', '종합', '점수']) };
     if (result.totalScore == null) result.totalScore = findByKeywords(['종합', '점수']);
     AXES.forEach(function(ax) {
-      result[ax.key] = findByKeywords(ax.keywords);
+      result[ax.key] = findAxisScore(ax.keywords);
     });
     return result;
   }

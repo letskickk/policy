@@ -536,13 +536,12 @@
       font-weight: 900;
     }
     .score-cards-row{
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
       gap: 0.5rem;
       margin-top: 0.75rem;
     }
     .score-card{
-      flex: 1 1 130px;
       padding: 0.85rem 0.75rem;
       border-radius: 10px;
       display: flex;
@@ -2123,27 +2122,47 @@
 
       if (baseText) {
         const lines = String(baseText).split(/\r?\n/).map(s => s.trim());
-        const pickNum = (line) => {
+
+        // 축 점수 전용 파서: 여러 형식 지원 + 범위(0-20) 오파싱 방지
+        const pickAxisScore = (line) => {
+          if (!line) return null;
+          // "(16점)" 형식
+          const m1 = line.match(/\((\d+(?:\.\d+)?)점\)/);
+          if (m1) return Number(m1[1]);
+          // "(0-20): 16" 또는 "(0-30): 22" 형식 — 범위 뒤 숫자
+          const m2 = line.match(/\(\d+-\d+\)\s*:\s*(\d+(?:\.\d+)?)/);
+          if (m2) return Number(m2[1]);
+          // "정합성: 16" 형식 — 콜론 직후 단독 숫자
+          const m3 = line.match(/:\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+          if (m3) return Number(m3[1]);
+          return null;
+        };
+        const findAxisScore = (...keywords) => {
+          const candidates = lines.filter(l => keywords.every(k => l.includes(k)));
+          for (const line of candidates) {
+            const v = pickAxisScore(line);
+            if (v != null) return v;
+          }
+          return null;
+        };
+        const findByKeyword = (...keywords) => {
+          const line = lines.find(l => keywords.every(k => l.includes(k)));
           if (!line) return null;
           const m = line.match(/(\d+(?:\.\d+)?)/);
           return m ? toNumber(Number(m[1])) : null;
         };
-        const findByKeyword = (...keywords) => {
-          const line = lines.find(l => keywords.every(k => l.includes(k)));
-          return pickNum(line);
-        };
 
-        // 총평 종합점수 (형식 흔들려도 라인 기준으로 추출)
+        // 총평 종합점수
         totalScore =
           findByKeyword("결과", "종합", "점수") ??
           findByKeyword("종합", "점수");
 
-        // 5축 점수 (라벨 라인 기준)
-        platformFitScore = findByKeyword("정강정책", "정합성");
-        designScore = findByKeyword("정책", "설계", "완성도");
-        feasibilityScore = findByKeyword("실현", "가능성");
-        specificityScore = findByKeyword("구체성");
-        messageScore = findByKeyword("전달력");
+        // 5축 점수 — pickAxisScore로 범위 오파싱 방지
+        platformFitScore = findAxisScore("정강정책", "정합성");
+        designScore      = findAxisScore("정책", "설계", "완성도");
+        feasibilityScore = findAxisScore("실현", "가능성");
+        specificityScore = findAxisScore("구체성");
+        messageScore     = findAxisScore("전달력");
       }
 
       // 총평 축점수 기반 가중 합(총평 내부 규칙) 계산
