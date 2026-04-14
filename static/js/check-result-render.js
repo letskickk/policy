@@ -54,31 +54,38 @@
   }
 
   // 총평 섹션 파싱 → 카드 데이터
+  var summaryAxeRe = new RegExp('^(' + AXIS_LABELS.join('|') + ')');
+
+  function pickScore(t) {
+    var m1 = t.match(/\((\d+(?:\.\d+)?)점\)/);
+    if (m1) return Number(m1[1]);
+    var m2 = t.match(/\(\d+-\d+\)\s*:\s*(\d+(?:\.\d+)?)/);
+    if (m2) return Number(m2[1]);
+    var m3 = t.match(/:\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+    if (m3) return Number(m3[1]);
+    return null;
+  }
+
   function parseSummaryTable(bodyLines) {
     var rows = [];
     var current = null;
-    var re = new RegExp('(' + AXIS_LABELS.join('|') + ')');
+    var mode = null;
     bodyLines.forEach(function(line) {
       var t = line.trim();
       if (!t) return;
-      var m = t.match(re);
+      var m = t.match(summaryAxeRe);
       if (m) {
         if (current) rows.push(current);
-        var axLabel = AXIS_LABELS.find(function(a) { return t.indexOf(a) !== -1; }) || m[1];
-        var scoreM = t.match(/(\d+(?:\.\d+)?)\s*[점\/]/);
-        current = { label: axLabel, max: AXIS_MAX[axLabel] || null, score: scoreM ? Number(scoreM[1]) : null, strength: '', supplement: '' };
+        var axLabel = AXIS_LABELS.find(function(a) { return t.indexOf(a) === 0; }) || m[1];
+        current = { label: axLabel, max: AXIS_MAX[axLabel] || null, score: pickScore(t), strength: '', supplement: '' };
+        mode = null;
         return;
       }
-      if (current) {
-        if (t.indexOf('강점:') === 0 || t.indexOf('강점 :') === 0) {
-          current.strength = t.replace(/^강점\s*:\s*/, '');
-        } else if (t.indexOf('보완 핵심:') === 0 || t.indexOf('보완핵심:') === 0 || t.indexOf('보완 핵심 :') === 0) {
-          current.supplement = t.replace(/^보완\s*핵심\s*:\s*/, '');
-        } else if (current.strength && !t.match(re)) {
-          // 이어지는 텍스트
-          if (!current.supplement) current.strength += ' ' + t;
-        }
-      }
+      if (!current) return;
+      if (/^강점\s*:/.test(t))              { mode = 'strength';   current.strength   = t.replace(/^강점\s*:\s*/, ''); return; }
+      if (/^보완\s*(?:핵심\s*)?:/.test(t))  { mode = 'supplement'; current.supplement = t.replace(/^보완\s*(?:핵심\s*)?:\s*/, ''); return; }
+      if (mode === 'strength')   { current.strength   += ' ' + t; return; }
+      if (mode === 'supplement') { current.supplement += ' ' + t; return; }
     });
     if (current) rows.push(current);
     return rows;

@@ -2128,25 +2128,44 @@
         { label: '구체성',            max: 15 },
         { label: '전달력',            max: 15 }
       ];
-      const summaryAxeRe = new RegExp('(' + SUMMARY_AXES.map(a => a.label).join('|') + ')');
+      // 줄 시작에서만 축 라벨 매칭 — 보완 텍스트 내 단어 오매칭 방지
+      const summaryAxeRe = new RegExp('^(' + SUMMARY_AXES.map(a => a.label).join('|') + ')');
+
+      function pickScore(t) {
+        // "(16점)" 형식
+        const m1 = t.match(/\((\d+(?:\.\d+)?)점\)/);
+        if (m1) return Number(m1[1]);
+        // "(0-20): 16" 형식
+        const m2 = t.match(/\(\d+-\d+\)\s*:\s*(\d+(?:\.\d+)?)/);
+        if (m2) return Number(m2[1]);
+        // "정합성: 16" 형식 — 콜론 후 숫자
+        const m3 = t.match(/:\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+        if (m3) return Number(m3[1]);
+        return null;
+      }
 
       function buildSummaryTable(bodyLines) {
         const rows = [];
         let cur = null;
+        let mode = null; // 'strength' | 'supplement' | null
         bodyLines.forEach(line => {
           const t = line.trim();
           if (!t) return;
+          // 축 라벨은 줄 시작에서만 인식
           const m = t.match(summaryAxeRe);
           if (m) {
             if (cur) rows.push(cur);
-            const ax = SUMMARY_AXES.find(a => t.includes(a.label));
-            const sm = t.match(/(\d+(?:\.\d+)?)\s*[점\/]/);
-            cur = { label: ax ? ax.label : m[1], max: ax ? ax.max : null, score: sm ? Number(sm[1]) : null, strength: '', supplement: '' };
+            const ax = SUMMARY_AXES.find(a => t.startsWith(a.label));
+            cur = { label: ax ? ax.label : m[1], max: ax ? ax.max : null, score: pickScore(t), strength: '', supplement: '' };
+            mode = null;
             return;
           }
           if (!cur) return;
-          if (/^강점\s*:/.test(t))       { cur.strength = t.replace(/^강점\s*:\s*/, ''); return; }
-          if (/^보완\s*핵심\s*:/.test(t)) { cur.supplement = t.replace(/^보완\s*핵심\s*:\s*/, ''); return; }
+          if (/^강점\s*:/.test(t))                    { mode = 'strength';   cur.strength   = t.replace(/^강점\s*:\s*/, ''); return; }
+          if (/^보완\s*(?:핵심\s*)?:/.test(t))         { mode = 'supplement'; cur.supplement = t.replace(/^보완\s*(?:핵심\s*)?:\s*/, ''); return; }
+          // 이어지는 텍스트 — 현재 mode에 추가
+          if (mode === 'strength')   { cur.strength   += ' ' + t; return; }
+          if (mode === 'supplement') { cur.supplement += ' ' + t; return; }
         });
         if (cur) rows.push(cur);
         return rows;
